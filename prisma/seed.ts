@@ -11,13 +11,13 @@ async function main() {
   console.log('Seeding database...')
 
   // ── Admin user ─────────────────────────────────────────────
-  const existing = await db.user.findUnique({ where: { email: 'admin@tuimedia.com' } })
+  const existing = await db.user.findUnique({ where: { email: 'hello@tuimedia.nz' } })
   if (!existing) {
-    const password = await bcrypt.hash('TuiMedia2025!', 12)
+    const password = await bcrypt.hash('Hezpyv-9dutqo-cabjij', 12)
     await db.user.create({
-      data: { email: 'admin@tuimedia.com', name: 'Tui Media Admin', password, role: 'admin' },
+      data: { email: 'hello@tuimedia.nz', name: 'Tui Media Admin', password, role: 'admin' },
     })
-    console.log('✓ Admin account created (admin@tuimedia.com / TuiMedia2025!)')
+    console.log('✓ Admin account created (hello@tuimedia.nz)')
   }
 
   // ── Clients ────────────────────────────────────────────────
