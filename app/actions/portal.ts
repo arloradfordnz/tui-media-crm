@@ -2,6 +2,7 @@
 
 import { db } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
+import { sendApprovalConfirmationEmail, sendRevisionRequestEmail } from '@/lib/email'
 
 export async function approveDelivery(deliveryFileId: string, jobId: string) {
   await db.deliveryFile.update({
@@ -9,7 +10,7 @@ export async function approveDelivery(deliveryFileId: string, jobId: string) {
     data: { deliveryStatus: 'approved', approvedAt: new Date() },
   })
 
-  const job = await db.job.findUnique({ where: { id: jobId } })
+  const job = await db.job.findUnique({ where: { id: jobId }, include: { client: true } })
   if (job) {
     await db.job.update({ where: { id: jobId }, data: { status: 'approved' } })
     await db.activity.create({
@@ -18,6 +19,11 @@ export async function approveDelivery(deliveryFileId: string, jobId: string) {
     await db.notification.create({
       data: { title: 'Delivery Approved', message: `Client approved a cut for "${job.name}"`, type: 'approved', jobId, clientId: job.clientId },
     })
+
+    // Send confirmation email to client
+    if (job.client.email) {
+      await sendApprovalConfirmationEmail(job.client.email, job.client.name, job.name)
+    }
   }
 
   revalidatePath(`/portal/`)
@@ -29,7 +35,7 @@ export async function requestChanges(prevState: { error?: string; success?: bool
 
   if (!request) return { error: 'Please describe the changes you need.' }
 
-  const job = await db.job.findUnique({ where: { id: jobId } })
+  const job = await db.job.findUnique({ where: { id: jobId }, include: { client: true } })
   if (!job) return { error: 'Job not found.' }
 
   if (job.revisionsUsed >= job.revisionLimit) {
@@ -47,6 +53,11 @@ export async function requestChanges(prevState: { error?: string; success?: bool
   await db.notification.create({
     data: { title: 'Revision Requested', message: `Client requested changes for "${job.name}" (round ${round})`, type: 'revision_request', jobId, clientId: job.clientId },
   })
+
+  // Send confirmation email to client
+  if (job.client.email) {
+    await sendRevisionRequestEmail(job.client.email, job.client.name, job.name, round)
+  }
 
   revalidatePath(`/portal/`)
   return { success: true }

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { db } from '@/lib/db'
+import { sendProposalEmail, sendProposalAcceptedEmail } from '@/lib/email'
 
 export async function createProposal(jobId: string) {
   const job = await db.job.findUnique({ where: { id: jobId }, include: { client: true } })
@@ -65,7 +66,7 @@ export async function updateProposal(prevState: { error?: string } | undefined, 
 }
 
 export async function sendProposal(proposalId: string) {
-  const proposal = await db.proposal.findUnique({ where: { id: proposalId }, include: { job: true } })
+  const proposal = await db.proposal.findUnique({ where: { id: proposalId }, include: { job: { include: { client: true } } } })
   if (!proposal) return { error: 'Proposal not found.' }
 
   await db.proposal.update({
@@ -79,6 +80,12 @@ export async function sendProposal(proposalId: string) {
   await db.notification.create({
     data: { title: 'Proposal Sent', message: `Proposal for "${proposal.job.name}" has been sent`, type: 'status_change', jobId: proposal.jobId, clientId: proposal.job.clientId },
   })
+
+  // Send email to client
+  if (proposal.job.client.email) {
+    const proposalUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://tuimedia.co.nz'}/proposal/${proposal.token}`
+    await sendProposalEmail(proposal.job.client.email, proposal.job.client.name, proposal.job.name, proposalUrl)
+  }
 
   revalidatePath(`/dashboard/jobs/${proposal.jobId}`)
   revalidatePath(`/dashboard/jobs/${proposal.jobId}/proposal/${proposalId}`)
@@ -105,6 +112,12 @@ export async function acceptProposal(token: string) {
   await db.notification.create({
     data: { title: 'Proposal Accepted!', message: `${proposal.job.client?.name || 'Client'} accepted the proposal for "${proposal.job.name}"`, type: 'status_change', jobId: proposal.jobId, clientId: proposal.job.clientId },
   })
+
+  // Notify admin via email
+  const admin = await db.user.findFirst({ where: { role: 'admin' } })
+  if (admin) {
+    await sendProposalAcceptedEmail(admin.email, proposal.job.client.name, proposal.job.name)
+  }
 
   revalidatePath(`/dashboard/jobs/${proposal.jobId}`)
 }
