@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "tui-media-crm",
+      "runtimeExecutable": "/usr/local/bin/node",
+      "runtimeArgs": ["/Users/arloradford/Claude/tui-media-crm/node_modules/next/dist/bin/next", "dev"],
+      "port": 3000
+    }
+  ]
+}
