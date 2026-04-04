@@ -6,9 +6,10 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 function createPrismaClient() {
-  // Use DIRECT_URL for direct PostgreSQL connection (avoids pgBouncer issues),
-  // fall back to DATABASE_URL (pooled) for production on Vercel
-  const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL!
+  // Always use DATABASE_URL (pgBouncer pooler) for runtime queries.
+  // DIRECT_URL is only for migrations (prisma.config.ts) and must never
+  // be used here — the direct host is unreachable in Vercel serverless.
+  const connectionString = process.env.DATABASE_URL!
   const adapter = new PrismaPg({ connectionString })
   return new PrismaClient({ adapter })
 }
