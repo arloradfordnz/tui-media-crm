@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "tui-media-crm",
-      "runtimeExecutable": "/usr/local/bin/node",
-      "runtimeArgs": ["/Users/arloradford/Claude/tui-media-crm/node_modules/next/dist/bin/next", "dev"],
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["/Users/arloradford/Claude/tui-media-crm/.claude/start-dev.sh"],
       "port": 3000
     }
   ]
