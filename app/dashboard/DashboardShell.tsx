@@ -1,24 +1,41 @@
 'use client'
 
+import { useState } from 'react'
 import Sidebar from '@/components/Sidebar'
+import BottomNav from '@/components/BottomNav'
 import NotificationBell from '@/components/NotificationBell'
 import { logout } from '@/app/actions/auth'
+import { Menu } from 'lucide-react'
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
+  const [mobileOpen, setMobileOpen] = useState(false)
+
   return (
     <div className="min-h-screen flex" style={{ background: 'var(--bg-base)' }}>
-      <Sidebar onLogout={() => logout()} />
+      <Sidebar onLogout={() => logout()} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
 
       {/* Main content area */}
-      <div className="flex-1" style={{ marginLeft: 'var(--sidebar-width)' }}>
+      <div className="flex-1 desktop-margin" style={{ marginLeft: 'var(--sidebar-width)' }}>
         {/* Top bar */}
         <header
-          className="sticky top-0 z-30 flex items-center justify-end px-6 py-3"
+          className="sticky top-0 z-30 flex items-center justify-between px-6 py-3 top-bar-mobile"
           style={{
             background: 'var(--bg-base)',
             borderBottom: '1px solid var(--bg-border)',
           }}
         >
+          {/* Mobile hamburger */}
+          <button
+            className="mobile-nav-toggle btn-icon"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Open menu"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+
+          {/* Spacer for desktop (hamburger hidden) */}
+          <div className="flex-1" />
+
           <NotificationBell />
         </header>
 
@@ -27,6 +44,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           {children}
         </main>
       </div>
+
+      <BottomNav />
     </div>
   )
 }
