@@ -1,27 +1,26 @@
 {
-  "name": "tui-media-crm",
-  "version": "0.1.0",
+  "name": "tui-media-os",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "npx tsx prisma/seed.ts"
+    "postinstall": "prisma generate",
+    "seed": "npx tsx prisma/seed.ts",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate deploy"
   },
   "dependencies": {
-    "@auth/prisma-adapter": "^2.11.1",
-    "@prisma/adapter-better-sqlite3": "^7.6.0",
+    "@prisma/adapter-pg": "^7.6.0",
     "@prisma/client": "^7.6.0",
     "@types/bcryptjs": "^2.4.6",
-    "@types/better-sqlite3": "^7.6.13",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.8.0",
     "dotenv": "^17.4.0",
     "jose": "^6.2.2",
     "lucide-react": "^1.7.0",
     "next": "16.2.2",
-    "next-auth": "^5.0.0-beta.30",
     "prisma": "^7.6.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"
