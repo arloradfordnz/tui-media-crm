@@ -85,6 +85,13 @@ export function statusLabel(status: string): string {
     call: 'Call',
     deadline: 'Deadline',
     personal: 'Personal',
+    draft: 'Draft',
+    accepted: 'Accepted',
+    declined: 'Declined',
+    proposal_created: 'Proposal Created',
+    proposal_sent: 'Proposal Sent',
+    proposal_accepted: 'Proposal Accepted',
+    proposal_declined: 'Proposal Declined',
   }
   return labels[status] || status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ')
 }
@@ -93,10 +100,10 @@ export function statusLabel(status: string): string {
  * Get badge CSS class for a status
  */
 export function statusBadgeClass(status: string): string {
-  const success = ['active', 'approved', 'delivered', 'completed', 'available', 'booked']
-  const warning = ['review', 'pending', 'in_service', 'editing', 'preproduction', 'discovery', 'proposal']
-  const danger = ['overdue', 'rejected', 'archived', 'retired', 'past']
-  const accent = ['enquiry', 'lead', 'shootday', 'out_on_shoot', 'contract']
+  const success = ['active', 'approved', 'delivered', 'completed', 'available', 'booked', 'accepted']
+  const warning = ['review', 'pending', 'in_service', 'editing', 'preproduction', 'discovery', 'proposal', 'draft']
+  const danger = ['overdue', 'rejected', 'archived', 'retired', 'past', 'declined']
+  const accent = ['enquiry', 'lead', 'shootday', 'out_on_shoot', 'contract', 'sent']
 
   if (success.includes(status)) return 'badge-success'
   if (warning.includes(status)) return 'badge-warning'

@@ -2,9 +2,10 @@
 
 import { useActionState, useState, useTransition } from 'react'
 import { updateJob, updateJobStatus, deleteJob, toggleTask, addRevision } from '@/app/actions/jobs'
+import { createProposal } from '@/app/actions/proposals'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@/lib/format'
 import Link from 'next/link'
-import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as ActivityIcon, MapPin, Calendar, Copy } from 'lucide-react'
+import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as ActivityIcon, MapPin, Calendar, Copy, FileText } from 'lucide-react'
 
 const JOB_STATUSES = ['enquiry', 'booked', 'preproduction', 'shootday', 'editing', 'review', 'approved', 'delivered', 'archived']
 const PHASES = ['preshoot', 'shootday', 'postproduction', 'delivery']
@@ -26,6 +27,7 @@ type JobData = {
   tasks: { id: string; phase: string; title: string; completed: boolean }[]
   deliverables: { id: string; title: string; description: string | null; completed: boolean; deliveryFiles: { id: string; originalName: string; versionLabel: string; deliveryStatus: string; createdAt: string }[] }[]
   revisions: { id: string; round: number; request: string; status: string; createdAt: string }[]
+  proposals: { id: string; status: string; token: string; totalValue: number; sentAt: string | null; respondedAt: string | null; createdAt: string }[]
   activities: { id: string; action: string; details: string | null; createdAt: string }[]
 }
 
@@ -89,6 +91,44 @@ export default function JobRecord({ job }: { job: JobData }) {
         <button onClick={copyPortalLink} className="btn-secondary text-sm">
           <Copy className="w-3.5 h-3.5" /> {copied ? 'Copied!' : 'Copy Link'}
         </button>
+      </div>
+
+      {/* Proposal */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Proposal</h3>
+          {job.proposals.length > 0 && (
+            <span className={`badge ${statusBadgeClass(job.proposals[0].status)}`}>{statusLabel(job.proposals[0].status)}</span>
+          )}
+        </div>
+        {job.proposals.length > 0 ? (
+          <div className="space-y-3">
+            {job.proposals.map((p) => (
+              <div key={p.id} className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{formatNZD(p.totalValue)}</p>
+                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                    Created {formatDate(p.createdAt)}
+                    {p.sentAt && ` · Sent ${formatDate(p.sentAt)}`}
+                    {p.respondedAt && ` · Responded ${formatDate(p.respondedAt)}`}
+                  </p>
+                </div>
+                <Link href={`/dashboard/jobs/${job.id}/proposal/${p.id}`} className="btn-secondary text-sm">
+                  <FileText className="w-3.5 h-3.5" /> {p.status === 'draft' ? 'Edit Proposal' : 'View Proposal'}
+                </Link>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No proposal created yet.</p>
+            <form action={async () => { await createProposal(job.id) }}>
+              <button type="submit" className="btn-primary text-sm">
+                <FileText className="w-3.5 h-3.5" /> Create Proposal
+              </button>
+            </form>
+          </div>
+        )}
       </div>
 
       {/* Job Type & Notes */}

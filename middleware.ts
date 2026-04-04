@@ -20,8 +20,8 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Public portal routes — no auth required
-  if (pathname.startsWith('/portal/')) {
+  // Public portal + proposal routes — no auth required
+  if (pathname.startsWith('/portal/') || pathname.startsWith('/proposal/')) {
     return NextResponse.next()
   }
 
@@ -47,5 +47,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login', '/api/:path*'],
+  matcher: ['/dashboard/:path*', '/login', '/api/:path*', '/proposal/:path*'],
 }

@@ -67,6 +67,7 @@ model Job {
   tasks        JobTask[]
   deliverables Deliverable[]
   revisions    Revision[]
+  proposals    Proposal[]
   events       Event[]
   activities   Activity[]
 }
@@ -144,6 +145,24 @@ model DeliveryFile {
   deliveryStatus String  @default("not_sent") // not_sent, sent, viewed, approved
   viewedAt      DateTime?
   approvedAt    DateTime?
+}
+
+// ── Proposals ────────────────────────────────────────────────
+model Proposal {
+  id           String    @id @default(cuid())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  jobId        String
+  job          Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  token        String    @unique @default(cuid())
+  status       String    @default("draft") // draft, sent, accepted, declined
+  coverNote    String?
+  services     String    @default("[]") // JSON array of { description, amount }
+  inclusions   String?
+  paymentTerms String    @default("50% deposit to secure your date. Remaining 50% due 7 days before the shoot.")
+  totalValue   Float     @default(0)
+  sentAt       DateTime?
+  respondedAt  DateTime?
 }
 
 // ── Revisions ────────────────────────────────────────────────

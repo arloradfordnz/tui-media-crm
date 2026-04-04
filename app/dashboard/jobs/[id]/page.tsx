@@ -12,6 +12,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
       tasks: { orderBy: { sortOrder: 'asc' } },
       deliverables: { include: { deliveryFiles: { orderBy: { createdAt: 'desc' } } } },
       revisions: { orderBy: { round: 'asc' } },
+      proposals: { orderBy: { createdAt: 'desc' } },
       activities: { orderBy: { createdAt: 'desc' }, take: 20 },
     },
   })
