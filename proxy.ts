@@ -6,7 +6,7 @@ const SECRET = new TextEncoder().encode(
   process.env.AUTH_SECRET ?? 'fallback-secret-change-me'
 )
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const token = request.cookies.get('tui-session')?.value
 
