@@ -38,7 +38,8 @@ export default function JobRecord({ job }: { job: JobData }) {
   const [deleting, setDeleting] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  const portalUrl = typeof window !== 'undefined' ? `${window.location.origin}/portal/${job.portalToken}` : `/portal/${job.portalToken}`
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tuimedia.co.nz'
+  const portalUrl = `${baseUrl}/portal/${job.portalToken}`
 
   function handleStatusChange(newStatus: string) {
     startTransition(() => { updateJobStatus(job.id, newStatus) })
