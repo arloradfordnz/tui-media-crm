@@ -1,51 +1,46 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
-import { jwtVerify } from 'jose'
-
-const SECRET = new TextEncoder().encode(
-  process.env.AUTH_SECRET ?? 'fallback-secret-change-me'
-)
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
 export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl
-  const token = request.cookies.get('tui-session')?.value
+  let supabaseResponse = NextResponse.next({ request })
 
-  let session = null
-  if (token) {
-    try {
-      const { payload } = await jwtVerify(token, SECRET)
-      session = payload as { userId: string; role: string }
-    } catch {
-      // invalid token
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
+        },
+      },
     }
-  }
+  )
 
-  // Public portal + proposal routes — no auth required
-  if (pathname.startsWith('/portal/') || pathname.startsWith('/proposal/')) {
-    return NextResponse.next()
-  }
+  // Refresh session — do not remove this line
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const { pathname } = request.nextUrl
 
   // Redirect logged-in users away from login
-  if (pathname === '/login' && session) {
+  if (pathname === '/login' && user) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  // Protect /dashboard routes — admin only
-  if (pathname.startsWith('/dashboard')) {
-    if (!session) return NextResponse.redirect(new URL('/login', request.url))
-    if (session.role !== 'admin') return NextResponse.redirect(new URL('/login', request.url))
+  // Protect /dashboard routes
+  if (pathname.startsWith('/dashboard') && !user) {
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Protect /api routes (except portal API)
-  if (pathname.startsWith('/api/') && !pathname.startsWith('/api/portal/')) {
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-  }
-
-  return NextResponse.next()
+  return supabaseResponse
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/login', '/api/:path*', '/proposal/:path*'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }
