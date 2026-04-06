@@ -1,9 +1,7 @@
 'use server'
 
-import bcrypt from 'bcryptjs'
 import { redirect } from 'next/navigation'
-import { db } from '@/lib/db'
-import { createSession, deleteSession } from '@/lib/session'
+import { createServerSupabaseClient } from '@/lib/supabase'
 
 export async function login(prevState: { error?: string } | undefined, formData: FormData) {
   const email = formData.get('email') as string
@@ -13,27 +11,18 @@ export async function login(prevState: { error?: string } | undefined, formData:
     return { error: 'Email and password are required.' }
   }
 
-  const user = await db.user.findUnique({ where: { email } })
-  if (!user) {
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
+
+  if (error) {
     return { error: 'Invalid email or password.' }
   }
-
-  const valid = await bcrypt.compare(password, user.password)
-  if (!valid) {
-    return { error: 'Invalid email or password.' }
-  }
-
-  await createSession({
-    userId: user.id,
-    email: user.email,
-    name: user.name,
-    role: user.role,
-  })
 
   redirect('/dashboard')
 }
 
 export async function logout() {
-  await deleteSession()
+  const supabase = await createServerSupabaseClient()
+  await supabase.auth.signOut()
   redirect('/login')
 }

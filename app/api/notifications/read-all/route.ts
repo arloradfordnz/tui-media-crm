@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createServerSupabaseClient } from '@/lib/supabase'
 
 export async function POST() {
-  await db.notification.updateMany({
-    where: { read: false },
-    data: { read: true },
-  })
+  const supabase = await createServerSupabaseClient()
+  await supabase.from('notifications').update({ read: true }).eq('read', false)
   return NextResponse.json({ ok: true })
 }

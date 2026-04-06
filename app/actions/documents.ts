@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { db } from '@/lib/db'
+import { createServerSupabaseClient } from '@/lib/supabase'
 
 export async function createDocument(prevState: { error?: string } | undefined, formData: FormData) {
   const name = formData.get('name') as string
@@ -10,9 +10,14 @@ export async function createDocument(prevState: { error?: string } | undefined, 
 
   if (!name) return { error: 'Name is required.' }
 
-  const doc = await db.document.create({
-    data: { name, docType: docType || 'contract', content: '' },
-  })
+  const supabase = await createServerSupabaseClient()
+  const { data: doc, error } = await supabase
+    .from('documents')
+    .insert({ name, doc_type: docType || 'contract', content: '' })
+    .select('id')
+    .single()
+
+  if (error || !doc) return { error: error?.message || 'Failed to create document.' }
 
   revalidatePath('/dashboard/documents')
   redirect(`/dashboard/documents/${doc.id}`)
@@ -26,10 +31,8 @@ export async function updateDocument(prevState: { error?: string } | undefined, 
 
   if (!name) return { error: 'Name is required.' }
 
-  await db.document.update({
-    where: { id: docId },
-    data: { name, docType: docType || 'contract', content: content || '' },
-  })
+  const supabase = await createServerSupabaseClient()
+  await supabase.from('documents').update({ name, doc_type: docType || 'contract', content: content || '' }).eq('id', docId)
 
   revalidatePath('/dashboard/documents')
   revalidatePath(`/dashboard/documents/${docId}`)
@@ -37,7 +40,8 @@ export async function updateDocument(prevState: { error?: string } | undefined, 
 }
 
 export async function deleteDocument(docId: string) {
-  await db.document.delete({ where: { id: docId } })
+  const supabase = await createServerSupabaseClient()
+  await supabase.from('documents').delete().eq('id', docId)
   revalidatePath('/dashboard/documents')
   redirect('/dashboard/documents')
 }

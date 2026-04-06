@@ -1,23 +1,27 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createServerSupabaseClient } from '@/lib/supabase'
 
 export async function GET(_req: Request, { params }: { params: Promise<{ jobType: string }> }) {
   const { jobType } = await params
+  const supabase = await createServerSupabaseClient()
 
-  const template = await db.jobTemplate.findUnique({
-    where: { jobType },
-    include: {
-      templateTasks: { orderBy: { sortOrder: 'asc' } },
-      templateDeliverables: { orderBy: { sortOrder: 'asc' } },
-    },
-  })
+  const { data: template } = await supabase
+    .from('job_templates')
+    .select('id, template_tasks(phase, title, sort_order), template_deliverables(title, description, sort_order)')
+    .eq('job_type', jobType)
+    .single()
 
   if (!template) {
     return NextResponse.json({ tasks: [], deliverables: [] })
   }
 
-  return NextResponse.json({
-    tasks: template.templateTasks.map((t) => ({ phase: t.phase, title: t.title })),
-    deliverables: template.templateDeliverables.map((d) => ({ title: d.title, description: d.description })),
-  })
+  const tasks = (template.template_tasks as { phase: string; title: string; sort_order: number }[])
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((t) => ({ phase: t.phase, title: t.title }))
+
+  const deliverables = (template.template_deliverables as { title: string; description: string | null; sort_order: number }[])
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((d) => ({ title: d.title, description: d.description }))
+
+  return NextResponse.json({ tasks, deliverables })
 }

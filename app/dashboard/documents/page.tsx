@@ -1,11 +1,15 @@
-import { db } from '@/lib/db'
+import { createServerSupabaseClient } from '@/lib/supabase'
 import { formatDate, statusLabel } from '@/lib/format'
-import { FileText, Plus } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import Link from 'next/link'
 import NewDocButton from './NewDocButton'
 
 export default async function DocumentsPage() {
-  const documents = await db.document.findMany({ orderBy: { updatedAt: 'desc' } })
+  const supabase = await createServerSupabaseClient()
+  const { data: documents } = await supabase
+    .from('documents')
+    .select('id, name, doc_type, updated_at')
+    .order('updated_at', { ascending: false })
 
   return (
     <div className="space-y-6">
@@ -14,7 +18,7 @@ export default async function DocumentsPage() {
         <NewDocButton />
       </div>
 
-      {documents.length === 0 ? (
+      {(documents ?? []).length === 0 ? (
         <div className="empty-state card">
           <FileText className="w-10 h-10 empty-icon" />
           <p className="empty-title">No documents yet</p>
@@ -22,14 +26,14 @@ export default async function DocumentsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {documents.map((d) => (
+          {(documents ?? []).map((d) => (
             <Link key={d.id} href={`/dashboard/documents/${d.id}`} className="card hover:border-[var(--accent)] transition-colors">
               <div className="flex items-start justify-between mb-3">
                 <FileText className="w-5 h-5" style={{ color: 'var(--accent)' }} />
-                <span className="badge badge-muted">{statusLabel(d.docType)}</span>
+                <span className="badge badge-muted">{statusLabel(d.doc_type)}</span>
               </div>
               <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{d.name}</h3>
-              <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)' }}>Edited {formatDate(d.updatedAt)}</p>
+              <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)' }}>Edited {formatDate(d.updated_at)}</p>
             </Link>
           ))}
         </div>

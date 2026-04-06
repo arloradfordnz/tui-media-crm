@@ -1,4 +1,4 @@
-import { db } from '@/lib/db'
+import { createServerSupabaseClient } from '@/lib/supabase'
 import { formatNZD, formatDate, getInitials, statusLabel, statusBadgeClass } from '@/lib/format'
 import { Users, Plus, Search } from 'lucide-react'
 import Link from 'next/link'
@@ -10,21 +10,29 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   const search = params.search || ''
   const statusFilter = params.status || 'all'
 
-  const where: Record<string, unknown> = {}
-  if (statusFilter !== 'all') where.status = statusFilter
-  if (search) {
-    where.OR = [
-      { name: { contains: search } },
-      { email: { contains: search } },
-      { location: { contains: search } },
-    ]
+  const supabase = await createServerSupabaseClient()
+
+  let query = supabase
+    .from('clients')
+    .select('id, name, email, location, status, lifetime_value, tags, created_at')
+    .order('name', { ascending: true })
+
+  if (statusFilter !== 'all') query = query.eq('status', statusFilter)
+  if (search) query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,location.ilike.%${search}%`)
+
+  const { data: clientRows } = await query
+
+  // Fetch job counts
+  const { data: jobCounts } = await supabase
+    .from('jobs')
+    .select('client_id')
+
+  const countMap: Record<string, number> = {}
+  for (const j of jobCounts ?? []) {
+    countMap[j.client_id] = (countMap[j.client_id] || 0) + 1
   }
 
-  const clients = await db.client.findMany({
-    where,
-    orderBy: { name: 'asc' },
-    include: { _count: { select: { jobs: true } } },
-  })
+  const clients = (clientRows ?? []).map((c) => ({ ...c, jobCount: countMap[c.id] || 0 }))
 
   return (
     <div className="space-y-6">
@@ -105,8 +113,8 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell text-sm" style={{ color: 'var(--text-secondary)' }}>{c.email || '—'}</td>
                     <td className="px-4 py-3 hidden lg:table-cell text-sm" style={{ color: 'var(--text-secondary)' }}>{c.location || '—'}</td>
-                    <td className="px-4 py-3 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-secondary)' }}>{c._count.jobs}</td>
-                    <td className="px-4 py-3 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-primary)' }}>{formatNZD(c.lifetimeValue)}</td>
+                    <td className="px-4 py-3 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-secondary)' }}>{c.jobCount}</td>
+                    <td className="px-4 py-3 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-primary)' }}>{formatNZD(c.lifetime_value)}</td>
                     <td className="px-4 py-3 text-right">
                       <span className={`badge ${statusBadgeClass(c.status)}`}>{statusLabel(c.status)}</span>
                     </td>

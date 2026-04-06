@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { db } from '@/lib/db'
+import { createServerSupabaseClient } from '@/lib/supabase'
 
 export async function createGear(prevState: { error?: string } | undefined, formData: FormData) {
   const name = formData.get('name') as string
@@ -13,15 +13,14 @@ export async function createGear(prevState: { error?: string } | undefined, form
 
   if (!name) return { error: 'Name is required.' }
 
-  await db.gear.create({
-    data: {
-      name,
-      category: category || null,
-      purchaseValue: purchaseValue ? parseFloat(purchaseValue) : null,
-      insuranceValue: insuranceValue ? parseFloat(insuranceValue) : null,
-      serialNumber: serialNumber || null,
-      notes: notes || null,
-    },
+  const supabase = await createServerSupabaseClient()
+  await supabase.from('gear').insert({
+    name,
+    category: category || null,
+    purchase_value: purchaseValue ? parseFloat(purchaseValue) : null,
+    insurance_value: insuranceValue ? parseFloat(insuranceValue) : null,
+    serial_number: serialNumber || null,
+    notes: notes || null,
   })
 
   revalidatePath('/dashboard/gear')
@@ -40,24 +39,23 @@ export async function updateGear(prevState: { error?: string } | undefined, form
 
   if (!name) return { error: 'Name is required.' }
 
-  await db.gear.update({
-    where: { id: gearId },
-    data: {
-      name,
-      category: category || null,
-      status: status || 'available',
-      purchaseValue: purchaseValue ? parseFloat(purchaseValue) : null,
-      insuranceValue: insuranceValue ? parseFloat(insuranceValue) : null,
-      serialNumber: serialNumber || null,
-      notes: notes || null,
-    },
-  })
+  const supabase = await createServerSupabaseClient()
+  await supabase.from('gear').update({
+    name,
+    category: category || null,
+    status: status || 'available',
+    purchase_value: purchaseValue ? parseFloat(purchaseValue) : null,
+    insurance_value: insuranceValue ? parseFloat(insuranceValue) : null,
+    serial_number: serialNumber || null,
+    notes: notes || null,
+  }).eq('id', gearId)
 
   revalidatePath('/dashboard/gear')
   return {}
 }
 
 export async function deleteGear(gearId: string) {
-  await db.gear.delete({ where: { id: gearId } })
+  const supabase = await createServerSupabaseClient()
+  await supabase.from('gear').delete().eq('id', gearId)
   revalidatePath('/dashboard/gear')
 }

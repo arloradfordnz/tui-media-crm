@@ -1,8 +1,6 @@
 'use server'
 
-import bcrypt from 'bcryptjs'
-import { db } from '@/lib/db'
-import { getSession } from '@/lib/session'
+import { createServerSupabaseClient } from '@/lib/supabase'
 
 export async function changePassword(prevState: { error?: string; success?: boolean } | undefined, formData: FormData) {
   const currentPassword = formData.get('currentPassword') as string
@@ -13,17 +11,17 @@ export async function changePassword(prevState: { error?: string; success?: bool
   if (newPassword !== confirmPassword) return { error: 'New passwords do not match.' }
   if (newPassword.length < 8) return { error: 'Password must be at least 8 characters.' }
 
-  const session = await getSession()
-  if (!session) return { error: 'Not authenticated.' }
+  const supabase = await createServerSupabaseClient()
 
-  const user = await db.user.findUnique({ where: { id: session.userId } })
-  if (!user) return { error: 'User not found.' }
+  // Re-authenticate to verify current password
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user?.email) return { error: 'Not authenticated.' }
 
-  const valid = await bcrypt.compare(currentPassword, user.password)
-  if (!valid) return { error: 'Current password is incorrect.' }
+  const { error: signInError } = await supabase.auth.signInWithPassword({ email: user.email, password: currentPassword })
+  if (signInError) return { error: 'Current password is incorrect.' }
 
-  const hashed = await bcrypt.hash(newPassword, 12)
-  await db.user.update({ where: { id: user.id }, data: { password: hashed } })
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) return { error: error.message }
 
   return { success: true }
 }

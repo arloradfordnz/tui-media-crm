@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { createServerSupabaseClient } from '@/lib/supabase'
 
 export async function GET() {
-  const notifications = await db.notification.findMany({
-    orderBy: { createdAt: 'desc' },
-    take: 50,
-  })
-  return NextResponse.json(notifications)
+  const supabase = await createServerSupabaseClient()
+  const { data: notifications } = await supabase
+    .from('notifications')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(50)
+  return NextResponse.json(notifications ?? [])
 }

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { db } from '@/lib/db'
+import { createServerSupabaseClient } from '@/lib/supabase'
 
 export async function createJob(prevState: { error?: string } | undefined, formData: FormData) {
   const name = formData.get('name') as string
@@ -16,36 +16,37 @@ export async function createJob(prevState: { error?: string } | undefined, formD
 
   if (!name || !clientId) return { error: 'Job name and client are required.' }
 
-  const job = await db.job.create({
-    data: {
-      name,
-      clientId,
-      jobType: jobType || null,
-      shootDate: shootDate ? new Date(shootDate) : null,
-      shootLocation: shootLocation || null,
-      quoteValue: quoteValue ? parseFloat(quoteValue) : null,
-    },
-  })
+  const supabase = await createServerSupabaseClient()
 
-  // Copy tasks from form data or template
+  const { data: job, error } = await supabase.from('jobs').insert({
+    name,
+    client_id: clientId,
+    job_type: jobType || null,
+    shoot_date: shootDate ? new Date(shootDate).toISOString() : null,
+    shoot_location: shootLocation || null,
+    quote_value: quoteValue ? parseFloat(quoteValue) : null,
+  }).select('id').single()
+
+  if (error || !job) return { error: error?.message || 'Failed to create job.' }
+
   if (tasksJson) {
     const tasks = JSON.parse(tasksJson) as { phase: string; title: string }[]
     for (let i = 0; i < tasks.length; i++) {
-      await db.jobTask.create({
-        data: { jobId: job.id, phase: tasks[i].phase, title: tasks[i].title, sortOrder: i },
-      })
+      await supabase.from('job_tasks').insert({ job_id: job.id, phase: tasks[i].phase, title: tasks[i].title, sort_order: i })
     }
   } else if (jobType) {
-    const template = await db.jobTemplate.findUnique({
-      where: { jobType },
-      include: { templateTasks: { orderBy: { sortOrder: 'asc' } }, templateDeliverables: { orderBy: { sortOrder: 'asc' } } },
-    })
+    const { data: template } = await supabase
+      .from('job_templates')
+      .select('id, template_tasks(phase, title, sort_order), template_deliverables(title, description, sort_order)')
+      .eq('job_type', jobType)
+      .single()
+
     if (template) {
-      for (const t of template.templateTasks) {
-        await db.jobTask.create({ data: { jobId: job.id, phase: t.phase, title: t.title, sortOrder: t.sortOrder } })
+      for (const t of (template.template_tasks as { phase: string; title: string; sort_order: number }[])) {
+        await supabase.from('job_tasks').insert({ job_id: job.id, phase: t.phase, title: t.title, sort_order: t.sort_order })
       }
-      for (const d of template.templateDeliverables) {
-        await db.deliverable.create({ data: { jobId: job.id, title: d.title, description: d.description } })
+      for (const d of (template.template_deliverables as { title: string; description: string | null; sort_order: number }[])) {
+        await supabase.from('deliverables').insert({ job_id: job.id, title: d.title, description: d.description })
       }
     }
   }
@@ -53,12 +54,15 @@ export async function createJob(prevState: { error?: string } | undefined, formD
   if (deliverablesJson) {
     const deliverables = JSON.parse(deliverablesJson) as { title: string; description?: string }[]
     for (const d of deliverables) {
-      await db.deliverable.create({ data: { jobId: job.id, title: d.title, description: d.description || null } })
+      await supabase.from('deliverables').insert({ job_id: job.id, title: d.title, description: d.description || null })
     }
   }
 
-  await db.activity.create({
-    data: { action: 'job_created', details: `Job "${name}" created`, jobId: job.id, clientId },
+  await supabase.from('activities').insert({
+    action: 'job_created',
+    details: `Job "${name}" created`,
+    job_id: job.id,
+    client_id: clientId,
   })
 
   revalidatePath('/dashboard/jobs')
@@ -77,30 +81,24 @@ export async function updateJob(prevState: { error?: string } | undefined, formD
 
   if (!name) return { error: 'Job name is required.' }
 
-  const job = await db.job.findUnique({ where: { id: jobId } })
+  const supabase = await createServerSupabaseClient()
+  const { data: job } = await supabase.from('jobs').select('status, client_id, name').eq('id', jobId).single()
   if (!job) return { error: 'Job not found.' }
 
   const statusChanged = status && status !== job.status
 
-  await db.job.update({
-    where: { id: jobId },
-    data: {
-      name,
-      shootDate: shootDate ? new Date(shootDate) : null,
-      shootLocation: shootLocation || null,
-      quoteValue: quoteValue ? parseFloat(quoteValue) : null,
-      notes: notes || null,
-      ...(status ? { status } : {}),
-    },
-  })
+  await supabase.from('jobs').update({
+    name,
+    shoot_date: shootDate ? new Date(shootDate).toISOString() : null,
+    shoot_location: shootLocation || null,
+    quote_value: quoteValue ? parseFloat(quoteValue) : null,
+    notes: notes || null,
+    ...(status ? { status } : {}),
+  }).eq('id', jobId)
 
   if (statusChanged) {
-    await db.activity.create({
-      data: { action: 'status_changed', details: `Status changed to ${status}`, jobId, clientId: job.clientId },
-    })
-    await db.notification.create({
-      data: { title: 'Job Status Updated', message: `"${name}" is now ${status}`, type: 'status_change', jobId, clientId: job.clientId },
-    })
+    await supabase.from('activities').insert({ action: 'status_changed', details: `Status changed to ${status}`, job_id: jobId, client_id: job.client_id })
+    await supabase.from('notifications').insert({ title: 'Job Status Updated', message: `"${name}" is now ${status}`, type: 'status_change', job_id: jobId, client_id: job.client_id })
   }
 
   revalidatePath('/dashboard/jobs')
@@ -109,17 +107,13 @@ export async function updateJob(prevState: { error?: string } | undefined, formD
 }
 
 export async function updateJobStatus(jobId: string, newStatus: string) {
-  const job = await db.job.findUnique({ where: { id: jobId } })
+  const supabase = await createServerSupabaseClient()
+  const { data: job } = await supabase.from('jobs').select('client_id, name').eq('id', jobId).single()
   if (!job) return
 
-  await db.job.update({ where: { id: jobId }, data: { status: newStatus } })
-
-  await db.activity.create({
-    data: { action: 'status_changed', details: `Status changed to ${newStatus}`, jobId, clientId: job.clientId },
-  })
-  await db.notification.create({
-    data: { title: 'Job Status Updated', message: `"${job.name}" is now ${newStatus}`, type: 'status_change', jobId, clientId: job.clientId },
-  })
+  await supabase.from('jobs').update({ status: newStatus }).eq('id', jobId)
+  await supabase.from('activities').insert({ action: 'status_changed', details: `Status changed to ${newStatus}`, job_id: jobId, client_id: job.client_id })
+  await supabase.from('notifications').insert({ title: 'Job Status Updated', message: `"${job.name}" is now ${newStatus}`, type: 'status_change', job_id: jobId, client_id: job.client_id })
 
   revalidatePath('/dashboard/jobs')
   revalidatePath(`/dashboard/jobs/${jobId}`)
@@ -127,17 +121,19 @@ export async function updateJobStatus(jobId: string, newStatus: string) {
 }
 
 export async function deleteJob(jobId: string) {
-  await db.job.delete({ where: { id: jobId } })
+  const supabase = await createServerSupabaseClient()
+  await supabase.from('jobs').delete().eq('id', jobId)
   revalidatePath('/dashboard/jobs')
   revalidatePath('/dashboard')
   redirect('/dashboard/jobs')
 }
 
 export async function toggleTask(taskId: string, completed: boolean) {
-  const task = await db.jobTask.findUnique({ where: { id: taskId } })
+  const supabase = await createServerSupabaseClient()
+  const { data: task } = await supabase.from('job_tasks').select('job_id').eq('id', taskId).single()
   if (!task) return
-  await db.jobTask.update({ where: { id: taskId }, data: { completed } })
-  revalidatePath(`/dashboard/jobs/${task.jobId}`)
+  await supabase.from('job_tasks').update({ completed }).eq('id', taskId)
+  revalidatePath(`/dashboard/jobs/${task.job_id}`)
 }
 
 export async function addRevision(prevState: { error?: string } | undefined, formData: FormData) {
@@ -146,20 +142,16 @@ export async function addRevision(prevState: { error?: string } | undefined, for
 
   if (!request) return { error: 'Please describe the changes requested.' }
 
-  const job = await db.job.findUnique({ where: { id: jobId } })
+  const supabase = await createServerSupabaseClient()
+  const { data: job } = await supabase.from('jobs').select('revisions_used, client_id, name').eq('id', jobId).single()
   if (!job) return { error: 'Job not found.' }
 
-  const round = job.revisionsUsed + 1
+  const round = job.revisions_used + 1
 
-  await db.revision.create({ data: { jobId, round, request } })
-  await db.job.update({ where: { id: jobId }, data: { revisionsUsed: round } })
-
-  await db.activity.create({
-    data: { action: 'revision_requested', details: `Revision round ${round} requested`, jobId, clientId: job.clientId },
-  })
-  await db.notification.create({
-    data: { title: 'Revision Requested', message: `Round ${round} for "${job.name}"`, type: 'revision_request', jobId, clientId: job.clientId },
-  })
+  await supabase.from('revisions').insert({ job_id: jobId, round, request })
+  await supabase.from('jobs').update({ revisions_used: round }).eq('id', jobId)
+  await supabase.from('activities').insert({ action: 'revision_requested', details: `Revision round ${round} requested`, job_id: jobId, client_id: job.client_id })
+  await supabase.from('notifications').insert({ title: 'Revision Requested', message: `Round ${round} for "${job.name}"`, type: 'revision_request', job_id: jobId, client_id: job.client_id })
 
   revalidatePath(`/dashboard/jobs/${jobId}`)
   return {}

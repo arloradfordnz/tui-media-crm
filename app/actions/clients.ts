@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { db } from '@/lib/db'
+import { createServerSupabaseClient } from '@/lib/supabase'
 
 export async function createClient(prevState: { error?: string } | undefined, formData: FormData) {
   const name = formData.get('name') as string
@@ -20,20 +20,21 @@ export async function createClient(prevState: { error?: string } | undefined, fo
 
   const tags = tagsRaw ? JSON.stringify(tagsRaw.split(',').map((t: string) => t.trim()).filter(Boolean)) : null
 
-  await db.client.create({
-    data: {
-      name,
-      email: email || null,
-      phone: phone || null,
-      location: location || null,
-      leadSource: leadSource || null,
-      firstContact: firstContact ? new Date(firstContact) : null,
-      pipelineStage: pipelineStage || 'enquiry',
-      status: status || 'lead',
-      notes: notes || null,
-      tags,
-    },
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.from('clients').insert({
+    name,
+    email: email || null,
+    phone: phone || null,
+    location: location || null,
+    lead_source: leadSource || null,
+    first_contact: firstContact ? new Date(firstContact).toISOString() : null,
+    pipeline_stage: pipelineStage || 'enquiry',
+    status: status || 'lead',
+    notes: notes || null,
+    tags,
   })
+
+  if (error) return { error: error.message }
 
   revalidatePath('/dashboard/clients')
   redirect('/dashboard/clients')
@@ -56,21 +57,21 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
 
   const tags = tagsRaw ? JSON.stringify(tagsRaw.split(',').map((t: string) => t.trim()).filter(Boolean)) : null
 
-  await db.client.update({
-    where: { id: clientId },
-    data: {
-      name,
-      email: email || null,
-      phone: phone || null,
-      location: location || null,
-      leadSource: leadSource || null,
-      firstContact: firstContact ? new Date(firstContact) : null,
-      pipelineStage: pipelineStage || 'enquiry',
-      status,
-      notes: notes || null,
-      tags,
-    },
-  })
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.from('clients').update({
+    name,
+    email: email || null,
+    phone: phone || null,
+    location: location || null,
+    lead_source: leadSource || null,
+    first_contact: firstContact ? new Date(firstContact).toISOString() : null,
+    pipeline_stage: pipelineStage || 'enquiry',
+    status,
+    notes: notes || null,
+    tags,
+  }).eq('id', clientId)
+
+  if (error) return { error: error.message }
 
   revalidatePath('/dashboard/clients')
   revalidatePath(`/dashboard/clients/${clientId}`)
@@ -78,7 +79,8 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
 }
 
 export async function deleteClient(clientId: string) {
-  await db.client.delete({ where: { id: clientId } })
+  const supabase = await createServerSupabaseClient()
+  await supabase.from('clients').delete().eq('id', clientId)
   revalidatePath('/dashboard/clients')
   redirect('/dashboard/clients')
 }

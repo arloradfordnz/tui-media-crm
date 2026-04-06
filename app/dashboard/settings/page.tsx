@@ -1,8 +1,9 @@
-import { getSession } from '@/lib/session'
+import { createServerSupabaseClient } from '@/lib/supabase'
 import SettingsForm from './SettingsForm'
 
 export default async function SettingsPage() {
-  const session = await getSession()
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -14,11 +15,11 @@ export default async function SettingsPage() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="label">Name</p>
-            <p className="text-sm mt-1" style={{ color: 'var(--text-primary)' }}>{session?.name || '—'}</p>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-primary)' }}>{user?.user_metadata?.name || '—'}</p>
           </div>
           <div>
             <p className="label">Email</p>
-            <p className="text-sm mt-1" style={{ color: 'var(--text-primary)' }}>{session?.email || '—'}</p>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-primary)' }}>{user?.email || '—'}</p>
           </div>
         </div>
       </div>
@@ -31,7 +32,7 @@ export default async function SettingsPage() {
         <h2 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>App Info</h2>
         <div className="space-y-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
           <p>Tui Media Operating System v1.0</p>
-          <p>Next.js + Prisma + Tailwind CSS</p>
+          <p>Next.js + Supabase + Tailwind CSS</p>
         </div>
       </div>
     </div>

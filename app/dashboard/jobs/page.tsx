@@ -1,4 +1,4 @@
-import { db } from '@/lib/db'
+import { createServerSupabaseClient } from '@/lib/supabase'
 import { formatNZD, formatDate, getInitials, statusLabel, statusBadgeClass } from '@/lib/format'
 import { Briefcase, Plus, Search } from 'lucide-react'
 import Link from 'next/link'
@@ -10,20 +10,17 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   const statusFilter = params.status || 'all'
   const search = params.search || ''
 
-  const where: Record<string, unknown> = {}
-  if (statusFilter !== 'all') where.status = statusFilter
-  if (search) {
-    where.OR = [
-      { name: { contains: search } },
-      { client: { name: { contains: search } } },
-    ]
-  }
+  const supabase = await createServerSupabaseClient()
 
-  const jobs = await db.job.findMany({
-    where,
-    orderBy: [{ shootDate: 'desc' }, { createdAt: 'desc' }],
-    include: { client: { select: { id: true, name: true } } },
-  })
+  let query = supabase
+    .from('jobs')
+    .select('id, name, job_type, status, shoot_date, quote_value, client_id, clients(id, name)')
+    .order('shoot_date', { ascending: false })
+
+  if (statusFilter !== 'all') query = query.eq('status', statusFilter)
+  if (search) query = query.ilike('name', `%${search}%`)
+
+  const { data: jobs } = await query
 
   return (
     <div className="space-y-6">
@@ -56,7 +53,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
       </div>
 
       {/* Table */}
-      {jobs.length === 0 ? (
+      {(jobs ?? []).length === 0 ? (
         <div className="empty-state card">
           <Briefcase className="w-10 h-10 empty-icon" />
           <p className="empty-title">No jobs found</p>
@@ -78,29 +75,32 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
               </tr>
             </thead>
             <tbody>
-              {jobs.map((j) => (
-                <tr key={j.id} className="table-row">
-                  <td className="px-4 py-3">
-                    <Link href={`/dashboard/jobs/${j.id}`} className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                      {j.name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 hidden md:table-cell">
-                    <Link href={`/dashboard/clients/${j.client.id}`} className="flex items-center gap-2">
-                      <div className="avatar avatar-sm">{getInitials(j.client.name)}</div>
-                      <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{j.client.name}</span>
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 hidden lg:table-cell text-sm" style={{ color: 'var(--text-secondary)' }}>{formatDate(j.shootDate)}</td>
-                  <td className="px-4 py-3 hidden sm:table-cell">
-                    {j.jobType && <span className="badge badge-muted">{statusLabel(j.jobType)}</span>}
-                  </td>
-                  <td className="px-4 py-3 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-primary)' }}>{j.quoteValue ? formatNZD(j.quoteValue) : '—'}</td>
-                  <td className="px-4 py-3 text-right">
-                    <span className={`badge ${statusBadgeClass(j.status)}`}>{statusLabel(j.status)}</span>
-                  </td>
-                </tr>
-              ))}
+              {(jobs ?? []).map((j) => {
+                const client = j.clients as unknown as { id: string; name: string }
+                return (
+                  <tr key={j.id} className="table-row">
+                    <td className="px-4 py-3">
+                      <Link href={`/dashboard/jobs/${j.id}`} className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                        {j.name}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell">
+                      <Link href={`/dashboard/clients/${client.id}`} className="flex items-center gap-2">
+                        <div className="avatar avatar-sm">{getInitials(client.name)}</div>
+                        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{client.name}</span>
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 hidden lg:table-cell text-sm" style={{ color: 'var(--text-secondary)' }}>{formatDate(j.shoot_date)}</td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      {j.job_type && <span className="badge badge-muted">{statusLabel(j.job_type)}</span>}
+                    </td>
+                    <td className="px-4 py-3 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-primary)' }}>{j.quote_value ? formatNZD(j.quote_value) : '—'}</td>
+                    <td className="px-4 py-3 text-right">
+                      <span className={`badge ${statusBadgeClass(j.status)}`}>{statusLabel(j.status)}</span>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

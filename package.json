@@ -6,22 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "postinstall": "prisma generate",
-    "seed": "npx tsx prisma/seed.ts",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate deploy"
+    "lint": "eslint"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.6.0",
-    "@prisma/client": "^7.6.0",
-    "@types/bcryptjs": "^2.4.6",
-    "bcryptjs": "^3.0.3",
+    "@supabase/ssr": "^0.10.0",
+    "@supabase/supabase-js": "^2.101.1",
     "dotenv": "^17.4.0",
     "jose": "^6.2.2",
     "lucide-react": "^1.7.0",
     "next": "16.2.2",
-    "prisma": "^7.6.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "resend": "^6.10.0"

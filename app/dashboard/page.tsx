@@ -1,4 +1,4 @@
-import { db } from '@/lib/db'
+import { createServerSupabaseClient } from '@/lib/supabase'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@/lib/format'
 import { Briefcase, Clock, DollarSign, Users, CalendarDays, Activity, Plus, UserPlus, Camera } from 'lucide-react'
 import Link from 'next/link'
@@ -17,45 +17,40 @@ const PIPELINE_COLORS: Record<string, string> = {
 }
 
 export default async function DashboardPage() {
+  const supabase = await createServerSupabaseClient()
   const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString()
 
-  const [activeJobs, reviewJobs, leadsInPipeline, allJobs, todayShoots, upcomingEvents, recentActivity] = await Promise.all([
-    db.job.count({ where: { status: { notIn: ['delivered', 'archived'] } } }),
-    db.job.count({ where: { status: 'review' } }),
-    db.client.count({ where: { pipelineStage: { in: ['enquiry', 'discovery'] } } }),
-    db.job.findMany({ select: { status: true, quoteValue: true, createdAt: true } }),
-    db.event.findMany({
-      where: { date: { gte: todayStart, lt: todayEnd }, eventType: 'shoot' },
-      orderBy: { startTime: 'asc' },
-      include: { job: { select: { id: true, name: true } } },
-    }),
-    db.event.findMany({
-      where: { date: { gte: todayStart } },
-      orderBy: { date: 'asc' },
-      take: 5,
-      include: { job: { select: { id: true, name: true } } },
-    }),
-    db.activity.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-      include: { job: { select: { id: true, name: true } }, client: { select: { id: true, name: true } } },
-    }),
+  const [
+    { count: activeJobs },
+    { count: reviewJobs },
+    { count: leadsInPipeline },
+    { data: allJobs },
+    { data: todayShoots },
+    { data: upcomingEvents },
+    { data: recentActivity },
+  ] = await Promise.all([
+    supabase.from('jobs').select('*', { count: 'exact', head: true }).not('status', 'in', '("delivered","archived")'),
+    supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('status', 'review'),
+    supabase.from('clients').select('*', { count: 'exact', head: true }).in('pipeline_stage', ['enquiry', 'discovery']),
+    supabase.from('jobs').select('status, quote_value, created_at'),
+    supabase.from('events').select('id, title, start_time, end_time, job_id, jobs(id, name)').eq('event_type', 'shoot').gte('date', todayStart).lt('date', todayEnd).order('start_time', { ascending: true }),
+    supabase.from('events').select('id, title, event_type, date, start_time, job_id, jobs(id, name)').gte('date', todayStart).order('date', { ascending: true }).limit(5),
+    supabase.from('activities').select('id, action, details, created_at, job_id, jobs(id, name), client_id, clients(id, name)').order('created_at', { ascending: false }).limit(10),
   ])
 
-  const revenueThisMonth = allJobs
-    .filter((j) => j.status === 'delivered' && j.createdAt >= startOfMonth)
-    .reduce((sum, j) => sum + (j.quoteValue || 0), 0)
+  const revenueThisMonth = (allJobs ?? [])
+    .filter((j) => j.status === 'delivered' && j.created_at >= startOfMonth)
+    .reduce((sum, j) => sum + (j.quote_value || 0), 0)
 
-  // Pipeline counts
   const pipelineCounts: Record<string, number> = {}
   for (const s of JOB_PIPELINE) pipelineCounts[s] = 0
-  for (const j of allJobs) {
+  for (const j of allJobs ?? []) {
     if (pipelineCounts[j.status] !== undefined) pipelineCounts[j.status]++
   }
-  const totalJobs = allJobs.length || 1
+  const totalJobs = (allJobs ?? []).length || 1
 
   return (
     <div className="space-y-6">
@@ -73,14 +68,13 @@ export default async function DashboardPage() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Briefcase} value={activeJobs} label="Active Jobs" />
-        <StatCard icon={Clock} value={reviewJobs} label="Awaiting Review" />
+        <StatCard icon={Briefcase} value={activeJobs ?? 0} label="Active Jobs" />
+        <StatCard icon={Clock} value={reviewJobs ?? 0} label="Awaiting Review" />
         <StatCard icon={DollarSign} value={formatNZD(revenueThisMonth)} label="Revenue This Month" />
-        <StatCard icon={Users} value={leadsInPipeline} label="Leads in Pipeline" />
+        <StatCard icon={Users} value={leadsInPipeline ?? 0} label="Leads in Pipeline" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column: Today's Shoots + Upcoming */}
         <div className="lg:col-span-2 space-y-6">
           {/* Today's Shoots */}
           <div className="card">
@@ -88,26 +82,29 @@ export default async function DashboardPage() {
               <Camera className="w-4 h-4" style={{ color: 'var(--accent)' }} />
               <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Today&apos;s Shoots</h2>
             </div>
-            {todayShoots.length === 0 ? (
+            {(todayShoots ?? []).length === 0 ? (
               <p className="text-sm py-4" style={{ color: 'var(--text-tertiary)' }}>No shoots scheduled for today.</p>
             ) : (
               <div className="space-y-3">
-                {todayShoots.map((e) => (
-                  <div key={e.id} className="flex items-center gap-3 py-2" style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                    <div className="w-2 h-2 rounded-full" style={{ background: 'var(--success)' }} />
-                    <div className="flex-1">
-                      <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{e.title}</span>
-                      {e.job && (
-                        <Link href={`/dashboard/jobs/${e.job.id}`} className="text-xs ml-2" style={{ color: 'var(--accent)' }}>{e.job.name}</Link>
+                {(todayShoots ?? []).map((e) => {
+                  const job = e.jobs as unknown as { id: string; name: string } | null
+                  return (
+                    <div key={e.id} className="flex items-center gap-3 py-2" style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                      <div className="w-2 h-2 rounded-full" style={{ background: 'var(--success)' }} />
+                      <div className="flex-1">
+                        <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{e.title}</span>
+                        {job && (
+                          <Link href={`/dashboard/jobs/${job.id}`} className="text-xs ml-2" style={{ color: 'var(--accent)' }}>{job.name}</Link>
+                        )}
+                      </div>
+                      {e.start_time && (
+                        <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                          {e.start_time}{e.end_time ? ` – ${e.end_time}` : ''}
+                        </span>
                       )}
                     </div>
-                    {e.startTime && (
-                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                        {e.startTime}{e.endTime ? ` – ${e.endTime}` : ''}
-                      </span>
-                    )}
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -121,17 +118,17 @@ export default async function DashboardPage() {
               </div>
               <Link href="/dashboard/calendar" className="text-xs" style={{ color: 'var(--accent)' }}>View Calendar &rarr;</Link>
             </div>
-            {upcomingEvents.length === 0 ? (
+            {(upcomingEvents ?? []).length === 0 ? (
               <p className="text-sm py-4" style={{ color: 'var(--text-tertiary)' }}>No upcoming events.</p>
             ) : (
               <div className="space-y-3">
-                {upcomingEvents.map((e) => (
+                {(upcomingEvents ?? []).map((e) => (
                   <div key={e.id} className="flex items-center gap-3 py-2" style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                    <span className={`badge ${statusBadgeClass(e.eventType)}`}>{statusLabel(e.eventType)}</span>
+                    <span className={`badge ${statusBadgeClass(e.event_type)}`}>{statusLabel(e.event_type)}</span>
                     <span className="text-sm font-medium flex-1" style={{ color: 'var(--text-primary)' }}>{e.title}</span>
                     <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{formatDate(e.date)}</span>
-                    {e.startTime && (
-                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{e.startTime}</span>
+                    {e.start_time && (
+                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{e.start_time}</span>
                     )}
                   </div>
                 ))}
@@ -146,26 +143,30 @@ export default async function DashboardPage() {
             <Activity className="w-4 h-4" style={{ color: 'var(--accent)' }} />
             <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Recent Activity</h2>
           </div>
-          {recentActivity.length === 0 ? (
+          {(recentActivity ?? []).length === 0 ? (
             <p className="text-sm py-4" style={{ color: 'var(--text-tertiary)' }}>No activity yet.</p>
           ) : (
             <div className="space-y-3">
-              {recentActivity.map((a) => (
-                <div key={a.id} className="py-2" style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                  <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                    {a.details || statusLabel(a.action)}
-                  </p>
-                  <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
-                    {a.job ? (
-                      <Link href={`/dashboard/jobs/${a.job.id}`} style={{ color: 'var(--accent)' }}>{a.job.name}</Link>
-                    ) : a.client ? (
-                      <Link href={`/dashboard/clients/${a.client.id}`} style={{ color: 'var(--accent)' }}>{a.client.name}</Link>
-                    ) : null}
-                    {(a.job || a.client) && ' · '}
-                    {timeAgo(a.createdAt)}
-                  </p>
-                </div>
-              ))}
+              {(recentActivity ?? []).map((a) => {
+                const job = a.jobs as unknown as { id: string; name: string } | null
+                const client = a.clients as unknown as { id: string; name: string } | null
+                return (
+                  <div key={a.id} className="py-2" style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                    <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                      {a.details || statusLabel(a.action)}
+                    </p>
+                    <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
+                      {job ? (
+                        <Link href={`/dashboard/jobs/${job.id}`} style={{ color: 'var(--accent)' }}>{job.name}</Link>
+                      ) : client ? (
+                        <Link href={`/dashboard/clients/${client.id}`} style={{ color: 'var(--accent)' }}>{client.name}</Link>
+                      ) : null}
+                      {(job || client) && ' · '}
+                      {timeAgo(a.created_at)}
+                    </p>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

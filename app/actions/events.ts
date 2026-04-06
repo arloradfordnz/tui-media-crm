@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { db } from '@/lib/db'
+import { createServerSupabaseClient } from '@/lib/supabase'
 
 export async function createEvent(prevState: { error?: string } | undefined, formData: FormData) {
   const title = formData.get('title') as string
@@ -14,16 +14,15 @@ export async function createEvent(prevState: { error?: string } | undefined, for
 
   if (!title || !date) return { error: 'Title and date are required.' }
 
-  await db.event.create({
-    data: {
-      title,
-      eventType: eventType || 'personal',
-      date: new Date(date),
-      startTime: startTime || null,
-      endTime: endTime || null,
-      notes: notes || null,
-      jobId: jobId || null,
-    },
+  const supabase = await createServerSupabaseClient()
+  await supabase.from('events').insert({
+    title,
+    event_type: eventType || 'personal',
+    date: new Date(date).toISOString(),
+    start_time: startTime || null,
+    end_time: endTime || null,
+    notes: notes || null,
+    job_id: jobId || null,
   })
 
   revalidatePath('/dashboard/calendar')
@@ -32,7 +31,8 @@ export async function createEvent(prevState: { error?: string } | undefined, for
 }
 
 export async function deleteEvent(eventId: string) {
-  await db.event.delete({ where: { id: eventId } })
+  const supabase = await createServerSupabaseClient()
+  await supabase.from('events').delete().eq('id', eventId)
   revalidatePath('/dashboard/calendar')
   revalidatePath('/dashboard')
 }

@@ -1,32 +1,35 @@
 'use server'
 
-import { db } from '@/lib/db'
+import { createServerSupabaseClient } from '@/lib/supabase'
 import { revalidatePath } from 'next/cache'
 import { sendApprovalConfirmationEmail, sendRevisionRequestEmail } from '@/lib/email'
 
 export async function approveDelivery(deliveryFileId: string, jobId: string) {
-  await db.deliveryFile.update({
-    where: { id: deliveryFileId },
-    data: { deliveryStatus: 'approved', approvedAt: new Date() },
-  })
+  const supabase = await createServerSupabaseClient()
 
-  const job = await db.job.findUnique({ where: { id: jobId }, include: { client: true } })
+  await supabase.from('delivery_files').update({
+    delivery_status: 'approved',
+    approved_at: new Date().toISOString(),
+  }).eq('id', deliveryFileId)
+
+  const { data: job } = await supabase
+    .from('jobs')
+    .select('id, name, client_id, clients(name, email)')
+    .eq('id', jobId)
+    .single()
+
   if (job) {
-    await db.job.update({ where: { id: jobId }, data: { status: 'approved' } })
-    await db.activity.create({
-      data: { action: 'delivery_approved', details: `Client approved delivery`, jobId, clientId: job.clientId },
-    })
-    await db.notification.create({
-      data: { title: 'Delivery Approved', message: `Client approved a cut for "${job.name}"`, type: 'approved', jobId, clientId: job.clientId },
-    })
+    const client = job.clients as unknown as { name: string; email: string | null }
+    await supabase.from('jobs').update({ status: 'approved' }).eq('id', jobId)
+    await supabase.from('activities').insert({ action: 'delivery_approved', details: 'Client approved delivery', job_id: jobId, client_id: job.client_id })
+    await supabase.from('notifications').insert({ title: 'Delivery Approved', message: `Client approved a cut for "${job.name}"`, type: 'approved', job_id: jobId, client_id: job.client_id })
 
-    // Send confirmation email to client
-    if (job.client.email) {
-      await sendApprovalConfirmationEmail(job.client.email, job.client.name, job.name)
+    if (client.email) {
+      await sendApprovalConfirmationEmail(client.email, client.name, job.name)
     }
   }
 
-  revalidatePath(`/portal/`)
+  revalidatePath('/portal/')
 }
 
 export async function requestChanges(prevState: { error?: string; success?: boolean } | undefined, formData: FormData) {
@@ -35,47 +38,45 @@ export async function requestChanges(prevState: { error?: string; success?: bool
 
   if (!request) return { error: 'Please describe the changes you need.' }
 
-  const job = await db.job.findUnique({ where: { id: jobId }, include: { client: true } })
+  const supabase = await createServerSupabaseClient()
+  const { data: job } = await supabase
+    .from('jobs')
+    .select('id, name, revisions_used, revision_limit, client_id, clients(name, email)')
+    .eq('id', jobId)
+    .single()
+
   if (!job) return { error: 'Job not found.' }
 
-  if (job.revisionsUsed >= job.revisionLimit) {
-    return { error: `Revision limit reached (${job.revisionLimit} rounds).` }
+  if (job.revisions_used >= job.revision_limit) {
+    return { error: `Revision limit reached (${job.revision_limit} rounds).` }
   }
 
-  const round = job.revisionsUsed + 1
+  const round = job.revisions_used + 1
+  const client = job.clients as unknown as { name: string; email: string | null }
 
-  await db.revision.create({ data: { jobId, round, request } })
-  await db.job.update({ where: { id: jobId }, data: { revisionsUsed: round, status: 'editing' } })
+  await supabase.from('revisions').insert({ job_id: jobId, round, request })
+  await supabase.from('jobs').update({ revisions_used: round, status: 'editing' }).eq('id', jobId)
+  await supabase.from('activities').insert({ action: 'revision_requested', details: `Client requested revision round ${round}`, job_id: jobId, client_id: job.client_id })
+  await supabase.from('notifications').insert({ title: 'Revision Requested', message: `Client requested changes for "${job.name}" (round ${round})`, type: 'revision_request', job_id: jobId, client_id: job.client_id })
 
-  await db.activity.create({
-    data: { action: 'revision_requested', details: `Client requested revision round ${round}`, jobId, clientId: job.clientId },
-  })
-  await db.notification.create({
-    data: { title: 'Revision Requested', message: `Client requested changes for "${job.name}" (round ${round})`, type: 'revision_request', jobId, clientId: job.clientId },
-  })
-
-  // Send confirmation email to client
-  if (job.client.email) {
-    await sendRevisionRequestEmail(job.client.email, job.client.name, job.name, round)
+  if (client.email) {
+    await sendRevisionRequestEmail(client.email, client.name, job.name, round)
   }
 
-  revalidatePath(`/portal/`)
+  revalidatePath('/portal/')
   return { success: true }
 }
 
 export async function markViewed(deliveryFileId: string, jobId: string) {
-  const file = await db.deliveryFile.findUnique({ where: { id: deliveryFileId } })
-  if (file && file.deliveryStatus === 'sent') {
-    await db.deliveryFile.update({
-      where: { id: deliveryFileId },
-      data: { deliveryStatus: 'viewed', viewedAt: new Date() },
-    })
+  const supabase = await createServerSupabaseClient()
+  const { data: file } = await supabase.from('delivery_files').select('delivery_status').eq('id', deliveryFileId).single()
 
-    const job = await db.job.findUnique({ where: { id: jobId } })
+  if (file && file.delivery_status === 'sent') {
+    await supabase.from('delivery_files').update({ delivery_status: 'viewed', viewed_at: new Date().toISOString() }).eq('id', deliveryFileId)
+
+    const { data: job } = await supabase.from('jobs').select('name, client_id').eq('id', jobId).single()
     if (job) {
-      await db.notification.create({
-        data: { title: 'Portal Viewed', message: `Client viewed delivery for "${job.name}"`, type: 'portal_viewed', jobId, clientId: job.clientId },
-      })
+      await supabase.from('notifications').insert({ title: 'Portal Viewed', message: `Client viewed delivery for "${job.name}"`, type: 'portal_viewed', job_id: jobId, client_id: job.client_id })
     }
   }
 }

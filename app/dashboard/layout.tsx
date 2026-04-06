@@ -1,10 +1,11 @@
-import { getSession } from '@/lib/session'
+import { createServerSupabaseClient } from '@/lib/supabase'
 import { redirect } from 'next/navigation'
 import DashboardShell from './DashboardShell'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const session = await getSession()
-  if (!session || session.role !== 'admin') {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
     redirect('/login')
   }
 
