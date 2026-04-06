@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useState, useTransition } from 'react'
+import { useActionState, useState, useOptimistic, useTransition } from 'react'
 import { updateJob, updateJobStatus, deleteJob, toggleTask, addRevision } from '@/app/actions/jobs'
 import { createProposal } from '@/app/actions/proposals'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@/lib/format'
@@ -10,6 +10,8 @@ import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as A
 const JOB_STATUSES = ['enquiry', 'booked', 'preproduction', 'shootday', 'editing', 'review', 'approved', 'delivered', 'archived']
 const PHASES = ['preshoot', 'shootday', 'postproduction', 'delivery']
 const PHASE_LABELS: Record<string, string> = { preshoot: 'Pre-shoot', shootday: 'Shoot Day', postproduction: 'Post-production', delivery: 'Delivery' }
+
+type Task = { id: string; phase: string; title: string; completed: boolean }
 
 type JobData = {
   id: string
@@ -24,7 +26,7 @@ type JobData = {
   notes: string | null
   portalToken: string
   client: { id: string; name: string }
-  tasks: { id: string; phase: string; title: string; completed: boolean }[]
+  tasks: Task[]
   deliverables: { id: string; title: string; description: string | null; completed: boolean; deliveryFiles: { id: string; originalName: string; versionLabel: string; deliveryStatus: string; createdAt: string }[] }[]
   revisions: { id: string; round: number; request: string; status: string; createdAt: string }[]
   proposals: { id: string; status: string; token: string; totalValue: number; sentAt: string | null; respondedAt: string | null; createdAt: string }[]
@@ -38,6 +40,13 @@ export default function JobRecord({ job }: { job: JobData }) {
   const [deleting, setDeleting] = useState(false)
   const [copied, setCopied] = useState(false)
 
+  // Optimistic task state — updates instantly on click
+  const [optimisticTasks, setOptimisticTask] = useOptimistic(
+    job.tasks,
+    (tasks: Task[], { id, completed }: { id: string; completed: boolean }) =>
+      tasks.map((t) => (t.id === id ? { ...t, completed } : t))
+  )
+
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tuimedia.co.nz'
   const portalUrl = `${baseUrl}/portal/${job.portalToken}`
 
@@ -45,8 +54,12 @@ export default function JobRecord({ job }: { job: JobData }) {
     startTransition(() => { updateJobStatus(job.id, newStatus) })
   }
 
-  function handleToggleTask(taskId: string, completed: boolean) {
-    startTransition(() => { toggleTask(taskId, completed) })
+  function handleToggleTask(taskId: string, currentCompleted: boolean) {
+    const newCompleted = !currentCompleted
+    startTransition(async () => {
+      setOptimisticTask({ id: taskId, completed: newCompleted })
+      await toggleTask(taskId, newCompleted)
+    })
   }
 
   async function handleDelete() {
@@ -165,11 +178,11 @@ export default function JobRecord({ job }: { job: JobData }) {
       {/* Task Checklist */}
       <div className="card">
         <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Task Checklist</h3>
-        {job.tasks.length === 0 ? (
+        {optimisticTasks.length === 0 ? (
           <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No tasks for this job.</p>
         ) : (
           PHASES.map((phase) => {
-            const phaseTasks = job.tasks.filter((t) => t.phase === phase)
+            const phaseTasks = optimisticTasks.filter((t) => t.phase === phase)
             if (phaseTasks.length === 0) return null
             const done = phaseTasks.filter((t) => t.completed).length
             return (
@@ -181,7 +194,7 @@ export default function JobRecord({ job }: { job: JobData }) {
                 {phaseTasks.map((t) => (
                   <button
                     key={t.id}
-                    onClick={() => handleToggleTask(t.id, !t.completed)}
+                    onClick={() => handleToggleTask(t.id, t.completed)}
                     className="flex items-center gap-3 py-2 w-full text-left"
                     style={{ borderBottom: '1px solid var(--bg-border)' }}
                   >
