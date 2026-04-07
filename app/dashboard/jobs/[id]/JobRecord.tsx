@@ -5,7 +5,7 @@ import { updateJob, updateJobStatus, deleteJob, toggleTask, addRevision } from '
 import { createProposal } from '@/app/actions/proposals'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@/lib/format'
 import Link from 'next/link'
-import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as ActivityIcon, MapPin, Calendar, Copy, FileText, Upload, Download, FileVideo } from 'lucide-react'
+import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as ActivityIcon, MapPin, Calendar, Copy, FileText, Upload, Download, FileVideo, Plus, Pencil, X } from 'lucide-react'
 
 const JOB_STATUSES = ['enquiry', 'booked', 'preproduction', 'shootday', 'editing', 'review', 'approved', 'delivered', 'archived']
 const PHASES = ['preshoot', 'shootday', 'postproduction', 'delivery']
@@ -47,6 +47,11 @@ export default function JobRecord({ job }: { job: JobData }) {
     }
     return map
   })
+  const [deliverables, setDeliverables] = useState(job.deliverables)
+  const [newDeliverableTitle, setNewDeliverableTitle] = useState('')
+  const [editingDeliverable, setEditingDeliverable] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [revisionLimit, setRevisionLimit] = useState(job.revisionLimit)
 
   // Optimistic task state — updates instantly on click
   const [optimisticTasks, setOptimisticTask] = useOptimistic(
@@ -122,6 +127,51 @@ export default function JobRecord({ job }: { job: JobData }) {
         f.id === fileId ? { ...f, deliveryStatus: newStatus } : f
       ),
     }))
+  }
+
+  async function handleAddDeliverable() {
+    if (!newDeliverableTitle.trim()) return
+    const res = await fetch('/api/deliverables', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: job.id, title: newDeliverableTitle.trim() }),
+    })
+    const data = await res.json()
+    if (data.deliverable) {
+      setDeliverables((prev) => [...prev, { ...data.deliverable, deliveryFiles: [] }])
+      setUploadedFiles((prev) => ({ ...prev, [data.deliverable.id]: [] }))
+      setNewDeliverableTitle('')
+    }
+  }
+
+  async function handleEditDeliverable(id: string) {
+    if (!editTitle.trim()) return
+    await fetch('/api/deliverables', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, title: editTitle.trim() }),
+    })
+    setDeliverables((prev) => prev.map((d) => d.id === id ? { ...d, title: editTitle.trim() } : d))
+    setEditingDeliverable(null)
+  }
+
+  async function handleDeleteDeliverable(id: string) {
+    if (!confirm('Delete this deliverable and all its files?')) return
+    await fetch('/api/deliverables', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    setDeliverables((prev) => prev.filter((d) => d.id !== id))
+  }
+
+  async function handleRevisionLimitChange(val: number) {
+    setRevisionLimit(val)
+    await fetch('/api/jobs/revision-limit', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: job.id, revisionLimit: val }),
+    })
   }
 
   return (
@@ -266,17 +316,44 @@ export default function JobRecord({ job }: { job: JobData }) {
       {/* Deliverables */}
       <div className="card">
         <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Deliverables</h3>
-        {job.deliverables.length === 0 ? (
-          <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No deliverables defined.</p>
+        {deliverables.length === 0 ? (
+          <p className="text-sm mb-4" style={{ color: 'var(--text-tertiary)' }}>No deliverables defined.</p>
         ) : (
-          job.deliverables.map((d) => {
+          deliverables.map((d) => {
             const files = uploadedFiles[d.id] || []
             return (
               <div key={d.id} className="py-4" style={{ borderBottom: '1px solid var(--bg-border)' }}>
                 <div className="flex items-center gap-3 mb-3">
                   <Film className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-                  <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{d.title}</span>
-                  {d.completed && <span className="badge badge-success">Complete</span>}
+                  {editingDeliverable === d.id ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <input
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        className="field-input text-sm flex-1"
+                        autoFocus
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleEditDeliverable(d.id); if (e.key === 'Escape') setEditingDeliverable(null) }}
+                      />
+                      <button onClick={() => handleEditDeliverable(d.id)} className="btn-primary text-xs" style={{ padding: '6px 12px' }}>Save</button>
+                      <button onClick={() => setEditingDeliverable(null)} className="btn-icon"><X className="w-4 h-4" /></button>
+                    </div>
+                  ) : (
+                    <>
+                      <span
+                        className="text-sm font-medium cursor-pointer"
+                        style={{ color: 'var(--text-primary)' }}
+                        onClick={() => { setEditingDeliverable(d.id); setEditTitle(d.title) }}
+                        title="Click to edit"
+                      >
+                        {d.title}
+                      </span>
+                      {d.completed && <span className="badge badge-success">Complete</span>}
+                      <div className="ml-auto flex items-center gap-1">
+                        <button onClick={() => { setEditingDeliverable(d.id); setEditTitle(d.title) }} className="btn-icon" title="Edit"><Pencil className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => handleDeleteDeliverable(d.id)} className="btn-icon" style={{ color: 'var(--danger)' }} title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                      </div>
+                    </>
+                  )}
                 </div>
                 {d.description && <p className="text-xs mb-3 ml-7" style={{ color: 'var(--text-secondary)' }}>{d.description}</p>}
 
@@ -324,15 +401,42 @@ export default function JobRecord({ job }: { job: JobData }) {
             )
           })
         )}
+
+        {/* Add new deliverable */}
+        <div className="flex items-center gap-3 mt-4">
+          <input
+            value={newDeliverableTitle}
+            onChange={(e) => setNewDeliverableTitle(e.target.value)}
+            placeholder="Add a new deliverable..."
+            className="field-input text-sm flex-1"
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddDeliverable() } }}
+          />
+          <button onClick={handleAddDeliverable} disabled={!newDeliverableTitle.trim()} className="btn-primary text-sm">
+            <Plus className="w-3.5 h-3.5" /> Add
+          </button>
+        </div>
       </div>
 
       {/* Revision Tracker */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Revisions</h3>
-          <span className="text-sm" style={{ color: job.revisionsUsed >= job.revisionLimit ? 'var(--danger)' : 'var(--text-secondary)' }}>
-            {job.revisionsUsed} of {job.revisionLimit} used
-          </span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>Rounds allowed:</label>
+              <input
+                type="number"
+                min={0}
+                value={revisionLimit}
+                onChange={(e) => handleRevisionLimitChange(parseInt(e.target.value) || 0)}
+                className="field-input text-sm"
+                style={{ width: '60px', padding: '4px 8px' }}
+              />
+            </div>
+            <span className="text-sm" style={{ color: job.revisionsUsed >= revisionLimit ? 'var(--danger)' : 'var(--text-secondary)' }}>
+              {job.revisionsUsed} of {revisionLimit} used
+            </span>
+          </div>
         </div>
         {job.revisions.map((r) => (
           <div key={r.id} className="py-3" style={{ borderBottom: '1px solid var(--bg-border)' }}>
@@ -344,7 +448,7 @@ export default function JobRecord({ job }: { job: JobData }) {
             <p className="text-sm ml-6" style={{ color: 'var(--text-secondary)' }}>{r.request}</p>
           </div>
         ))}
-        {job.revisionsUsed < job.revisionLimit && (
+        {job.revisionsUsed < revisionLimit && (
           <form action={revAction} className="mt-4 flex gap-3">
             <input type="hidden" name="jobId" value={job.id} />
             <input name="request" placeholder="Describe revision request..." className="field-input flex-1" />
