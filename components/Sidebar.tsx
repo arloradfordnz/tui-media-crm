@@ -15,6 +15,7 @@ import {
   LogOut,
   X,
   Bot,
+  Building2,
 } from 'lucide-react'
 
 const mainNav = [
@@ -32,6 +33,7 @@ const businessNav = [
 ]
 
 const accountNav = [
+  { href: '/dashboard/business', label: 'Business Info', icon: Building2 },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ]
 

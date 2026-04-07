@@ -201,6 +201,13 @@ CREATE TABLE activities (
   client_id   UUID REFERENCES clients(id) ON DELETE SET NULL
 );
 
+-- ── Business Info ─────────────────────────────────────────────────────────────
+CREATE TABLE business_info (
+  id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  section  TEXT UNIQUE NOT NULL,
+  content  TEXT DEFAULT ''
+);
+
 -- ── updated_at triggers ───────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
@@ -235,6 +242,7 @@ ALTER TABLE gear              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE documents         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE activities        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE business_info    ENABLE ROW LEVEL SECURITY;
 
 -- Authenticated users (admins) can do everything
 CREATE POLICY "auth_all" ON clients           FOR ALL TO authenticated USING (true) WITH CHECK (true);
@@ -253,6 +261,7 @@ CREATE POLICY "auth_all" ON gear              FOR ALL TO authenticated USING (tr
 CREATE POLICY "auth_all" ON documents         FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "auth_all" ON notifications     FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "auth_all" ON activities        FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "auth_all" ON business_info    FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 -- Anon users can read jobs/deliverables/delivery_files/proposals/revisions/clients
 -- (needed for the public portal and proposal pages which use the anon key)
