@@ -17,20 +17,25 @@ export async function POST(request: NextRequest) {
 
   const client = new Anthropic({ apiKey })
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-5-20250514',
-    max_tokens: 1024,
-    system: SYSTEM_PROMPT,
-    messages: messages.map((m: { role: string; content: string }) => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content,
-    })),
-  })
+  try {
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      system: SYSTEM_PROMPT,
+      messages: messages.map((m: { role: string; content: string }) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      })),
+    })
 
-  const text = response.content
-    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-    .map((block) => block.text)
-    .join('')
+    const text = response.content
+      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+      .map((block) => block.text)
+      .join('')
 
-  return Response.json({ message: text })
+    return Response.json({ message: text })
+  } catch (err) {
+    console.error('Anthropic API error:', err)
+    return Response.json({ error: 'Failed to get response from AI.' }, { status: 500 })
+  }
 }
