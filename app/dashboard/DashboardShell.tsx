@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Sidebar from '@/components/Sidebar'
 import BottomNav from '@/components/BottomNav'
 import NotificationBell from '@/components/NotificationBell'
+import AiChatWidget from '@/components/AiChatWidget'
 import { logout } from '@/app/actions/auth'
 import { Menu } from 'lucide-react'
 
@@ -46,6 +47,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       </div>
 
       <BottomNav />
+      <AiChatWidget />
     </div>
   )
 }
