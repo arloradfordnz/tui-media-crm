@@ -4,7 +4,7 @@ import { useActionState, useState } from 'react'
 import { createEvent, deleteEvent } from '@/app/actions/events'
 import { statusLabel } from '@/lib/format'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Plus, X, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, X, Trash2, Calendar } from 'lucide-react'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -61,13 +61,21 @@ export default function CalendarView({ events, jobs, month, year }: { events: Ev
 
   const selectedEvents = selectedDay ? eventsForDay(selectedDay) : []
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tuimedia.co.nz'
+  const webcalUrl = `webcal://${appUrl.replace(/^https?:\/\//, '')}/api/calendar/feed.ics`
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>Calendar</h1>
-        <button onClick={() => setShowModal(true)} className="btn-primary">
-          <Plus className="w-4 h-4" /> Add Event
-        </button>
+        <div className="flex items-center gap-3">
+          <a href={webcalUrl} className="btn-secondary text-sm">
+            <Calendar className="w-3.5 h-3.5" /> Subscribe in Apple Calendar
+          </a>
+          <button onClick={() => setShowModal(true)} className="btn-primary">
+            <Plus className="w-4 h-4" /> Add Event
+          </button>
+        </div>
       </div>
 
       {/* Month navigation */}
