@@ -295,8 +295,8 @@ export default function JobRecord({ job }: { job: JobData }) {
                   <button
                     key={t.id}
                     onClick={() => handleToggleTask(t.id, t.completed)}
-                    className="flex items-center gap-3 py-2 w-full text-left"
-                    style={{ borderBottom: '1px solid var(--bg-border)' }}
+                    className="flex items-center gap-3 py-2 w-full text-left rounded-lg px-2 -mx-2"
+                    style={{ marginBottom: '2px' }}
                   >
                     {t.completed
                       ? <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: 'var(--success)' }} />
@@ -322,7 +322,7 @@ export default function JobRecord({ job }: { job: JobData }) {
           deliverables.map((d) => {
             const files = uploadedFiles[d.id] || []
             return (
-              <div key={d.id} className="py-4" style={{ borderBottom: '1px solid var(--bg-border)' }}>
+              <div key={d.id} className="py-4 rounded-lg" style={{ background: 'var(--bg-elevated)', padding: '12px', marginBottom: '8px' }}>
                 <div className="flex items-center gap-3 mb-3">
                   <Film className="w-4 h-4" style={{ color: 'var(--accent)' }} />
                   {editingDeliverable === d.id ? (
@@ -439,7 +439,7 @@ export default function JobRecord({ job }: { job: JobData }) {
           </div>
         </div>
         {job.revisions.map((r) => (
-          <div key={r.id} className="py-3" style={{ borderBottom: '1px solid var(--bg-border)' }}>
+          <div key={r.id} className="py-3 rounded-lg px-3" style={{ background: 'var(--bg-elevated)', marginBottom: '4px' }}>
             <div className="flex items-center gap-2 mb-1">
               <RotateCcw className="w-3.5 h-3.5" style={{ color: 'var(--warning)' }} />
               <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Round {r.round}</span>
@@ -464,7 +464,7 @@ export default function JobRecord({ job }: { job: JobData }) {
           <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No activity recorded.</p>
         ) : (
           job.activities.map((a) => (
-            <div key={a.id} className="flex items-start gap-3 py-2" style={{ borderBottom: '1px solid var(--bg-border)' }}>
+            <div key={a.id} className="flex items-start gap-3 py-2 rounded-lg px-2" style={{ marginBottom: '2px' }}>
               <ActivityIcon className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
               <div>
                 <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{a.details || statusLabel(a.action)}</p>
@@ -476,7 +476,7 @@ export default function JobRecord({ job }: { job: JobData }) {
       </div>
 
       {/* Delete */}
-      <div className="pt-6" style={{ borderTop: '1px solid var(--bg-border)' }}>
+      <div className="pt-6 mt-4">
         <button onClick={handleDelete} disabled={deleting} className="btn-danger">
           <Trash2 className="w-4 h-4" /> {deleting ? 'Deleting...' : 'Delete Job'}
         </button>

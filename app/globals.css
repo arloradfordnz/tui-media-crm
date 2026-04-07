@@ -209,15 +209,12 @@ input, textarea, select, button { font-family: inherit; }
   letter-spacing: 0.06em;
   color: var(--text-tertiary);
   padding: 12px 16px;
-  border-bottom: 1px solid var(--bg-border);
 }
 
 .table-row {
   transition: background 150ms ease;
-  border-bottom: 1px solid var(--bg-border);
 }
 .table-row:hover { background: var(--bg-elevated); }
-.table-row:last-child { border-bottom: none; }
 
 /* ── Badges ───────────────────────────────────────────────── */
 .badge {

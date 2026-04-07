@@ -104,7 +104,7 @@ export default async function DashboardPage() {
                 {(todayShoots ?? []).map((e) => {
                   const job = e.jobs as unknown as { id: string; name: string } | null
                   return (
-                    <div key={e.id} className="flex items-center gap-3 py-2" style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                    <div key={e.id} className="flex items-center gap-3 py-2" style={{ background: 'var(--bg-elevated)', borderRadius: '8px', padding: '8px 12px', marginBottom: '4px' }}>
                       <div className="w-2 h-2 rounded-full" style={{ background: 'var(--success)' }} />
                       <div className="flex-1">
                         <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{e.title}</span>
@@ -138,7 +138,7 @@ export default async function DashboardPage() {
             ) : (
               <div className="space-y-3">
                 {(upcomingEvents ?? []).map((e) => (
-                  <div key={e.id} className="flex items-center gap-3 py-2" style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                  <div key={e.id} className="flex items-center gap-3 py-2" style={{ background: 'var(--bg-elevated)', borderRadius: '8px', padding: '8px 12px', marginBottom: '4px' }}>
                     <span className={`badge ${statusBadgeClass(e.event_type)}`}>{statusLabel(e.event_type)}</span>
                     <span className="text-sm font-medium flex-1" style={{ color: 'var(--text-primary)' }}>{e.title}</span>
                     <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{formatDate(e.date)}</span>
@@ -166,7 +166,7 @@ export default async function DashboardPage() {
                 const job = a.jobs as unknown as { id: string; name: string } | null
                 const client = a.clients as unknown as { id: string; name: string } | null
                 return (
-                  <div key={a.id} className="py-2" style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                  <div key={a.id} className="py-2" style={{ background: 'var(--bg-elevated)', borderRadius: '8px', padding: '8px 12px', marginBottom: '4px' }}>
                     <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
                       {a.details || statusLabel(a.action)}
                     </p>

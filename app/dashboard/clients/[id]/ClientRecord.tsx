@@ -222,7 +222,7 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
           ) : (
             <div className="space-y-4">
               {client.activities.map((a) => (
-                <div key={a.id} className="flex gap-3 py-3" style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                <div key={a.id} className="flex gap-3 py-3 rounded-lg px-2" style={{ marginBottom: '2px' }}>
                   <div className="w-2 h-2 rounded-full mt-2 shrink-0" style={{ background: 'var(--accent)' }} />
                   <div>
                     <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{a.details || statusLabel(a.action)}</p>
@@ -261,7 +261,7 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
       )}
 
       {/* Delete */}
-      <div className="pt-6" style={{ borderTop: '1px solid var(--bg-border)' }}>
+      <div className="pt-6 mt-4">
         <button onClick={handleDelete} disabled={deleting} className="btn-danger">
           <Trash2 className="w-4 h-4" /> {deleting ? 'Deleting...' : 'Delete Client'}
         </button>
