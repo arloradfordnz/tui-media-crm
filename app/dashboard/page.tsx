@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@/lib/format'
-import { Briefcase, Clock, DollarSign, Users, CalendarDays, Activity, Plus, UserPlus, Camera } from 'lucide-react'
+import { Briefcase, Clock, DollarSign, Users, CalendarDays, Activity, Plus, UserPlus, Camera, CheckSquare } from 'lucide-react'
+import TodoWidget from './TodoWidget'
 import Link from 'next/link'
 
 const JOB_PIPELINE = ['enquiry', 'booked', 'preproduction', 'shootday', 'editing', 'review', 'approved', 'delivered', 'archived']
@@ -76,6 +77,9 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
+          {/* To Do List */}
+          <TodoWidget />
+
           {/* Today's Shoots */}
           <div className="card">
             <div className="flex items-center gap-2 mb-4">
