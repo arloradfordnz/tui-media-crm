@@ -22,7 +22,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     { data: activities },
   ] = await Promise.all([
     supabase.from('job_tasks').select('id, phase, title, completed').eq('job_id', id).order('sort_order', { ascending: true }),
-    supabase.from('deliverables').select('id, title, description, completed, delivery_files(id, original_name, version_label, delivery_status, created_at)').eq('job_id', id),
+    supabase.from('deliverables').select('id, title, description, completed, delivery_files(id, original_name, version_label, delivery_status, created_at, file_url, personal_note)').eq('job_id', id),
     supabase.from('revisions').select('id, round, request, status, created_at').eq('job_id', id).order('round', { ascending: true }),
     supabase.from('proposals').select('id, status, token, total_value, sent_at, responded_at, created_at').eq('job_id', id).order('created_at', { ascending: false }),
     supabase.from('activities').select('id, action, details, created_at').eq('job_id', id).order('created_at', { ascending: false }).limit(20),
@@ -54,12 +54,14 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
       title: d.title,
       description: d.description,
       completed: d.completed,
-      deliveryFiles: ((d.delivery_files as unknown as { id: string; original_name: string; version_label: string; delivery_status: string; created_at: string }[]) ?? []).map((f) => ({
+      deliveryFiles: ((d.delivery_files as unknown as { id: string; original_name: string; version_label: string; delivery_status: string; created_at: string; file_url: string; personal_note: string | null }[]) ?? []).map((f) => ({
         id: f.id,
         originalName: f.original_name,
         versionLabel: f.version_label,
         deliveryStatus: f.delivery_status,
         createdAt: f.created_at,
+        fileUrl: f.file_url,
+        personalNote: f.personal_note,
       })),
     })),
     revisions: (revisions ?? []).map((r) => ({

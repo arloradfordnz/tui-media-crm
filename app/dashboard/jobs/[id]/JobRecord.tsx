@@ -5,7 +5,7 @@ import { updateJob, updateJobStatus, deleteJob, toggleTask, addRevision } from '
 import { createProposal } from '@/app/actions/proposals'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@/lib/format'
 import Link from 'next/link'
-import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as ActivityIcon, MapPin, Calendar, Copy, FileText } from 'lucide-react'
+import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as ActivityIcon, MapPin, Calendar, Copy, FileText, Upload, Download, FileVideo } from 'lucide-react'
 
 const JOB_STATUSES = ['enquiry', 'booked', 'preproduction', 'shootday', 'editing', 'review', 'approved', 'delivered', 'archived']
 const PHASES = ['preshoot', 'shootday', 'postproduction', 'delivery']
@@ -27,7 +27,7 @@ type JobData = {
   portalToken: string
   client: { id: string; name: string }
   tasks: Task[]
-  deliverables: { id: string; title: string; description: string | null; completed: boolean; deliveryFiles: { id: string; originalName: string; versionLabel: string; deliveryStatus: string; createdAt: string }[] }[]
+  deliverables: { id: string; title: string; description: string | null; completed: boolean; deliveryFiles: { id: string; originalName: string; versionLabel: string; deliveryStatus: string; createdAt: string; fileUrl: string; personalNote: string | null }[] }[]
   revisions: { id: string; round: number; request: string; status: string; createdAt: string }[]
   proposals: { id: string; status: string; token: string; totalValue: number; sentAt: string | null; respondedAt: string | null; createdAt: string }[]
   activities: { id: string; action: string; details: string | null; createdAt: string }[]
@@ -39,6 +39,14 @@ export default function JobRecord({ job }: { job: JobData }) {
   const [isPending, startTransition] = useTransition()
   const [deleting, setDeleting] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [uploadingFor, setUploadingFor] = useState<string | null>(null)
+  const [uploadedFiles, setUploadedFiles] = useState<Record<string, { id: string; originalName: string; versionLabel: string; deliveryStatus: string; createdAt: string; fileUrl: string; personalNote: string | null }[]>>(() => {
+    const map: Record<string, typeof uploadedFiles[string]> = {}
+    for (const d of job.deliverables) {
+      map[d.id] = d.deliveryFiles.map(f => ({ ...f, fileUrl: f.fileUrl || '', personalNote: f.personalNote || null }))
+    }
+    return map
+  })
 
   // Optimistic task state — updates instantly on click
   const [optimisticTasks, setOptimisticTask] = useOptimistic(
@@ -72,6 +80,48 @@ export default function JobRecord({ job }: { job: JobData }) {
     navigator.clipboard.writeText(portalUrl)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  async function handleFileUpload(deliverableId: string, file: File, versionLabel: string, notes: string) {
+    setUploadingFor(deliverableId)
+    const form = new FormData()
+    form.append('file', file)
+    form.append('deliverableId', deliverableId)
+    form.append('versionLabel', versionLabel)
+    form.append('notes', notes)
+    try {
+      const res = await fetch('/api/deliverables/upload', { method: 'POST', body: form })
+      const data = await res.json()
+      if (data.file) {
+        setUploadedFiles((prev) => ({
+          ...prev,
+          [deliverableId]: [...(prev[deliverableId] || []), {
+            id: data.file.id,
+            originalName: data.file.original_name,
+            versionLabel: data.file.version_label,
+            deliveryStatus: data.file.delivery_status,
+            createdAt: data.file.created_at,
+            fileUrl: data.file.file_url,
+            personalNote: data.file.personal_note,
+          }],
+        }))
+      }
+    } catch { /* ignore */ }
+    setUploadingFor(null)
+  }
+
+  async function handleStatusChange_file(fileId: string, deliverableId: string, newStatus: string) {
+    await fetch('/api/deliverables/status', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileId, status: newStatus }),
+    })
+    setUploadedFiles((prev) => ({
+      ...prev,
+      [deliverableId]: (prev[deliverableId] || []).map((f) =>
+        f.id === fileId ? { ...f, deliveryStatus: newStatus } : f
+      ),
+    }))
   }
 
   return (
@@ -219,27 +269,60 @@ export default function JobRecord({ job }: { job: JobData }) {
         {job.deliverables.length === 0 ? (
           <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No deliverables defined.</p>
         ) : (
-          job.deliverables.map((d) => (
-            <div key={d.id} className="py-3" style={{ borderBottom: '1px solid var(--bg-border)' }}>
-              <div className="flex items-center gap-3">
-                <Film className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-                <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{d.title}</span>
-                {d.completed && <span className="badge badge-success">Complete</span>}
-              </div>
-              {d.description && <p className="text-xs mt-1 ml-7" style={{ color: 'var(--text-secondary)' }}>{d.description}</p>}
-              {d.deliveryFiles.length > 0 && (
-                <div className="ml-7 mt-2 space-y-1">
-                  {d.deliveryFiles.map((f) => (
-                    <div key={f.id} className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                      <span>{f.originalName}</span>
-                      <span className={`badge ${statusBadgeClass(f.versionLabel)}`}>{statusLabel(f.versionLabel)}</span>
-                      <span className={`badge ${statusBadgeClass(f.deliveryStatus)}`}>{statusLabel(f.deliveryStatus)}</span>
-                    </div>
-                  ))}
+          job.deliverables.map((d) => {
+            const files = uploadedFiles[d.id] || []
+            return (
+              <div key={d.id} className="py-4" style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                <div className="flex items-center gap-3 mb-3">
+                  <Film className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{d.title}</span>
+                  {d.completed && <span className="badge badge-success">Complete</span>}
                 </div>
-              )}
-            </div>
-          ))
+                {d.description && <p className="text-xs mb-3 ml-7" style={{ color: 'var(--text-secondary)' }}>{d.description}</p>}
+
+                {/* Uploaded files list */}
+                {files.length > 0 && (
+                  <div className="ml-7 space-y-2 mb-3">
+                    {files.map((f) => (
+                      <div key={f.id} className="flex items-center gap-3 p-3 rounded-lg" style={{ background: 'var(--bg-elevated)' }}>
+                        <FileVideo className="w-4 h-4 shrink-0" style={{ color: 'var(--accent)' }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm truncate" style={{ color: 'var(--text-primary)' }}>{f.originalName}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`badge ${f.versionLabel === 'final_delivery' ? 'badge-success' : f.versionLabel === 'revised_cut' ? 'badge-warning' : f.versionLabel === 'raw_files' ? 'badge-muted' : 'badge-accent'}`}>
+                              {statusLabel(f.versionLabel)}
+                            </span>
+                            <select
+                              value={f.deliveryStatus}
+                              onChange={(e) => handleStatusChange_file(f.id, d.id, e.target.value)}
+                              className="text-xs px-2 py-0.5 rounded border-none"
+                              style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)', fontSize: '11px' }}
+                            >
+                              <option value="not_sent">Not Sent</option>
+                              <option value="sent">Sent</option>
+                              <option value="viewed">Viewed</option>
+                              <option value="approved">Approved</option>
+                            </select>
+                            {f.personalNote && <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{f.personalNote}</span>}
+                          </div>
+                        </div>
+                        <a href={f.fileUrl} download={f.originalName} className="btn-icon" title="Download">
+                          <Download className="w-4 h-4" />
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Upload form */}
+                <DeliverableUploadForm
+                  deliverableId={d.id}
+                  uploading={uploadingFor === d.id}
+                  onUpload={handleFileUpload}
+                />
+              </div>
+            )
+          })
         )}
       </div>
 
@@ -295,5 +378,67 @@ export default function JobRecord({ job }: { job: JobData }) {
         </button>
       </div>
     </div>
+  )
+}
+
+const VERSION_LABELS = [
+  { value: 'first_cut', label: 'First Cut' },
+  { value: 'revised_cut', label: 'Revised Cut' },
+  { value: 'final_delivery', label: 'Final Delivery' },
+  { value: 'raw_files', label: 'Raw Files' },
+]
+
+function DeliverableUploadForm({ deliverableId, uploading, onUpload }: { deliverableId: string; uploading: boolean; onUpload: (id: string, file: File, version: string, notes: string) => void }) {
+  const [expanded, setExpanded] = useState(false)
+  const [file, setFile] = useState<File | null>(null)
+  const [version, setVersion] = useState('first_cut')
+  const [notes, setNotes] = useState('')
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!file) return
+    onUpload(deliverableId, file, version, notes)
+    setFile(null)
+    setNotes('')
+    setExpanded(false)
+  }
+
+  if (!expanded) {
+    return (
+      <button onClick={() => setExpanded(true)} className="ml-7 flex items-center gap-2 text-xs py-2" style={{ color: 'var(--accent)' }}>
+        <Upload className="w-3.5 h-3.5" /> Upload file
+      </button>
+    )
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="ml-7 p-3 rounded-lg space-y-3" style={{ background: 'var(--bg-elevated)' }}>
+      <div>
+        <input
+          type="file"
+          onChange={(e) => setFile(e.target.files?.[0] || null)}
+          className="text-sm"
+          style={{ color: 'var(--text-secondary)' }}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="field-label">Version</label>
+          <select value={version} onChange={(e) => setVersion(e.target.value)} className="field-input text-sm">
+            {VERSION_LABELS.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="field-label">Notes</label>
+          <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes..." className="field-input text-sm" />
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button type="submit" disabled={!file || uploading} className="btn-primary text-sm">
+          <Upload className="w-3.5 h-3.5" /> {uploading ? 'Uploading...' : 'Upload'}
+        </button>
+        <button type="button" onClick={() => setExpanded(false)} className="btn-secondary text-sm">Cancel</button>
+      </div>
+    </form>
   )
 }
