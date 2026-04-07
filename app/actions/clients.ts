@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { sendWelcomeEmail } from '@/lib/email'
 
 export async function createClient(prevState: { error?: string } | undefined, formData: FormData) {
   const name = formData.get('name') as string
@@ -35,6 +36,10 @@ export async function createClient(prevState: { error?: string } | undefined, fo
   })
 
   if (error) return { error: error.message }
+
+  if (email) {
+    sendWelcomeEmail(email, name).catch(() => {})
+  }
 
   revalidatePath('/dashboard/clients')
   redirect('/dashboard/clients')

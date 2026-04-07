@@ -86,6 +86,20 @@ export async function sendProposalEmail(to: string, clientName: string, jobName:
   })
 }
 
+export async function sendWelcomeEmail(to: string, clientName: string) {
+  await send({
+    to,
+    subject: 'Welcome to Tui Media — looking forward to working together',
+    html: wrap(`
+      <h2 style="margin:0 0 16px;font-size:20px;color:#f5f5f5;">Hi ${clientName},</h2>
+      <p style="color:#a3a3a3;line-height:1.6;margin:0 0 16px;">Welcome to Tui Media! We're thrilled to have you on board and excited about the opportunity to bring your vision to life through professional videography.</p>
+      <p style="color:#a3a3a3;line-height:1.6;margin:0 0 16px;">Arlo will be in touch shortly to discuss your project and next steps. In the meantime, feel free to reach out if you have any questions.</p>
+      <p style="color:#a3a3a3;line-height:1.6;margin:0 0 8px;">Looking forward to creating something great together.</p>
+      <p style="color:#f5f5f5;margin:24px 0 0;font-weight:600;">Arlo | Tui Media | tuimedia.nz</p>
+    `),
+  })
+}
+
 export async function sendProposalAcceptedEmail(to: string, clientName: string, jobName: string) {
   await send({
     to,
