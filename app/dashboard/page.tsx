@@ -68,11 +68,22 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard icon={Briefcase} value={activeJobs ?? 0} label="Active Jobs" />
         <StatCard icon={Clock} value={reviewJobs ?? 0} label="Awaiting Review" />
         <StatCard icon={DollarSign} value={formatNZD(revenueThisMonth)} label="Revenue This Month" />
         <StatCard icon={Users} value={leadsInPipeline ?? 0} label="Leads in Pipeline" />
+        <div className="stat-card flex flex-col items-center justify-center text-center">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="mb-2">
+            <path d="M24 4C12.954 4 4 12.954 4 24s8.954 20 20 20 20-8.954 20-20S35.046 4 24 4z" fill="#13B5EA"/>
+            <path d="M28.5 17.5c-2.5-1.5-5.5-1-7 1s-1 5.5 1.5 7c2 1.2 3.5 2.5 3.5 4.5 0 1.5-1 2.5-2.5 2.5s-2.5-1-2.5-2.5" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/>
+            <path d="M24 14v-2m0 24v-2" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/>
+          </svg>
+          <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>Financial dashboard coming soon</p>
+          <button className="btn-secondary text-xs" style={{ padding: '6px 12px', opacity: 0.7, cursor: 'not-allowed' }} disabled>
+            Connect Xero
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
