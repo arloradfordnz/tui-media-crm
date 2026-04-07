@@ -59,7 +59,11 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>{client.name}</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>{client.email || 'No email'}</p>
+          {client.email ? (
+            <a href={`mailto:${client.email}`} className="text-sm mt-1 block" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }} onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')} onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}>{client.email}</a>
+          ) : (
+            <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>No email</p>
+          )}
         </div>
         <span className={`badge ${statusBadgeClass(client.status)}`}>{statusLabel(client.status)}</span>
       </div>
