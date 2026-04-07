@@ -86,7 +86,7 @@ input, textarea, select, button { font-family: inherit; }
   background: var(--accent);
   color: #fff;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -106,7 +106,7 @@ input, textarea, select, button { font-family: inherit; }
   background: transparent;
   color: var(--text-primary);
   border: 1px solid var(--bg-border);
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -123,7 +123,7 @@ input, textarea, select, button { font-family: inherit; }
   background: transparent;
   color: var(--danger);
   border: 1px solid rgba(248, 113, 113, 0.3);
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -221,7 +221,7 @@ input, textarea, select, button { font-family: inherit; }
   display: inline-flex;
   align-items: center;
   padding: 3px 10px;
-  border-radius: 20px;
+  border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
