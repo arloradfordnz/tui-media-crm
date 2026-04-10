@@ -40,8 +40,9 @@ export default function JobRecord({ job }: { job: JobData }) {
   const [deleting, setDeleting] = useState(false)
   const [copied, setCopied] = useState(false)
   const [uploadingFor, setUploadingFor] = useState<string | null>(null)
-  const [uploadedFiles, setUploadedFiles] = useState<Record<string, { id: string; originalName: string; versionLabel: string; deliveryStatus: string; createdAt: string; fileUrl: string; personalNote: string | null }[]>>(() => {
-    const map: Record<string, typeof uploadedFiles[string]> = {}
+  type UploadedFile = { id: string; originalName: string; versionLabel: string; deliveryStatus: string; createdAt: string; fileUrl: string; personalNote: string | null }
+  const [uploadedFiles, setUploadedFiles] = useState<Record<string, UploadedFile[]>>(() => {
+    const map: Record<string, UploadedFile[]> = {}
     for (const d of job.deliverables) {
       map[d.id] = d.deliveryFiles.map(f => ({ ...f, fileUrl: f.fileUrl || '', personalNote: f.personalNote || null }))
     }

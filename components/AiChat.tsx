@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Send, Trash2, Bot, User } from 'lucide-react'
 
 type Message = { role: 'user' | 'assistant'; content: string }
@@ -10,6 +11,7 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -19,7 +21,7 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
     if (!input.trim() || loading) return
     const userMsg: Message = { role: 'user', content: input.trim() }
     const newMessages = [...messages, userMsg]
-    setMessages(newMessages)
+    setMessages([...newMessages, { role: 'assistant', content: '' }])
     setInput('')
     setLoading(true)
 
@@ -29,14 +31,44 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: newMessages }),
       })
-      const data = await res.json()
-      if (data.message) {
-        setMessages((prev) => [...prev, { role: 'assistant', content: data.message }])
-      } else if (data.error) {
-        setMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${data.error}` }])
+
+      if (!res.ok) {
+        let errorMsg = 'Something went wrong.'
+        try {
+          const data = await res.json()
+          errorMsg = data.error || errorMsg
+        } catch { /* not JSON */ }
+        setMessages((prev) => {
+          const updated = [...prev]
+          updated[updated.length - 1] = { role: 'assistant', content: `Error: ${errorMsg}` }
+          return updated
+        })
+        setLoading(false)
+        return
       }
+
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = decoder.decode(value, { stream: true })
+        setMessages((prev) => {
+          const updated = [...prev]
+          const last = updated[updated.length - 1]
+          updated[updated.length - 1] = { ...last, content: last.content + chunk }
+          return updated
+        })
+      }
+
+      router.refresh()
     } catch {
-      setMessages((prev) => [...prev, { role: 'assistant', content: 'Something went wrong. Please try again.' }])
+      setMessages((prev) => {
+        const updated = [...prev]
+        updated[updated.length - 1] = { role: 'assistant', content: 'Something went wrong. Please try again.' }
+        return updated
+      })
     }
     setLoading(false)
   }
@@ -77,42 +109,36 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
           <div className="flex flex-col items-center justify-center h-full text-center" style={{ color: 'var(--text-tertiary)' }}>
             <Bot className="w-8 h-8 mb-2" />
             <p className="text-sm">How can I help with Tui Media today?</p>
+            <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)', opacity: 0.7 }}>I can manage clients, jobs, events, documents &amp; gear.</p>
           </div>
         )}
-        {messages.map((m, i) => (
-          <div key={i} className={`flex gap-3 ${m.role === 'user' ? 'justify-end' : ''}`}>
-            {m.role === 'assistant' && (
-              <div className="avatar avatar-sm shrink-0" style={{ background: 'var(--accent-muted)' }}>
-                <Bot className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+        {messages.map((m, i) => {
+          const isStreamingEmpty = loading && i === messages.length - 1 && m.role === 'assistant' && !m.content
+          return (
+            <div key={i} className={`flex gap-3 ${m.role === 'user' ? 'justify-end' : ''}`}>
+              {m.role === 'assistant' && (
+                <div className="avatar avatar-sm shrink-0" style={{ background: 'var(--accent-muted)' }}>
+                  <Bot className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+                </div>
+              )}
+              <div
+                className="max-w-[80%] rounded-lg px-3 py-2 text-sm"
+                style={{
+                  background: m.role === 'user' ? 'var(--accent)' : 'var(--bg-elevated)',
+                  color: m.role === 'user' ? '#fff' : isStreamingEmpty ? 'var(--text-tertiary)' : 'var(--text-primary)',
+                  whiteSpace: 'pre-wrap',
+                }}
+              >
+                {isStreamingEmpty ? 'Thinking...' : m.content}
               </div>
-            )}
-            <div
-              className="max-w-[80%] rounded-lg px-3 py-2 text-sm"
-              style={{
-                background: m.role === 'user' ? 'var(--accent)' : 'var(--bg-elevated)',
-                color: m.role === 'user' ? '#fff' : 'var(--text-primary)',
-                whiteSpace: 'pre-wrap',
-              }}
-            >
-              {m.content}
+              {m.role === 'user' && (
+                <div className="avatar avatar-sm shrink-0" style={{ background: 'var(--bg-elevated)' }}>
+                  <User className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
+                </div>
+              )}
             </div>
-            {m.role === 'user' && (
-              <div className="avatar avatar-sm shrink-0" style={{ background: 'var(--bg-elevated)' }}>
-                <User className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
-              </div>
-            )}
-          </div>
-        ))}
-        {loading && (
-          <div className="flex gap-3">
-            <div className="avatar avatar-sm shrink-0" style={{ background: 'var(--accent-muted)' }}>
-              <Bot className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-            </div>
-            <div className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--bg-elevated)', color: 'var(--text-tertiary)' }}>
-              Thinking...
-            </div>
-          </div>
-        )}
+          )
+        })}
         <div ref={messagesEndRef} />
       </div>
 

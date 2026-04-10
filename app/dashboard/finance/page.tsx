@@ -1,12 +1,9 @@
-import Image from 'next/image'
 import { DollarSign } from 'lucide-react'
 
 export default function FinancePage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
-      <Image src="/Primary_White.svg" alt="Tui Media" width={160} height={34} className="mb-8" style={{ height: 'auto' }} />
-
-      <DollarSign className="w-12 h-12 mb-4" style={{ color: 'var(--accent)' }} />
+      <img src="/Xero_software_logo.svg.png" alt="Xero" width={120} height={120} className="mb-6" style={{ objectFit: 'contain' }} />
 
       <h1 className="text-2xl font-semibold mb-2" style={{ letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
         Financial Dashboard

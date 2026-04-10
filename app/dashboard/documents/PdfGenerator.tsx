@@ -30,7 +30,8 @@ export default function PdfGenerator() {
     try {
       const { pdf } = await import('@react-pdf/renderer')
       const { default: TuiDocument } = await import('./TuiPdfDocument')
-      const blob = await pdf(TuiDocument({ template, form })).toBlob()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const blob = await pdf(TuiDocument({ template, form }) as any).toBlob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
