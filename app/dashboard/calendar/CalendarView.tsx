@@ -66,10 +66,10 @@ export default function CalendarView({ events, jobs, month, year }: { events: Ev
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>Calendar</h1>
         <div className="flex items-center gap-3">
-          <a href={webcalUrl} className="btn-secondary text-sm">
+          <a href={webcalUrl} className="btn-secondary text-sm hidden! sm:inline-flex!">
             <Calendar className="w-3.5 h-3.5" /> Subscribe in Apple Calendar
           </a>
           <button onClick={() => setShowModal(true)} className="btn-primary">

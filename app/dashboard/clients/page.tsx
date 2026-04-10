@@ -36,9 +36,9 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>Clients</h1>
-        <Link href="/dashboard/clients/new" className="btn-primary">
+        <Link href="/dashboard/clients/new" className="btn-primary w-fit">
           <Plus className="w-4 h-4" /> New Client
         </Link>
       </div>
