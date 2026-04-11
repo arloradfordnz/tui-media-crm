@@ -2,24 +2,34 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Send, Trash2, Bot, User } from 'lucide-react'
+import { Send, Trash2, Bot, User, Plus, Search, CalendarDays, BarChart3 } from 'lucide-react'
 
 type Message = { role: 'user' | 'assistant'; content: string }
+
+const QUICK_ACTIONS = [
+  { label: 'New Client', icon: Plus, prompt: 'Create a new client called ' },
+  { label: 'New Job', icon: Plus, prompt: 'Create a new job called ' },
+  { label: 'Find Client', icon: Search, prompt: 'Search for client ' },
+  { label: "Today's Schedule", icon: CalendarDays, prompt: "What's on my schedule today?" },
+  { label: 'Dashboard Stats', icon: BarChart3, prompt: 'Show me a quick overview of how the business is going' },
+  { label: 'Jobs in Review', icon: Search, prompt: 'Which jobs are currently in review?' },
+]
 
 export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  async function handleSend() {
-    if (!input.trim() || loading) return
-    const userMsg: Message = { role: 'user', content: input.trim() }
+  async function sendMessage(text: string) {
+    if (!text.trim() || loading) return
+    const userMsg: Message = { role: 'user', content: text.trim() }
     const newMessages = [...messages, userMsg]
     setMessages([...newMessages, { role: 'assistant', content: '' }])
     setInput('')
@@ -73,6 +83,15 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
     setLoading(false)
   }
 
+  function handleQuickAction(action: typeof QUICK_ACTIONS[number]) {
+    if (action.prompt.endsWith(' ')) {
+      setInput(action.prompt)
+      inputRef.current?.focus()
+    } else {
+      sendMessage(action.prompt)
+    }
+  }
+
   function handleClear() {
     setMessages([])
   }
@@ -108,8 +127,26 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center" style={{ color: 'var(--text-tertiary)' }}>
             <Bot className="w-8 h-8 mb-2" />
-            <p className="text-sm">How can I help with Tui Media today?</p>
-            <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)', opacity: 0.7 }}>I can manage clients, jobs, events, documents &amp; gear.</p>
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>How can I help?</p>
+            <div className="flex flex-wrap gap-1.5 mt-4 justify-center px-2">
+              {QUICK_ACTIONS.map((a) => (
+                <button
+                  key={a.label}
+                  onClick={() => handleQuickAction(a)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors"
+                  style={{
+                    background: 'var(--bg-elevated)',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--bg-border)',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--bg-border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}
+                >
+                  <a.icon className="w-3 h-3" />
+                  {a.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
         {messages.map((m, i) => {
@@ -129,7 +166,14 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
                   whiteSpace: 'pre-wrap',
                 }}
               >
-                {isStreamingEmpty ? 'Thinking...' : m.content}
+                {isStreamingEmpty ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs">Thinking</span>
+                    <div className="loading-dots">
+                      <span /><span /><span />
+                    </div>
+                  </div>
+                ) : m.content}
               </div>
               {m.role === 'user' && (
                 <div className="avatar avatar-sm shrink-0" style={{ background: 'var(--bg-elevated)' }}>
@@ -145,10 +189,11 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
       {/* Input */}
       <div className="p-3" style={{ borderTop: '1px solid var(--bg-border)' }}>
         <form
-          onSubmit={(e) => { e.preventDefault(); handleSend() }}
+          onSubmit={(e) => { e.preventDefault(); sendMessage(input) }}
           className="flex gap-2"
         >
           <input
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask anything..."

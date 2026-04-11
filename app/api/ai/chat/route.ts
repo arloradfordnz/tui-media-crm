@@ -2,8 +2,43 @@ import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
 
-function getSystemPrompt() {
-  const today = new Date().toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+async function getSystemPrompt(supabase: ReturnType<typeof createServerSupabaseClient> extends Promise<infer T> ? T : never) {
+  const now = new Date()
+  const today = now.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const todayISO = now.toISOString().split('T')[0]
+  const weekFromNow = new Date(now.getTime() + 7 * 86400000).toISOString().split('T')[0]
+
+  // Fetch live context in parallel for speed
+  const [
+    { data: todayEvents },
+    { data: activeJobs },
+    { data: reviewJobs },
+    { count: totalClients },
+    { data: recentActivity },
+  ] = await Promise.all([
+    supabase.from('events').select('title, event_type, date, start_time, end_time, notes').gte('date', todayISO).lte('date', weekFromNow).order('date').order('start_time').limit(10),
+    supabase.from('jobs').select('name, status, clients(name), shoot_date').not('status', 'in', '("delivered","archived")').order('created_at', { ascending: false }).limit(10),
+    supabase.from('jobs').select('name, clients(name)').eq('status', 'review').limit(5),
+    supabase.from('clients').select('*', { count: 'exact', head: true }),
+    supabase.from('activities').select('action, details, created_at').order('created_at', { ascending: false }).limit(5),
+  ])
+
+  const eventsBlock = (todayEvents ?? []).length > 0
+    ? `\n\nUpcoming schedule (next 7 days):\n${(todayEvents ?? []).map(e => `- ${e.date?.split('T')[0]} ${e.start_time || ''}: ${e.title} (${e.event_type})`).join('\n')}`
+    : '\n\nNo events scheduled in the next 7 days.'
+
+  const activeBlock = (activeJobs ?? []).length > 0
+    ? `\n\nActive jobs right now:\n${(activeJobs ?? []).map(j => `- "${j.name}" [${j.status}]${(j.clients as unknown as { name: string })?.name ? ` for ${(j.clients as unknown as { name: string }).name}` : ''}${j.shoot_date ? ` — shoot: ${j.shoot_date.split('T')[0]}` : ''}`).join('\n')}`
+    : ''
+
+  const reviewBlock = (reviewJobs ?? []).length > 0
+    ? `\n\nJobs awaiting review:\n${(reviewJobs ?? []).map(j => `- "${j.name}"${(j.clients as unknown as { name: string })?.name ? ` for ${(j.clients as unknown as { name: string }).name}` : ''}`).join('\n')}`
+    : ''
+
+  const activityBlock = (recentActivity ?? []).length > 0
+    ? `\n\nRecent activity:\n${(recentActivity ?? []).map(a => `- ${a.details || a.action} (${new Date(a.created_at).toLocaleDateString('en-NZ')})`).join('\n')}`
+    : ''
+
   return `You are the AI assistant for Tui Media, a professional videography and photography business based in Nelson, New Zealand, run by Arlo Radford.
 
 You have full access to the Tui Media CRM dashboard. You can search, create, update, and delete clients, jobs, calendar events, documents, and gear items. You can also view dashboard statistics and manage job tasks.
@@ -14,7 +49,7 @@ Guidelines:
 - After performing an action, confirm in one short sentence (e.g. "Done — added John as a client."). Do NOT repeat back all the details you just saved.
 - Use sensible defaults for optional fields the user doesn't specify (e.g. status "lead", pipeline_stage "enquiry").
 - When searching by name, the search is case-insensitive and partial.
-- Today is ${today}.
+- Today is ${today}. Total clients: ${totalClients ?? 0}.
 
 Reference values:
 - Client pipeline stages: enquiry, discovery, proposal, negotiation, won, lost
@@ -22,7 +57,9 @@ Reference values:
 - Job statuses: enquiry, booked, preproduction, shootday, editing, review, approved, delivered, archived
 - Event types: shoot, meeting, deadline, personal
 - Gear statuses: available, in-use, maintenance, retired
-- Document types: contract, invoice, brief, other`
+- Document types: contract, invoice, brief, other
+
+=== CURRENT STATUS ===${eventsBlock}${activeBlock}${reviewBlock}${activityBlock}`
 }
 
 const TOOLS: Anthropic.Tool[] = [
@@ -673,6 +710,9 @@ export async function POST(request: NextRequest) {
     content: m.content,
   }))
 
+  // Pre-fetch system prompt with live context before starting the stream
+  const systemPrompt = await getSystemPrompt(supabase)
+
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
@@ -685,7 +725,7 @@ export async function POST(request: NextRequest) {
           const anthropicStream = anthropic.messages.stream({
             model: 'claude-haiku-4-5-20251001',
             max_tokens: 2048,
-            system: getSystemPrompt(),
+            system: systemPrompt,
             messages: currentMessages,
             tools: TOOLS,
           })

@@ -373,10 +373,38 @@ input, textarea, select, button { font-family: inherit; }
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes pulse-dot {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
 
 .animate-fade-in {
   animation: fadeIn 200ms ease;
 }
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-border) 50%, var(--bg-elevated) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 6px;
+}
+.loading-dots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.loading-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+.loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+.loading-dots span:nth-child(3) { animation-delay: 0.4s; }
 
 /* ── Search ───────────────────────────────────────────────── */
 .search-input {
