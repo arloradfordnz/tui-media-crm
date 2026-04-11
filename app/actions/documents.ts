@@ -7,13 +7,14 @@ import { createServerSupabaseClient } from '@/lib/supabase'
 export async function createDocument(prevState: { error?: string } | undefined, formData: FormData) {
   const name = formData.get('name') as string
   const docType = formData.get('docType') as string
+  const clientId = formData.get('clientId') as string
 
   if (!name) return { error: 'Name is required.' }
 
   const supabase = await createServerSupabaseClient()
   const { data: doc, error } = await supabase
     .from('documents')
-    .insert({ name, doc_type: docType || 'contract', content: '' })
+    .insert({ name, doc_type: docType || 'contract', content: '', client_id: clientId || null })
     .select('id')
     .single()
 
@@ -28,11 +29,12 @@ export async function updateDocument(prevState: { error?: string } | undefined, 
   const name = formData.get('name') as string
   const docType = formData.get('docType') as string
   const content = formData.get('content') as string
+  const clientId = formData.get('clientId') as string
 
   if (!name) return { error: 'Name is required.' }
 
   const supabase = await createServerSupabaseClient()
-  await supabase.from('documents').update({ name, doc_type: docType || 'contract', content: content || '' }).eq('id', docId)
+  await supabase.from('documents').update({ name, doc_type: docType || 'contract', content: content || '', client_id: clientId || null }).eq('id', docId)
 
   revalidatePath('/dashboard/documents')
   revalidatePath(`/dashboard/documents/${docId}`)

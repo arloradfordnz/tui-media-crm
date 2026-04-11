@@ -5,7 +5,7 @@ import { updateClient, deleteClient } from '@/app/actions/clients'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@/lib/format'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Trash2, Briefcase, MessageSquare, StickyNote, UserCircle } from 'lucide-react'
+import { ArrowLeft, Trash2, Briefcase, MessageSquare, StickyNote, UserCircle, Copy, Check, FileText, ExternalLink } from 'lucide-react'
 
 const PIPELINE_STAGES = ['enquiry', 'discovery', 'proposal', 'contract', 'booked']
 const LEAD_SOURCES = ['Referral', 'Website', 'Social Media', 'Google', 'Word of Mouth', 'Other']
@@ -23,6 +23,8 @@ type ClientData = {
   lifetimeValue: number
   notes: string | null
   tags: string | null
+  portalToken: string | null
+  documents: { id: string; name: string; docType: string; updatedAt: string }[]
   jobs: { id: string; name: string; jobType: string | null; status: string; quoteValue: number | null; shootDate: string | null }[]
   activities: { id: string; action: string; details: string | null; createdAt: string; job: { name: string } | null }[]
 }
@@ -30,6 +32,7 @@ type ClientData = {
 const TABS = [
   { key: 'details', label: 'Details', icon: UserCircle },
   { key: 'jobs', label: 'Jobs', icon: Briefcase },
+  { key: 'documents', label: 'Documents', icon: FileText },
   { key: 'history', label: 'History', icon: MessageSquare },
   { key: 'notes', label: 'Notes', icon: StickyNote },
 ]
@@ -38,7 +41,29 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
   const [tab, setTab] = useState(activeTab)
   const [state, action, pending] = useActionState(updateClient, undefined)
   const [deleting, setDeleting] = useState(false)
+  const [copied, setCopied] = useState(false)
   const router = useRouter()
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tuimedia.co.nz'
+  const portalLink = client.portalToken ? `${appUrl}/portal/client/${client.portalToken}` : null
+
+  async function copyPortalLink() {
+    if (!portalLink) return
+    try {
+      await navigator.clipboard.writeText(portalLink)
+    } catch {
+      const ta = document.createElement('textarea')
+      ta.value = portalLink
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   const tags: string[] = client.tags ? JSON.parse(client.tags) : []
   const pipelineIndex = PIPELINE_STAGES.indexOf(client.pipelineStage)
@@ -65,7 +90,15 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
             <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>No email</p>
           )}
         </div>
-        <span className={`badge ${statusBadgeClass(client.status)}`}>{statusLabel(client.status)}</span>
+        <div className="flex items-center gap-3">
+          {portalLink && (
+            <button onClick={copyPortalLink} className="btn-secondary text-sm">
+              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? 'Copied!' : 'Copy Client Portal Link'}
+            </button>
+          )}
+          <span className={`badge ${statusBadgeClass(client.status)}`}>{statusLabel(client.status)}</span>
+        </div>
       </div>
 
       {/* Stat strip */}
@@ -207,6 +240,41 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
                 ))}
               </tbody>
             </table>
+          )}
+        </div>
+      )}
+
+      {tab === 'documents' && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Client Documents</p>
+            <Link href={`/dashboard/documents?clientId=${client.id}`} className="btn-primary text-sm">
+              <FileText className="w-3.5 h-3.5" /> Create Document
+            </Link>
+          </div>
+          {client.documents.length === 0 ? (
+            <div className="empty-state">
+              <FileText className="w-10 h-10 empty-icon" />
+              <p className="empty-title">No documents yet</p>
+              <p className="empty-description">Create a contract, invoice, or other document for this client.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {client.documents.map((d) => (
+                <div key={d.id} className="flex items-center justify-between py-3 px-3 rounded-lg" style={{ background: 'var(--bg-elevated)' }}>
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+                    <div>
+                      <Link href={`/dashboard/documents/${d.id}`} className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{d.name}</Link>
+                      <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{d.docType} · {formatDate(d.updatedAt)}</p>
+                    </div>
+                  </div>
+                  <Link href={`/dashboard/documents/${d.id}`} className="btn-icon">
+                    <ExternalLink className="w-4 h-4" />
+                  </Link>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}

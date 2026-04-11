@@ -7,9 +7,10 @@ import { ArrowLeft, Save, Trash2 } from 'lucide-react'
 
 const DOC_TYPES = ['contract', 'callsheet', 'shotlist', 'questionnaire']
 
-type DocData = { id: string; name: string; docType: string; content: string }
+type DocData = { id: string; name: string; docType: string; content: string; clientId: string | null }
+type ClientOption = { id: string; name: string }
 
-export default function DocumentEditor({ doc }: { doc: DocData }) {
+export default function DocumentEditor({ doc, clients }: { doc: DocData; clients: ClientOption[] }) {
   const [state, action, pending] = useActionState(updateDocument, undefined)
   const [deleting, setDeleting] = useState(false)
 
@@ -36,6 +37,13 @@ export default function DocumentEditor({ doc }: { doc: DocData }) {
             <label className="field-label">Type</label>
             <select name="docType" defaultValue={doc.docType} className="field-input">
               {DOC_TYPES.map((t) => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="field-label">Client</label>
+            <select name="clientId" defaultValue={doc.clientId || ''} className="field-input">
+              <option value="">None</option>
+              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
         </div>

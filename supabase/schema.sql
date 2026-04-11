@@ -17,7 +17,8 @@ CREATE TABLE clients (
   status          TEXT DEFAULT 'lead',
   lifetime_value  NUMERIC DEFAULT 0,
   notes           TEXT,
-  tags            TEXT  -- stored as JSON array string e.g. '["Wedding","Referral"]'
+  tags            TEXT,  -- stored as JSON array string e.g. '["Wedding","Referral"]'
+  portal_token    TEXT UNIQUE DEFAULT gen_random_uuid()::text
 );
 
 -- ── Job Templates ─────────────────────────────────────────────────────────────
@@ -175,7 +176,8 @@ CREATE TABLE documents (
   updated_at  TIMESTAMPTZ DEFAULT NOW(),
   name        TEXT NOT NULL,
   doc_type    TEXT NOT NULL,
-  content     TEXT DEFAULT ''
+  content     TEXT DEFAULT '',
+  client_id   UUID REFERENCES clients(id) ON DELETE SET NULL
 );
 
 -- ── Notifications ─────────────────────────────────────────────────────────────
@@ -271,6 +273,7 @@ CREATE POLICY "anon_read" ON delivery_files  FOR SELECT TO anon USING (true);
 CREATE POLICY "anon_read" ON proposals       FOR SELECT TO anon USING (true);
 CREATE POLICY "anon_read" ON revisions       FOR SELECT TO anon USING (true);
 CREATE POLICY "anon_read" ON clients         FOR SELECT TO anon USING (true);
+CREATE POLICY "anon_read" ON documents       FOR SELECT TO anon USING (true);
 
 -- Anon can update delivery_files and jobs (for approve/request changes from portal)
 CREATE POLICY "anon_update_delivery" ON delivery_files FOR UPDATE TO anon USING (true) WITH CHECK (true);

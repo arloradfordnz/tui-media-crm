@@ -428,7 +428,7 @@ input, textarea, select, button { font-family: inherit; }
   .mobile-nav-toggle { display: flex; }
   .desktop-margin { margin-left: 0 !important; }
   .bottom-nav { display: flex; }
-  .top-bar-mobile { padding-left: 56px; }
+  .top-bar-mobile { padding-left: 16px; }
   main.p-6 { padding-bottom: 80px; }
 }
 @media (min-width: 769px) {
