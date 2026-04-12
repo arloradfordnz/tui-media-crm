@@ -40,7 +40,7 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
   const [copied, setCopied] = useState(false)
 
   const isDraft = proposal.status === 'draft'
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tuimedia.co.nz'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
   const proposalUrl = `${baseUrl}/proposal/${proposal.token}`
   const total = services.reduce((sum, s) => sum + (s.amount || 0), 0)
 

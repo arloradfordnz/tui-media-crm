@@ -86,7 +86,7 @@ export async function sendProposal(proposalId: string) {
   await supabase.from('notifications').insert({ title: 'Proposal Sent', message: `Proposal for "${job.name}" has been sent`, type: 'status_change', job_id: proposal.job_id, client_id: job.client_id })
 
   if (job.clients.email) {
-    const proposalUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://tuimedia.co.nz'}/proposal/${proposal.token}`
+    const proposalUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'}/proposal/${proposal.token}`
     await sendProposalEmail(job.clients.email, job.clients.name, job.name, proposalUrl)
   }
 
@@ -114,7 +114,7 @@ export async function acceptProposal(token: string) {
   await supabase.from('notifications').insert({ title: 'Proposal Accepted!', message: `${job.clients.name} accepted the proposal for "${job.name}"`, type: 'status_change', job_id: proposal.job_id, client_id: job.client_id })
 
   // Notify admin via email — use first authenticated user's metadata or a fixed address
-  await sendProposalAcceptedEmail('hello@tuimedia.co.nz', job.clients.name, job.name)
+  await sendProposalAcceptedEmail('hello@tuimedia.nz', job.clients.name, job.name)
 
   revalidatePath(`/dashboard/jobs/${proposal.job_id}`)
 }

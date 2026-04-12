@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Trash2, Briefcase, MessageSquare, StickyNote, UserCircle, Copy, Check, FileText, ExternalLink } from 'lucide-react'
 
-const PIPELINE_STAGES = ['enquiry', 'discovery', 'proposal', 'contract', 'booked']
+const PIPELINE_STAGES = ['enquiry', 'discovery', 'proposal', 'negotiation', 'won']
 const LEAD_SOURCES = ['Referral', 'Website', 'Social Media', 'Google', 'Word of Mouth', 'Other']
 
 type ClientData = {
@@ -44,7 +44,7 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
   const [copied, setCopied] = useState(false)
   const router = useRouter()
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tuimedia.co.nz'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
   const portalLink = client.portalToken ? `${appUrl}/portal/client/${client.portalToken}` : null
 
   async function copyPortalLink() {
@@ -66,7 +66,7 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
   }
 
   const tags: string[] = client.tags ? JSON.parse(client.tags) : []
-  const pipelineIndex = PIPELINE_STAGES.indexOf(client.pipelineStage)
+  const pipelineIndex = Math.max(0, PIPELINE_STAGES.indexOf(client.pipelineStage))
 
   async function handleDelete() {
     if (!confirm('Delete this client and all their data? This cannot be undone.')) return

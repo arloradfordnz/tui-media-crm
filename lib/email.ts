@@ -2,7 +2,7 @@ import { Resend } from 'resend'
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
-const FROM = process.env.EMAIL_FROM || 'Tui Media <noreply@tuimedia.co.nz>'
+const FROM = process.env.EMAIL_FROM || 'Tui Media <noreply@tuimedia.nz>'
 
 async function send({ to, subject, html }: { to: string; subject: string; html: string }) {
   if (!resend) {
@@ -21,7 +21,7 @@ function wrap(body: string) {
     <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#0a0a0a;color:#f5f5f5;padding:40px 20px;">
       <div style="max-width:560px;margin:0 auto;">
         <div style="text-align:center;margin-bottom:32px;">
-          <img src="https://tuimedia.co.nz/Primary_White.svg" alt="Tui Media" width="140" style="display:inline-block;" />
+          <img src="https://dashboard.tuimedia.nz/Primary_White.svg" alt="Tui Media" width="140" style="display:inline-block;" />
         </div>
         <div style="background:#141414;border:1px solid #1e1e1e;border-radius:12px;padding:32px;">
           ${body}

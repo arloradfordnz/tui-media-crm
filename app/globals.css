@@ -27,6 +27,7 @@ body {
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeSpeed;
 }
 
 /* ── Scrollbar ────────────────────────────────────────────── */
@@ -62,7 +63,7 @@ input, textarea, select, button { font-family: inherit; }
   color: var(--text-primary);
   background: var(--bg-elevated);
   outline: none;
-  transition: border-color 150ms ease;
+  transition: border-color 80ms ease;
 }
 .field-input::placeholder { color: var(--text-tertiary); }
 .field-input:focus { border-color: var(--accent); }
@@ -90,8 +91,9 @@ input, textarea, select, button { font-family: inherit; }
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 150ms ease;
+  transition: background 100ms ease, transform 100ms ease;
   text-decoration: none;
+  will-change: transform;
 }
 .btn-primary:hover { background: var(--accent-hover); transform: scale(1.02); }
 .btn-primary:active { transform: scale(0.98); }
@@ -110,7 +112,7 @@ input, textarea, select, button { font-family: inherit; }
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 150ms ease;
+  transition: background 100ms ease, border-color 100ms ease;
   text-decoration: none;
 }
 .btn-secondary:hover { background: var(--bg-elevated); }
@@ -151,6 +153,7 @@ input, textarea, select, button { font-family: inherit; }
   border: 1px solid var(--bg-border);
   border-radius: 12px;
   padding: 1.25rem;
+  contain: layout style;
 }
 
 .card-flush {
@@ -158,6 +161,7 @@ input, textarea, select, button { font-family: inherit; }
   border: 1px solid var(--bg-border);
   border-radius: 12px;
   overflow: hidden;
+  contain: layout style;
 }
 
 /* ── Navigation ───────────────────────────────────────────── */
@@ -171,8 +175,9 @@ input, textarea, select, button { font-family: inherit; }
   font-weight: 400;
   color: var(--text-secondary);
   text-decoration: none;
-  transition: all 150ms ease;
+  transition: color 100ms ease, background 100ms ease;
   position: relative;
+  will-change: background;
 }
 .nav-item:hover { color: var(--text-primary); background: var(--bg-elevated); }
 .nav-item.active {
@@ -212,7 +217,8 @@ input, textarea, select, button { font-family: inherit; }
 }
 
 .table-row {
-  transition: background 150ms ease;
+  transition: background 80ms ease;
+  contain: content;
 }
 .table-row:hover { background: var(--bg-elevated); }
 
@@ -261,7 +267,7 @@ input, textarea, select, button { font-family: inherit; }
   align-items: center;
   justify-content: center;
   z-index: 50;
-  animation: fadeIn 150ms ease;
+  animation: fadeIn 100ms ease;
 }
 .modal-content {
   background: var(--bg-surface);
@@ -272,7 +278,8 @@ input, textarea, select, button { font-family: inherit; }
   max-width: 480px;
   max-height: 90vh;
   overflow-y: auto;
-  animation: slideUp 150ms ease;
+  animation: slideUp 100ms ease;
+  will-change: transform, opacity;
 }
 
 /* ── Upload Drop Zone ─────────────────────────────────────── */
@@ -383,7 +390,7 @@ input, textarea, select, button { font-family: inherit; }
 }
 
 .animate-fade-in {
-  animation: fadeIn 200ms ease;
+  animation: fadeIn 120ms ease;
 }
 .skeleton {
   background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-border) 50%, var(--bg-elevated) 75%);
@@ -447,10 +454,10 @@ input, textarea, select, button { font-family: inherit; }
 /* ── Mobile Responsive ────────────────────────────────────── */
 @media (max-width: 768px) {
   .sidebar {
-    transform: translateX(-100%);
+    transform: translate3d(-100%, 0, 0);
   }
   .sidebar.sidebar-open {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
   .mobile-nav { display: flex; }
   .mobile-nav-toggle { display: flex; }

@@ -47,7 +47,7 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
   const router = useRouter()
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
   }, [messages])
 
   async function sendMessage(text: string) {

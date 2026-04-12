@@ -1,7 +1,8 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { formatNZD, formatDate, getInitials, statusLabel, statusBadgeClass } from '@/lib/format'
-import { Users, Plus, Search } from 'lucide-react'
+import { Users, Plus } from 'lucide-react'
 import Link from 'next/link'
+import SearchInput from '@/components/SearchInput'
 
 const STATUSES = ['all', 'lead', 'active', 'past', 'archived']
 
@@ -14,7 +15,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
 
   let query = supabase
     .from('clients')
-    .select('id, name, email, location, status, lifetime_value, tags, created_at')
+    .select('id, name, email, location, status, lifetime_value, tags, created_at, jobs(count)')
     .order('name', { ascending: true })
 
   if (statusFilter !== 'all') query = query.eq('status', statusFilter)
@@ -22,17 +23,10 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
 
   const { data: clientRows } = await query
 
-  // Fetch job counts
-  const { data: jobCounts } = await supabase
-    .from('jobs')
-    .select('client_id')
-
-  const countMap: Record<string, number> = {}
-  for (const j of jobCounts ?? []) {
-    countMap[j.client_id] = (countMap[j.client_id] || 0) + 1
-  }
-
-  const clients = (clientRows ?? []).map((c) => ({ ...c, jobCount: countMap[c.id] || 0 }))
+  const clients = (clientRows ?? []).map((c) => ({
+    ...c,
+    jobCount: (c.jobs as unknown as { count: number }[])?.[0]?.count ?? 0,
+  }))
 
   return (
     <div className="space-y-6">
@@ -45,16 +39,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <form className="relative flex-1" action="/dashboard/clients" method="GET">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-          <input
-            name="search"
-            defaultValue={search}
-            placeholder="Search clients..."
-            className="search-input"
-          />
-          {statusFilter !== 'all' && <input type="hidden" name="status" value={statusFilter} />}
-        </form>
+        <SearchInput basePath="/dashboard/clients" placeholder="Search clients..." />
         <div className="flex gap-2">
           {STATUSES.map((s) => (
             <Link

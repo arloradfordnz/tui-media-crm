@@ -61,7 +61,7 @@ export default function JobRecord({ job }: { job: JobData }) {
       tasks.map((t) => (t.id === id ? { ...t, completed } : t))
   )
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tuimedia.co.nz'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
   const portalUrl = `${baseUrl}/portal/${job.portalToken}`
 
   function handleStatusChange(newStatus: string) {

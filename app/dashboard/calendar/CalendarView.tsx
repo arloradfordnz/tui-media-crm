@@ -61,7 +61,7 @@ export default function CalendarView({ events, jobs, month, year }: { events: Ev
 
   const selectedEvents = selectedDay ? eventsForDay(selectedDay) : []
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://tuimedia.co.nz'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
   const webcalUrl = `webcal://${appUrl.replace(/^https?:\/\//, '')}/api/calendar/feed.ics`
 
   return (

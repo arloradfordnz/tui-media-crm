@@ -28,7 +28,8 @@ export default async function DashboardPage() {
     { count: activeJobs },
     { count: reviewJobs },
     { count: leadsInPipeline },
-    { data: allJobs },
+    { data: deliveredThisMonth },
+    { data: pipelineJobs },
     { data: todayShoots },
     { data: upcomingEvents },
     { data: recentActivity },
@@ -36,22 +37,21 @@ export default async function DashboardPage() {
     supabase.from('jobs').select('*', { count: 'exact', head: true }).not('status', 'in', '("delivered","archived")'),
     supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('status', 'review'),
     supabase.from('clients').select('*', { count: 'exact', head: true }).in('pipeline_stage', ['enquiry', 'discovery']),
-    supabase.from('jobs').select('status, quote_value, created_at'),
+    supabase.from('jobs').select('quote_value').eq('status', 'delivered').gte('created_at', startOfMonth),
+    supabase.from('jobs').select('status'),
     supabase.from('events').select('id, title, start_time, end_time, job_id, jobs(id, name)').eq('event_type', 'shoot').gte('date', todayStart).lt('date', todayEnd).order('start_time', { ascending: true }),
     supabase.from('events').select('id, title, event_type, date, start_time, job_id, jobs(id, name)').gte('date', todayStart).order('date', { ascending: true }).limit(5),
     supabase.from('activities').select('id, action, details, created_at, job_id, jobs(id, name), client_id, clients(id, name)').order('created_at', { ascending: false }).limit(10),
   ])
 
-  const revenueThisMonth = (allJobs ?? [])
-    .filter((j) => j.status === 'delivered' && j.created_at >= startOfMonth)
-    .reduce((sum, j) => sum + (j.quote_value || 0), 0)
+  const revenueThisMonth = (deliveredThisMonth ?? []).reduce((sum, j) => sum + (j.quote_value || 0), 0)
 
   const pipelineCounts: Record<string, number> = {}
   for (const s of JOB_PIPELINE) pipelineCounts[s] = 0
-  for (const j of allJobs ?? []) {
+  for (const j of pipelineJobs ?? []) {
     if (pipelineCounts[j.status] !== undefined) pipelineCounts[j.status]++
   }
-  const totalJobs = (allJobs ?? []).length || 1
+  const totalJobs = (pipelineJobs ?? []).length || 1
 
   return (
     <div className="space-y-6">

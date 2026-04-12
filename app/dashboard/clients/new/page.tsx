@@ -2,11 +2,12 @@
 
 import { useActionState } from 'react'
 import { createClient } from '@/app/actions/clients'
+import { statusLabel } from '@/lib/format'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 
 const LEAD_SOURCES = ['Referral', 'Website', 'Social Media', 'Google', 'Word of Mouth', 'Other']
-const PIPELINE_STAGES = ['enquiry', 'discovery', 'proposal', 'contract', 'booked']
+const PIPELINE_STAGES = ['enquiry', 'discovery', 'proposal', 'negotiation', 'won']
 const STATUSES = ['lead', 'active']
 
 export default function NewClientPage() {
@@ -53,7 +54,7 @@ export default function NewClientPage() {
             <label className="field-label">Pipeline Stage</label>
             <select name="pipelineStage" defaultValue="enquiry" className="field-input">
               {PIPELINE_STAGES.map((s) => (
-                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                <option key={s} value={s}>{statusLabel(s)}</option>
               ))}
             </select>
           </div>
@@ -61,7 +62,7 @@ export default function NewClientPage() {
             <label className="field-label">Status</label>
             <select name="status" defaultValue="lead" className="field-input">
               {STATUSES.map((s) => (
-                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                <option key={s} value={s}>{statusLabel(s)}</option>
               ))}
             </select>
           </div>

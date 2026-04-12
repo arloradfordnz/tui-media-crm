@@ -1,7 +1,8 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { formatNZD, formatDate, getInitials, statusLabel, statusBadgeClass } from '@/lib/format'
-import { Briefcase, Plus, Search } from 'lucide-react'
+import { Briefcase, Plus } from 'lucide-react'
 import Link from 'next/link'
+import SearchInput from '@/components/SearchInput'
 
 const JOB_STATUSES = ['all', 'enquiry', 'booked', 'preproduction', 'shootday', 'editing', 'review', 'approved', 'delivered', 'archived']
 
@@ -33,11 +34,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <form className="relative flex-1" action="/dashboard/jobs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
-          <input name="search" defaultValue={search} placeholder="Search jobs..." className="search-input" />
-          {statusFilter !== 'all' && <input type="hidden" name="status" value={statusFilter} />}
-        </form>
+        <SearchInput basePath="/dashboard/jobs" placeholder="Search jobs..." />
         <div className="flex gap-2 overflow-x-auto pb-1">
           {JOB_STATUSES.slice(0, 6).map((s) => (
             <Link

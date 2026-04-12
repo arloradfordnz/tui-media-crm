@@ -8,58 +8,35 @@ async function getSystemPrompt(supabase: ReturnType<typeof createServerSupabaseC
   const todayISO = now.toISOString().split('T')[0]
   const weekFromNow = new Date(now.getTime() + 7 * 86400000).toISOString().split('T')[0]
 
-  // Fetch live context in parallel for speed
+  // Fetch live context in parallel — keep lightweight for fast first-token
   const [
     { data: todayEvents },
     { data: activeJobs },
-    { data: reviewJobs },
     { count: totalClients },
-    { data: recentActivity },
   ] = await Promise.all([
-    supabase.from('events').select('title, event_type, date, start_time, end_time, notes').gte('date', todayISO).lte('date', weekFromNow).order('date').order('start_time').limit(10),
-    supabase.from('jobs').select('name, status, clients(name), shoot_date').not('status', 'in', '("delivered","archived")').order('created_at', { ascending: false }).limit(10),
-    supabase.from('jobs').select('name, clients(name)').eq('status', 'review').limit(5),
+    supabase.from('events').select('title, event_type, date, start_time').gte('date', todayISO).lte('date', weekFromNow).order('date').order('start_time').limit(7),
+    supabase.from('jobs').select('name, status, clients(name)').not('status', 'in', '("delivered","archived")').order('created_at', { ascending: false }).limit(8),
     supabase.from('clients').select('*', { count: 'exact', head: true }),
-    supabase.from('activities').select('action, details, created_at').order('created_at', { ascending: false }).limit(5),
   ])
 
   const eventsBlock = (todayEvents ?? []).length > 0
-    ? `\n\nUpcoming schedule (next 7 days):\n${(todayEvents ?? []).map(e => `- ${e.date?.split('T')[0]} ${e.start_time || ''}: ${e.title} (${e.event_type})`).join('\n')}`
-    : '\n\nNo events scheduled in the next 7 days.'
+    ? `\nSchedule (7d): ${(todayEvents ?? []).map(e => `${e.date?.split('T')[0]} ${e.start_time || ''} ${e.title} (${e.event_type})`).join(' | ')}`
+    : ''
 
   const activeBlock = (activeJobs ?? []).length > 0
-    ? `\n\nActive jobs right now:\n${(activeJobs ?? []).map(j => `- "${j.name}" [${j.status}]${(j.clients as unknown as { name: string })?.name ? ` for ${(j.clients as unknown as { name: string }).name}` : ''}${j.shoot_date ? ` — shoot: ${j.shoot_date.split('T')[0]}` : ''}`).join('\n')}`
+    ? `\nActive jobs: ${(activeJobs ?? []).map(j => `"${j.name}" [${j.status}]${(j.clients as unknown as { name: string })?.name ? ` — ${(j.clients as unknown as { name: string }).name}` : ''}`).join(' | ')}`
     : ''
 
-  const reviewBlock = (reviewJobs ?? []).length > 0
-    ? `\n\nJobs awaiting review:\n${(reviewJobs ?? []).map(j => `- "${j.name}"${(j.clients as unknown as { name: string })?.name ? ` for ${(j.clients as unknown as { name: string }).name}` : ''}`).join('\n')}`
-    : ''
+  return `You are the AI assistant for Tui Media CRM (Arlo Radford, videography/photography, Nelson NZ).
 
-  const activityBlock = (recentActivity ?? []).length > 0
-    ? `\n\nRecent activity:\n${(recentActivity ?? []).map(a => `- ${a.details || a.action} (${new Date(a.created_at).toLocaleDateString('en-NZ')})`).join('\n')}`
-    : ''
+You can search, create, and update clients, jobs, events, documents, and gear. You can view stats and manage tasks.
+IMPORTANT: You CANNOT delete clients. Client deletion is not permitted via AI — tell the user to do it from the client profile page.
 
-  return `You are the AI assistant for Tui Media, a professional videography and photography business based in Nelson, New Zealand, run by Arlo Radford.
+Rules: Be short (1-2 sentences). Act immediately with tools. Use sensible defaults (status "lead", pipeline "enquiry"). Confirm actions in one sentence.
+Today: ${today}. Clients: ${totalClients ?? 0}.
 
-You have full access to the Tui Media CRM dashboard. You can search, create, update, and delete clients, jobs, calendar events, documents, and gear items. You can also view dashboard statistics and manage job tasks.
-
-Guidelines:
-- Keep responses SHORT — 1-2 sentences max. No bullet points or lists unless the user asks for a summary.
-- Be concise and action-oriented. When asked to do something, use your tools immediately — don't ask for confirmation unless essential information is missing.
-- After performing an action, confirm in one short sentence (e.g. "Done — added John as a client."). Do NOT repeat back all the details you just saved.
-- Use sensible defaults for optional fields the user doesn't specify (e.g. status "lead", pipeline_stage "enquiry").
-- When searching by name, the search is case-insensitive and partial.
-- Today is ${today}. Total clients: ${totalClients ?? 0}.
-
-Reference values:
-- Client pipeline stages: enquiry, discovery, proposal, negotiation, won, lost
-- Client statuses: lead, active, inactive
-- Job statuses: enquiry, booked, preproduction, shootday, editing, review, approved, delivered, archived
-- Event types: shoot, meeting, deadline, personal
-- Gear statuses: available, in-use, maintenance, retired
-- Document types: contract, invoice, brief, other
-
-=== CURRENT STATUS ===${eventsBlock}${activeBlock}${reviewBlock}${activityBlock}`
+Enums — Pipeline: enquiry,discovery,proposal,negotiation,won,lost | Client status: lead,active,inactive | Job status: enquiry,booked,preproduction,shootday,editing,review,approved,delivered,archived | Events: shoot,meeting,deadline,personal | Gear: available,in-use,maintenance,retired | Docs: contract,invoice,brief,other
+${eventsBlock}${activeBlock}`
 }
 
 const TOOLS: Anthropic.Tool[] = [
@@ -125,18 +102,6 @@ const TOOLS: Anthropic.Tool[] = [
       required: ['client_id'],
     },
   },
-  {
-    name: 'delete_client',
-    description: 'Delete a client by ID. This is permanent.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        client_id: { type: 'string' },
-      },
-      required: ['client_id'],
-    },
-  },
-
   // ── Jobs ──────────────────────────────────────
   {
     name: 'search_jobs',
@@ -436,9 +401,7 @@ async function executeTool(name: string, input: Record<string, unknown>, supabas
     }
 
     case 'delete_client': {
-      const { error } = await supabase.from('clients').delete().eq('id', input.client_id as string)
-      if (error) return JSON.stringify({ error: error.message })
-      return JSON.stringify({ success: true })
+      return JSON.stringify({ error: 'Client deletion is not allowed via AI. Please delete clients manually from their profile page.' })
     }
 
     // ── Jobs ────────────────────────────────
@@ -725,7 +688,7 @@ export async function POST(request: NextRequest) {
         for (let round = 0; round < maxRounds; round++) {
           const anthropicStream = anthropic.messages.stream({
             model: 'claude-haiku-4-5-20251001',
-            max_tokens: 2048,
+            max_tokens: 1024,
             system: systemPrompt,
             messages: currentMessages,
             tools: TOOLS,
