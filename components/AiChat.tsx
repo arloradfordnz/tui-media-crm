@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Send, Trash2, Bot, User, Plus, Search, CalendarDays, BarChart3 } from 'lucide-react'
+import { Send, Trash2, Bot, User, Plus, Search, CalendarDays, BarChart3, ExternalLink } from 'lucide-react'
+import Link from 'next/link'
 
 type Message = { role: 'user' | 'assistant'; content: string }
 
@@ -14,6 +15,28 @@ const QUICK_ACTIONS = [
   { label: 'Dashboard Stats', icon: BarChart3, prompt: 'Show me a quick overview of how the business is going' },
   { label: 'Jobs in Review', icon: Search, prompt: 'Which jobs are currently in review?' },
 ]
+
+// Parse [[LINK:path|label]] markers from message content
+function parseLinks(content: string): { text: string; links: { path: string; label: string }[] } {
+  const links: { path: string; label: string }[] = []
+  const text = content.replace(/\[\[LINK:([^|]+)\|([^\]]+)\]\]/g, (_, path, label) => {
+    links.push({ path: path.trim(), label: label.trim() })
+    return ''
+  }).trim()
+  return { text, links }
+}
+
+// Strip working markers from display text
+function cleanContent(content: string): string {
+  return content.replace(/\[\[WORKING\]\]/g, '').replace(/\[\[\/WORKING\]\]/g, '').trim()
+}
+
+// Check if the message is currently in a working state (tool execution)
+function isWorking(content: string): boolean {
+  const lastWorking = content.lastIndexOf('[[WORKING]]')
+  const lastDone = content.lastIndexOf('[[/WORKING]]')
+  return lastWorking > lastDone
+}
 
 export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
   const [messages, setMessages] = useState<Message[]>([])
@@ -150,7 +173,11 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
           </div>
         )}
         {messages.map((m, i) => {
-          const isStreamingEmpty = loading && i === messages.length - 1 && m.role === 'assistant' && !m.content
+          const isLastAssistant = loading && i === messages.length - 1 && m.role === 'assistant'
+          const isEmpty = !m.content
+          const currentlyWorking = isLastAssistant && (isEmpty || isWorking(m.content))
+          const { text: displayText, links } = m.role === 'assistant' ? parseLinks(cleanContent(m.content)) : { text: m.content, links: [] }
+
           return (
             <div key={i} className={`flex gap-3 ${m.role === 'user' ? 'justify-end' : ''}`}>
               {m.role === 'assistant' && (
@@ -158,22 +185,43 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
                   <Bot className="w-4 h-4" style={{ color: 'var(--accent)' }} />
                 </div>
               )}
-              <div
-                className="max-w-[80%] rounded-lg px-3 py-2 text-sm"
-                style={{
-                  background: m.role === 'user' ? 'var(--accent)' : 'var(--bg-elevated)',
-                  color: m.role === 'user' ? '#fff' : isStreamingEmpty ? 'var(--text-tertiary)' : 'var(--text-primary)',
-                  whiteSpace: 'pre-wrap',
-                }}
-              >
-                {isStreamingEmpty ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs">Thinking</span>
-                    <div className="loading-dots">
-                      <span /><span /><span />
+              <div className="max-w-[80%] space-y-2">
+                <div
+                  className="rounded-lg px-3 py-2 text-sm"
+                  style={{
+                    background: m.role === 'user' ? 'var(--accent)' : 'var(--bg-elevated)',
+                    color: m.role === 'user' ? '#fff' : currentlyWorking ? 'var(--text-tertiary)' : 'var(--text-primary)',
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+                  {currentlyWorking ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs">{isEmpty ? 'Thinking' : 'Working on it'}</span>
+                      <div className="loading-dots">
+                        <span /><span /><span />
+                      </div>
                     </div>
+                  ) : displayText || '\u200B'}
+                </div>
+                {/* Link buttons for created entities */}
+                {links.length > 0 && !loading && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {links.map((link, li) => (
+                      <Link
+                        key={li}
+                        href={link.path}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                        style={{
+                          background: 'var(--accent)',
+                          color: '#fff',
+                        }}
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        {link.label}
+                      </Link>
+                    ))}
                   </div>
-                ) : m.content}
+                )}
               </div>
               {m.role === 'user' && (
                 <div className="avatar avatar-sm shrink-0" style={{ background: 'var(--bg-elevated)' }}>

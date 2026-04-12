@@ -719,6 +719,7 @@ export async function POST(request: NextRequest) {
     async start(controller) {
       try {
         const currentMessages: Anthropic.MessageParam[] = [...apiMessages]
+        const createdLinks: { path: string; label: string }[] = []
         const maxRounds = 10
 
         for (let round = 0; round < maxRounds; round++) {
@@ -741,9 +742,18 @@ export async function POST(request: NextRequest) {
           )
 
           if (toolUseBlocks.length === 0) {
+            // Append any collected links before closing
+            if (createdLinks.length > 0) {
+              for (const link of createdLinks) {
+                controller.enqueue(encoder.encode(`\n[[LINK:${link.path}|${link.label}]]`))
+              }
+            }
             controller.close()
             return
           }
+
+          // Signal to the UI that we're executing tools
+          controller.enqueue(encoder.encode('[[WORKING]]'))
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           currentMessages.push({ role: 'assistant', content: finalMessage.content as any })
@@ -753,8 +763,23 @@ export async function POST(request: NextRequest) {
             if (block.type === 'tool_use') {
               const result = await executeTool(block.name, block.input as Record<string, unknown>, supabase)
               toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
+
+              // Track created entities for link buttons
+              try {
+                const parsed = JSON.parse(result)
+                if (parsed.success) {
+                  if (parsed.client?.id) createdLinks.push({ path: `/dashboard/clients/${parsed.client.id}`, label: `View ${parsed.client.name || 'Client'}` })
+                  if (parsed.job?.id) createdLinks.push({ path: `/dashboard/jobs/${parsed.job.id}`, label: `View ${parsed.job.name || 'Job'}` })
+                  if (parsed.document?.id) createdLinks.push({ path: `/dashboard/documents/${parsed.document.id}`, label: `View ${parsed.document.name || 'Document'}` })
+                  if (parsed.event?.id) createdLinks.push({ path: `/dashboard/calendar`, label: 'View Calendar' })
+                  if (parsed.gear?.id) createdLinks.push({ path: `/dashboard/gear`, label: `View ${parsed.gear.name || 'Gear'}` })
+                }
+              } catch { /* not JSON or no link needed */ }
             }
           }
+
+          // Clear the working indicator
+          controller.enqueue(encoder.encode('[[/WORKING]]'))
 
           currentMessages.push({ role: 'user', content: toolResults })
         }
