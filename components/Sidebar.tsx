@@ -16,6 +16,7 @@ import {
   X,
   Bot,
   Building2,
+  Mail,
 } from 'lucide-react'
 
 const mainNav = [
@@ -30,6 +31,7 @@ const businessNav = [
   { href: '/dashboard/finance', label: 'Finance', icon: DollarSign },
   { href: '/dashboard/gear', label: 'Gear', icon: Camera },
   { href: '/dashboard/documents', label: 'Documents', icon: FileText },
+  { href: '/dashboard/emails', label: 'Email Log', icon: Mail },
 ]
 
 const accountNav = [

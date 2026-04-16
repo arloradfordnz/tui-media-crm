@@ -25,3 +25,24 @@ export async function changePassword(prevState: { error?: string; success?: bool
 
   return { success: true }
 }
+
+export async function saveEmailTemplate(prevState: { error?: string; success?: boolean } | undefined, formData: FormData) {
+  const type = formData.get('type') as string
+  const subject = formData.get('subject') as string
+  const body = formData.get('body') as string
+
+  if (!type || !subject || !body) return { error: 'All fields are required.' }
+
+  const supabase = await createServerSupabaseClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated.' }
+
+  const { error } = await supabase
+    .from('email_templates')
+    .upsert({ type, subject, body, updated_at: new Date().toISOString() }, { onConflict: 'type' })
+
+  if (error) return { error: error.message }
+
+  return { success: true }
+}

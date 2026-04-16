@@ -1,9 +1,15 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import SettingsForm from './SettingsForm'
+import EmailTemplatesForm from './EmailTemplatesForm'
 
 export default async function SettingsPage() {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
+
+  const { data: templates } = await supabase
+    .from('email_templates')
+    .select('*')
+    .order('type')
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -27,11 +33,14 @@ export default async function SettingsPage() {
       {/* Change Password */}
       <SettingsForm />
 
+      {/* Email Templates */}
+      <EmailTemplatesForm templates={templates || []} />
+
       {/* App Info */}
       <div className="card">
         <h2 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>App Info</h2>
         <div className="space-y-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-          <p>Tui Media Operating System v1.0</p>
+          <p>Tui Media Operating System v2.0</p>
           <p>Next.js + Supabase + Tailwind CSS</p>
         </div>
       </div>
