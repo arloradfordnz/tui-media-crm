@@ -134,6 +134,7 @@ export async function toggleTask(taskId: string, completed: boolean) {
   if (!task) return
   await supabase.from('job_tasks').update({ completed }).eq('id', taskId)
   revalidatePath(`/dashboard/jobs/${task.job_id}`)
+  revalidatePath('/dashboard')
 }
 
 export async function addRevision(prevState: { error?: string } | undefined, formData: FormData) {

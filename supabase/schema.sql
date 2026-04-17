@@ -281,3 +281,18 @@ CREATE POLICY "anon_update_jobs"     ON jobs           FOR UPDATE TO anon USING 
 CREATE POLICY "anon_insert"          ON revisions      FOR INSERT TO anon WITH CHECK (true);
 CREATE POLICY "anon_insert"          ON activities     FOR INSERT TO anon WITH CHECK (true);
 CREATE POLICY "anon_insert"          ON notifications  FOR INSERT TO anon WITH CHECK (true);
+
+-- ── Todos ─────────────────────────────────────────────────────────────────────
+CREATE TABLE todos (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  title            TEXT NOT NULL,
+  completed        BOOLEAN DEFAULT false,
+  due_date         TIMESTAMPTZ,
+  linked_job_id    UUID REFERENCES jobs(id) ON DELETE SET NULL,
+  linked_client_id UUID REFERENCES clients(id) ON DELETE SET NULL,
+  sort_order       INTEGER DEFAULT 0
+);
+
+ALTER TABLE todos ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "auth_all" ON todos FOR ALL TO authenticated USING (true) WITH CHECK (true);

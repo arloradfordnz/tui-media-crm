@@ -17,12 +17,14 @@ import {
   Bot,
   Building2,
   Mail,
+  CheckSquare,
 } from 'lucide-react'
 
 const mainNav = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/clients', label: 'Clients', icon: Users },
   { href: '/dashboard/jobs', label: 'Jobs', icon: Briefcase },
+  { href: '/dashboard/todos', label: 'To Do', icon: CheckSquare },
   { href: '/dashboard/calendar', label: 'Calendar', icon: Calendar },
   { href: '/dashboard/ai', label: 'AI Assistant', icon: Bot },
 ]

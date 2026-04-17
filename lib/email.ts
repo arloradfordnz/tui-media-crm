@@ -87,7 +87,7 @@ const NO_REPLY = `
   </div>
 `
 
-function wrap(body: string) {
+function wrap(body: string, signoff = SIGNOFF) {
   return `
     <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#0a0a0a;color:#f5f5f5;padding:48px 20px;">
       <div style="max-width:560px;margin:0 auto;">
@@ -96,7 +96,7 @@ function wrap(body: string) {
         </div>
         <div style="background:#0a0a0a;padding:0 8px;">
           ${body}
-          ${SIGNOFF}
+          ${signoff}
           ${NO_REPLY}
         </div>
         <p style="text-align:center;color:#444;font-size:12px;margin-top:32px;">&copy; ${new Date().getFullYear()} Tui Media &middot; <a href="https://tuimedia.nz" style="color:#555;text-decoration:none;">tuimedia.nz</a></p>
@@ -276,6 +276,112 @@ export async function sendWelcomeEmail(to: string, clientName: string, clientId?
       ${bodyToHtml(bodyText)}
     `),
   })
+}
+
+type BriefingTodo = { title: string; dueDate: string | null; isOverdue: boolean; jobName: string | null }
+type BriefingEvent = { title: string; startTime: string | null; jobName: string | null }
+type BriefingUpcoming = { title: string; date: string; jobName: string | null }
+type BriefingJob = { name: string; clientName: string | null }
+
+export type MorningBriefingData = {
+  date: Date
+  weather: { temp: number; description: string; windKph: number } | null
+  todos: BriefingTodo[]
+  overdueCount: number
+  todayEvents: BriefingEvent[]
+  upcomingEvents: BriefingUpcoming[]
+  reviewJobs: BriefingJob[]
+  weekJobCount: number
+}
+
+function fmtShortDate(d: string) {
+  return new Date(d).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+function section(label: string, content: string) {
+  return `
+    <div style="border-top:1px solid #222;margin-top:28px;padding-top:20px;">
+      <p style="color:#555;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin:0 0 14px;">${label}</p>
+      ${content}
+    </div>
+  `
+}
+
+export async function sendMorningBriefingEmail(data: MorningBriefingData) {
+  const { date, weather, todos, overdueCount, todayEvents, upcomingEvents, reviewJobs, weekJobCount } = data
+
+  const dayLabel = date.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const shortDay = date.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })
+
+  // Weather
+  const weatherContent = weather
+    ? `<p style="color:#f5f5f5;font-size:26px;font-weight:700;margin:0 0 4px;">${weather.temp}&deg;C</p>
+       <p style="color:#a3a3a3;font-size:14px;line-height:1.6;margin:0;">${weather.description} &middot; Wind ${weather.windKph} km/h &middot; Nelson, NZ</p>`
+    : `<p style="color:#a3a3a3;font-size:15px;margin:0;">Weather unavailable.</p>`
+
+  // Todos
+  const todoContent = todos.length === 0
+    ? `<p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0;">All caught up — no outstanding to-dos.</p>`
+    : todos.map((t) => {
+        const duePart = t.dueDate
+          ? ` &mdash; <span style="color:${t.isOverdue ? '#f87171' : '#555'};font-size:13px;">${t.isOverdue ? 'Overdue &middot; ' : ''}${fmtShortDate(t.dueDate)}</span>`
+          : ''
+        const jobPart = t.jobName ? ` <span style="color:#7790ed;font-size:13px;">${t.jobName}</span>` : ''
+        return `<p style="color:#a3a3a3;font-size:15px;line-height:1.6;margin:0 0 10px;">${t.title}${duePart}${jobPart}</p>`
+      }).join('')
+
+  // Today
+  const todayContent = todayEvents.length === 0
+    ? `<p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0;">Nothing scheduled today.</p>`
+    : todayEvents.map((e) => {
+        const timePart = e.startTime ? ` <span style="color:#555;font-size:13px;">&middot; ${e.startTime}</span>` : ''
+        const jobPart = e.jobName ? ` <span style="color:#7790ed;font-size:13px;">${e.jobName}</span>` : ''
+        return `<p style="color:#a3a3a3;font-size:15px;line-height:1.6;margin:0 0 10px;">${e.title}${timePart}${jobPart}</p>`
+      }).join('')
+
+  // Upcoming
+  const upcomingContent = upcomingEvents.length === 0
+    ? `<p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0;">Nothing coming up this week.</p>`
+    : upcomingEvents.map((e) => {
+        const jobPart = e.jobName ? ` <span style="color:#7790ed;font-size:13px;">${e.jobName}</span>` : ''
+        return `<p style="color:#a3a3a3;font-size:15px;line-height:1.6;margin:0 0 10px;"><span style="color:#555;font-size:13px;">${fmtShortDate(e.date)} &mdash;</span> ${e.title}${jobPart}</p>`
+      }).join('')
+
+  // Revenue placeholder
+  const revenueContent = `
+    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 8px;">Not connected &mdash; link Xero to track revenue.</p>
+    <p style="color:#555;font-size:13px;margin:0;">Jobs active this week: <span style="color:#f5f5f5;">${weekJobCount}</span></p>
+  `
+
+  // Review jobs
+  const reviewContent = reviewJobs.length === 0
+    ? ''
+    : section('Awaiting Your Review',
+        reviewJobs.map((j) => {
+          const clientPart = j.clientName ? ` <span style="color:#555;font-size:13px;">&mdash; ${j.clientName}</span>` : ''
+          return `<p style="color:#a3a3a3;font-size:15px;line-height:1.6;margin:0 0 10px;">${j.name}${clientPart}</p>`
+        }).join('')
+      )
+
+  const todoLabel = `${todos.length} to-do${todos.length !== 1 ? 's' : ''}${overdueCount > 0 ? ` (${overdueCount} overdue)` : ''}`
+
+  const subject = `Morning briefing — ${dayLabel}`
+
+  const tuiSignoff = `<p style="color:#d4d4d4;font-size:15px;line-height:1.6;margin:32px 0 0;"><span style="color:#f5f5f5;font-weight:600;">Tui</span></p>`
+
+  const html = wrap(`
+    <h2 style="margin:0 0 4px;font-size:22px;color:#f5f5f5;font-weight:600;">Kia ora Arlo,</h2>
+    <p style="color:#555;font-size:14px;margin:0;">${dayLabel}</p>
+    ${section('Weather', weatherContent)}
+    ${section('Revenue This Week', revenueContent)}
+    ${section(`To Do — ${todoLabel}`, todoContent)}
+    ${section("Today's Schedule", todayContent)}
+    ${section('Coming Up This Week', upcomingContent)}
+    ${reviewContent}
+    ${section('', `<a href="https://dashboard.tuimedia.nz" style="color:#7790ed;font-size:14px;text-decoration:none;">Open dashboard</a>`)}
+  `, tuiSignoff)
+
+  await send({ to: 'hello@tuimedia.nz', subject, html, type: 'morning_briefing' })
 }
 
 export async function sendProposalAcceptedEmail(to: string, clientName: string, jobName: string, clientId?: string, jobId?: string) {
