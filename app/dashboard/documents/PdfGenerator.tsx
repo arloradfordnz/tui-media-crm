@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Download, Save } from 'lucide-react'
+import CustomSelect from '@/components/CustomSelect'
 
 const TEMPLATES = ['Contract', 'Quote', 'Call Sheet', 'General Document']
 
@@ -67,9 +68,13 @@ export default function PdfGenerator() {
     <div className="card space-y-5">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Generate PDF</h2>
-        <select value={template} onChange={(e) => setTemplate(e.target.value)} className="field-input" style={{ width: 'auto' }}>
-          {TEMPLATES.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
+        <div style={{ minWidth: '200px' }}>
+          <CustomSelect
+            value={template}
+            onChange={setTemplate}
+            options={TEMPLATES.map((t) => ({ value: t, label: t }))}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

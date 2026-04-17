@@ -4,12 +4,12 @@ import { Users, Plus } from 'lucide-react'
 import Link from 'next/link'
 import SearchInput from '@/components/SearchInput'
 
-const STATUSES = ['all', 'lead', 'active', 'past', 'archived']
+const STATUSES = ['active', 'lead', 'past', 'archived', 'all']
 
 export default async function ClientsPage({ searchParams }: { searchParams: Promise<{ search?: string; status?: string }> }) {
   const params = await searchParams
   const search = params.search || ''
-  const statusFilter = params.status || 'all'
+  const statusFilter = params.status || 'active'
 
   const supabase = await createServerSupabaseClient()
 

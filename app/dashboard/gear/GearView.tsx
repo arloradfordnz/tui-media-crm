@@ -5,6 +5,7 @@ import { createGear, updateGear, deleteGear } from '@/app/actions/gear'
 import { formatNZD, statusLabel, statusBadgeClass } from '@/lib/format'
 import Link from 'next/link'
 import { Camera, Plus, X, Trash2, Edit2 } from 'lucide-react'
+import CustomSelect from '@/components/CustomSelect'
 
 const CATEGORIES = ['all', 'camera', 'lens', 'audio', 'lighting', 'accessories', 'other']
 const STATUSES = ['all', 'available', 'out_on_shoot', 'in_service', 'retired']
@@ -61,6 +62,30 @@ export default function GearView({ gear, category, status }: { gear: GearItem[];
         ))}
       </div>
 
+      {/* Totals summary */}
+      {gear.length > 0 && (() => {
+        const totalPurchase = gear.reduce((s, g) => s + (g.purchaseValue || 0), 0)
+        const totalInsurance = gear.reduce((s, g) => s + (g.insuranceValue || 0), 0)
+        const activeGear = gear.filter((g) => g.status !== 'retired')
+        return (
+          <div className="grid grid-cols-3 gap-4">
+            <div className="card text-center py-4">
+              <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Total Items</p>
+              <p className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>{gear.length}</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{activeGear.length} active</p>
+            </div>
+            <div className="card text-center py-4">
+              <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Purchase Value</p>
+              <p className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>{formatNZD(totalPurchase)}</p>
+            </div>
+            <div className="card text-center py-4">
+              <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Insurance Value</p>
+              <p className="text-xl font-semibold" style={{ color: 'var(--accent)' }}>{formatNZD(totalInsurance)}</p>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Grid */}
       {gear.length === 0 ? (
         <div className="empty-state card">
@@ -110,17 +135,21 @@ export default function GearView({ gear, category, status }: { gear: GearItem[];
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="field-label">Category</label>
-                  <select name="category" defaultValue={editItem?.category || ''} className="field-input">
-                    <option value="">Select...</option>
-                    {CATEGORIES.filter((c) => c !== 'all').map((c) => <option key={c} value={c}>{CAT_LABELS[c]}</option>)}
-                  </select>
+                  <CustomSelect
+                    name="category"
+                    defaultValue={editItem?.category || ''}
+                    placeholder="Select..."
+                    options={[{ value: '', label: 'Select...' }, ...CATEGORIES.filter((c) => c !== 'all').map((c) => ({ value: c, label: CAT_LABELS[c] }))]}
+                  />
                 </div>
                 {editItem && (
                   <div>
                     <label className="field-label">Status</label>
-                    <select name="status" defaultValue={editItem.status} className="field-input">
-                      {STATUSES.filter((s) => s !== 'all').map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}
-                    </select>
+                    <CustomSelect
+                      name="status"
+                      defaultValue={editItem.status}
+                      options={STATUSES.filter((s) => s !== 'all').map((s) => ({ value: s, label: statusLabel(s) }))}
+                    />
                   </div>
                 )}
               </div>

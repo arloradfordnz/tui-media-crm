@@ -89,8 +89,8 @@ const NO_REPLY = `
 
 function wrap(body: string, signoff = SIGNOFF) {
   return `
-    <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#0a0a0a;color:#f5f5f5;padding:48px 20px;">
-      <div style="max-width:560px;margin:0 auto;">
+    <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#0a0a0a;color:#f5f5f5;width:100%;margin:0;padding:0;">
+      <div style="max-width:560px;margin:0 auto;padding:48px 20px;">
         <div style="text-align:center;margin-bottom:36px;">
           <img src="https://dashboard.tuimedia.nz/Primary_White.svg" alt="Tui Media" width="140" style="display:inline-block;" />
         </div>

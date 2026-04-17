@@ -4,6 +4,7 @@ import { useActionState, useState, useEffect } from 'react'
 import { createJob } from '@/app/actions/jobs'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, Check, Film, Heart, Building2, PartyPopper, Home, Palette } from 'lucide-react'
+import CustomSelect from '@/components/CustomSelect'
 
 type Client = { id: string; name: string; email: string | null }
 type TemplateTask = { phase: string; title: string }
@@ -87,10 +88,13 @@ export default function NewJobPage() {
         <div className="card space-y-5">
           <div>
             <label className="field-label">Client *</label>
-            <select value={selectedClient} onChange={(e) => setSelectedClient(e.target.value)} className="field-input">
-              <option value="">Select a client...</option>
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <CustomSelect
+              value={selectedClient}
+              onChange={setSelectedClient}
+              placeholder="Select a client..."
+              searchable
+              options={clients.map((c) => ({ value: c.id, label: c.name }))}
+            />
           </div>
           <div>
             <label className="field-label">Job Name *</label>

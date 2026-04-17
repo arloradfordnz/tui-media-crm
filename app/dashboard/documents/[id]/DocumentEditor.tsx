@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react'
 import { updateDocument, deleteDocument } from '@/app/actions/documents'
 import Link from 'next/link'
 import { ArrowLeft, Save, Trash2 } from 'lucide-react'
+import CustomSelect from '@/components/CustomSelect'
 
 const DOC_TYPES = ['contract', 'callsheet', 'shotlist', 'questionnaire']
 
@@ -35,16 +36,21 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
           </div>
           <div>
             <label className="field-label">Type</label>
-            <select name="docType" defaultValue={doc.docType} className="field-input">
-              {DOC_TYPES.map((t) => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
-            </select>
+            <CustomSelect
+              name="docType"
+              defaultValue={doc.docType}
+              options={DOC_TYPES.map((t) => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
+            />
           </div>
           <div>
             <label className="field-label">Client</label>
-            <select name="clientId" defaultValue={doc.clientId || ''} className="field-input">
-              <option value="">None</option>
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <CustomSelect
+              name="clientId"
+              defaultValue={doc.clientId || ''}
+              placeholder="None"
+              searchable
+              options={[{ value: '', label: 'None' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
+            />
           </div>
         </div>
 

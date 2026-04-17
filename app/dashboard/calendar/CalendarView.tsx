@@ -5,12 +5,14 @@ import { createEvent, deleteEvent } from '@/app/actions/events'
 import { statusLabel } from '@/lib/format'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Plus, X, Trash2, Calendar } from 'lucide-react'
+import CustomSelect from '@/components/CustomSelect'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const EVENT_COLORS: Record<string, string> = {
   shoot: 'var(--accent)',
-  call: 'var(--accent-hover)',
+  meeting: '#a78bfa',
+  call: '#a78bfa',
   deadline: 'var(--warning)',
   personal: 'var(--text-tertiary)',
 }
@@ -172,12 +174,16 @@ export default function CalendarView({ events, jobs, month, year }: { events: Ev
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="field-label">Type</label>
-                  <select name="eventType" className="field-input">
-                    <option value="shoot">Shoot</option>
-                    <option value="call">Call</option>
-                    <option value="deadline">Deadline</option>
-                    <option value="personal">Personal</option>
-                  </select>
+                  <CustomSelect
+                    name="eventType"
+                    defaultValue="shoot"
+                    options={[
+                      { value: 'shoot', label: 'Shoot' },
+                      { value: 'meeting', label: 'Meeting' },
+                      { value: 'deadline', label: 'Deadline' },
+                      { value: 'personal', label: 'Personal' },
+                    ]}
+                  />
                 </div>
                 <div>
                   <label className="field-label">Date *</label>
@@ -196,10 +202,12 @@ export default function CalendarView({ events, jobs, month, year }: { events: Ev
               </div>
               <div>
                 <label className="field-label">Linked Job</label>
-                <select name="jobId" className="field-input">
-                  <option value="">None</option>
-                  {jobs.map((j) => <option key={j.id} value={j.id}>{j.name}</option>)}
-                </select>
+                <CustomSelect
+                  name="jobId"
+                  placeholder="None"
+                  searchable
+                  options={[{ value: '', label: 'None' }, ...jobs.map((j) => ({ value: j.id, label: j.name }))]}
+                />
               </div>
               <div>
                 <label className="field-label">Notes</label>

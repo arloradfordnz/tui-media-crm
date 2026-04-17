@@ -413,6 +413,76 @@ input, textarea, select, button { font-family: inherit; }
 .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
 .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
 
+/* ── Custom Select ────────────────────────────────────────── */
+.custom-select-trigger {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px 10px 14px;
+  border: 1px solid var(--bg-border);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 80ms ease;
+  font-family: inherit;
+}
+.custom-select-trigger:hover:not(:disabled) { border-color: var(--text-tertiary); }
+.custom-select-trigger:focus { outline: none; border-color: var(--accent); }
+.custom-select-trigger:disabled { opacity: 0.5; cursor: not-allowed; }
+.custom-select-trigger[aria-expanded="true"] { border-color: var(--accent); }
+
+.custom-select-value { color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.custom-select-placeholder { color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.custom-select-menu {
+  background: var(--bg-surface);
+  border: 1px solid var(--bg-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.3);
+  animation: selectMenuIn 100ms ease;
+  transform-origin: top center;
+}
+
+@keyframes selectMenuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.custom-select-search {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--bg-border);
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+}
+.custom-select-search:focus { border-color: var(--accent); }
+
+.custom-select-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+.custom-select-option[data-active="true"] { background: var(--bg-elevated); }
+.custom-select-option[data-selected="true"] { color: var(--accent); }
+
 /* ── Search ───────────────────────────────────────────────── */
 .search-input {
   width: 100%;

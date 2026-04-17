@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@/lib/format'
-import { Briefcase, Clock, DollarSign, Users, CalendarDays, Activity, Plus, UserPlus, Camera, CheckSquare } from 'lucide-react'
+import { Briefcase, Clock, DollarSign, Users, CalendarDays, Activity, Plus, UserPlus, Camera, CheckSquare, TrendingUp } from 'lucide-react'
 import TodoWidget from './TodoWidget'
 import Link from 'next/link'
 
@@ -38,13 +38,16 @@ export default async function DashboardPage() {
     supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('status', 'review'),
     supabase.from('clients').select('*', { count: 'exact', head: true }).in('pipeline_stage', ['enquiry', 'discovery']),
     supabase.from('jobs').select('quote_value').eq('status', 'delivered').gte('created_at', startOfMonth),
-    supabase.from('jobs').select('status'),
+    supabase.from('jobs').select('status, quote_value'),
     supabase.from('events').select('id, title, start_time, end_time, job_id, jobs(id, name)').eq('event_type', 'shoot').gte('date', todayStart).lt('date', todayEnd).order('start_time', { ascending: true }),
     supabase.from('events').select('id, title, event_type, date, start_time, job_id, jobs(id, name)').gte('date', todayStart).order('date', { ascending: true }).limit(5),
     supabase.from('activities').select('id, action, details, created_at, job_id, jobs(id, name), client_id, clients(id, name)').order('created_at', { ascending: false }).limit(10),
   ])
 
   const revenueThisMonth = (deliveredThisMonth ?? []).reduce((sum, j) => sum + (j.quote_value || 0), 0)
+  const pipelineValue = (pipelineJobs ?? [])
+    .filter((j) => !['delivered', 'archived'].includes(j.status))
+    .reduce((sum, j) => sum + ((j as { status: string; quote_value?: number }).quote_value || 0), 0)
 
   const pipelineCounts: Record<string, number> = {}
   for (const s of JOB_PIPELINE) pipelineCounts[s] = 0
@@ -68,18 +71,12 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={Briefcase} value={activeJobs ?? 0} label="Active Jobs" />
         <StatCard icon={Clock} value={reviewJobs ?? 0} label="Awaiting Review" />
         <StatCard icon={DollarSign} value={formatNZD(revenueThisMonth)} label="Revenue This Month" />
         <StatCard icon={Users} value={leadsInPipeline ?? 0} label="Leads in Pipeline" />
-        <div className="stat-card flex flex-col items-center justify-center text-center">
-          <img src="/Xero_software_logo.svg.png" alt="Xero" width={80} height={80} className="mb-2" style={{ objectFit: 'contain' }} />
-          <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>Financial dashboard coming soon</p>
-          <button className="btn-secondary text-xs" style={{ padding: '6px 12px', opacity: 0.7, cursor: 'not-allowed' }} disabled>
-            Connect Xero
-          </button>
-        </div>
+        <StatCard icon={TrendingUp} value={formatNZD(pipelineValue)} label="Pipeline Value" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

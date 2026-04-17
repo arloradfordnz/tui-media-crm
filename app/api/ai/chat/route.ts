@@ -687,8 +687,8 @@ export async function POST(request: NextRequest) {
 
         for (let round = 0; round < maxRounds; round++) {
           const anthropicStream = anthropic.messages.stream({
-            model: 'claude-haiku-4-5-20251001',
-            max_tokens: 1024,
+            model: 'claude-sonnet-4-6',
+            max_tokens: 2048,
             system: systemPrompt,
             messages: currentMessages,
             tools: TOOLS,

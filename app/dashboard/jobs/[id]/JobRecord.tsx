@@ -6,6 +6,7 @@ import { createProposal } from '@/app/actions/proposals'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@/lib/format'
 import Link from 'next/link'
 import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as ActivityIcon, MapPin, Calendar, Copy, FileText, Upload, Download, FileVideo, Plus, Pencil, X } from 'lucide-react'
+import CustomSelect from '@/components/CustomSelect'
 
 const JOB_STATUSES = ['enquiry', 'booked', 'preproduction', 'shootday', 'editing', 'review', 'approved', 'delivered', 'archived']
 const PHASES = ['preshoot', 'shootday', 'postproduction', 'delivery']
@@ -193,9 +194,13 @@ export default function JobRecord({ job }: { job: JobData }) {
         </div>
         <div className="flex items-center gap-3">
           {job.quoteValue && <span className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{formatNZD(job.quoteValue)}</span>}
-          <select value={job.status} onChange={(e) => handleStatusChange(e.target.value)} className="field-input" style={{ width: 'auto' }}>
-            {JOB_STATUSES.map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}
-          </select>
+          <div style={{ minWidth: '160px' }}>
+            <CustomSelect
+              value={job.status}
+              onChange={handleStatusChange}
+              options={JOB_STATUSES.map((s) => ({ value: s, label: statusLabel(s) }))}
+            />
+          </div>
         </div>
       </div>
 
@@ -370,17 +375,18 @@ export default function JobRecord({ job }: { job: JobData }) {
                             <span className={`badge ${f.versionLabel === 'final_delivery' ? 'badge-success' : f.versionLabel === 'revised_cut' ? 'badge-warning' : f.versionLabel === 'raw_files' ? 'badge-muted' : 'badge-accent'}`}>
                               {statusLabel(f.versionLabel)}
                             </span>
-                            <select
-                              value={f.deliveryStatus}
-                              onChange={(e) => handleStatusChange_file(f.id, d.id, e.target.value)}
-                              className="text-xs px-2 py-0.5 rounded border-none"
-                              style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)', fontSize: '11px' }}
-                            >
-                              <option value="not_sent">Not Sent</option>
-                              <option value="sent">Sent</option>
-                              <option value="viewed">Viewed</option>
-                              <option value="approved">Approved</option>
-                            </select>
+                            <div style={{ minWidth: '120px' }}>
+                              <CustomSelect
+                                value={f.deliveryStatus}
+                                onChange={(v) => handleStatusChange_file(f.id, d.id, v)}
+                                options={[
+                                  { value: 'not_sent', label: 'Not Sent' },
+                                  { value: 'sent', label: 'Sent' },
+                                  { value: 'viewed', label: 'Viewed' },
+                                  { value: 'approved', label: 'Approved' },
+                                ]}
+                              />
+                            </div>
                             {f.personalNote && <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{f.personalNote}</span>}
                           </div>
                         </div>
@@ -529,9 +535,11 @@ function DeliverableUploadForm({ deliverableId, uploading, onUpload }: { deliver
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="field-label">Version</label>
-          <select value={version} onChange={(e) => setVersion(e.target.value)} className="field-input text-sm">
-            {VERSION_LABELS.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
-          </select>
+          <CustomSelect
+            value={version}
+            onChange={setVersion}
+            options={VERSION_LABELS}
+          />
         </div>
         <div>
           <label className="field-label">Notes</label>

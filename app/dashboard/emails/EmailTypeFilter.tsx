@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTransition } from 'react'
+import CustomSelect from '@/components/CustomSelect'
 
 const EMAIL_TYPES = [
   { value: 'all', label: 'All Types' },
@@ -32,21 +33,12 @@ export default function EmailTypeFilter() {
   }
 
   return (
-    <select
-      value={currentType}
-      onChange={(e) => handleChange(e.target.value)}
-      className="field-input"
-      style={{
-        width: 'auto',
-        minWidth: '160px',
-        opacity: isPending ? 0.7 : 1,
-      }}
-    >
-      {EMAIL_TYPES.map((t) => (
-        <option key={t.value} value={t.value}>
-          {t.label}
-        </option>
-      ))}
-    </select>
+    <div style={{ minWidth: '180px', opacity: isPending ? 0.7 : 1 }}>
+      <CustomSelect
+        value={currentType}
+        onChange={handleChange}
+        options={EMAIL_TYPES}
+      />
+    </div>
   )
 }

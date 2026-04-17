@@ -2,8 +2,9 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react'
 import { createTodo, toggleTodo, deleteTodo } from '@/app/actions/todos'
-import { CheckSquare, CheckCircle2, Circle, Trash2, Plus, ChevronDown, ChevronUp } from 'lucide-react'
+import { CheckSquare, CheckCircle2, Circle, Trash2, Plus, SlidersHorizontal } from 'lucide-react'
 import Link from 'next/link'
+import CustomSelect from '@/components/CustomSelect'
 
 type Todo = {
   id: string
@@ -22,6 +23,7 @@ type Client = { id: string; name: string }
 
 const FILTERS = [
   { value: 'todo', label: 'To Do' },
+  { value: 'overdue', label: 'Overdue' },
   { value: 'done', label: 'Done' },
   { value: 'all', label: 'All' },
 ]
@@ -116,13 +118,13 @@ function CreateForm({ jobs, clients }: { jobs: Job[]; clients: Client[] }) {
   }, [isPending, state])
 
   return (
-    <form ref={formRef} action={action} className="card space-y-3">
-      <div className="flex items-center gap-2">
+    <form ref={formRef} action={action} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="flex items-center gap-2 px-4 py-3">
         <Plus className="w-4 h-4 shrink-0" style={{ color: 'var(--accent)' }} />
         <input
           name="title"
           type="text"
-          placeholder="New to-do…"
+          placeholder="Add a to-do…"
           autoComplete="off"
           required
           className="flex-1 bg-transparent text-sm outline-none"
@@ -132,47 +134,58 @@ function CreateForm({ jobs, clients }: { jobs: Job[]; clients: Client[] }) {
         <button
           type="button"
           onClick={() => setShowExtra((v) => !v)}
-          className="text-xs flex items-center gap-1"
-          style={{ color: 'var(--text-tertiary)' }}
+          className="btn-icon"
+          title={showExtra ? 'Hide options' : 'More options'}
+          aria-label={showExtra ? 'Hide options' : 'More options'}
+          style={{ color: showExtra ? 'var(--accent)' : 'var(--text-tertiary)' }}
         >
-          {showExtra ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          {showExtra ? 'Less' : 'More'}
+          <SlidersHorizontal className="w-4 h-4" />
         </button>
-        <button type="submit" className="btn-primary text-sm" disabled={isPending}>
+        <button type="submit" className="btn-primary text-sm" disabled={isPending} style={{ padding: '8px 16px' }}>
           Add
         </button>
       </div>
 
       {showExtra && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1" style={{ borderTop: '1px solid var(--bg-border)' }}>
+        <div
+          className="grid grid-cols-1 sm:grid-cols-3 gap-3 px-4 py-3 animate-fade-in"
+          style={{ borderTop: '1px solid var(--bg-border)', background: 'var(--bg-elevated)' }}
+        >
           <div>
-            <label className="text-xs mb-1 block" style={{ color: 'var(--text-secondary)' }}>Due date</label>
+            <label className="text-xs mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>Due date</label>
             <input
               name="due_date"
               type="date"
-              className="input text-sm w-full"
+              className="field-input"
+              disabled={isPending}
+              style={{ padding: '8px 12px' }}
+            />
+          </div>
+          <div>
+            <label className="text-xs mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>Link to job</label>
+            <CustomSelect
+              name="linked_job_id"
+              placeholder="None"
+              searchable
+              options={[{ value: '', label: 'None' }, ...jobs.map((j) => ({ value: j.id, label: j.name }))]}
               disabled={isPending}
             />
           </div>
           <div>
-            <label className="text-xs mb-1 block" style={{ color: 'var(--text-secondary)' }}>Link to job</label>
-            <select name="linked_job_id" className="input text-sm w-full" disabled={isPending}>
-              <option value="">None</option>
-              {jobs.map((j) => <option key={j.id} value={j.id}>{j.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs mb-1 block" style={{ color: 'var(--text-secondary)' }}>Link to client</label>
-            <select name="linked_client_id" className="input text-sm w-full" disabled={isPending}>
-              <option value="">None</option>
-              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <label className="text-xs mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>Link to client</label>
+            <CustomSelect
+              name="linked_client_id"
+              placeholder="None"
+              searchable
+              options={[{ value: '', label: 'None' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
+              disabled={isPending}
+            />
           </div>
         </div>
       )}
 
       {state?.error && (
-        <p className="text-sm" style={{ color: 'var(--danger)' }}>{state.error}</p>
+        <p className="text-sm px-4 py-2" style={{ color: 'var(--danger)' }}>{state.error}</p>
       )}
     </form>
   )
@@ -188,6 +201,7 @@ export default function TodosView({ todos, jobs, clients, filter }: {
 
   const filtered = todos.filter((t) => {
     if (filter === 'todo') return !t.completed
+    if (filter === 'overdue') return !t.completed && !!t.due_date && new Date(t.due_date) < now
     if (filter === 'done') return t.completed
     return true
   })

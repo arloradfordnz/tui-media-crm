@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react'
 import { createDocument } from '@/app/actions/documents'
 import { Plus, X } from 'lucide-react'
+import CustomSelect from '@/components/CustomSelect'
 
 const DOC_TYPES = ['contract', 'callsheet', 'shotlist', 'questionnaire']
 
@@ -33,16 +34,21 @@ export default function NewDocButton({ clients, defaultClientId }: { clients: Cl
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="field-label">Type</label>
-                  <select name="docType" className="field-input">
-                    {DOC_TYPES.map((t) => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
-                  </select>
+                  <CustomSelect
+                    name="docType"
+                    defaultValue="contract"
+                    options={DOC_TYPES.map((t) => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
+                  />
                 </div>
                 <div>
                   <label className="field-label">Client</label>
-                  <select name="clientId" defaultValue={defaultClientId || ''} className="field-input">
-                    <option value="">None (Template)</option>
-                    {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  <CustomSelect
+                    name="clientId"
+                    defaultValue={defaultClientId || ''}
+                    placeholder="None (Template)"
+                    searchable
+                    options={[{ value: '', label: 'None (Template)' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
+                  />
                 </div>
               </div>
               {state?.error && <p className="text-sm" style={{ color: 'var(--danger)' }}>{state.error}</p>}

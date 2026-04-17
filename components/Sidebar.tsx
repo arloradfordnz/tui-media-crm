@@ -18,6 +18,8 @@ import {
   Building2,
   Mail,
   CheckSquare,
+  Activity,
+  Layers,
 } from 'lucide-react'
 
 const mainNav = [
@@ -33,6 +35,8 @@ const businessNav = [
   { href: '/dashboard/finance', label: 'Finance', icon: DollarSign },
   { href: '/dashboard/gear', label: 'Gear', icon: Camera },
   { href: '/dashboard/documents', label: 'Documents', icon: FileText },
+  { href: '/dashboard/jobs/templates', label: 'Templates', icon: Layers },
+  { href: '/dashboard/activity', label: 'Activity', icon: Activity },
   { href: '/dashboard/emails', label: 'Email Log', icon: Mail },
 ]
 

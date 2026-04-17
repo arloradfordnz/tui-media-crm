@@ -5,6 +5,7 @@ import { createClient } from '@/app/actions/clients'
 import { statusLabel } from '@/lib/format'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import CustomSelect from '@/components/CustomSelect'
 
 const LEAD_SOURCES = ['Referral', 'Website', 'Social Media', 'Google', 'Word of Mouth', 'Other']
 const PIPELINE_STAGES = ['enquiry', 'discovery', 'proposal', 'negotiation', 'won']
@@ -41,10 +42,11 @@ export default function NewClientPage() {
           </div>
           <div>
             <label className="field-label">Lead Source</label>
-            <select name="leadSource" className="field-input">
-              <option value="">Select...</option>
-              {LEAD_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <CustomSelect
+              name="leadSource"
+              placeholder="Select..."
+              options={[{ value: '', label: 'Select...' }, ...LEAD_SOURCES.map((s) => ({ value: s, label: s }))]}
+            />
           </div>
           <div>
             <label className="field-label">First Contact</label>
@@ -52,19 +54,19 @@ export default function NewClientPage() {
           </div>
           <div>
             <label className="field-label">Pipeline Stage</label>
-            <select name="pipelineStage" defaultValue="enquiry" className="field-input">
-              {PIPELINE_STAGES.map((s) => (
-                <option key={s} value={s}>{statusLabel(s)}</option>
-              ))}
-            </select>
+            <CustomSelect
+              name="pipelineStage"
+              defaultValue="enquiry"
+              options={PIPELINE_STAGES.map((s) => ({ value: s, label: statusLabel(s) }))}
+            />
           </div>
           <div>
             <label className="field-label">Status</label>
-            <select name="status" defaultValue="lead" className="field-input">
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>{statusLabel(s)}</option>
-              ))}
-            </select>
+            <CustomSelect
+              name="status"
+              defaultValue="lead"
+              options={STATUSES.map((s) => ({ value: s, label: statusLabel(s) }))}
+            />
           </div>
         </div>
 
