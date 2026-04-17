@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useState, useOptimistic, useTransition } from 'react'
+import { useActionState, useState, useOptimistic, useTransition, useRef } from 'react'
 import { updateJob, updateJobStatus, deleteJob, toggleTask, addRevision } from '@/app/actions/jobs'
 import { createProposal } from '@/app/actions/proposals'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@/lib/format'
@@ -83,8 +83,18 @@ export default function JobRecord({ job }: { job: JobData }) {
     await deleteJob(job.id)
   }
 
-  function copyPortalLink() {
-    navigator.clipboard.writeText(portalUrl)
+  async function copyPortalLink() {
+    try {
+      await navigator.clipboard.writeText(portalUrl)
+    } catch {
+      const ta = document.createElement('textarea')
+      ta.value = portalUrl
+      ta.style.cssText = 'position:fixed;opacity:0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -504,6 +514,8 @@ function DeliverableUploadForm({ deliverableId, uploading, onUpload }: { deliver
   const [file, setFile] = useState<File | null>(null)
   const [version, setVersion] = useState('first_cut')
   const [notes, setNotes] = useState('')
+  const [dragging, setDragging] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -512,6 +524,13 @@ function DeliverableUploadForm({ deliverableId, uploading, onUpload }: { deliver
     setFile(null)
     setNotes('')
     setExpanded(false)
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragging(false)
+    const dropped = e.dataTransfer.files[0]
+    if (dropped) setFile(dropped)
   }
 
   if (!expanded) {
@@ -524,22 +543,51 @@ function DeliverableUploadForm({ deliverableId, uploading, onUpload }: { deliver
 
   return (
     <form onSubmit={handleSubmit} className="ml-7 p-3 rounded-lg space-y-3" style={{ background: 'var(--bg-elevated)' }}>
-      <div>
+      {/* Drop zone */}
+      <div
+        onClick={() => inputRef.current?.click()}
+        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={handleDrop}
+        className="upload-drop"
+        style={{
+          borderColor: dragging ? 'var(--accent)' : file ? 'var(--success)' : undefined,
+          background: dragging ? 'var(--accent-muted)' : undefined,
+          cursor: 'pointer',
+          minHeight: 72,
+        }}
+      >
         <input
+          ref={inputRef}
           type="file"
+          className="sr-only"
           onChange={(e) => setFile(e.target.files?.[0] || null)}
-          className="text-sm"
-          style={{ color: 'var(--text-secondary)' }}
         />
+        {file ? (
+          <div className="flex items-center gap-2">
+            <FileVideo className="w-4 h-4 shrink-0" style={{ color: 'var(--success)' }} />
+            <span className="text-sm truncate" style={{ color: 'var(--text-primary)', maxWidth: 240 }}>{file.name}</span>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setFile(null) }}
+              style={{ color: 'var(--text-tertiary)', marginLeft: 'auto' }}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-1 text-center pointer-events-none">
+            <Upload className="w-5 h-5" style={{ color: 'var(--text-tertiary)' }} />
+            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Drop file here or <span style={{ color: 'var(--accent)' }}>browse</span></p>
+            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Any file type</p>
+          </div>
+        )}
       </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="field-label">Version</label>
-          <CustomSelect
-            value={version}
-            onChange={setVersion}
-            options={VERSION_LABELS}
-          />
+          <CustomSelect value={version} onChange={setVersion} options={VERSION_LABELS} />
         </div>
         <div>
           <label className="field-label">Notes</label>
@@ -550,7 +598,7 @@ function DeliverableUploadForm({ deliverableId, uploading, onUpload }: { deliver
         <button type="submit" disabled={!file || uploading} className="btn-primary text-sm">
           <Upload className="w-3.5 h-3.5" /> {uploading ? 'Uploading...' : 'Upload'}
         </button>
-        <button type="button" onClick={() => setExpanded(false)} className="btn-secondary text-sm">Cancel</button>
+        <button type="button" onClick={() => { setExpanded(false); setFile(null) }} className="btn-secondary text-sm">Cancel</button>
       </div>
     </form>
   )

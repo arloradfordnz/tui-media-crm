@@ -31,6 +31,25 @@ export async function toggleTodo(todoId: string, completed: boolean) {
   revalidatePath('/dashboard/todos')
 }
 
+export async function updateTodo(
+  todoId: string,
+  data: { title: string; due_date: string | null; linked_job_id: string | null; linked_client_id: string | null },
+) {
+  const title = data.title?.trim()
+  if (!title) return { error: 'Title is required.' }
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.from('todos').update({
+    title,
+    due_date: data.due_date || null,
+    linked_job_id: data.linked_job_id || null,
+    linked_client_id: data.linked_client_id || null,
+  }).eq('id', todoId)
+  if (error) return { error: error.message }
+  revalidatePath('/dashboard')
+  revalidatePath('/dashboard/todos')
+  return { ok: true }
+}
+
 export async function deleteTodo(todoId: string) {
   const supabase = await createServerSupabaseClient()
   await supabase.from('todos').delete().eq('id', todoId)

@@ -1,10 +1,18 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
-import { formatNZD, formatDate, getInitials, statusLabel, statusBadgeClass } from '@/lib/format'
+import { formatNZD, getInitials } from '@/lib/format'
 import { Users, Plus } from 'lucide-react'
 import Link from 'next/link'
 import SearchInput from '@/components/SearchInput'
+import FilterTabs from '@/components/FilterTabs'
+import QuickStatus from './QuickStatus'
 
-const STATUSES = ['active', 'lead', 'past', 'archived', 'all']
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Active' },
+  { value: 'lead', label: 'Lead' },
+  { value: 'past', label: 'Past' },
+  { value: 'archived', label: 'Archived' },
+  { value: 'all', label: 'All' },
+]
 
 export default async function ClientsPage({ searchParams }: { searchParams: Promise<{ search?: string; status?: string }> }) {
   const params = await searchParams
@@ -40,18 +48,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <SearchInput basePath="/dashboard/clients" placeholder="Search clients..." />
-        <div className="flex gap-2">
-          {STATUSES.map((s) => (
-            <Link
-              key={s}
-              href={`/dashboard/clients?status=${s}${search ? `&search=${search}` : ''}`}
-              className="btn-secondary text-sm"
-              style={statusFilter === s ? { background: 'var(--accent-muted)', color: 'var(--accent)', borderColor: 'var(--accent)' } : {}}
-            >
-              {s === 'all' ? 'All' : statusLabel(s)}
-            </Link>
-          ))}
-        </div>
+        <FilterTabs options={STATUS_OPTIONS} paramName="status" defaultValue="active" />
       </div>
 
       {/* Table */}
@@ -101,7 +98,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
                     <td className="px-4 py-3 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-secondary)' }}>{c.jobCount}</td>
                     <td className="px-4 py-3 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-primary)' }}>{formatNZD(c.lifetime_value)}</td>
                     <td className="px-4 py-3 text-right">
-                      <span className={`badge ${statusBadgeClass(c.status)}`}>{statusLabel(c.status)}</span>
+                      <QuickStatus clientId={c.id} status={c.status} />
                     </td>
                   </tr>
                 )

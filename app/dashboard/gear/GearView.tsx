@@ -6,6 +6,7 @@ import { formatNZD, statusLabel, statusBadgeClass } from '@/lib/format'
 import Link from 'next/link'
 import { Camera, Plus, X, Trash2, Edit2 } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
+import FilterTabs from '@/components/FilterTabs'
 
 const CATEGORIES = ['all', 'camera', 'lens', 'audio', 'lighting', 'accessories', 'other']
 const STATUSES = ['all', 'available', 'out_on_shoot', 'in_service', 'retired']
@@ -38,28 +39,18 @@ export default function GearView({ gear, category, status }: { gear: GearItem[];
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        {CATEGORIES.map((c) => (
-          <Link
-            key={c}
-            href={`/dashboard/gear?category=${c}${status !== 'all' ? `&status=${status}` : ''}`}
-            className="btn-secondary text-sm"
-            style={category === c ? { background: 'var(--accent-muted)', color: 'var(--accent)', borderColor: 'var(--accent)' } : {}}
-          >
-            {c === 'all' ? 'All' : CAT_LABELS[c] || c}
-          </Link>
-        ))}
-        <div className="w-px mx-1" style={{ background: 'var(--bg-border)' }} />
-        {STATUSES.map((s) => (
-          <Link
-            key={s}
-            href={`/dashboard/gear?status=${s}${category !== 'all' ? `&category=${category}` : ''}`}
-            className="btn-secondary text-sm"
-            style={status === s ? { background: 'var(--accent-muted)', color: 'var(--accent)', borderColor: 'var(--accent)' } : {}}
-          >
-            {s === 'all' ? 'All Status' : statusLabel(s)}
-          </Link>
-        ))}
+      <div className="flex flex-wrap items-center gap-2">
+        <FilterTabs
+          paramName="category"
+          defaultValue="all"
+          options={CATEGORIES.map((c) => ({ value: c, label: c === 'all' ? 'All' : CAT_LABELS[c] || c }))}
+        />
+        <div className="w-px h-6 mx-1" style={{ background: 'var(--bg-border)' }} />
+        <FilterTabs
+          paramName="status"
+          defaultValue="all"
+          options={STATUSES.map((s) => ({ value: s, label: s === 'all' ? 'All Status' : statusLabel(s) }))}
+        />
       </div>
 
       {/* Totals summary */}

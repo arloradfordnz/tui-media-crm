@@ -29,7 +29,7 @@ async function getSystemPrompt(supabase: ReturnType<typeof createServerSupabaseC
 
   return `You are the AI assistant for Tui Media CRM (Arlo Radford, videography/photography, Nelson NZ).
 
-You can search, create, and update clients, jobs, events, documents, and gear. You can view stats and manage tasks.
+You can search, create, and update clients, jobs, events, documents, gear, and deliverables. You can view stats and manage tasks.
 IMPORTANT: You CANNOT delete clients. Client deletion is not permitted via AI — tell the user to do it from the client profile page.
 
 Rules: Be short (1-2 sentences). Act immediately with tools. Use sensible defaults (status "lead", pipeline "enquiry"). Confirm actions in one sentence.
@@ -330,6 +330,32 @@ const TOOLS: Anthropic.Tool[] = [
     },
   },
 
+  // ── Deliverables ──────────────────────────────
+  {
+    name: 'create_deliverable',
+    description: 'Add a custom deliverable to a job. Use this when the user describes something they want tracked as a deliverable (e.g. "add a highlight reel deliverable to the Smith wedding job").',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        job_id: { type: 'string', description: 'Job UUID. Search for the job first if needed.' },
+        title: { type: 'string', description: 'Deliverable title, e.g. "5-Minute Highlight Reel"' },
+        description: { type: 'string', description: 'Optional description of this deliverable' },
+      },
+      required: ['job_id', 'title'],
+    },
+  },
+  {
+    name: 'list_deliverables',
+    description: 'List all deliverables for a job.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        job_id: { type: 'string' },
+      },
+      required: ['job_id'],
+    },
+  },
+
   // ── Dashboard ─────────────────────────────────
   {
     name: 'get_dashboard_stats',
@@ -610,6 +636,27 @@ async function executeTool(name: string, input: Record<string, unknown>, supabas
       const { error } = await supabase.from('gear').delete().eq('id', input.gear_id as string)
       if (error) return JSON.stringify({ error: error.message })
       return JSON.stringify({ success: true })
+    }
+
+    // ── Deliverables ────────────────────────
+    case 'create_deliverable': {
+      const { data, error } = await supabase.from('deliverables').insert({
+        job_id: input.job_id as string,
+        title: input.title as string,
+        description: (input.description as string) || null,
+      }).select('id, title').single()
+      if (error) return JSON.stringify({ error: error.message })
+      return JSON.stringify({ success: true, deliverable: data })
+    }
+
+    case 'list_deliverables': {
+      const { data, error } = await supabase
+        .from('deliverables')
+        .select('id, title, description, completed')
+        .eq('job_id', input.job_id as string)
+        .order('created_at')
+      if (error) return JSON.stringify({ error: error.message })
+      return JSON.stringify({ deliverables: data })
     }
 
     // ── Dashboard ───────────────────────────

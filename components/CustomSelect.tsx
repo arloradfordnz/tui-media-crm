@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronDown, Check } from 'lucide-react'
 
 export type Option = { value: string; label: string; group?: string }
@@ -40,7 +41,10 @@ export default function CustomSelect({
   const [query, setQuery] = useState('')
   const [activeIdx, setActiveIdx] = useState(0)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  const [mounted, setMounted] = useState(false)
   const isControlled = controlledValue !== undefined
+
+  useEffect(() => { setMounted(true) }, [])
   const value = isControlled ? controlledValue : internal
 
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -69,7 +73,8 @@ export default function CustomSelect({
   }, [open])
 
   useLayoutEffect(() => {
-    if (!open || !btnRef.current) return
+    if (!open) { setMenuPos(null); return }
+    if (!btnRef.current) return
     function position() {
       const r = btnRef.current!.getBoundingClientRect()
       const spaceBelow = window.innerHeight - r.bottom
@@ -153,7 +158,7 @@ export default function CustomSelect({
         <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 120ms ease' }} />
       </button>
 
-      {open && menuPos && (
+      {open && menuPos && mounted && createPortal(
         <div
           ref={menuRef}
           className="custom-select-menu"
@@ -205,7 +210,8 @@ export default function CustomSelect({
               })
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

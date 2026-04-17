@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabase'
 import { timeAgo, statusLabel } from '@/lib/format'
 import { Activity, Briefcase, Users } from 'lucide-react'
 import Link from 'next/link'
+import FilterTabs from '@/components/FilterTabs'
 
 const ACTION_LABELS: Record<string, string> = {
   job_created: 'Job created',
@@ -67,25 +68,14 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
       </div>
 
       {/* Type filter */}
-      <div className="flex flex-wrap gap-2">
-        <Link
-          href="/dashboard/activity"
-          className="btn-secondary text-sm"
-          style={!type || type === 'all' ? { background: 'var(--accent-muted)', color: 'var(--accent)', borderColor: 'var(--accent)' } : {}}
-        >
-          All
-        </Link>
-        {uniqueTypes.map((t) => (
-          <Link
-            key={t}
-            href={`/dashboard/activity?type=${t}`}
-            className="btn-secondary text-sm"
-            style={type === t ? { background: 'var(--accent-muted)', color: 'var(--accent)', borderColor: 'var(--accent)' } : {}}
-          >
-            {ACTION_LABELS[t] || statusLabel(t)}
-          </Link>
-        ))}
-      </div>
+      <FilterTabs
+        paramName="type"
+        defaultValue="all"
+        options={[
+          { value: 'all', label: 'All' },
+          ...uniqueTypes.map((t) => ({ value: t, label: ACTION_LABELS[t] || statusLabel(t) })),
+        ]}
+      />
 
       {(activities ?? []).length === 0 ? (
         <div className="card text-center py-16">

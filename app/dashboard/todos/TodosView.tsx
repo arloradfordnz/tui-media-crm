@@ -1,10 +1,11 @@
 'use client'
 
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react'
-import { createTodo, toggleTodo, deleteTodo } from '@/app/actions/todos'
-import { CheckSquare, CheckCircle2, Circle, Trash2, Plus, SlidersHorizontal } from 'lucide-react'
+import { createTodo, toggleTodo, deleteTodo, updateTodo } from '@/app/actions/todos'
+import { CheckSquare, CheckCircle2, Circle, Trash2, Plus, SlidersHorizontal, Pencil, X, Check } from 'lucide-react'
 import Link from 'next/link'
 import CustomSelect from '@/components/CustomSelect'
+import FilterTabs from '@/components/FilterTabs'
 
 type Todo = {
   id: string
@@ -28,9 +29,15 @@ const FILTERS = [
   { value: 'all', label: 'All' },
 ]
 
-function TodoRow({ todo, now }: { todo: Todo; now: Date }) {
+function TodoRow({ todo, now, jobs, clients }: { todo: Todo; now: Date; jobs: Job[]; clients: Client[] }) {
   const [isPending, startTransition] = useTransition()
   const [optimisticDone, setOptimisticDone] = useState(todo.completed)
+  const [editing, setEditing] = useState(false)
+  const [title, setTitle] = useState(todo.title)
+  const [dueDate, setDueDate] = useState(todo.due_date ? todo.due_date.slice(0, 10) : '')
+  const [jobId, setJobId] = useState(todo.linked_job_id || '')
+  const [clientId, setClientId] = useState(todo.linked_client_id || '')
+  const [error, setError] = useState<string | null>(null)
 
   const job = todo.jobs as { id: string; name: string } | null
   const client = todo.clients as { id: string; name: string } | null
@@ -48,6 +55,92 @@ function TodoRow({ todo, now }: { todo: Todo; now: Date }) {
     startTransition(async () => {
       await deleteTodo(todo.id)
     })
+  }
+
+  function openEdit() {
+    setTitle(todo.title)
+    setDueDate(todo.due_date ? todo.due_date.slice(0, 10) : '')
+    setJobId(todo.linked_job_id || '')
+    setClientId(todo.linked_client_id || '')
+    setError(null)
+    setEditing(true)
+  }
+
+  function handleSave() {
+    if (!title.trim()) { setError('Title is required.'); return }
+    startTransition(async () => {
+      const res = await updateTodo(todo.id, {
+        title,
+        due_date: dueDate || null,
+        linked_job_id: jobId || null,
+        linked_client_id: clientId || null,
+      })
+      if (res && 'error' in res && res.error) { setError(res.error); return }
+      setEditing(false)
+    })
+  }
+
+  if (editing) {
+    return (
+      <div
+        className="flex flex-col gap-3 py-3 px-4 rounded-lg"
+        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--accent)', opacity: isPending ? 0.6 : 1 }}
+      >
+        <input
+          autoFocus
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSave() }
+            if (e.key === 'Escape') setEditing(false)
+          }}
+          placeholder="Title"
+          className="field-input"
+          style={{ padding: '8px 12px' }}
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="text-xs mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>Due date</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="field-input"
+              style={{ padding: '8px 12px' }}
+            />
+          </div>
+          <div>
+            <label className="text-xs mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>Link to job</label>
+            <CustomSelect
+              value={jobId}
+              onChange={setJobId}
+              placeholder="None"
+              searchable
+              options={[{ value: '', label: 'None' }, ...jobs.map((j) => ({ value: j.id, label: j.name }))]}
+            />
+          </div>
+          <div>
+            <label className="text-xs mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>Link to client</label>
+            <CustomSelect
+              value={clientId}
+              onChange={setClientId}
+              placeholder="None"
+              searchable
+              options={[{ value: '', label: 'None' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
+            />
+          </div>
+        </div>
+        {error && <p className="text-sm" style={{ color: 'var(--danger)' }}>{error}</p>}
+        <div className="flex gap-2 justify-end">
+          <button onClick={() => setEditing(false)} className="btn-secondary text-sm" disabled={isPending}>
+            <X className="w-4 h-4" /> Cancel
+          </button>
+          <button onClick={handleSave} className="btn-primary text-sm" disabled={isPending}>
+            <Check className="w-4 h-4" /> {isPending ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -92,15 +185,24 @@ function TodoRow({ todo, now }: { todo: Todo; now: Date }) {
         </div>
       </div>
 
-      <button
-        onClick={handleDelete}
-        disabled={isPending}
-        className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5"
-        style={{ color: 'var(--text-tertiary)' }}
-        aria-label="Delete"
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
+      <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
+        <button
+          onClick={openEdit}
+          disabled={isPending}
+          style={{ color: 'var(--text-tertiary)' }}
+          aria-label="Edit"
+        >
+          <Pencil className="w-4 h-4" />
+        </button>
+        <button
+          onClick={handleDelete}
+          disabled={isPending}
+          style={{ color: 'var(--text-tertiary)' }}
+          aria-label="Delete"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   )
 }
@@ -235,18 +337,7 @@ export default function TodosView({ todos, jobs, clients, filter }: {
 
       <CreateForm jobs={jobs} clients={clients} />
 
-      <div className="flex items-center gap-2">
-        {FILTERS.map((f) => (
-          <Link
-            key={f.value}
-            href={`/dashboard/todos?filter=${f.value}`}
-            className="btn-secondary text-sm"
-            style={filter === f.value ? { background: 'var(--accent-muted)', color: 'var(--accent)', borderColor: 'var(--accent)' } : {}}
-          >
-            {f.label}
-          </Link>
-        ))}
-      </div>
+      <FilterTabs options={FILTERS} paramName="filter" defaultValue="todo" />
 
       {sorted.length === 0 ? (
         <div className="card text-center py-10">
@@ -258,7 +349,7 @@ export default function TodosView({ todos, jobs, clients, filter }: {
       ) : (
         <div className="space-y-2">
           {sorted.map((t) => (
-            <TodoRow key={t.id} todo={t} now={now} />
+            <TodoRow key={t.id} todo={t} now={now} jobs={jobs} clients={clients} />
           ))}
         </div>
       )}

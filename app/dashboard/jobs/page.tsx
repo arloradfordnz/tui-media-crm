@@ -3,8 +3,16 @@ import { formatNZD, formatDate, getInitials, statusLabel, statusBadgeClass } fro
 import { Briefcase, Plus } from 'lucide-react'
 import Link from 'next/link'
 import SearchInput from '@/components/SearchInput'
+import FilterTabs from '@/components/FilterTabs'
 
-const JOB_STATUSES = ['all', 'enquiry', 'booked', 'preproduction', 'shootday', 'editing', 'review', 'approved', 'delivered', 'archived']
+const JOB_STATUS_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'enquiry', label: 'Enquiry' },
+  { value: 'booked', label: 'Booked' },
+  { value: 'preproduction', label: 'Pre-production' },
+  { value: 'shootday', label: 'Shoot Day' },
+  { value: 'editing', label: 'Editing' },
+]
 
 export default async function JobsPage({ searchParams }: { searchParams: Promise<{ status?: string; search?: string }> }) {
   const params = await searchParams
@@ -35,18 +43,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <SearchInput basePath="/dashboard/jobs" placeholder="Search jobs..." />
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {JOB_STATUSES.slice(0, 6).map((s) => (
-            <Link
-              key={s}
-              href={`/dashboard/jobs?status=${s}${search ? `&search=${search}` : ''}`}
-              className="btn-secondary text-sm whitespace-nowrap"
-              style={statusFilter === s ? { background: 'var(--accent-muted)', color: 'var(--accent)', borderColor: 'var(--accent)' } : {}}
-            >
-              {s === 'all' ? 'All' : statusLabel(s)}
-            </Link>
-          ))}
-        </div>
+        <FilterTabs options={JOB_STATUS_OPTIONS} paramName="status" defaultValue="all" />
       </div>
 
       {/* Table */}

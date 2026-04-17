@@ -83,6 +83,17 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
   redirect(`/dashboard/clients/${clientId}`)
 }
 
+export async function updateClientStatus(clientId: string, status: string) {
+  const allowed = ['active', 'lead', 'past', 'archived']
+  if (!allowed.includes(status)) return { error: 'Invalid status.' }
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.from('clients').update({ status }).eq('id', clientId)
+  if (error) return { error: error.message }
+  revalidatePath('/dashboard/clients')
+  revalidatePath(`/dashboard/clients/${clientId}`)
+  return { ok: true }
+}
+
 export async function deleteClient(clientId: string) {
   const supabase = await createServerSupabaseClient()
   await supabase.from('clients').delete().eq('id', clientId)
