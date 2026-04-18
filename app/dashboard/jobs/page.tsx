@@ -1,9 +1,10 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
-import { formatNZD, formatDate, getInitials, statusLabel, statusBadgeClass } from '@/lib/format'
+import { formatNZD, formatDate, getInitials, statusLabel } from '@/lib/format'
 import { Briefcase, Plus } from 'lucide-react'
 import Link from 'next/link'
 import SearchInput from '@/components/SearchInput'
 import FilterTabs from '@/components/FilterTabs'
+import QuickStatus from './QuickStatus'
 
 const JOB_STATUS_OPTIONS = [
   { value: 'all', label: 'All' },
@@ -73,24 +74,24 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
                 const client = j.clients as unknown as { id: string; name: string }
                 return (
                   <tr key={j.id} className="table-row">
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-4">
                       <Link href={`/dashboard/jobs/${j.id}`} className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                         {j.name}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 hidden md:table-cell">
+                    <td className="px-4 py-4 hidden md:table-cell">
                       <Link href={`/dashboard/clients/${client.id}`} className="flex items-center gap-2">
                         <div className="avatar avatar-sm">{getInitials(client.name)}</div>
                         <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{client.name}</span>
                       </Link>
                     </td>
-                    <td className="px-4 py-3 hidden lg:table-cell text-sm" style={{ color: 'var(--text-secondary)' }}>{formatDate(j.shoot_date)}</td>
-                    <td className="px-4 py-3 hidden sm:table-cell">
+                    <td className="px-4 py-4 hidden lg:table-cell text-sm" style={{ color: 'var(--text-secondary)' }}>{formatDate(j.shoot_date)}</td>
+                    <td className="px-4 py-4 hidden sm:table-cell">
                       {j.job_type && <span className="badge badge-muted">{statusLabel(j.job_type)}</span>}
                     </td>
-                    <td className="px-4 py-3 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-primary)' }}>{j.quote_value ? formatNZD(j.quote_value) : '—'}</td>
-                    <td className="px-4 py-3 text-right">
-                      <span className={`badge ${statusBadgeClass(j.status)}`}>{statusLabel(j.status)}</span>
+                    <td className="px-4 py-4 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-primary)' }}>{j.quote_value ? formatNZD(j.quote_value) : '—'}</td>
+                    <td className="px-4 py-4 text-right">
+                      <QuickStatus jobId={j.id} status={j.status} />
                     </td>
                   </tr>
                 )

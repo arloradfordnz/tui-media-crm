@@ -23,7 +23,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
 
   let query = supabase
     .from('clients')
-    .select('id, name, email, location, status, lifetime_value, tags, created_at, jobs(count)')
+    .select('id, name, email, location, status, lifetime_value, tags, created_at, jobs(quote_value)')
     .order('name', { ascending: true })
 
   if (statusFilter !== 'all') query = query.eq('status', statusFilter)
@@ -31,10 +31,15 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
 
   const { data: clientRows } = await query
 
-  const clients = (clientRows ?? []).map((c) => ({
-    ...c,
-    jobCount: (c.jobs as unknown as { count: number }[])?.[0]?.count ?? 0,
-  }))
+  const clients = (clientRows ?? []).map((c) => {
+    const jobs = (c.jobs as unknown as { quote_value: number | null }[]) ?? []
+    const jobsValue = jobs.reduce((sum, j) => sum + (j.quote_value ?? 0), 0)
+    return {
+      ...c,
+      jobCount: jobs.length,
+      lifetime_value: (c.lifetime_value ?? 0) + jobsValue,
+    }
+  })
 
   return (
     <div className="space-y-6">
@@ -78,7 +83,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
                 const tags: string[] = c.tags ? JSON.parse(c.tags) : []
                 return (
                   <tr key={c.id} className="table-row">
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-4">
                       <Link href={`/dashboard/clients/${c.id}`} className="flex items-center gap-3">
                         <div className="avatar avatar-md">{getInitials(c.name)}</div>
                         <div>
@@ -86,18 +91,18 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
                           {tags.length > 0 && (
                             <div className="flex gap-1 mt-1">
                               {tags.slice(0, 3).map((t) => (
-                                <span key={t} className="badge badge-muted" style={{ fontSize: '10px', padding: '1px 6px' }}>{t}</span>
+                                <span key={t} className="badge badge-muted badge-sm">{t}</span>
                               ))}
                             </div>
                           )}
                         </div>
                       </Link>
                     </td>
-                    <td className="px-4 py-3 hidden md:table-cell text-sm" style={{ color: 'var(--text-secondary)' }}>{c.email || '—'}</td>
-                    <td className="px-4 py-3 hidden lg:table-cell text-sm" style={{ color: 'var(--text-secondary)' }}>{c.location || '—'}</td>
-                    <td className="px-4 py-3 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-secondary)' }}>{c.jobCount}</td>
-                    <td className="px-4 py-3 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-primary)' }}>{formatNZD(c.lifetime_value)}</td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-4 hidden md:table-cell text-sm" style={{ color: 'var(--text-secondary)' }}>{c.email || '—'}</td>
+                    <td className="px-4 py-4 hidden lg:table-cell text-sm" style={{ color: 'var(--text-secondary)' }}>{c.location || '—'}</td>
+                    <td className="px-4 py-4 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-secondary)' }}>{c.jobCount}</td>
+                    <td className="px-4 py-4 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-primary)' }}>{formatNZD(c.lifetime_value)}</td>
+                    <td className="px-4 py-4 text-right">
                       <QuickStatus clientId={c.id} status={c.status} />
                     </td>
                   </tr>

@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useTransition, useState, useEffect } from 'react'
+import CustomSelect from './CustomSelect'
 
 export type FilterOption = { value: string; label: string }
 
@@ -39,21 +40,32 @@ export default function FilterTabs({
   }
 
   return (
-    <div className="flex gap-2" style={{ opacity: pending ? 0.7 : 1, transition: 'opacity 100ms ease' }}>
-      {options.map((o) => {
-        const active = o.value === optimistic
-        return (
-          <button
-            key={o.value}
-            type="button"
-            onClick={() => onSelect(o.value)}
-            className="btn-secondary text-sm"
-            style={active ? { background: 'var(--accent-muted)', color: 'var(--accent)', borderColor: 'var(--accent)' } : {}}
-          >
-            {o.label}
-          </button>
-        )
-      })}
+    <div style={{ opacity: pending ? 0.7 : 1, transition: 'opacity 100ms ease' }}>
+      {/* Mobile: dropdown */}
+      <div className="sm:hidden w-full">
+        <CustomSelect
+          value={optimistic}
+          onChange={onSelect}
+          options={options}
+        />
+      </div>
+      {/* Desktop: button row */}
+      <div className="hidden sm:flex gap-2">
+        {options.map((o) => {
+          const active = o.value === optimistic
+          return (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => onSelect(o.value)}
+              className="btn-secondary text-sm"
+              style={active ? { background: 'var(--accent-muted)', color: 'var(--accent)', borderColor: 'var(--accent)' } : {}}
+            >
+              {o.label}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

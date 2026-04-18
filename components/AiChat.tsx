@@ -28,7 +28,11 @@ function parseLinks(content: string): { text: string; links: { path: string; lab
 
 // Strip working markers from display text
 function cleanContent(content: string): string {
-  return content.replace(/\[\[WORKING\]\]/g, '').replace(/\[\[\/WORKING\]\]/g, '').trim()
+  return content
+    .replace(/\[\[WORKING\]\]/g, '')
+    .replace(/\[\[\/WORKING\]\]/g, '')
+    .replace(/\[\[MUTATED\]\]/g, '')
+    .trim()
 }
 
 // Check if the message is currently in a working state (tool execution)
@@ -36,6 +40,19 @@ function isWorking(content: string): boolean {
   const lastWorking = content.lastIndexOf('[[WORKING]]')
   const lastDone = content.lastIndexOf('[[/WORKING]]')
   return lastWorking > lastDone
+}
+
+// Render a subset of Markdown safely: **bold** and *italic* / _italic_.
+// Input is escaped first so no HTML can sneak in.
+function renderMarkdown(text: string): string {
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+  return escaped
+    .replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[\s(])\*([^*\n]+?)\*(?=[\s.,!?;:)]|$)/g, '$1<em>$2</em>')
+    .replace(/(^|[\s(])_([^_\n]+?)_(?=[\s.,!?;:)]|$)/g, '$1<em>$2</em>')
 }
 
 export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
@@ -58,6 +75,54 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
     setInput('')
     setLoading(true)
 
+    // Pending buffer + rAF-driven typewriter so streamed chunks reveal smoothly
+    // instead of jumping in bursts. Control markers ([[WORKING]] etc.) must flush
+    // instantly so the UI state doesn't lag behind tool execution.
+    let pending = ''
+    let streamDone = false
+    let rafId: number | null = null
+
+    const flushTick = () => {
+      if (pending.length === 0) {
+        if (streamDone) { rafId = null; return }
+        rafId = requestAnimationFrame(flushTick)
+        return
+      }
+
+      // Reveal a slice proportional to buffer size so big dumps don't lag,
+      // but small chunks still animate. Floor of 2 chars/frame ≈ ~120 cps.
+      const sliceLen = Math.max(2, Math.ceil(pending.length / 20))
+      const ctrlIdx = pending.indexOf('[[')
+      let emit: string
+      if (ctrlIdx === 0) {
+        // Flush entire control marker atomically
+        const end = pending.indexOf(']]')
+        if (end === -1) {
+          rafId = requestAnimationFrame(flushTick)
+          return
+        }
+        emit = pending.slice(0, end + 2)
+        pending = pending.slice(end + 2)
+      } else if (ctrlIdx > 0 && ctrlIdx < sliceLen) {
+        emit = pending.slice(0, ctrlIdx)
+        pending = pending.slice(ctrlIdx)
+      } else {
+        emit = pending.slice(0, sliceLen)
+        pending = pending.slice(sliceLen)
+      }
+
+      setMessages((prev) => {
+        const updated = [...prev]
+        const last = updated[updated.length - 1]
+        updated[updated.length - 1] = { ...last, content: last.content + emit }
+        return updated
+      })
+
+      rafId = requestAnimationFrame(flushTick)
+    }
+
+    rafId = requestAnimationFrame(flushTick)
+
     try {
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
@@ -71,6 +136,8 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
           const data = await res.json()
           errorMsg = data.error || errorMsg
         } catch { /* not JSON */ }
+        streamDone = true
+        if (rafId !== null) cancelAnimationFrame(rafId)
         setMessages((prev) => {
           const updated = [...prev]
           updated[updated.length - 1] = { role: 'assistant', content: `Error: ${errorMsg}` }
@@ -82,21 +149,26 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
 
       const reader = res.body!.getReader()
       const decoder = new TextDecoder()
+      let didMutate = false
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
         const chunk = decoder.decode(value, { stream: true })
-        setMessages((prev) => {
-          const updated = [...prev]
-          const last = updated[updated.length - 1]
-          updated[updated.length - 1] = { ...last, content: last.content + chunk }
-          return updated
-        })
+        if (chunk.includes('[[MUTATED]]')) didMutate = true
+        pending += chunk
       }
 
-      router.refresh()
+      streamDone = true
+      while (pending.length > 0) {
+        await new Promise((r) => setTimeout(r, 16))
+      }
+
+      // Only invalidate server data when the assistant actually wrote something.
+      if (didMutate) router.refresh()
     } catch {
+      streamDone = true
+      if (rafId !== null) cancelAnimationFrame(rafId)
       setMessages((prev) => {
         const updated = [...prev]
         updated[updated.length - 1] = { role: 'assistant', content: 'Something went wrong. Please try again.' }
@@ -120,7 +192,7 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
   }
 
   const containerStyle = fullPage
-    ? { height: 'calc(100vh - 120px)' }
+    ? { height: '100%', width: '100%' }
     : { height: '400px', width: '340px' }
 
   return (
@@ -201,6 +273,8 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
                         <span /><span /><span />
                       </div>
                     </div>
+                  ) : m.role === 'assistant' ? (
+                    <span dangerouslySetInnerHTML={{ __html: renderMarkdown(displayText) || '&#8203;' }} />
                   ) : displayText || '\u200B'}
                 </div>
                 {/* Link buttons for created entities */}

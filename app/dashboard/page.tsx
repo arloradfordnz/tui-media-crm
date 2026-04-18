@@ -102,7 +102,7 @@ export default async function DashboardPage() {
                       <div className="flex-1">
                         <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{e.title}</span>
                         {job && (
-                          <Link href={`/dashboard/jobs/${job.id}`} className="text-xs ml-2" style={{ color: 'var(--accent)' }}>{job.name}</Link>
+                          <Link href={`/dashboard/jobs/${job.id}`} className="text-xs ml-2 link-subtle">{job.name}</Link>
                         )}
                       </div>
                       {e.start_time && (
@@ -165,9 +165,9 @@ export default async function DashboardPage() {
                     </p>
                     <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
                       {job ? (
-                        <Link href={`/dashboard/jobs/${job.id}`} style={{ color: 'var(--accent)' }}>{job.name}</Link>
+                        <Link href={`/dashboard/jobs/${job.id}`} className="link-subtle">{job.name}</Link>
                       ) : client ? (
-                        <Link href={`/dashboard/clients/${client.id}`} style={{ color: 'var(--accent)' }}>{client.name}</Link>
+                        <Link href={`/dashboard/clients/${client.id}`} className="link-subtle">{client.name}</Link>
                       ) : null}
                       {(job || client) && ' · '}
                       {timeAgo(a.created_at)}
