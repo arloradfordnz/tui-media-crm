@@ -72,6 +72,63 @@ export async function requestChanges(prevState: { error?: string; success?: bool
   return { success: true }
 }
 
+export async function requestDeliverableRevision(prevState: { error?: string; success?: boolean } | undefined, formData: FormData) {
+  const deliverableId = formData.get('deliverableId') as string
+  const request = (formData.get('request') as string)?.trim()
+
+  if (!deliverableId) return { error: 'Missing deliverable.' }
+  if (!request) return { error: 'Please describe the changes you need.' }
+
+  const supabase = await createServerSupabaseClient()
+  const { data: deliverable } = await supabase
+    .from('deliverables')
+    .select('id, title, job_id, revision_limit, revisions_used')
+    .eq('id', deliverableId)
+    .single()
+
+  if (!deliverable) return { error: 'Deliverable not found.' }
+
+  const limit = deliverable.revision_limit ?? 2
+  const used = deliverable.revisions_used ?? 0
+  if (used >= limit) return { error: `Revision limit reached (${limit} round${limit !== 1 ? 's' : ''}).` }
+
+  const round = used + 1
+
+  const { data: job } = await supabase
+    .from('jobs')
+    .select('id, name, client_id, clients(name, email)')
+    .eq('id', deliverable.job_id)
+    .single()
+
+  if (!job) return { error: 'Job not found.' }
+  const client = job.clients as unknown as { name: string; email: string | null }
+
+  await supabase.from('revisions').insert({ job_id: job.id, deliverable_id: deliverableId, round, request })
+  await supabase.from('deliverables').update({ revisions_used: round }).eq('id', deliverableId)
+  await supabase.from('jobs').update({ status: 'editing' }).eq('id', job.id)
+  await supabase.from('activities').insert({
+    action: 'revision_requested',
+    details: `Client requested revision round ${round} on "${deliverable.title}"`,
+    job_id: job.id,
+    client_id: job.client_id,
+  })
+  await supabase.from('notifications').insert({
+    title: 'Revision Requested',
+    message: `Client requested changes on "${deliverable.title}" for "${job.name}" (round ${round})`,
+    type: 'revision_request',
+    job_id: job.id,
+    client_id: job.client_id,
+  })
+
+  if (client?.email) {
+    await sendRevisionRequestEmail(client.email, client.name, job.name, round)
+  }
+  await sendAdminRevisionRequestedEmail(client?.name || 'Your client', `${job.name} — ${deliverable.title}`, round, request, job.id, job.client_id)
+
+  revalidatePath('/portal/')
+  return { success: true }
+}
+
 export async function markViewed(deliveryFileId: string, jobId: string) {
   const supabase = await createServerSupabaseClient()
   const { data: file } = await supabase.from('delivery_files').select('delivery_status, original_name').eq('id', deliveryFileId).single()

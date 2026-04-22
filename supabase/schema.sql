@@ -76,12 +76,14 @@ CREATE TABLE job_tasks (
 
 -- ── Deliverables ─────────────────────────────────────────────────────────────
 CREATE TABLE deliverables (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at  TIMESTAMPTZ DEFAULT NOW(),
-  job_id      UUID REFERENCES jobs(id) ON DELETE CASCADE,
-  title       TEXT NOT NULL,
-  description TEXT,
-  completed   BOOLEAN DEFAULT false
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  job_id          UUID REFERENCES jobs(id) ON DELETE CASCADE,
+  title           TEXT NOT NULL,
+  description     TEXT,
+  completed       BOOLEAN DEFAULT false,
+  revision_limit  INTEGER DEFAULT 2,
+  revisions_used  INTEGER DEFAULT 0
 );
 
 -- ── Delivery Files ────────────────────────────────────────────────────────────
@@ -123,12 +125,13 @@ CREATE TABLE proposals (
 
 -- ── Revisions ─────────────────────────────────────────────────────────────────
 CREATE TABLE revisions (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at  TIMESTAMPTZ DEFAULT NOW(),
-  job_id      UUID REFERENCES jobs(id) ON DELETE CASCADE,
-  round       INTEGER NOT NULL,
-  request     TEXT NOT NULL,
-  status      TEXT DEFAULT 'pending'
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  job_id          UUID REFERENCES jobs(id) ON DELETE CASCADE,
+  deliverable_id  UUID REFERENCES deliverables(id) ON DELETE CASCADE,
+  round           INTEGER NOT NULL,
+  request         TEXT NOT NULL,
+  status          TEXT DEFAULT 'pending'
 );
 
 -- ── Legacy Files (client uploads) ─────────────────────────────────────────────

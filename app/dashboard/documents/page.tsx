@@ -22,17 +22,18 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   } else {
     documents = (docsWithClient ?? []) as unknown as DocRow[]
   }
-  const { data: clients } = await supabase.from('clients').select('id, name').order('name', { ascending: true })
+  const { data: clients } = await supabase.from('clients').select('id, name, email, phone, location').order('name', { ascending: true })
+  const clientOptions = (clients ?? []).map((c) => ({ id: c.id, name: c.name, email: c.email, phone: c.phone, location: c.location }))
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>Documents & PDF Generator</h1>
-        <NewDocButton clients={(clients ?? []).map((c) => ({ id: c.id, name: c.name }))} defaultClientId={params.clientId} />
+        <NewDocButton clients={clientOptions.map((c) => ({ id: c.id, name: c.name }))} defaultClientId={params.clientId} />
       </div>
 
       {/* PDF Generator */}
-      <PdfGenerator />
+      <PdfGenerator clients={clientOptions} initialClientId={params.clientId} />
 
       {/* Saved Templates */}
       {documents.length > 0 && (

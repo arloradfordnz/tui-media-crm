@@ -1,22 +1,32 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Download, Save } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 
 const TEMPLATES = ['Contract', 'Quote', 'Call Sheet', 'General Document']
 
-export default function PdfGenerator() {
+export type ClientOption = {
+  id: string
+  name: string
+  email: string | null
+  phone: string | null
+  location: string | null
+}
+
+export default function PdfGenerator({ clients, initialClientId }: { clients: ClientOption[]; initialClientId?: string }) {
   const [template, setTemplate] = useState('Contract')
+  const [selectedClientId, setSelectedClientId] = useState(initialClientId || '')
+  const initial = clients.find((c) => c.id === initialClientId)
   const [form, setForm] = useState({
-    clientName: '',
-    clientEmail: '',
-    clientPhone: '',
+    clientName: initial?.name || '',
+    clientEmail: initial?.email || '',
+    clientPhone: initial?.phone || '',
     businessName: 'Tui Media',
     date: new Date().toISOString().split('T')[0],
     jobDescription: '',
     shootDate: '',
-    location: '',
+    location: initial?.location || '',
     body: '',
   })
   const [generating, setGenerating] = useState(false)
@@ -25,6 +35,25 @@ export default function PdfGenerator() {
   function update(key: string, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
+
+  function handleClientChange(id: string) {
+    setSelectedClientId(id)
+    const c = clients.find((x) => x.id === id)
+    if (!c) return
+    setForm((prev) => ({
+      ...prev,
+      clientName: c.name,
+      clientEmail: c.email || '',
+      clientPhone: c.phone || '',
+      location: c.location || prev.location,
+    }))
+  }
+
+  useEffect(() => {
+    if (initialClientId && initial) {
+      setSelectedClientId(initialClientId)
+    }
+  }, [initialClientId, initial])
 
   async function handleDownloadPdf() {
     setGenerating(true)
@@ -75,6 +104,17 @@ export default function PdfGenerator() {
             options={TEMPLATES.map((t) => ({ value: t, label: t }))}
           />
         </div>
+      </div>
+
+      <div>
+        <label className="field-label">Client</label>
+        <CustomSelect
+          value={selectedClientId}
+          onChange={handleClientChange}
+          placeholder="Select a client to autofill, or leave blank"
+          searchable
+          options={[{ value: '', label: 'No client (manual entry)' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
+        />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { approveDelivery, markViewed } from '@/app/actions/portal'
+import { useActionState, useEffect, useState } from 'react'
+import { approveDelivery, markViewed, requestDeliverableRevision } from '@/app/actions/portal'
 import { statusLabel, statusBadgeClass, formatDate } from '@/lib/format'
 import Image from 'next/image'
-import { Briefcase, FileText, Film, Image as ImageIcon, File, Music, Download, ChevronDown, ChevronRight, Check } from 'lucide-react'
+import { Briefcase, FileText, Film, Image as ImageIcon, File, Music, Download, ChevronDown, ChevronRight, Check, MessageSquare } from 'lucide-react'
 
 type DeliveryFile = {
   id: string
@@ -18,11 +18,22 @@ type DeliveryFile = {
   createdAt: string
 }
 
+type Revision = {
+  id: string
+  round: number
+  request: string
+  status: string
+  createdAt: string
+}
+
 type Deliverable = {
   id: string
   title: string
   description: string | null
   completed: boolean
+  revisionLimit: number
+  revisionsUsed: number
+  revisions: Revision[]
   deliveryFiles: DeliveryFile[]
 }
 
@@ -149,10 +160,13 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
                         ) : (
                           job.deliverables.map((d) => (
                             <div key={d.id} className="space-y-3">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <Film className="w-4 h-4" style={{ color: 'var(--accent)' }} />
                                 <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{d.title}</span>
                                 {d.completed && <span className="badge badge-success">Complete</span>}
+                                <span className="text-xs ml-auto" style={{ color: 'var(--text-tertiary)' }}>
+                                  {Math.max(d.revisionLimit - d.revisionsUsed, 0)} of {d.revisionLimit} revision{d.revisionLimit !== 1 ? 's' : ''} remaining
+                                </span>
                               </div>
                               {d.description && <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{d.description}</p>}
 
@@ -162,6 +176,10 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
 
                               {d.deliveryFiles.length === 0 && (
                                 <p className="text-xs py-2" style={{ color: 'var(--text-tertiary)' }}>Files will appear here once uploaded.</p>
+                              )}
+
+                              {d.deliveryFiles.length > 0 && (
+                                <RevisionPanel deliverable={d} />
                               )}
                             </div>
                           ))
@@ -269,6 +287,70 @@ function FileCard({ file, jobId, onApprove }: { file: DeliveryFile; jobId: strin
           </button>
         )}
       </div>
+    </div>
+  )
+}
+
+function RevisionPanel({ deliverable }: { deliverable: Deliverable }) {
+  const [open, setOpen] = useState(false)
+  const [state, action, pending] = useActionState(requestDeliverableRevision, undefined)
+  const used = deliverable.revisionsUsed
+  const limit = deliverable.revisionLimit
+  const remaining = Math.max(limit - used, 0)
+  const allApproved = deliverable.deliveryFiles.length > 0 && deliverable.deliveryFiles.every((f) => f.deliveryStatus === 'approved')
+
+  useEffect(() => {
+    if (state?.success) setOpen(false)
+  }, [state?.success])
+
+  return (
+    <div className="rounded-lg p-4" style={{ background: 'var(--bg-elevated)' }}>
+      {deliverable.revisions.length > 0 && (
+        <div className="space-y-2 mb-3">
+          <p className="label">Revision history</p>
+          {deliverable.revisions.map((r) => (
+            <div key={r.id} className="rounded-md p-3" style={{ background: 'var(--bg-surface)' }}>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="badge badge-muted">Round {r.round}</span>
+                <span className={`badge ${statusBadgeClass(r.status)}`}>{statusLabel(r.status)}</span>
+                <span className="text-xs ml-auto" style={{ color: 'var(--text-tertiary)' }}>{formatDate(r.createdAt)}</span>
+              </div>
+              <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{r.request}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {allApproved ? (
+        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>This deliverable has been approved — no further revisions needed.</p>
+      ) : remaining === 0 ? (
+        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>You&apos;ve used all {limit} included revision{limit !== 1 ? 's' : ''} for this deliverable. Get in touch if you need more.</p>
+      ) : !open ? (
+        <button onClick={() => setOpen(true)} className="btn-secondary text-sm">
+          <MessageSquare className="w-3.5 h-3.5" /> Request changes
+        </button>
+      ) : (
+        <form action={action} className="space-y-3">
+          <input type="hidden" name="deliverableId" value={deliverable.id} />
+          <div>
+            <label className="label mb-2 block">Round {used + 1} feedback</label>
+            <textarea
+              name="request"
+              rows={4}
+              required
+              className="field-input w-full"
+              placeholder="Describe the changes you'd like (e.g. trim the intro, swap shot at 0:42, lower the music...)"
+            />
+          </div>
+          {state?.error && <p className="text-sm" style={{ color: 'var(--danger)' }}>{state.error}</p>}
+          <div className="flex gap-2">
+            <button type="submit" disabled={pending} className="btn-primary text-sm">
+              {pending ? 'Sending...' : 'Send feedback'}
+            </button>
+            <button type="button" onClick={() => setOpen(false)} className="btn-secondary text-sm">Cancel</button>
+          </div>
+        </form>
+      )}
     </div>
   )
 }
