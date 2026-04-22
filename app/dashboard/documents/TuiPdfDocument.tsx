@@ -11,24 +11,24 @@ Font.register({
 })
 
 const styles = StyleSheet.create({
-  page: { fontFamily: 'Poppins', fontSize: 10, color: '#1a1a1a', paddingBottom: 60 },
-  header: { padding: 30, paddingBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e5e5e5' },
-  headerTitle: { color: '#1a1a1a', fontSize: 18, fontWeight: 600 },
-  headerSub: { color: '#888888', fontSize: 9, marginTop: 4 },
-  body: { padding: 40, paddingTop: 30 },
-  section: { marginBottom: 20 },
-  label: { fontSize: 8, fontWeight: 600, color: '#888888', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  value: { fontSize: 10, color: '#1a1a1a', lineHeight: 1.6 },
-  row: { flexDirection: 'row', gap: 20, marginBottom: 12 },
+  page: { fontFamily: 'Poppins', fontSize: 12, color: '#1a1a1a', paddingBottom: 70 },
+  header: { paddingHorizontal: 48, paddingTop: 40, paddingBottom: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerTitle: { color: '#1a1a1a', fontSize: 22, fontWeight: 600 },
+  headerSub: { color: '#888888', fontSize: 11, marginTop: 6 },
+  body: { paddingHorizontal: 48, paddingTop: 16 },
+  section: { marginBottom: 28 },
+  label: { fontSize: 10, fontWeight: 600, color: '#999999', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 },
+  value: { fontSize: 12, color: '#1a1a1a', lineHeight: 1.6 },
+  meta: { fontSize: 11, color: '#666666', lineHeight: 1.6 },
+  row: { flexDirection: 'row', gap: 32, marginBottom: 28 },
   col: { flex: 1 },
-  divider: { height: 1, backgroundColor: '#e5e5e5', marginVertical: 16 },
-  bodyText: { fontSize: 10, color: '#333333', lineHeight: 1.8, whiteSpace: 'pre-wrap' },
-  signatureBlock: { flexDirection: 'row', marginTop: 40, gap: 40 },
+  bodyText: { fontSize: 12, color: '#2a2a2a', lineHeight: 1.8, whiteSpace: 'pre-wrap' },
+  signatureBlock: { flexDirection: 'row', marginTop: 56, gap: 48 },
   signatureCol: { flex: 1 },
-  signatureLine: { height: 1, backgroundColor: '#1a1a1a', marginTop: 40, marginBottom: 6 },
-  signatureLabel: { fontSize: 9, color: '#888888' },
-  signatureName: { fontSize: 10, fontWeight: 600, marginBottom: 2 },
-  footer: { position: 'absolute', bottom: 20, left: 0, right: 0, textAlign: 'center', fontSize: 8, color: '#888888' },
+  signatureLine: { height: 1, backgroundColor: '#1a1a1a', marginTop: 48, marginBottom: 8 },
+  signatureLabel: { fontSize: 10, color: '#888888' },
+  signatureName: { fontSize: 12, fontWeight: 600, marginBottom: 2 },
+  footer: { position: 'absolute', bottom: 28, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: '#999999' },
 })
 
 type FormData = {
@@ -45,7 +45,7 @@ type FormData = {
 
 function TuiLogo() {
   return (
-    <Svg width={150} height={31} viewBox="0 0 1280 264.55">
+    <Svg width={130} height={27} viewBox="0 0 1280 264.55">
       <G>
         <Path d="M306.45,44.96v23.38h-46.52v151.37h-28.66V68.34h-46.77v-23.38h121.95Z" fill="#111" />
         <Path d="M460.83,81.16v138.54h-28.66v-16.34c-4.53,5.7-10.44,10.18-17.73,13.45-7.29,3.27-15.05,4.9-23.26,4.9-10.9,0-20.66-2.26-29.29-6.79-8.64-4.53-15.42-11.23-20.37-20.11-4.95-8.88-7.42-19.61-7.42-32.18v-81.47h28.41v77.19c0,12.41,3.1,21.92,9.3,28.54,6.2,6.62,14.67,9.93,25.4,9.93s19.23-3.31,25.52-9.93c6.29-6.62,9.43-16.13,9.43-28.54v-77.19h28.66Z" fill="#111" />
@@ -71,7 +71,6 @@ export default function TuiDocument({ template, form }: { template: string; form
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Header */}
         <View style={styles.header}>
           <TuiLogo />
           <View style={{ alignItems: 'flex-end' }}>
@@ -80,60 +79,51 @@ export default function TuiDocument({ template, form }: { template: string; form
           </View>
         </View>
 
-        {/* Body */}
         <View style={styles.body}>
-          {/* Client & Job Info */}
           <View style={styles.row}>
             <View style={styles.col}>
               <Text style={styles.label}>Client</Text>
               <Text style={styles.value}>{form.clientName || '—'}</Text>
-              {form.clientEmail && <Text style={[styles.value, { fontSize: 9, color: '#666' }]}>{form.clientEmail}</Text>}
-              {form.clientPhone && <Text style={[styles.value, { fontSize: 9, color: '#666' }]}>{form.clientPhone}</Text>}
+              {form.clientEmail && <Text style={styles.meta}>{form.clientEmail}</Text>}
+              {form.clientPhone && <Text style={styles.meta}>{form.clientPhone}</Text>}
             </View>
             <View style={styles.col}>
-              <Text style={styles.label}>Business</Text>
+              <Text style={styles.label}>Prepared by</Text>
               <Text style={styles.value}>{form.businessName}</Text>
             </View>
           </View>
 
           {(form.jobDescription || form.shootDate || form.location) && (
-            <>
-              <View style={styles.divider} />
-              <View style={styles.row}>
-                {form.jobDescription && (
-                  <View style={styles.col}>
-                    <Text style={styles.label}>Job Description</Text>
-                    <Text style={styles.value}>{form.jobDescription}</Text>
+            <View style={styles.row}>
+              {form.jobDescription && (
+                <View style={styles.col}>
+                  <Text style={styles.label}>Job Description</Text>
+                  <Text style={styles.value}>{form.jobDescription}</Text>
+                </View>
+              )}
+              <View style={styles.col}>
+                {form.shootDate && (
+                  <View style={{ marginBottom: 14 }}>
+                    <Text style={styles.label}>Shoot Date</Text>
+                    <Text style={styles.value}>{formattedShootDate}</Text>
                   </View>
                 )}
-                <View style={styles.col}>
-                  {form.shootDate && (
-                    <>
-                      <Text style={styles.label}>Shoot Date</Text>
-                      <Text style={[styles.value, { marginBottom: 8 }]}>{formattedShootDate}</Text>
-                    </>
-                  )}
-                  {form.location && (
-                    <>
-                      <Text style={styles.label}>Location</Text>
-                      <Text style={styles.value}>{form.location}</Text>
-                    </>
-                  )}
-                </View>
+                {form.location && (
+                  <View>
+                    <Text style={styles.label}>Location</Text>
+                    <Text style={styles.value}>{form.location}</Text>
+                  </View>
+                )}
               </View>
-            </>
+            </View>
           )}
 
           {form.body && (
-            <>
-              <View style={styles.divider} />
-              <View style={styles.section}>
-                <Text style={styles.bodyText}>{form.body}</Text>
-              </View>
-            </>
+            <View style={styles.section}>
+              <Text style={styles.bodyText}>{form.body}</Text>
+            </View>
           )}
 
-          {/* Signature Block */}
           <View style={styles.signatureBlock}>
             <View style={styles.signatureCol}>
               <Text style={styles.signatureName}>Arlo Radford | Tui Media</Text>
@@ -150,8 +140,7 @@ export default function TuiDocument({ template, form }: { template: string; form
           </View>
         </View>
 
-        {/* Footer */}
-        <Text style={styles.footer}>tuimedia.nz</Text>
+        <Text style={styles.footer} fixed>www.tuimedia.nz</Text>
       </Page>
     </Document>
   )

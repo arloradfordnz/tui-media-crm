@@ -88,21 +88,51 @@ const NO_REPLY = `
 `
 
 function wrap(body: string, signoff = SIGNOFF) {
-  return `
-    <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background:#0a0a0a;color:#f5f5f5;width:100%;margin:0;padding:0;">
-      <div style="max-width:560px;margin:0 auto;padding:48px 20px;">
-        <div style="text-align:center;margin-bottom:36px;">
-          <img src="https://dashboard.tuimedia.nz/Primary_White.svg" alt="Tui Media" width="140" style="display:inline-block;" />
-        </div>
-        <div style="background:#0a0a0a;padding:0 8px;">
-          ${body}
-          ${signoff}
-          ${NO_REPLY}
-        </div>
-        <p style="text-align:center;color:#444;font-size:12px;margin-top:32px;">&copy; ${new Date().getFullYear()} Tui Media &middot; <a href="https://tuimedia.nz" style="color:#555;text-decoration:none;">tuimedia.nz</a></p>
-      </div>
-    </div>
-  `
+  return `<!DOCTYPE html>
+<html lang="en" style="background:#0a0a0a;margin:0;padding:0;">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="dark only" />
+    <meta name="supported-color-schemes" content="dark only" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <style>
+      :root { color-scheme: dark only; supported-color-schemes: dark only; }
+      html, body { background:#0a0a0a !important; margin:0 !important; padding:0 !important; }
+      body, table, td, div, p, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+      @media (prefers-color-scheme: light) {
+        html, body, .email-bg { background:#0a0a0a !important; }
+      }
+    </style>
+  </head>
+  <body bgcolor="#0a0a0a" style="background:#0a0a0a;margin:0;padding:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#f5f5f5;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0a0a0a" class="email-bg" style="background:#0a0a0a;width:100%;margin:0;padding:0;">
+      <tr>
+        <td align="center" bgcolor="#0a0a0a" style="background:#0a0a0a;padding:48px 20px;">
+          <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" bgcolor="#0a0a0a" style="background:#0a0a0a;max-width:560px;width:100%;">
+            <tr>
+              <td align="left" bgcolor="#0a0a0a" style="background:#0a0a0a;padding:0 8px 36px;">
+                <img src="https://dashboard.tuimedia.nz/Primary_White.svg" alt="Tui Media" width="140" style="display:block;" />
+              </td>
+            </tr>
+            <tr>
+              <td bgcolor="#0a0a0a" style="background:#0a0a0a;padding:0 8px;">
+                ${body}
+                ${signoff}
+                ${NO_REPLY}
+              </td>
+            </tr>
+            <tr>
+              <td align="left" bgcolor="#0a0a0a" style="background:#0a0a0a;padding:32px 8px 0;color:#444;font-size:12px;">
+                &copy; ${new Date().getFullYear()} Tui Media &middot; <a href="https://tuimedia.nz" style="color:#555;text-decoration:none;">www.tuimedia.nz</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`
 }
 
 // --- Default templates (fallback when DB has no custom entry) ---
@@ -191,7 +221,7 @@ export async function sendPortalDeliveryEmail(to: string, clientName: string, jo
     html: wrap(`
       ${buildGreeting(clientName)}
       ${bodyToHtml(bodyText)}
-      <div style="text-align:center;margin:28px 0;">
+      <div style="text-align:left;margin:28px 0;">
         <a href="${portalUrl}" style="display:inline-block;background:#7790ed;color:#fff;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">View Your Video</a>
       </div>
       <p style="color:#555;font-size:13px;margin:0;">If the button doesn't work, copy this link: <a href="${portalUrl}" style="color:#7790ed;text-decoration:none;">${portalUrl}</a></p>
@@ -252,7 +282,7 @@ export async function sendProposalEmail(to: string, clientName: string, jobName:
     html: wrap(`
       ${buildGreeting(clientName)}
       ${bodyToHtml(bodyText)}
-      <div style="text-align:center;margin:28px 0;">
+      <div style="text-align:left;margin:28px 0;">
         <a href="${proposalUrl}" style="display:inline-block;background:#7790ed;color:#fff;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">View Proposal</a>
       </div>
       <p style="color:#555;font-size:13px;margin:0;">If the button doesn't work, copy this link: <a href="${proposalUrl}" style="color:#7790ed;text-decoration:none;">${proposalUrl}</a></p>
@@ -389,7 +419,7 @@ export async function sendAdminDeliveryViewedEmail(clientName: string, jobName: 
   const html = wrap(`
     <h2 style="margin:0 0 20px;font-size:22px;color:#f5f5f5;font-weight:600;">Kia ora Arlo,</h2>
     <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;"><span style="color:#f5f5f5;font-weight:600;">${clientName}</span> just opened the portal and viewed <span style="color:#f5f5f5;">${fileName}</span> for <span style="color:#7790ed;">${jobName}</span>.</p>
-    <div style="text-align:center;margin:24px 0;">
+    <div style="text-align:left;margin:24px 0;">
       <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#7790ed;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Open dashboard</a>
     </div>
   `)
@@ -401,7 +431,7 @@ export async function sendAdminDeliveryApprovedEmail(clientName: string, jobName
   const html = wrap(`
     <h2 style="margin:0 0 20px;font-size:22px;color:#f5f5f5;font-weight:600;">Kia ora Arlo,</h2>
     <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;"><span style="color:#f5f5f5;font-weight:600;">${clientName}</span> has approved <span style="color:#f5f5f5;">${fileName}</span> for <span style="color:#7790ed;">${jobName}</span>.</p>
-    <div style="text-align:center;margin:24px 0;">
+    <div style="text-align:left;margin:24px 0;">
       <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#7790ed;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Open dashboard</a>
     </div>
   `)
@@ -416,7 +446,7 @@ export async function sendAdminRevisionRequestedEmail(clientName: string, jobNam
     <div style="background:#111;border-radius:8px;padding:16px;margin:16px 0;">
       <p style="color:#d4d4d4;font-size:14px;line-height:1.6;margin:0;white-space:pre-wrap;">${request.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
     </div>
-    <div style="text-align:center;margin:24px 0;">
+    <div style="text-align:left;margin:24px 0;">
       <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#7790ed;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Open dashboard</a>
     </div>
   `)
