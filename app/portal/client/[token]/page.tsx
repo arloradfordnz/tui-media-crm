@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { signedDownloadUrl } from '@/lib/r2'
 import ClientPortalView from './ClientPortalView'
 
 export default async function ClientPortalPage({ params }: { params: Promise<{ token: string }> }) {
@@ -41,36 +42,49 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
     .eq('client_id', client.id)
     .order('updated_at', { ascending: false })
 
-  type RawDeliverable = {
-    id: string; title: string; description: string | null; completed: boolean;
-    delivery_files: { id: string; file_name: string; original_name: string; file_url: string | null; version_label: string; delivery_status: string; download_enabled: boolean; personal_note: string | null; created_at: string }[]
+  type RawDeliveryFile = { id: string; file_name: string; original_name: string; file_url: string | null; version_label: string; delivery_status: string; download_enabled: boolean; personal_note: string | null; created_at: string }
+  type RawDeliverable = { id: string; title: string; description: string | null; completed: boolean; delivery_files: RawDeliveryFile[] }
+  type RawJob = { id: string; name: string; status: string; job_type: string | null; shoot_date: string | null; deliverables: RawDeliverable[] }
+
+  // Generate fresh presigned R2 URLs for every delivered file.
+  // file_name holds the R2 object key; file_url may hold an externally-hosted URL (e.g. Vimeo) in legacy rows.
+  const resolveFileUrl = async (key: string | null, legacyUrl: string | null): Promise<string | null> => {
+    if (legacyUrl && /^https?:\/\//.test(legacyUrl)) return legacyUrl
+    if (!key) return null
+    try { return await signedDownloadUrl(key) } catch { return null }
   }
 
-  const portalData = {
-    client: { name: client.name },
-    jobs: (jobs ?? []).map((j) => ({
+  const jobsResolved = await Promise.all(
+    ((jobs as unknown as RawJob[]) ?? []).map(async (j) => ({
       id: j.id,
       name: j.name,
       status: j.status,
       jobType: j.job_type,
       shootDate: j.shoot_date,
-      deliverables: ((j.deliverables as unknown as RawDeliverable[]) ?? []).map((d) => ({
+      deliverables: await Promise.all((j.deliverables ?? []).map(async (d) => ({
         id: d.id,
         title: d.title,
         description: d.description,
         completed: d.completed,
-        deliveryFiles: (d.delivery_files ?? []).map((f) => ({
-          id: f.id,
-          originalName: f.original_name,
-          fileUrl: f.file_url,
-          versionLabel: f.version_label,
-          deliveryStatus: f.delivery_status,
-          downloadEnabled: f.download_enabled,
-          personalNote: f.personal_note,
-          createdAt: f.created_at,
-        })),
-      })),
-    })),
+        deliveryFiles: await Promise.all((d.delivery_files ?? [])
+          .filter((f) => f.delivery_status !== 'uploading')
+          .map(async (f) => ({
+            id: f.id,
+            originalName: f.original_name,
+            fileUrl: await resolveFileUrl(f.file_name, f.file_url),
+            versionLabel: f.version_label,
+            deliveryStatus: f.delivery_status,
+            downloadEnabled: f.download_enabled,
+            personalNote: f.personal_note,
+            createdAt: f.created_at,
+          }))),
+      }))),
+    }))
+  )
+
+  const portalData = {
+    client: { name: client.name },
+    jobs: jobsResolved,
     documents: (documents ?? []).map((d) => ({
       id: d.id,
       name: d.name,

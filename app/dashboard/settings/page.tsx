@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import SettingsForm from './SettingsForm'
 import EmailTemplatesForm from './EmailTemplatesForm'
+import { APP_VERSION } from '@/lib/version'
 
 export default async function SettingsPage() {
   const supabase = await createServerSupabaseClient()
@@ -40,7 +41,12 @@ export default async function SettingsPage() {
       <div className="card">
         <h2 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>App Info</h2>
         <div className="space-y-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-          <p>Tui Media Operating System v2.0</p>
+          <p>
+            Tui Media Operating System{' '}
+            <span style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+              v{APP_VERSION}
+            </span>
+          </p>
           <p>Next.js + Supabase + Tailwind CSS</p>
         </div>
       </div>

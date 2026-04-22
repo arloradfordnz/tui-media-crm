@@ -2,13 +2,25 @@ import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
 
-async function getSystemPrompt(supabase: ReturnType<typeof createServerSupabaseClient> extends Promise<infer T> ? T : never) {
+// Static system prompt — rules, voice, enums. Stable across turns, so we can
+// cache it with a cache_control breakpoint and reuse it on every request.
+const STATIC_SYSTEM = `You are the AI assistant for Tui Media CRM (Arlo Radford, videography/photography, Nelson NZ).
+
+You can search, create, and update clients, jobs, events, documents, gear, and deliverables. You can view stats and manage tasks.
+IMPORTANT: You CANNOT delete clients. Client deletion is not permitted via AI — tell the user to do it from the client profile page.
+
+Voice: professional, concise New Zealand English. Correct grammar and punctuation always. Never use emojis. Keep replies to one or two sentences unless the user asks for detail. Act immediately with tools rather than narrating what you are about to do. Use sensible defaults (status "lead", pipeline "enquiry"). Confirm completed actions in a single sentence.
+
+Formatting: you may use Markdown — **bold** for emphasis on key nouns (names, statuses, dates) and *italic* sparingly for subtle emphasis. Do not use headings, lists, or code blocks unless explicitly asked.
+
+Enums — Pipeline: enquiry,discovery,proposal,negotiation,won,lost | Client status: lead,active,inactive | Job status: enquiry,booked,preproduction,shootday,editing,review,approved,delivered,archived | Events: shoot,meeting,deadline,personal | Gear: available,in-use,maintenance,retired | Docs: contract,invoice,brief,other`
+
+async function getDynamicContext(supabase: ReturnType<typeof createServerSupabaseClient> extends Promise<infer T> ? T : never) {
   const now = new Date()
   const today = now.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   const todayISO = now.toISOString().split('T')[0]
   const weekFromNow = new Date(now.getTime() + 7 * 86400000).toISOString().split('T')[0]
 
-  // Fetch live context in parallel — keep lightweight for fast first-token
   const [
     { data: todayEvents },
     { data: activeJobs },
@@ -27,17 +39,19 @@ async function getSystemPrompt(supabase: ReturnType<typeof createServerSupabaseC
     ? `\nActive jobs: ${(activeJobs ?? []).map(j => `"${j.name}" [${j.status}]${(j.clients as unknown as { name: string })?.name ? ` — ${(j.clients as unknown as { name: string }).name}` : ''}`).join(' | ')}`
     : ''
 
-  return `You are the AI assistant for Tui Media CRM (Arlo Radford, videography/photography, Nelson NZ).
-
-You can search, create, and update clients, jobs, events, documents, gear, and deliverables. You can view stats and manage tasks.
-IMPORTANT: You CANNOT delete clients. Client deletion is not permitted via AI — tell the user to do it from the client profile page.
-
-Rules: Be short (1-2 sentences). Act immediately with tools. Use sensible defaults (status "lead", pipeline "enquiry"). Confirm actions in one sentence.
-Today: ${today}. Clients: ${totalClients ?? 0}.
-
-Enums — Pipeline: enquiry,discovery,proposal,negotiation,won,lost | Client status: lead,active,inactive | Job status: enquiry,booked,preproduction,shootday,editing,review,approved,delivered,archived | Events: shoot,meeting,deadline,personal | Gear: available,in-use,maintenance,retired | Docs: contract,invoice,brief,other
-${eventsBlock}${activeBlock}`
+  return `Today: ${today}. Clients: ${totalClients ?? 0}.${eventsBlock}${activeBlock}`
 }
+
+// Tool names that mutate state — used to decide whether the client should
+// router.refresh() after the turn, and whether the server is worth invalidating.
+const MUTATING_TOOLS = new Set([
+  'create_client', 'update_client',
+  'create_job', 'update_job', 'update_job_status', 'delete_job', 'toggle_task',
+  'create_event', 'delete_event',
+  'create_document', 'delete_document',
+  'create_gear', 'update_gear', 'delete_gear',
+  'create_deliverable',
+])
 
 const TOOLS: Anthropic.Tool[] = [
   // ── Clients ───────────────────────────────────
@@ -720,8 +734,7 @@ export async function POST(request: NextRequest) {
     content: m.content,
   }))
 
-  // Pre-fetch system prompt with live context before starting the stream
-  const systemPrompt = await getSystemPrompt(supabase)
+  const dynamicContext = await getDynamicContext(supabase)
 
   const encoder = new TextEncoder()
 
@@ -730,15 +743,30 @@ export async function POST(request: NextRequest) {
       try {
         const currentMessages: Anthropic.MessageParam[] = [...apiMessages]
         const createdLinks: { path: string; label: string }[] = []
+        let mutated = false
         const maxRounds = 10
+
+        // Two cache breakpoints: one after the large static system prompt, one
+        // after the tool list. The static prompt hits the cache on every turn
+        // regardless of changing live context; the second breakpoint extends
+        // the cache over system + tools so a stable live context also hits.
+        const cachedTools = TOOLS.map((t, i) =>
+          i === TOOLS.length - 1
+            ? ({ ...t, cache_control: { type: 'ephemeral' } } as Anthropic.Tool)
+            : t
+        )
+        const systemBlocks: Anthropic.TextBlockParam[] = [
+          { type: 'text', text: STATIC_SYSTEM, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: dynamicContext },
+        ]
 
         for (let round = 0; round < maxRounds; round++) {
           const anthropicStream = anthropic.messages.stream({
-            model: 'claude-sonnet-4-6',
-            max_tokens: 2048,
-            system: systemPrompt,
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 512,
+            system: systemBlocks,
             messages: currentMessages,
-            tools: TOOLS,
+            tools: cachedTools,
           })
 
           anthropicStream.on('text', (text) => {
@@ -752,7 +780,9 @@ export async function POST(request: NextRequest) {
           )
 
           if (toolUseBlocks.length === 0) {
-            // Append any collected links before closing
+            if (mutated) {
+              controller.enqueue(encoder.encode('[[MUTATED]]'))
+            }
             if (createdLinks.length > 0) {
               for (const link of createdLinks) {
                 controller.enqueue(encoder.encode(`\n[[LINK:${link.path}|${link.label}]]`))
@@ -762,33 +792,42 @@ export async function POST(request: NextRequest) {
             return
           }
 
-          // Signal to the UI that we're executing tools
           controller.enqueue(encoder.encode('[[WORKING]]'))
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           currentMessages.push({ role: 'assistant', content: finalMessage.content as any })
 
-          const toolResults: Anthropic.ToolResultBlockParam[] = []
-          for (const block of toolUseBlocks) {
-            if (block.type === 'tool_use') {
+          // Run tool calls in parallel — most are independent Supabase queries,
+          // so fanning them out hides round-trip latency when the model asks
+          // for several lookups at once.
+          const results = await Promise.all(
+            toolUseBlocks.map(async (block) => {
+              if (block.type !== 'tool_use') return null
               const result = await executeTool(block.name, block.input as Record<string, unknown>, supabase)
-              toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
+              return { block, result }
+            })
+          )
 
-              // Track created entities for link buttons
-              try {
-                const parsed = JSON.parse(result)
-                if (parsed.success) {
-                  if (parsed.client?.id) createdLinks.push({ path: `/dashboard/clients/${parsed.client.id}`, label: `View ${parsed.client.name || 'Client'}` })
-                  if (parsed.job?.id) createdLinks.push({ path: `/dashboard/jobs/${parsed.job.id}`, label: `View ${parsed.job.name || 'Job'}` })
-                  if (parsed.document?.id) createdLinks.push({ path: `/dashboard/documents/${parsed.document.id}`, label: `View ${parsed.document.name || 'Document'}` })
-                  if (parsed.event?.id) createdLinks.push({ path: `/dashboard/calendar`, label: 'View Calendar' })
-                  if (parsed.gear?.id) createdLinks.push({ path: `/dashboard/gear`, label: `View ${parsed.gear.name || 'Gear'}` })
-                }
-              } catch { /* not JSON or no link needed */ }
-            }
+          const toolResults: Anthropic.ToolResultBlockParam[] = []
+          for (const entry of results) {
+            if (!entry) continue
+            const { block, result } = entry
+            toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
+
+            if (MUTATING_TOOLS.has(block.name)) mutated = true
+
+            try {
+              const parsed = JSON.parse(result)
+              if (parsed.success) {
+                if (parsed.client?.id) createdLinks.push({ path: `/dashboard/clients/${parsed.client.id}`, label: `View ${parsed.client.name || 'Client'}` })
+                if (parsed.job?.id) createdLinks.push({ path: `/dashboard/jobs/${parsed.job.id}`, label: `View ${parsed.job.name || 'Job'}` })
+                if (parsed.document?.id) createdLinks.push({ path: `/dashboard/documents/${parsed.document.id}`, label: `View ${parsed.document.name || 'Document'}` })
+                if (parsed.event?.id) createdLinks.push({ path: `/dashboard/calendar`, label: 'View Calendar' })
+                if (parsed.gear?.id) createdLinks.push({ path: `/dashboard/gear`, label: `View ${parsed.gear.name || 'Gear'}` })
+              }
+            } catch { /* not JSON or no link needed */ }
           }
 
-          // Clear the working indicator
           controller.enqueue(encoder.encode('[[/WORKING]]'))
 
           currentMessages.push({ role: 'user', content: toolResults })
