@@ -152,7 +152,8 @@ export default function PdfGenerator({ clients, initialClientId }: { clients: Cl
         </div>
         <div className="sm:col-span-2">
           <label className="field-label">Document Content</label>
-          <textarea value={form.body} onChange={(e) => update('body', e.target.value)} rows={8} className="field-input" placeholder="Write your document content here..." />
+          <textarea value={form.body} onChange={(e) => update('body', e.target.value)} rows={8} className="field-input" placeholder="Write your document content here...&#10;&#10;Formatting: # Heading, ## Subheading, ### Small heading, **bold text**" />
+          <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>Formatting: <code># Heading</code>, <code>## Subheading</code>, <code>### Small heading</code>, <code>**bold**</code></p>
         </div>
       </div>
 

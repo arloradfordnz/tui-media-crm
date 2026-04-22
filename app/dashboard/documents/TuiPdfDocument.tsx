@@ -10,6 +10,11 @@ Font.register({
   ],
 })
 
+Font.register({
+  family: 'Signature',
+  src: 'https://fonts.gstatic.com/s/dancingscript/v25/If2cXTr6YS-zF4S-kcSWSVi_sxjsohD9F50Ruu7BMSo3ROpA.ttf',
+})
+
 const styles = StyleSheet.create({
   page: { fontFamily: 'Poppins', fontSize: 12, color: '#1a1a1a', paddingBottom: 70 },
   header: { paddingHorizontal: 48, paddingTop: 40, paddingBottom: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -22,12 +27,18 @@ const styles = StyleSheet.create({
   meta: { fontSize: 11, color: '#666666', lineHeight: 1.6 },
   row: { flexDirection: 'row', gap: 32, marginBottom: 28 },
   col: { flex: 1 },
-  bodyText: { fontSize: 12, color: '#2a2a2a', lineHeight: 1.8, whiteSpace: 'pre-wrap' },
+  bodyText: { fontSize: 12, color: '#2a2a2a', lineHeight: 1.8 },
+  paragraph: { fontSize: 12, color: '#2a2a2a', lineHeight: 1.8, marginBottom: 10 },
+  h1: { fontSize: 20, fontWeight: 600, color: '#1a1a1a', marginTop: 18, marginBottom: 10 },
+  h2: { fontSize: 16, fontWeight: 600, color: '#1a1a1a', marginTop: 16, marginBottom: 8 },
+  h3: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginTop: 14, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.6 },
   signatureBlock: { flexDirection: 'row', marginTop: 56, gap: 48 },
   signatureCol: { flex: 1 },
-  signatureLine: { height: 1, backgroundColor: '#1a1a1a', marginTop: 48, marginBottom: 8 },
+  signatureLine: { height: 1, backgroundColor: '#1a1a1a', marginTop: 8, marginBottom: 8 },
   signatureLabel: { fontSize: 10, color: '#888888' },
   signatureName: { fontSize: 12, fontWeight: 600, marginBottom: 2 },
+  signatureScript: { fontFamily: 'Signature', fontSize: 32, color: '#1a1a1a', marginTop: 12, marginBottom: 0, height: 40 },
+  signaturePrinted: { fontSize: 11, color: '#666666', marginTop: 4 },
   footer: { position: 'absolute', bottom: 28, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: '#999999' },
 })
 
@@ -64,9 +75,53 @@ function TuiLogo() {
   )
 }
 
+function renderInline(text: string): ReactElement[] {
+  const parts: ReactElement[] = []
+  const re = /\*\*(.+?)\*\*/g
+  let last = 0
+  let m: RegExpExecArray | null
+  let i = 0
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(<Text key={i++}>{text.slice(last, m.index)}</Text>)
+    parts.push(<Text key={i++} style={{ fontWeight: 600 }}>{m[1]}</Text>)
+    last = m.index + m[0].length
+  }
+  if (last < text.length) parts.push(<Text key={i++}>{text.slice(last)}</Text>)
+  return parts
+}
+
+function renderBody(body: string): ReactElement[] {
+  const lines = body.split('\n')
+  const out: ReactElement[] = []
+  let buffer: string[] = []
+  let key = 0
+
+  const flush = () => {
+    if (buffer.length === 0) return
+    const para = buffer.join(' ')
+    out.push(<Text key={key++} style={styles.paragraph}>{renderInline(para)}</Text>)
+    buffer = []
+  }
+
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (line === '') { flush(); continue }
+    const h3 = /^###\s+(.+)/.exec(line)
+    const h2 = /^##\s+(.+)/.exec(line)
+    const h1 = /^#\s+(.+)/.exec(line)
+    if (h3) { flush(); out.push(<Text key={key++} style={styles.h3}>{renderInline(h3[1])}</Text>); continue }
+    if (h2) { flush(); out.push(<Text key={key++} style={styles.h2}>{renderInline(h2[1])}</Text>); continue }
+    if (h1) { flush(); out.push(<Text key={key++} style={styles.h1}>{renderInline(h1[1])}</Text>); continue }
+    buffer.push(line)
+  }
+  flush()
+  return out
+}
+
 export default function TuiDocument({ template, form }: { template: string; form: FormData }): ReactElement<DocumentProps> {
   const formattedDate = form.date ? new Date(form.date + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
   const formattedShootDate = form.shootDate ? new Date(form.shootDate + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
+  const today = new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
 
   return (
     <Document>
@@ -119,23 +174,23 @@ export default function TuiDocument({ template, form }: { template: string; form
           )}
 
           {form.body && (
-            <View style={styles.section}>
-              <Text style={styles.bodyText}>{form.body}</Text>
-            </View>
+            <View style={styles.section}>{renderBody(form.body)}</View>
           )}
 
           <View style={styles.signatureBlock}>
             <View style={styles.signatureCol}>
-              <Text style={styles.signatureName}>Arlo Radford | Tui Media</Text>
+              <Text style={styles.signatureName}>Arlo Radford</Text>
+              <Text style={styles.signaturePrinted}>Tui Media</Text>
+              <Text style={styles.signatureScript}>Arlo Radford</Text>
               <View style={styles.signatureLine} />
-              <Text style={styles.signatureLabel}>Signature</Text>
-              <Text style={[styles.signatureLabel, { marginTop: 4 }]}>Date: _______________</Text>
+              <Text style={styles.signatureLabel}>Signed {today}</Text>
             </View>
             <View style={styles.signatureCol}>
-              <Text style={styles.signatureName}>Client Signature</Text>
+              <Text style={styles.signatureName}>{form.clientName || 'Client'}</Text>
+              <Text style={styles.signaturePrinted}>{form.businessName && form.businessName !== 'Tui Media' ? form.businessName : 'Client'}</Text>
+              <Text style={[styles.signatureScript, { color: '#bbbbbb' }]}> </Text>
               <View style={styles.signatureLine} />
-              <Text style={styles.signatureLabel}>{form.clientName || 'Name'}</Text>
-              <Text style={[styles.signatureLabel, { marginTop: 4 }]}>Date: _______________</Text>
+              <Text style={styles.signatureLabel}>Signature &amp; Date</Text>
             </View>
           </View>
         </View>
