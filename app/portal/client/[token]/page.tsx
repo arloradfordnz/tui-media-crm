@@ -28,7 +28,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
       id, name, status, job_type, shoot_date,
       deliverables(
         id, title, description, completed,
-        delivery_files(id, file_name, original_name, file_url, version_label, delivery_status, download_enabled, personal_note, created_at)
+        delivery_files(id, file_name, original_name, file_url, mime_type, version_label, delivery_status, download_enabled, personal_note, created_at)
       )
     `)
     .eq('client_id', client.id)
@@ -42,7 +42,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
     .eq('client_id', client.id)
     .order('updated_at', { ascending: false })
 
-  type RawDeliveryFile = { id: string; file_name: string; original_name: string; file_url: string | null; version_label: string; delivery_status: string; download_enabled: boolean; personal_note: string | null; created_at: string }
+  type RawDeliveryFile = { id: string; file_name: string; original_name: string; file_url: string | null; mime_type: string | null; version_label: string; delivery_status: string; download_enabled: boolean; personal_note: string | null; created_at: string }
   type RawDeliverable = { id: string; title: string; description: string | null; completed: boolean; delivery_files: RawDeliveryFile[] }
   type RawJob = { id: string; name: string; status: string; job_type: string | null; shoot_date: string | null; deliverables: RawDeliverable[] }
 
@@ -72,6 +72,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
             id: f.id,
             originalName: f.original_name,
             fileUrl: await resolveFileUrl(f.file_name, f.file_url),
+            mimeType: f.mime_type,
             versionLabel: f.version_label,
             deliveryStatus: f.delivery_status,
             downloadEnabled: f.download_enabled,

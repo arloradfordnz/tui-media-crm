@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { signedUploadUrl, deleteObject } from '@/lib/r2'
+import { sendPortalDeliveryEmail } from '@/lib/email'
 import { NextRequest } from 'next/server'
 
 // Step 1: client requests a presigned PUT URL and creates a pending DB row.
@@ -53,15 +54,60 @@ export async function PATCH(request: NextRequest) {
     return Response.json({ error: 'fileId is required.' }, { status: 400 })
   }
 
+  // Flip to 'sent' so the file shows on the portal and kicks off the client email.
   const { data: record, error } = await supabase
     .from('delivery_files')
-    .update({ delivery_status: 'not_sent' })
+    .update({ delivery_status: 'sent' })
     .eq('id', fileId)
-    .select('id, original_name, version_label, delivery_status, created_at, file_url, personal_note')
+    .select('id, deliverable_id, original_name, version_label, delivery_status, created_at, file_url, personal_note')
     .single()
 
   if (error) {
     return Response.json({ error: error.message }, { status: 500 })
+  }
+
+  // Fire the client email + activity/notification records (best-effort; don't block the response on failure).
+  try {
+    const { data: deliverable } = await supabase
+      .from('deliverables')
+      .select('job_id')
+      .eq('id', record.deliverable_id)
+      .single()
+
+    if (deliverable) {
+      const { data: job } = await supabase
+        .from('jobs')
+        .select('name, portal_token, client_id, clients(name, email, portal_token)')
+        .eq('id', deliverable.job_id)
+        .single()
+
+      if (job) {
+        const client = job.clients as unknown as { name: string; email: string | null; portal_token: string | null }
+        const portalToken = client.portal_token || job.portal_token
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
+        const portalUrl = `${appUrl}/portal/client/${portalToken}`
+
+        if (client.email) {
+          await sendPortalDeliveryEmail(client.email, client.name, job.name, portalUrl, job.client_id, deliverable.job_id)
+        }
+
+        await supabase.from('activities').insert({
+          action: 'delivery_sent',
+          details: `Delivery "${record.original_name}" sent to client for "${job.name}"`,
+          job_id: deliverable.job_id,
+          client_id: job.client_id,
+        })
+        await supabase.from('notifications').insert({
+          title: 'Delivery Sent',
+          message: `New file delivered to client for "${job.name}"`,
+          type: 'delivery_sent',
+          job_id: deliverable.job_id,
+          client_id: job.client_id,
+        })
+      }
+    }
+  } catch (e) {
+    console.error('[deliverables/upload PATCH email]', e)
   }
 
   return Response.json({ file: record })

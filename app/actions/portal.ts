@@ -2,7 +2,7 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { revalidatePath } from 'next/cache'
-import { sendApprovalConfirmationEmail, sendRevisionRequestEmail } from '@/lib/email'
+import { sendApprovalConfirmationEmail, sendRevisionRequestEmail, sendAdminDeliveryViewedEmail, sendAdminDeliveryApprovedEmail, sendAdminRevisionRequestedEmail } from '@/lib/email'
 
 export async function approveDelivery(deliveryFileId: string, jobId: string) {
   const supabase = await createServerSupabaseClient()
@@ -11,6 +11,9 @@ export async function approveDelivery(deliveryFileId: string, jobId: string) {
     delivery_status: 'approved',
     approved_at: new Date().toISOString(),
   }).eq('id', deliveryFileId)
+
+  const { data: file } = await supabase.from('delivery_files').select('original_name').eq('id', deliveryFileId).single()
+  const fileName = file?.original_name || 'a delivery file'
 
   const { data: job } = await supabase
     .from('jobs')
@@ -27,6 +30,7 @@ export async function approveDelivery(deliveryFileId: string, jobId: string) {
     if (client.email) {
       await sendApprovalConfirmationEmail(client.email, client.name, job.name)
     }
+    await sendAdminDeliveryApprovedEmail(client.name, job.name, fileName, jobId, job.client_id)
   }
 
   revalidatePath('/portal/')
@@ -62,6 +66,7 @@ export async function requestChanges(prevState: { error?: string; success?: bool
   if (client.email) {
     await sendRevisionRequestEmail(client.email, client.name, job.name, round)
   }
+  await sendAdminRevisionRequestedEmail(client.name, job.name, round, request, jobId, job.client_id)
 
   revalidatePath('/portal/')
   return { success: true }
@@ -69,14 +74,16 @@ export async function requestChanges(prevState: { error?: string; success?: bool
 
 export async function markViewed(deliveryFileId: string, jobId: string) {
   const supabase = await createServerSupabaseClient()
-  const { data: file } = await supabase.from('delivery_files').select('delivery_status').eq('id', deliveryFileId).single()
+  const { data: file } = await supabase.from('delivery_files').select('delivery_status, original_name').eq('id', deliveryFileId).single()
 
   if (file && file.delivery_status === 'sent') {
     await supabase.from('delivery_files').update({ delivery_status: 'viewed', viewed_at: new Date().toISOString() }).eq('id', deliveryFileId)
 
-    const { data: job } = await supabase.from('jobs').select('name, client_id').eq('id', jobId).single()
+    const { data: job } = await supabase.from('jobs').select('name, client_id, clients(name)').eq('id', jobId).single()
     if (job) {
+      const client = job.clients as unknown as { name: string } | null
       await supabase.from('notifications').insert({ title: 'Portal Viewed', message: `Client viewed delivery for "${job.name}"`, type: 'portal_viewed', job_id: jobId, client_id: job.client_id })
+      await sendAdminDeliveryViewedEmail(client?.name || 'Your client', job.name, file.original_name || 'a delivery file', jobId, job.client_id)
     }
   }
 }

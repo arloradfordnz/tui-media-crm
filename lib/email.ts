@@ -384,6 +384,47 @@ export async function sendMorningBriefingEmail(data: MorningBriefingData) {
   await send({ to: 'hello@tuimedia.nz', subject, html, type: 'morning_briefing' })
 }
 
+const ADMIN_INBOX = 'hello@tuimedia.nz'
+
+export async function sendAdminDeliveryViewedEmail(clientName: string, jobName: string, fileName: string, jobId?: string, clientId?: string) {
+  const subject = `Client viewed delivery — ${jobName}`
+  const html = wrap(`
+    <h2 style="margin:0 0 20px;font-size:22px;color:#f5f5f5;font-weight:600;">Kia ora Arlo,</h2>
+    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;"><span style="color:#f5f5f5;font-weight:600;">${clientName}</span> just opened the portal and viewed <span style="color:#f5f5f5;">${fileName}</span> for <span style="color:#7790ed;">${jobName}</span>.</p>
+    <div style="text-align:center;margin:24px 0;">
+      <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#7790ed;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Open dashboard</a>
+    </div>
+  `, `<p style="color:#d4d4d4;font-size:15px;line-height:1.6;margin:32px 0 0;"><span style="color:#f5f5f5;font-weight:600;">Tui</span></p>`)
+  await send({ to: ADMIN_INBOX, subject, html, type: 'admin_delivery_viewed', clientId, jobId })
+}
+
+export async function sendAdminDeliveryApprovedEmail(clientName: string, jobName: string, fileName: string, jobId?: string, clientId?: string) {
+  const subject = `Delivery approved — ${jobName}`
+  const html = wrap(`
+    <h2 style="margin:0 0 20px;font-size:22px;color:#f5f5f5;font-weight:600;">Kia ora Arlo,</h2>
+    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;"><span style="color:#f5f5f5;font-weight:600;">${clientName}</span> has approved <span style="color:#f5f5f5;">${fileName}</span> for <span style="color:#7790ed;">${jobName}</span>.</p>
+    <div style="text-align:center;margin:24px 0;">
+      <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#7790ed;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Open dashboard</a>
+    </div>
+  `, `<p style="color:#d4d4d4;font-size:15px;line-height:1.6;margin:32px 0 0;"><span style="color:#f5f5f5;font-weight:600;">Tui</span></p>`)
+  await send({ to: ADMIN_INBOX, subject, html, type: 'admin_delivery_approved', clientId, jobId })
+}
+
+export async function sendAdminRevisionRequestedEmail(clientName: string, jobName: string, round: number, request: string, jobId?: string, clientId?: string) {
+  const subject = `Revision requested — ${jobName} (round ${round})`
+  const html = wrap(`
+    <h2 style="margin:0 0 20px;font-size:22px;color:#f5f5f5;font-weight:600;">Kia ora Arlo,</h2>
+    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;"><span style="color:#f5f5f5;font-weight:600;">${clientName}</span> has requested changes on <span style="color:#7790ed;">${jobName}</span> (round ${round}).</p>
+    <div style="background:#111;border-radius:8px;padding:16px;margin:16px 0;">
+      <p style="color:#d4d4d4;font-size:14px;line-height:1.6;margin:0;white-space:pre-wrap;">${request.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+    </div>
+    <div style="text-align:center;margin:24px 0;">
+      <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#7790ed;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Open dashboard</a>
+    </div>
+  `, `<p style="color:#d4d4d4;font-size:15px;line-height:1.6;margin:32px 0 0;"><span style="color:#f5f5f5;font-weight:600;">Tui</span></p>`)
+  await send({ to: ADMIN_INBOX, subject, html, type: 'admin_revision_requested', clientId, jobId })
+}
+
 export async function sendProposalAcceptedEmail(to: string, clientName: string, jobName: string, clientId?: string, jobId?: string) {
   const tpl = await getTemplate('proposal_accepted')
   const vars = { clientName, jobName }
