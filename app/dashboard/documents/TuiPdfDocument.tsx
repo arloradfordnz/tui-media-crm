@@ -12,7 +12,7 @@ Font.register({
 
 Font.register({
   family: 'Signature',
-  src: 'https://fonts.gstatic.com/s/dancingscript/v25/If2cXTr6YS-zF4S-kcSWSVi_sxjsohD9F50Ruu7BMSo3ROpA.ttf',
+  src: 'https://fonts.gstatic.com/s/dancingscript/v29/If2cXTr6YS-zF4S-kcSWSVi_sxjsohD9F50Ruu7B7y0HTQ.ttf',
 })
 
 const styles = StyleSheet.create({
