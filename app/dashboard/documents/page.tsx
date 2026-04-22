@@ -22,8 +22,8 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   } else {
     documents = (docsWithClient ?? []) as unknown as DocRow[]
   }
-  const { data: clients } = await supabase.from('clients').select('id, name, email, phone, location').order('name', { ascending: true })
-  const clientOptions = (clients ?? []).map((c) => ({ id: c.id, name: c.name, email: c.email, phone: c.phone, location: c.location }))
+  const { data: clients } = await supabase.from('clients').select('id, name, contact_person, email, phone, location').order('name', { ascending: true })
+  const clientOptions = (clients ?? []).map((c) => ({ id: c.id, name: c.name, contactPerson: c.contact_person, email: c.email, phone: c.phone, location: c.location }))
 
   return (
     <div className="space-y-6">

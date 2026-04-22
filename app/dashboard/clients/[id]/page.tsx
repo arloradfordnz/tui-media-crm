@@ -8,13 +8,13 @@ export default async function ClientDetailPage({ params, searchParams }: { param
 
   const supabase = await createServerSupabaseClient()
 
-  type ClientRow = { id: string; name: string; email: string | null; phone: string | null; location: string | null; lead_source: string | null; first_contact: string | null; pipeline_stage: string; status: string; lifetime_value: number; notes: string | null; tags: string | null; portal_token?: string | null }
+  type ClientRow = { id: string; name: string; contact_person: string | null; email: string | null; phone: string | null; location: string | null; lead_source: string | null; first_contact: string | null; pipeline_stage: string; status: string; lifetime_value: number; notes: string | null; tags: string | null; portal_token?: string | null }
 
   // Fetch all data in parallel for speed
   const [clientResult, { data: jobs }, { data: activities }, { data: documents }] = await Promise.all([
     supabase
       .from('clients')
-      .select('id, name, email, phone, location, lead_source, first_contact, pipeline_stage, status, lifetime_value, notes, tags, portal_token')
+      .select('id, name, contact_person, email, phone, location, lead_source, first_contact, pipeline_stage, status, lifetime_value, notes, tags, portal_token')
       .eq('id', id)
       .single(),
     supabase
@@ -44,6 +44,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
   const clientData = {
     id: client.id,
     name: client.name,
+    contactPerson: client.contact_person,
     email: client.email,
     phone: client.phone,
     location: client.location,

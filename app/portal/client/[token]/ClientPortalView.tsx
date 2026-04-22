@@ -370,6 +370,7 @@ function DocumentCard({ doc }: { doc: Document }) {
           template: String(obj.template ?? ''),
           form: {
             clientName: get('clientName'),
+            contactPerson: get('contactPerson'),
             clientEmail: get('clientEmail'),
             clientPhone: get('clientPhone'),
             businessName: get('businessName'),
@@ -433,7 +434,8 @@ function DocumentCard({ doc }: { doc: Document }) {
             <div className="space-y-3 text-sm" style={{ color: 'var(--text-primary)' }}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {parsed.form.clientName && <PreviewField label="Client" value={parsed.form.clientName} />}
-                {parsed.form.businessName && <PreviewField label="Business" value={parsed.form.businessName} />}
+                {parsed.form.contactPerson && <PreviewField label="Contact" value={parsed.form.contactPerson} />}
+                {parsed.form.businessName && <PreviewField label="Prepared by" value={parsed.form.businessName} />}
                 {parsed.form.date && <PreviewField label="Date" value={parsed.form.date} />}
                 {parsed.form.shootDate && <PreviewField label="Shoot Date" value={parsed.form.shootDate} />}
                 {parsed.form.location && <PreviewField label="Location" value={parsed.form.location} />}

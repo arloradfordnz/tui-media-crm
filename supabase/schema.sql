@@ -7,7 +7,8 @@ CREATE TABLE clients (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at      TIMESTAMPTZ DEFAULT NOW(),
   updated_at      TIMESTAMPTZ DEFAULT NOW(),
-  name            TEXT NOT NULL,
+  name            TEXT NOT NULL,           -- client / business name
+  contact_person  TEXT,                     -- key contact within that business
   email           TEXT,
   phone           TEXT,
   location        TEXT,

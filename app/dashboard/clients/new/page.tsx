@@ -25,8 +25,12 @@ export default function NewClientPage() {
       <form action={action} className="card space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="field-label">Name *</label>
-            <input name="name" required className="field-input" placeholder="Full name" />
+            <label className="field-label">Client / Business Name *</label>
+            <input name="name" required className="field-input" placeholder="Acme Co. or full name" />
+          </div>
+          <div>
+            <label className="field-label">Key Contact Person</label>
+            <input name="contactPerson" className="field-input" placeholder="Jane Smith" />
           </div>
           <div>
             <label className="field-label">Email</label>

@@ -7,6 +7,7 @@ import { sendWelcomeEmail } from '@/lib/email'
 
 export async function createClient(prevState: { error?: string } | undefined, formData: FormData) {
   const name = formData.get('name') as string
+  const contactPerson = formData.get('contactPerson') as string
   const email = formData.get('email') as string
   const phone = formData.get('phone') as string
   const location = formData.get('location') as string
@@ -17,13 +18,14 @@ export async function createClient(prevState: { error?: string } | undefined, fo
   const notes = formData.get('notes') as string
   const tagsRaw = formData.get('tags') as string
 
-  if (!name) return { error: 'Name is required.' }
+  if (!name) return { error: 'Client / business name is required.' }
 
   const tags = tagsRaw ? JSON.stringify(tagsRaw.split(',').map((t: string) => t.trim()).filter(Boolean)) : null
 
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.from('clients').insert({
     name,
+    contact_person: contactPerson || null,
     email: email || null,
     phone: phone || null,
     location: location || null,
@@ -48,6 +50,7 @@ export async function createClient(prevState: { error?: string } | undefined, fo
 export async function updateClient(prevState: { error?: string } | undefined, formData: FormData) {
   const clientId = formData.get('clientId') as string
   const name = formData.get('name') as string
+  const contactPerson = formData.get('contactPerson') as string
   const email = formData.get('email') as string
   const phone = formData.get('phone') as string
   const location = formData.get('location') as string
@@ -58,13 +61,14 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
   const notes = formData.get('notes') as string
   const tagsRaw = formData.get('tags') as string
 
-  if (!name) return { error: 'Name is required.' }
+  if (!name) return { error: 'Client / business name is required.' }
 
   const tags = tagsRaw ? JSON.stringify(tagsRaw.split(',').map((t: string) => t.trim()).filter(Boolean)) : null
 
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.from('clients').update({
     name,
+    contact_person: contactPerson || null,
     email: email || null,
     phone: phone || null,
     location: location || null,

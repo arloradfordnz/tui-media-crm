@@ -30,15 +30,17 @@ const styles = StyleSheet.create({
   sectionHeading: { fontSize: 15, fontWeight: 600, color: '#1a1a1a', marginBottom: 12 },
   signatureBlock: { flexDirection: 'row', marginTop: 56, gap: 48 },
   signatureCol: { flex: 1 },
-  signatureLine: { height: 1, backgroundColor: '#1a1a1a', marginTop: 36, marginBottom: 8 },
-  signatureLabel: { fontSize: 10, color: '#888888' },
-  signatureName: { fontSize: 14, fontWeight: 600, color: '#1a1a1a' },
+  signatureTyped: { fontSize: 14, color: '#1a1a1a', marginBottom: 4, height: 18 },
+  signatureLine: { height: 1, backgroundColor: '#1a1a1a', marginBottom: 8 },
+  signatureLabel: { fontSize: 10, color: '#888888', marginTop: 6 },
+  signatureName: { fontSize: 13, fontWeight: 600, color: '#1a1a1a' },
   signaturePrinted: { fontSize: 11, color: '#666666', marginTop: 2 },
   footer: { position: 'absolute', bottom: 28, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: '#999999' },
 })
 
 type FormData = {
   clientName: string
+  contactPerson?: string
   clientEmail: string
   clientPhone: string
   businessName: string
@@ -134,6 +136,7 @@ export default function TuiDocument({ template, form }: { template: string; form
             <View style={styles.col}>
               <Text style={styles.label}>Client</Text>
               <Text style={styles.value}>{form.clientName || '—'}</Text>
+              {form.contactPerson && <Text style={styles.meta}>Attn: {form.contactPerson}</Text>}
               {form.clientEmail && <Text style={styles.meta}>{form.clientEmail}</Text>}
               {form.clientPhone && <Text style={styles.meta}>{form.clientPhone}</Text>}
             </View>
@@ -177,15 +180,18 @@ export default function TuiDocument({ template, form }: { template: string; form
 
           <View style={styles.signatureBlock}>
             <View style={styles.signatureCol}>
+              <Text style={styles.signatureTyped}>Arlo Radford</Text>
+              <View style={styles.signatureLine} />
               <Text style={styles.signatureName}>Arlo Radford</Text>
               <Text style={styles.signaturePrinted}>Tui Media</Text>
-              <View style={styles.signatureLine} />
               <Text style={styles.signatureLabel}>Signed {today}</Text>
             </View>
             <View style={styles.signatureCol}>
-              <Text style={styles.signatureName}>{form.clientName || 'Client'}</Text>
+              <Text style={styles.signatureTyped}> </Text>
               <View style={styles.signatureLine} />
-              <Text style={styles.signatureLabel}>Signature &amp; Date</Text>
+              <Text style={styles.signatureName}>{form.contactPerson || form.clientName || 'Client'}</Text>
+              <Text style={styles.signaturePrinted}>{form.contactPerson && form.clientName ? form.clientName : 'Client'}</Text>
+              <Text style={styles.signatureLabel}>Date: _______________</Text>
             </View>
           </View>
         </View>

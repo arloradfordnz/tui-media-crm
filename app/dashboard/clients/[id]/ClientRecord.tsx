@@ -14,6 +14,7 @@ const LEAD_SOURCES = ['Referral', 'Website', 'Social Media', 'Google', 'Word of 
 type ClientData = {
   id: string
   name: string
+  contactPerson: string | null
   email: string | null
   phone: string | null
   location: string | null
@@ -85,6 +86,9 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>{client.name}</h1>
+          {client.contactPerson && (
+            <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>Contact: {client.contactPerson}</p>
+          )}
           {client.email ? (
             <a href={`mailto:${client.email}`} className="text-sm mt-1 block" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }} onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')} onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}>{client.email}</a>
           ) : (
@@ -135,8 +139,12 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
           <input type="hidden" name="clientId" value={client.id} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="field-label">Name *</label>
+              <label className="field-label">Client / Business Name *</label>
               <input name="name" required defaultValue={client.name} className="field-input" />
+            </div>
+            <div>
+              <label className="field-label">Key Contact Person</label>
+              <input name="contactPerson" defaultValue={client.contactPerson || ''} className="field-input" placeholder="Jane Smith" />
             </div>
             <div>
               <label className="field-label">Email</label>
@@ -312,6 +320,7 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
         <form action={action} className="card space-y-4">
           <input type="hidden" name="clientId" value={client.id} />
           <input type="hidden" name="name" value={client.name} />
+          <input type="hidden" name="contactPerson" value={client.contactPerson || ''} />
           <input type="hidden" name="status" value={client.status} />
           <input type="hidden" name="pipelineStage" value={client.pipelineStage} />
           <div>

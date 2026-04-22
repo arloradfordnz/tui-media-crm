@@ -9,6 +9,7 @@ const TEMPLATES = ['Contract', 'Quote', 'Call Sheet', 'General Document']
 export type ClientOption = {
   id: string
   name: string
+  contactPerson: string | null
   email: string | null
   phone: string | null
   location: string | null
@@ -20,6 +21,7 @@ export default function PdfGenerator({ clients, initialClientId }: { clients: Cl
   const initial = clients.find((c) => c.id === initialClientId)
   const [form, setForm] = useState({
     clientName: initial?.name || '',
+    contactPerson: initial?.contactPerson || '',
     clientEmail: initial?.email || '',
     clientPhone: initial?.phone || '',
     businessName: 'Tui Media',
@@ -43,6 +45,7 @@ export default function PdfGenerator({ clients, initialClientId }: { clients: Cl
     setForm((prev) => ({
       ...prev,
       clientName: c.name,
+      contactPerson: c.contactPerson || '',
       clientEmail: c.email || '',
       clientPhone: c.phone || '',
       location: c.location || prev.location,
@@ -119,8 +122,12 @@ export default function PdfGenerator({ clients, initialClientId }: { clients: Cl
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="field-label">Client Name</label>
+          <label className="field-label">Client / Business Name</label>
           <input value={form.clientName} onChange={(e) => update('clientName', e.target.value)} className="field-input" />
+        </div>
+        <div>
+          <label className="field-label">Key Contact Person</label>
+          <input value={form.contactPerson} onChange={(e) => update('contactPerson', e.target.value)} className="field-input" placeholder="Jane Smith" />
         </div>
         <div>
           <label className="field-label">Client Email</label>
