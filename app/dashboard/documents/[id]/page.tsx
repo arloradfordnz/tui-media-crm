@@ -8,7 +8,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
 
   const [{ data: doc }, { data: clients }] = await Promise.all([
     supabase.from('documents').select('*').eq('id', id).single(),
-    supabase.from('clients').select('id, name').order('name', { ascending: true }),
+    supabase.from('clients').select('id, name, contact_person, email, phone, location').order('name', { ascending: true }),
   ])
 
   if (!doc) notFound()
@@ -16,7 +16,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
   return (
     <DocumentEditor
       doc={{ id: doc.id, name: doc.name, docType: doc.doc_type, content: doc.content, clientId: doc.client_id ?? null }}
-      clients={(clients ?? []).map((c) => ({ id: c.id, name: c.name }))}
+      clients={(clients ?? []).map((c) => ({ id: c.id, name: c.name, contactPerson: c.contact_person, email: c.email, phone: c.phone, location: c.location }))}
     />
   )
 }

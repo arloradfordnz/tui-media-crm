@@ -54,6 +54,8 @@ async function send({
   type,
   clientId,
   jobId,
+  attachments,
+  rethrow,
 }: {
   to: string
   subject: string
@@ -61,6 +63,8 @@ async function send({
   type: string
   clientId?: string
   jobId?: string
+  attachments?: { filename: string; content: string }[]
+  rethrow?: boolean
 }) {
   if (!resend) {
     console.log(`[email skipped] No RESEND_API_KEY — would have sent to ${to}: ${subject}`)
@@ -68,12 +72,16 @@ async function send({
     return
   }
   try {
-    await resend.emails.send({ from: FROM, to, subject, html })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const payload: any = { from: FROM, to, subject, html }
+    if (attachments && attachments.length) payload.attachments = attachments
+    await resend.emails.send(payload)
     await logEmail({ to, subject, type, status: 'sent', clientId, jobId })
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err)
     console.error('[email error]', err)
     await logEmail({ to, subject, type, status: 'failed', error: errorMessage, clientId, jobId })
+    if (rethrow) throw err
   }
 }
 
@@ -451,6 +459,41 @@ export async function sendAdminRevisionRequestedEmail(clientName: string, jobNam
     </div>
   `)
   await send({ to: ADMIN_INBOX, subject, html, type: 'admin_revision_requested', clientId, jobId })
+}
+
+export async function sendDocumentToClientEmail({
+  to,
+  clientName,
+  docName,
+  template,
+  fileName,
+  pdfBase64,
+  clientId,
+}: {
+  to: string
+  clientName: string
+  docName: string
+  template: string
+  fileName: string
+  pdfBase64: string
+  clientId?: string
+}) {
+  const subject = `${docName} — Tui Media`
+  const intro = `Please find your ${template.toLowerCase()} attached. Let me know if anything needs changing or if you're happy to proceed.`
+  const html = wrap(`
+    ${buildGreeting(clientName)}
+    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;">${intro}</p>
+    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;">📎 <span style="color:#f5f5f5;">${fileName}</span></p>
+  `)
+  await send({
+    to,
+    subject,
+    html,
+    type: 'document_to_client',
+    clientId,
+    attachments: [{ filename: fileName, content: pdfBase64 }],
+    rethrow: true,
+  })
 }
 
 export async function sendProposalAcceptedEmail(to: string, clientName: string, jobName: string, clientId?: string, jobId?: string) {
