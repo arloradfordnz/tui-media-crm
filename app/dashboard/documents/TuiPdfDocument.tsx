@@ -10,11 +10,6 @@ Font.register({
   ],
 })
 
-Font.register({
-  family: 'Signature',
-  src: 'https://fonts.gstatic.com/s/dancingscript/v29/If2cXTr6YS-zF4S-kcSWSVi_sxjsohD9F50Ruu7B7y0HTQ.ttf',
-})
-
 const styles = StyleSheet.create({
   page: { fontFamily: 'Poppins', fontSize: 12, color: '#1a1a1a', paddingBottom: 70 },
   header: { paddingHorizontal: 48, paddingTop: 40, paddingBottom: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -22,8 +17,8 @@ const styles = StyleSheet.create({
   headerSub: { color: '#888888', fontSize: 11, marginTop: 6 },
   body: { paddingHorizontal: 48, paddingTop: 16 },
   section: { marginBottom: 28 },
-  label: { fontSize: 10, fontWeight: 600, color: '#999999', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 },
-  value: { fontSize: 12, color: '#1a1a1a', lineHeight: 1.6 },
+  label: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginBottom: 6 },
+  value: { fontSize: 12, color: '#444444', lineHeight: 1.6 },
   meta: { fontSize: 11, color: '#666666', lineHeight: 1.6 },
   row: { flexDirection: 'row', gap: 32, marginBottom: 28 },
   col: { flex: 1 },
@@ -31,14 +26,14 @@ const styles = StyleSheet.create({
   paragraph: { fontSize: 12, color: '#2a2a2a', lineHeight: 1.8, marginBottom: 10 },
   h1: { fontSize: 20, fontWeight: 600, color: '#1a1a1a', marginTop: 18, marginBottom: 10 },
   h2: { fontSize: 16, fontWeight: 600, color: '#1a1a1a', marginTop: 16, marginBottom: 8 },
-  h3: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginTop: 14, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.6 },
+  h3: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginTop: 14, marginBottom: 6 },
+  sectionHeading: { fontSize: 15, fontWeight: 600, color: '#1a1a1a', marginBottom: 12 },
   signatureBlock: { flexDirection: 'row', marginTop: 56, gap: 48 },
   signatureCol: { flex: 1 },
-  signatureLine: { height: 1, backgroundColor: '#1a1a1a', marginTop: 8, marginBottom: 8 },
+  signatureLine: { height: 1, backgroundColor: '#1a1a1a', marginTop: 36, marginBottom: 8 },
   signatureLabel: { fontSize: 10, color: '#888888' },
-  signatureName: { fontSize: 12, fontWeight: 600, marginBottom: 2 },
-  signatureScript: { fontFamily: 'Signature', fontSize: 32, color: '#1a1a1a', marginTop: 12, marginBottom: 0, height: 40 },
-  signaturePrinted: { fontSize: 11, color: '#666666', marginTop: 4 },
+  signatureName: { fontSize: 14, fontWeight: 600, color: '#1a1a1a' },
+  signaturePrinted: { fontSize: 11, color: '#666666', marginTop: 2 },
   footer: { position: 'absolute', bottom: 28, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: '#999999' },
 })
 
@@ -174,21 +169,21 @@ export default function TuiDocument({ template, form }: { template: string; form
           )}
 
           {form.body && (
-            <View style={styles.section}>{renderBody(form.body)}</View>
+            <View style={styles.section}>
+              <Text style={styles.sectionHeading}>Document Content</Text>
+              {renderBody(form.body)}
+            </View>
           )}
 
           <View style={styles.signatureBlock}>
             <View style={styles.signatureCol}>
               <Text style={styles.signatureName}>Arlo Radford</Text>
               <Text style={styles.signaturePrinted}>Tui Media</Text>
-              <Text style={styles.signatureScript}>Arlo Radford</Text>
               <View style={styles.signatureLine} />
               <Text style={styles.signatureLabel}>Signed {today}</Text>
             </View>
             <View style={styles.signatureCol}>
               <Text style={styles.signatureName}>{form.clientName || 'Client'}</Text>
-              <Text style={styles.signaturePrinted}>{form.businessName && form.businessName !== 'Tui Media' ? form.businessName : 'Client'}</Text>
-              <Text style={[styles.signatureScript, { color: '#bbbbbb' }]}> </Text>
               <View style={styles.signatureLine} />
               <Text style={styles.signatureLabel}>Signature &amp; Date</Text>
             </View>
