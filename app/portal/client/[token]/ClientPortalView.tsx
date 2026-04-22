@@ -39,6 +39,7 @@ type Document = {
   id: string
   name: string
   docType: string
+  content: string | null
   updatedAt: string
 }
 
@@ -182,15 +183,7 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
             </div>
             <div className="space-y-2">
               {data.documents.map((doc) => (
-                <div key={doc.id} className="card flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <FileText className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-                    <div>
-                      <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{doc.name}</p>
-                      <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{statusLabel(doc.docType)} · {formatDate(doc.updatedAt)}</p>
-                    </div>
-                  </div>
-                </div>
+                <DocumentCard key={doc.id} doc={doc} />
               ))}
             </div>
           </div>
@@ -276,6 +269,98 @@ function FileCard({ file, jobId, onApprove }: { file: DeliveryFile; jobId: strin
           </button>
         )}
       </div>
+    </div>
+  )
+}
+
+function DocumentCard({ doc }: { doc: Document }) {
+  const [expanded, setExpanded] = useState(false)
+  const [generating, setGenerating] = useState(false)
+
+  const parsed = (() => {
+    if (!doc.content) return null
+    try {
+      const obj = JSON.parse(doc.content)
+      if (obj && typeof obj === 'object' && 'template' in obj && 'form' in obj) return obj as { template: string; form: Record<string, string> }
+      return null
+    } catch { return null }
+  })()
+
+  async function handleDownload() {
+    if (!parsed) return
+    setGenerating(true)
+    try {
+      const { pdf } = await import('@react-pdf/renderer')
+      const { default: TuiDocument } = await import('@/app/dashboard/documents/TuiPdfDocument')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const blob = await pdf(TuiDocument({ template: parsed.template, form: parsed.form }) as any).toBlob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${doc.name.replace(/\s+/g, '_')}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('PDF generation error:', err)
+    }
+    setGenerating(false)
+  }
+
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <button onClick={() => setExpanded((v) => !v)} className="flex items-center gap-3 text-left flex-1 min-w-0">
+          {expanded ? (
+            <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+          ) : (
+            <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+          )}
+          <FileText className="w-4 h-4 shrink-0" style={{ color: 'var(--accent)' }} />
+          <div className="min-w-0">
+            <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{doc.name}</p>
+            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{statusLabel(doc.docType)} · {formatDate(doc.updatedAt)}</p>
+          </div>
+        </button>
+        {parsed && (
+          <button onClick={handleDownload} disabled={generating} className="btn-secondary text-sm">
+            <Download className="w-3.5 h-3.5" /> {generating ? 'Generating...' : 'Download PDF'}
+          </button>
+        )}
+      </div>
+
+      {expanded && (
+        <div className="mt-4 space-y-3" style={{ borderTop: '1px solid var(--bg-border)', paddingTop: '16px' }}>
+          {parsed ? (
+            <div className="space-y-3 text-sm" style={{ color: 'var(--text-primary)' }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {parsed.form.clientName && <PreviewField label="Client" value={parsed.form.clientName} />}
+                {parsed.form.businessName && <PreviewField label="Business" value={parsed.form.businessName} />}
+                {parsed.form.date && <PreviewField label="Date" value={parsed.form.date} />}
+                {parsed.form.shootDate && <PreviewField label="Shoot Date" value={parsed.form.shootDate} />}
+                {parsed.form.location && <PreviewField label="Location" value={parsed.form.location} />}
+                {parsed.form.jobDescription && <PreviewField label="Job" value={parsed.form.jobDescription} />}
+              </div>
+              {parsed.form.body && (
+                <div className="rounded-lg p-3" style={{ background: 'var(--bg-elevated)' }}>
+                  <p className="label mb-2">Content</p>
+                  <p className="whitespace-pre-wrap text-sm" style={{ color: 'var(--text-primary)', lineHeight: 1.7 }}>{parsed.form.body}</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Preview not available for this document.</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PreviewField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="label mb-1">{label}</p>
+      <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{value}</p>
     </div>
   )
 }

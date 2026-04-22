@@ -90,6 +90,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
       id: d.id,
       name: d.name,
       docType: d.doc_type,
+      content: d.content,
       updatedAt: d.updated_at,
     })),
   }
