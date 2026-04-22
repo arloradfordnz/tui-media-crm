@@ -281,7 +281,24 @@ function DocumentCard({ doc }: { doc: Document }) {
     if (!doc.content) return null
     try {
       const obj = JSON.parse(doc.content)
-      if (obj && typeof obj === 'object' && 'template' in obj && 'form' in obj) return obj as { template: string; form: Record<string, string> }
+      if (obj && typeof obj === 'object' && 'template' in obj && 'form' in obj) {
+        const f = (obj.form ?? {}) as Record<string, unknown>
+        const get = (k: string) => (typeof f[k] === 'string' ? (f[k] as string) : '')
+        return {
+          template: String(obj.template ?? ''),
+          form: {
+            clientName: get('clientName'),
+            clientEmail: get('clientEmail'),
+            clientPhone: get('clientPhone'),
+            businessName: get('businessName'),
+            date: get('date'),
+            jobDescription: get('jobDescription'),
+            shootDate: get('shootDate'),
+            location: get('location'),
+            body: get('body'),
+          },
+        }
+      }
       return null
     } catch { return null }
   })()
