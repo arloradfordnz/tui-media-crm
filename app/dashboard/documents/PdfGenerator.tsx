@@ -58,6 +58,21 @@ export default function PdfGenerator({ clients, initialClientId }: { clients: Cl
     }
   }, [initialClientId, initial])
 
+  async function persistDocument() {
+    try {
+      await fetch('/api/documents/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `${template} - ${form.clientName || 'Untitled'}`,
+          docType: template.toLowerCase().replace(/\s+/g, '_'),
+          content: JSON.stringify({ template, form }),
+          clientId: selectedClientId || null,
+        }),
+      })
+    } catch { /* ignore */ }
+  }
+
   async function handleDownloadPdf() {
     setGenerating(true)
     try {
@@ -71,6 +86,8 @@ export default function PdfGenerator({ clients, initialClientId }: { clients: Cl
       a.download = `${template.replace(/\s+/g, '_')}_${form.clientName || 'document'}.pdf`
       a.click()
       URL.revokeObjectURL(url)
+      // Auto-save an editable copy alongside the download
+      await persistDocument()
     } catch (err) {
       console.error('PDF generation error:', err)
     }
@@ -79,20 +96,8 @@ export default function PdfGenerator({ clients, initialClientId }: { clients: Cl
 
   async function handleSaveTemplate() {
     setSaving(true)
-    try {
-      const res = await fetch('/api/documents/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: `${template} - ${form.clientName || 'Untitled'}`,
-          docType: template.toLowerCase().replace(/\s+/g, '_'),
-          content: JSON.stringify({ template, form }),
-        }),
-      })
-      if (res.ok) {
-        window.location.reload()
-      }
-    } catch { /* ignore */ }
+    await persistDocument()
+    window.location.reload()
     setSaving(false)
   }
 

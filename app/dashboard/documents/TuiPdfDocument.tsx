@@ -27,7 +27,7 @@ const styles = StyleSheet.create({
   h1: { fontSize: 20, fontWeight: 600, color: '#1a1a1a', marginTop: 18, marginBottom: 10 },
   h2: { fontSize: 16, fontWeight: 600, color: '#1a1a1a', marginTop: 16, marginBottom: 8 },
   h3: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginTop: 14, marginBottom: 6 },
-  sectionHeading: { fontSize: 15, fontWeight: 600, color: '#1a1a1a', marginBottom: 12 },
+  sectionHeading: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 },
   signatureBlock: { flexDirection: 'row', marginTop: 56, gap: 48 },
   signatureCol: { flex: 1 },
   signatureTyped: { fontSize: 14, color: '#1a1a1a', marginBottom: 4, height: 18 },
@@ -173,7 +173,7 @@ export default function TuiDocument({ template, form }: { template: string; form
 
           {form.body && (
             <View style={styles.section}>
-              <Text style={styles.sectionHeading}>Document Content</Text>
+              <Text style={styles.sectionHeading}>Content</Text>
               {renderBody(form.body)}
             </View>
           )}
