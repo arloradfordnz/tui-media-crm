@@ -8,7 +8,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
   const { data: job } = await supabase
     .from('jobs')
-    .select('id, name, job_type, status, shoot_date, shoot_location, quote_value, revision_limit, revisions_used, notes, portal_token, client_id, clients(id, name)')
+    .select('id, name, job_type, status, shoot_date, shoot_location, quote_value, revision_limit, revisions_used, notes, client_id, clients(id, name)')
     .eq('id', id)
     .single()
 
@@ -41,7 +41,6 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     revisionLimit: job.revision_limit,
     revisionsUsed: job.revisions_used,
     notes: job.notes,
-    portalToken: job.portal_token,
     client,
     tasks: (tasks ?? []).map((t) => ({
       id: t.id,

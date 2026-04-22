@@ -5,7 +5,7 @@ import { updateJob, updateJobStatus, deleteJob, toggleTask, addRevision } from '
 import { createProposal } from '@/app/actions/proposals'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@/lib/format'
 import Link from 'next/link'
-import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as ActivityIcon, MapPin, Calendar, Copy, FileText, Upload, Download, FileVideo, Plus, Pencil, X } from 'lucide-react'
+import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as ActivityIcon, MapPin, Calendar, FileText, Upload, Download, FileVideo, Plus, Pencil, X } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 
 const JOB_STATUSES = ['enquiry', 'booked', 'preproduction', 'shootday', 'editing', 'review', 'approved', 'delivered', 'archived']
@@ -25,7 +25,6 @@ type JobData = {
   revisionLimit: number
   revisionsUsed: number
   notes: string | null
-  portalToken: string
   client: { id: string; name: string }
   tasks: Task[]
   deliverables: { id: string; title: string; description: string | null; completed: boolean; deliveryFiles: { id: string; originalName: string; versionLabel: string; deliveryStatus: string; createdAt: string; fileUrl: string; personalNote: string | null }[] }[]
@@ -39,7 +38,6 @@ export default function JobRecord({ job }: { job: JobData }) {
   const [revState, revAction, revPending] = useActionState(addRevision, undefined)
   const [isPending, startTransition] = useTransition()
   const [deleting, setDeleting] = useState(false)
-  const [copied, setCopied] = useState(false)
   const [uploadingFor, setUploadingFor] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadStage, setUploadStage] = useState<'idle' | 'preparing' | 'uploading' | 'finalising'>('idle')
@@ -64,9 +62,6 @@ export default function JobRecord({ job }: { job: JobData }) {
       tasks.map((t) => (t.id === id ? { ...t, completed } : t))
   )
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
-  const portalUrl = `${baseUrl}/portal/${job.portalToken}`
-
   function handleStatusChange(newStatus: string) {
     startTransition(() => { updateJobStatus(job.id, newStatus) })
   }
@@ -83,22 +78,6 @@ export default function JobRecord({ job }: { job: JobData }) {
     if (!confirm('Delete this job and all its data?')) return
     setDeleting(true)
     await deleteJob(job.id)
-  }
-
-  async function copyPortalLink() {
-    try {
-      await navigator.clipboard.writeText(portalUrl)
-    } catch {
-      const ta = document.createElement('textarea')
-      ta.value = portalUrl
-      ta.style.cssText = 'position:fixed;opacity:0'
-      document.body.appendChild(ta)
-      ta.select()
-      document.execCommand('copy')
-      document.body.removeChild(ta)
-    }
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
   }
 
   async function handleFileUpload(deliverableId: string, file: File, versionLabel: string, notes: string) {
@@ -266,15 +245,6 @@ export default function JobRecord({ job }: { job: JobData }) {
             />
           </div>
         </div>
-      </div>
-
-      {/* Portal Link */}
-      <div className="card flex items-center gap-3">
-        <span className="label shrink-0">Client Portal</span>
-        <code className="text-xs flex-1 truncate" style={{ color: 'var(--text-secondary)' }}>{portalUrl}</code>
-        <button onClick={copyPortalLink} className="btn-secondary text-sm">
-          <Copy className="w-3.5 h-3.5" /> {copied ? 'Copied!' : 'Copy Link'}
-        </button>
       </div>
 
       {/* Proposal */}

@@ -77,17 +77,16 @@ export async function PATCH(request: NextRequest) {
     if (deliverable) {
       const { data: job } = await supabase
         .from('jobs')
-        .select('name, portal_token, client_id, clients(name, email, portal_token)')
+        .select('name, client_id, clients(name, email, portal_token)')
         .eq('id', deliverable.job_id)
         .single()
 
       if (job) {
         const client = job.clients as unknown as { name: string; email: string | null; portal_token: string | null }
-        const portalToken = client.portal_token || job.portal_token
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
-        const portalUrl = `${appUrl}/portal/client/${portalToken}`
+        const portalUrl = client.portal_token ? `${appUrl}/portal/client/${client.portal_token}` : null
 
-        if (client.email) {
+        if (client.email && portalUrl) {
           await sendPortalDeliveryEmail(client.email, client.name, job.name, portalUrl, job.client_id, deliverable.job_id)
         }
 

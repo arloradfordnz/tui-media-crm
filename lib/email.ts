@@ -367,8 +367,6 @@ export async function sendMorningBriefingEmail(data: MorningBriefingData) {
 
   const subject = `Morning briefing — ${dayLabel}`
 
-  const tuiSignoff = `<p style="color:#d4d4d4;font-size:15px;line-height:1.6;margin:32px 0 0;"><span style="color:#f5f5f5;font-weight:600;">Tui</span></p>`
-
   const html = wrap(`
     <h2 style="margin:0 0 4px;font-size:22px;color:#f5f5f5;font-weight:600;">Kia ora Arlo,</h2>
     <p style="color:#555;font-size:14px;margin:0;">${dayLabel}</p>
@@ -379,7 +377,7 @@ export async function sendMorningBriefingEmail(data: MorningBriefingData) {
     ${section('Coming Up This Week', upcomingContent)}
     ${reviewContent}
     ${section('', `<a href="https://dashboard.tuimedia.nz" style="color:#7790ed;font-size:14px;text-decoration:none;">Open dashboard</a>`)}
-  `, tuiSignoff)
+  `)
 
   await send({ to: 'hello@tuimedia.nz', subject, html, type: 'morning_briefing' })
 }
@@ -394,7 +392,7 @@ export async function sendAdminDeliveryViewedEmail(clientName: string, jobName: 
     <div style="text-align:center;margin:24px 0;">
       <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#7790ed;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Open dashboard</a>
     </div>
-  `, `<p style="color:#d4d4d4;font-size:15px;line-height:1.6;margin:32px 0 0;"><span style="color:#f5f5f5;font-weight:600;">Tui</span></p>`)
+  `)
   await send({ to: ADMIN_INBOX, subject, html, type: 'admin_delivery_viewed', clientId, jobId })
 }
 
@@ -406,7 +404,7 @@ export async function sendAdminDeliveryApprovedEmail(clientName: string, jobName
     <div style="text-align:center;margin:24px 0;">
       <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#7790ed;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Open dashboard</a>
     </div>
-  `, `<p style="color:#d4d4d4;font-size:15px;line-height:1.6;margin:32px 0 0;"><span style="color:#f5f5f5;font-weight:600;">Tui</span></p>`)
+  `)
   await send({ to: ADMIN_INBOX, subject, html, type: 'admin_delivery_approved', clientId, jobId })
 }
 
@@ -421,7 +419,7 @@ export async function sendAdminRevisionRequestedEmail(clientName: string, jobNam
     <div style="text-align:center;margin:24px 0;">
       <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#7790ed;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Open dashboard</a>
     </div>
-  `, `<p style="color:#d4d4d4;font-size:15px;line-height:1.6;margin:32px 0 0;"><span style="color:#f5f5f5;font-weight:600;">Tui</span></p>`)
+  `)
   await send({ to: ADMIN_INBOX, subject, html, type: 'admin_revision_requested', clientId, jobId })
 }
 
