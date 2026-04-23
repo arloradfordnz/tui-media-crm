@@ -116,7 +116,7 @@ export default function DatePicker({
   const todayTs = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime() })()
 
   return (
-    <div ref={wrapperRef} className={`custom-select ${className}`} style={{ position: 'relative', ...style }}>
+    <div ref={wrapperRef} style={{ position: 'relative' }}>
       {name && <input type="hidden" name={name} value={value} required={required} />}
       <button
         ref={btnRef}
@@ -125,7 +125,8 @@ export default function DatePicker({
         onClick={() => !disabled && setOpen(v => !v)}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className="custom-select-trigger"
+        className={`custom-select-trigger ${className}`}
+        style={style}
       >
         <span className={value ? 'custom-select-value' : 'custom-select-placeholder'}>
           {value ? toDisplay(value) : placeholder}
