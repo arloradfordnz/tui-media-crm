@@ -15,6 +15,7 @@ export type ClientOption = {
   email: string | null
   phone: string | null
   location: string | null
+  portalToken: string | null
 }
 
 export type DocFormShape = {
@@ -205,6 +206,7 @@ export default function DocumentForm({ clients, mode }: { clients: ClientOption[
           fileName: fileNameSafe,
           pdfBase64: base64,
           clientId: selectedClientId || null,
+          portalToken: clients.find((c) => c.id === selectedClientId)?.portalToken || null,
         }),
       })
       if (!res.ok) {

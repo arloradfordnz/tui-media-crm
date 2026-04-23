@@ -52,7 +52,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
     firstContact: client.first_contact,
     pipelineStage: client.pipeline_stage,
     status: client.status,
-    lifetimeValue: client.lifetime_value,
+    lifetimeValue: (jobs ?? []).reduce((sum, j) => sum + (j.quote_value ?? 0), 0),
     notes: client.notes,
     tags: client.tags,
     portalToken: client.portal_token ?? null,

@@ -37,7 +37,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
     return {
       ...c,
       jobCount: jobs.length,
-      lifetime_value: (c.lifetime_value ?? 0) + jobsValue,
+      lifetime_value: jobsValue,
     }
   })
 

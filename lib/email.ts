@@ -473,6 +473,7 @@ export async function sendDocumentToClientEmail({
   fileName,
   pdfBase64,
   clientId,
+  portalToken,
 }: {
   to: string
   clientName: string
@@ -481,13 +482,20 @@ export async function sendDocumentToClientEmail({
   fileName: string
   pdfBase64: string
   clientId?: string
+  portalToken?: string | null
 }) {
   const subject = `${docName} — Tui Media`
   const intro = `Please find your ${template.toLowerCase()} attached. Let me know if anything needs changing or if you're happy to proceed.`
+  const portalUrl = portalToken ? `https://dashboard.tuimedia.nz/portal/client/${portalToken}` : null
+  const buttonSection = portalUrl
+    ? `<div style="text-align:left;margin:28px 0 0;">
+        <a href="${portalUrl}" target="_blank" style="display:inline-block;background:#7790ed;color:#fff;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">View Document</a>
+      </div>`
+    : ''
   const html = wrap(`
     ${buildGreeting(clientName)}
     <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;">${intro}</p>
-    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;">📎 <span style="color:#f5f5f5;">${fileName}</span></p>
+    ${buttonSection}
   `)
   await send({
     to,

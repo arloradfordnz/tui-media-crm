@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { sendDocumentToClientEmail } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
-  const { to, clientName, docName, template, fileName, pdfBase64, clientId } = await request.json()
+  const { to, clientName, docName, template, fileName, pdfBase64, clientId, portalToken } = await request.json()
   if (!to || !pdfBase64) return Response.json({ error: 'Missing recipient or PDF.' }, { status: 400 })
 
   try {
@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
       fileName: fileName || `${(docName || 'document').replace(/\s+/g, '_')}.pdf`,
       pdfBase64,
       clientId,
+      portalToken: portalToken || null,
     })
     return Response.json({ ok: true })
   } catch (err) {
