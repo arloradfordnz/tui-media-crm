@@ -76,6 +76,7 @@ export async function updateJob(prevState: { error?: string } | undefined, formD
   const shootDate = formData.get('shootDate') as string
   const shootLocation = formData.get('shootLocation') as string
   const quoteValue = formData.get('quoteValue') as string
+  const estimatedHours = formData.get('estimatedHours') as string
   const notes = formData.get('notes') as string
   const status = formData.get('status') as string
 
@@ -92,6 +93,7 @@ export async function updateJob(prevState: { error?: string } | undefined, formD
     shoot_date: shootDate ? new Date(shootDate).toISOString() : null,
     shoot_location: shootLocation || null,
     quote_value: quoteValue ? parseFloat(quoteValue) : null,
+    estimated_hours: estimatedHours ? parseFloat(estimatedHours) : 0,
     notes: notes || null,
     ...(status ? { status } : {}),
   }).eq('id', jobId)

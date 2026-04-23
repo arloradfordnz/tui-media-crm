@@ -5,6 +5,7 @@ import { createJob } from '@/app/actions/jobs'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, Check, Film, Heart, Building2, PartyPopper, Home, Palette } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
+import DatePicker from '@/components/DatePicker'
 
 type Client = { id: string; name: string; email: string | null }
 type TemplateTask = { phase: string; title: string }
@@ -103,7 +104,7 @@ export default function NewJobPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="field-label">Shoot Date</label>
-              <input type="date" value={shootDate} onChange={(e) => setShootDate(e.target.value)} className="field-input" />
+              <DatePicker value={shootDate} onChange={setShootDate} className="field-input" />
             </div>
             <div>
               <label className="field-label">Quote Value (NZD)</label>

@@ -6,6 +6,7 @@ import { statusLabel } from '@/lib/format'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
+import DatePicker from '@/components/DatePicker'
 
 const LEAD_SOURCES = ['Referral', 'Website', 'Social Media', 'Google', 'Word of Mouth', 'Other']
 const PIPELINE_STAGES = ['enquiry', 'discovery', 'proposal', 'negotiation', 'won']
@@ -54,7 +55,7 @@ export default function NewClientPage() {
           </div>
           <div>
             <label className="field-label">First Contact</label>
-            <input name="firstContact" type="date" className="field-input" />
+            <DatePicker name="firstContact" className="field-input" />
           </div>
           <div>
             <label className="field-label">Pipeline Stage</label>

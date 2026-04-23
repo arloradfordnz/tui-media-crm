@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Trash2, Briefcase, MessageSquare, StickyNote, UserCircle, Copy, Check, FileText, ExternalLink } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
+import DatePicker from '@/components/DatePicker'
 
 const PIPELINE_STAGES = ['enquiry', 'discovery', 'proposal', 'negotiation', 'won']
 const LEAD_SOURCES = ['Referral', 'Website', 'Social Media', 'Google', 'Word of Mouth', 'Other']
@@ -169,7 +170,7 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
             </div>
             <div>
               <label className="field-label">First Contact</label>
-              <input name="firstContact" type="date" defaultValue={client.firstContact?.split('T')[0] || ''} className="field-input" />
+              <DatePicker name="firstContact" defaultValue={client.firstContact?.split('T')[0] || ''} className="field-input" />
             </div>
             <div>
               <label className="field-label">Pipeline Stage</label>

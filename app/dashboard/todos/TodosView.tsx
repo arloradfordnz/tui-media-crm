@@ -5,6 +5,7 @@ import { createTodo, toggleTodo, deleteTodo, updateTodo } from '@/app/actions/to
 import { CheckSquare, CheckCircle2, Circle, Trash2, Plus, SlidersHorizontal, Pencil, X, Check } from 'lucide-react'
 import Link from 'next/link'
 import CustomSelect from '@/components/CustomSelect'
+import DatePicker from '@/components/DatePicker'
 import FilterTabs from '@/components/FilterTabs'
 
 type Todo = {
@@ -101,10 +102,9 @@ function TodoRow({ todo, now, jobs, clients }: { todo: Todo; now: Date; jobs: Jo
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="text-xs mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>Due date</label>
-            <input
-              type="date"
+            <DatePicker
               value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
+              onChange={setDueDate}
               className="field-input"
               style={{ padding: '8px 12px' }}
             />
@@ -255,9 +255,8 @@ function CreateForm({ jobs, clients }: { jobs: Job[]; clients: Client[] }) {
         >
           <div>
             <label className="text-xs mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>Due date</label>
-            <input
+            <DatePicker
               name="due_date"
-              type="date"
               className="field-input"
               disabled={isPending}
               style={{ padding: '8px 12px' }}

@@ -6,6 +6,7 @@ import { statusLabel } from '@/lib/format'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Plus, X, Trash2, Calendar } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
+import DatePicker from '@/components/DatePicker'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -187,7 +188,7 @@ export default function CalendarView({ events, jobs, month, year }: { events: Ev
                 </div>
                 <div>
                   <label className="field-label">Date *</label>
-                  <input name="date" type="date" required defaultValue={selectedDay ? `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}` : ''} className="field-input" />
+                  <DatePicker name="date" required defaultValue={selectedDay ? `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}` : ''} className="field-input" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">

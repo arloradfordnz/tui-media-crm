@@ -7,6 +7,8 @@ import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@
 import Link from 'next/link'
 import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as ActivityIcon, MapPin, Calendar, FileText, Upload, Download, FileVideo, Plus, Pencil, X } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
+import DatePicker from '@/components/DatePicker'
+import JobTimeTracker, { type TimeEntry } from './JobTimeTracker'
 
 const JOB_STATUSES = ['enquiry', 'booked', 'preproduction', 'shootday', 'editing', 'review', 'approved', 'delivered', 'archived']
 const PHASES = ['preshoot', 'shootday', 'postproduction', 'delivery']
@@ -24,6 +26,8 @@ type JobData = {
   quoteValue: number | null
   revisionLimit: number
   revisionsUsed: number
+  hourlyRate: number
+  estimatedHours: number
   notes: string | null
   client: { id: string; name: string }
   tasks: Task[]
@@ -31,6 +35,7 @@ type JobData = {
   revisions: { id: string; round: number; request: string; status: string; createdAt: string }[]
   proposals: { id: string; status: string; token: string; totalValue: number; sentAt: string | null; respondedAt: string | null; createdAt: string }[]
   activities: { id: string; action: string; details: string | null; createdAt: string }[]
+  timeEntries: TimeEntry[]
 }
 
 export default function JobRecord({ job }: { job: JobData }) {
@@ -296,7 +301,7 @@ export default function JobRecord({ job }: { job: JobData }) {
           </div>
           <div>
             <label className="field-label">Shoot Date</label>
-            <input name="shootDate" type="date" defaultValue={job.shootDate?.split('T')[0] || ''} className="field-input" />
+            <DatePicker name="shootDate" defaultValue={job.shootDate?.split('T')[0] || ''} className="field-input" />
           </div>
           <div>
             <label className="field-label">Shoot Location</label>
@@ -305,6 +310,10 @@ export default function JobRecord({ job }: { job: JobData }) {
           <div>
             <label className="field-label">Quote Value (NZD)</label>
             <input name="quoteValue" type="number" step="0.01" defaultValue={job.quoteValue || ''} className="field-input" />
+          </div>
+          <div>
+            <label className="field-label">Estimated Hours</label>
+            <input name="estimatedHours" type="number" step="0.5" min={0} defaultValue={job.estimatedHours || ''} className="field-input" placeholder="e.g. 20" />
           </div>
         </div>
         <div>
@@ -499,6 +508,9 @@ export default function JobRecord({ job }: { job: JobData }) {
           </form>
         )}
       </div>
+
+      {/* Time Tracking */}
+      <JobTimeTracker jobId={job.id} hourlyRate={job.hourlyRate} estimatedHours={job.estimatedHours} entries={job.timeEntries} />
 
       {/* Activity Log */}
       <div className="card">

@@ -89,6 +89,10 @@ const SIGNOFF = `
   <p style="color:#d4d4d4;font-size:15px;line-height:1.6;margin:32px 0 0;">Ng\u0101 mihi,<br/><span style="color:#f5f5f5;font-weight:600;">Arlo Radford</span></p>
 `
 
+const BRIEFING_SIGNOFF = `
+  <p style="color:#f5f5f5;font-size:15px;font-weight:600;margin:32px 0 0;">Arlo</p>
+`
+
 const NO_REPLY = `
   <div style="border-top:1px solid #222;margin-top:32px;padding-top:20px;">
     <p style="color:#555;font-size:13px;line-height:1.5;margin:0;">This is an automated message — please do not reply to this email. If you need to get in touch, email us at <a href="mailto:hello@tuimedia.nz" style="color:#7790ed;text-decoration:none;">hello@tuimedia.nz</a></p>
@@ -116,22 +120,22 @@ function wrap(body: string, signoff = SIGNOFF) {
   <body bgcolor="#0a0a0a" style="background:#0a0a0a;margin:0;padding:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#f5f5f5;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0a0a0a" class="email-bg" style="background:#0a0a0a;width:100%;margin:0;padding:0;">
       <tr>
-        <td align="center" bgcolor="#0a0a0a" style="background:#0a0a0a;padding:48px 20px;">
-          <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" bgcolor="#0a0a0a" style="background:#0a0a0a;max-width:560px;width:100%;">
+        <td align="center" bgcolor="#0a0a0a" style="background:#0a0a0a;padding:48px 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0a0a0a" style="background:#0a0a0a;width:100%;">
             <tr>
-              <td align="left" bgcolor="#0a0a0a" style="background:#0a0a0a;padding:0 8px 36px;">
+              <td align="left" bgcolor="#0a0a0a" style="background:#0a0a0a;padding:0 40px 36px;">
                 <img src="https://dashboard.tuimedia.nz/Primary_White.svg" alt="Tui Media" width="140" style="display:block;" />
               </td>
             </tr>
             <tr>
-              <td bgcolor="#0a0a0a" style="background:#0a0a0a;padding:0 8px;">
+              <td bgcolor="#0a0a0a" style="background:#0a0a0a;padding:0 40px;">
                 ${body}
                 ${signoff}
                 ${NO_REPLY}
               </td>
             </tr>
             <tr>
-              <td align="left" bgcolor="#0a0a0a" style="background:#0a0a0a;padding:32px 8px 0;color:#444;font-size:12px;">
+              <td align="left" bgcolor="#0a0a0a" style="background:#0a0a0a;padding:32px 40px 0;color:#444;font-size:12px;">
                 &copy; ${new Date().getFullYear()} Tui Media &middot; <a href="https://tuimedia.nz" style="color:#555;text-decoration:none;">www.tuimedia.nz</a>
               </td>
             </tr>
@@ -415,7 +419,7 @@ export async function sendMorningBriefingEmail(data: MorningBriefingData) {
     ${section('Coming Up This Week', upcomingContent)}
     ${reviewContent}
     ${section('', `<a href="https://dashboard.tuimedia.nz" style="color:#7790ed;font-size:14px;text-decoration:none;">Open dashboard</a>`)}
-  `)
+  `, BRIEFING_SIGNOFF)
 
   await send({ to: 'hello@tuimedia.nz', subject, html, type: 'morning_briefing' })
 }

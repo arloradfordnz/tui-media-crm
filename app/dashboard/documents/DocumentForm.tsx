@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Download, Save, Mail, Trash2, Check } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
+import DatePicker from '@/components/DatePicker'
 
 const TEMPLATES = ['Contract', 'Quote', 'Call Sheet', 'General Document']
 
@@ -289,11 +290,11 @@ export default function DocumentForm({ clients, mode }: { clients: ClientOption[
         </div>
         <div>
           <label className="field-label">Date</label>
-          <input value={form.date} onChange={(e) => update('date', e.target.value)} type="date" className="field-input" />
+          <DatePicker value={form.date} onChange={(v) => update('date', v)} className="field-input" />
         </div>
         <div>
           <label className="field-label">Shoot Date</label>
-          <input value={form.shootDate} onChange={(e) => update('shootDate', e.target.value)} type="date" className="field-input" />
+          <DatePicker value={form.shootDate} onChange={(v) => update('shootDate', v)} className="field-input" />
         </div>
         <div className="sm:col-span-2">
           <label className="field-label">Job Description</label>

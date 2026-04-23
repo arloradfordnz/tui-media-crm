@@ -1,5 +1,10 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { formatNZD, formatDate, getInitials, statusLabel } from '@/lib/format'
+
+function formatHours(seconds: number): string {
+  const h = seconds / 3600
+  return h < 1 ? `${Math.round(seconds / 60)}m` : `${h % 1 === 0 ? h : h.toFixed(1)}h`
+}
 import { Briefcase, Plus } from 'lucide-react'
 import Link from 'next/link'
 import SearchInput from '@/components/SearchInput'
@@ -31,6 +36,22 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   if (search) query = query.ilike('name', `%${search}%`)
 
   const { data: jobs } = await query
+
+  // Time totals per job — gracefully skip if table doesn't exist yet
+  const jobIds = (jobs ?? []).map((j) => j.id)
+  let timeByJob: Record<string, number> = {}
+  if (jobIds.length > 0) {
+    const { data: timeTotals } = await supabase
+      .from('time_entries')
+      .select('job_id, duration_seconds')
+      .in('job_id', jobIds)
+      .not('ended_at', 'is', null)
+    if (timeTotals) {
+      for (const t of timeTotals) {
+        timeByJob[t.job_id] = (timeByJob[t.job_id] || 0) + (t.duration_seconds || 0)
+      }
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -66,6 +87,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
                 <th className="table-header text-left hidden lg:table-cell">Shoot Date</th>
                 <th className="table-header text-left hidden sm:table-cell">Type</th>
                 <th className="table-header text-right hidden sm:table-cell">Value</th>
+                <th className="table-header text-right hidden md:table-cell">Time</th>
                 <th className="table-header text-right">Status</th>
               </tr>
             </thead>
@@ -90,6 +112,9 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
                       {j.job_type && <span className="badge badge-muted">{statusLabel(j.job_type)}</span>}
                     </td>
                     <td className="px-4 py-4 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-primary)' }}>{j.quote_value ? formatNZD(j.quote_value) : '—'}</td>
+                    <td className="px-4 py-4 hidden md:table-cell text-sm text-right" style={{ color: 'var(--text-tertiary)' }}>
+                      {timeByJob[j.id] ? formatHours(timeByJob[j.id]) : '—'}
+                    </td>
                     <td className="px-4 py-4 text-right">
                       <QuickStatus jobId={j.id} status={j.status} />
                     </td>

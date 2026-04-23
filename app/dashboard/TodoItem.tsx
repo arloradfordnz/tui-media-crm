@@ -53,7 +53,7 @@ export default function TodoItem({ id, title, dueDate, isOverdue, linkedJob, lin
           )}
           {dueDate && (
             <span className="text-xs" style={{ color: isOverdue ? 'var(--danger)' : 'var(--text-tertiary)' }}>
-              {isOverdue ? 'Overdue · ' : ''}{new Date(dueDate).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}
+              {isOverdue ? 'Overdue · ' : ''}{(() => { const d = new Date(dueDate); return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}/${String(d.getFullYear()).slice(2)}` })()}
             </span>
           )}
         </div>

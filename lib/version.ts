@@ -2,4 +2,4 @@
 // - PATCH: small fixes, tweaks, copy changes
 // - MINOR: new features (e.g. R2 deliverables, new sections)
 // - MAJOR: breaking changes or a visible overhaul
-export const APP_VERSION = '1.7.0'
+export const APP_VERSION = '1.7.1'
