@@ -19,3 +19,6 @@ CREATE TABLE IF NOT EXISTS time_entries (
 
 CREATE INDEX IF NOT EXISTS idx_time_entries_job ON time_entries(job_id);
 CREATE INDEX IF NOT EXISTS idx_time_entries_running ON time_entries(job_id) WHERE ended_at IS NULL;
+
+ALTER TABLE time_entries ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "auth_all" ON time_entries FOR ALL TO authenticated USING (true) WITH CHECK (true);
