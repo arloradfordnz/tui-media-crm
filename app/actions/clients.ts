@@ -2,8 +2,18 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { sendWelcomeEmail } from '@/lib/email'
+
+// Service-role client that bypasses RLS. Used for cleanup on tables where the
+// user's auth session doesn't have UPDATE/DELETE policies (e.g. email_logs).
+function getAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return null
+  return createServiceClient(url, key)
+}
 
 export async function createClient(prevState: { error?: string } | undefined, formData: FormData) {
   const name = formData.get('name') as string
@@ -100,10 +110,24 @@ export async function updateClientStatus(clientId: string, status: string) {
 
 export async function deleteClient(clientId: string): Promise<{ error?: string } | never> {
   const supabase = await createServerSupabaseClient()
+  const admin = getAdminClient()
 
-  // Clear refs that would otherwise block the delete (email_logs.client_id has
-  // a plain FK with no ON DELETE action) or that we don't want to keep around.
-  await supabase.from('email_logs').update({ client_id: null }).eq('client_id', clientId)
+  // email_logs.client_id FK has no ON DELETE action, and email_logs has RLS
+  // with no UPDATE policy — so we must use the service-role client to null
+  // those refs before the clients delete can succeed.
+  if (admin) {
+    const { error: logErr } = await admin
+      .from('email_logs')
+      .update({ client_id: null })
+      .eq('client_id', clientId)
+    if (logErr) {
+      console.error('[deleteClient] email_logs cleanup failed:', logErr)
+      return { error: `Couldn't clear email logs for this client: ${logErr.message}` }
+    }
+  } else {
+    return { error: 'Missing SUPABASE_SERVICE_ROLE_KEY — set it in Vercel env vars so the server can clean up email_logs before deleting the client.' }
+  }
+
   await supabase.from('documents').delete().eq('client_id', clientId)
   await supabase.from('notifications').delete().eq('client_id', clientId)
 
