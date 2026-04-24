@@ -121,7 +121,7 @@ function wrap(body: string, signoff = SIGNOFF) {
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0a0a0a" class="email-bg" style="background:#0a0a0a;width:100%;margin:0;padding:0;">
       <tr>
         <td align="center" bgcolor="#0a0a0a" style="background:#0a0a0a;padding:48px 0;">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0a0a0a" style="background:#0a0a0a;width:100%;">
+          <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" bgcolor="#0a0a0a" style="background:#0a0a0a;width:100%;max-width:560px;margin:0 auto;">
             <tr>
               <td align="left" bgcolor="#0a0a0a" style="background:#0a0a0a;padding:0 40px 36px;">
                 <img src="https://dashboard.tuimedia.nz/Primary_White.svg" alt="Tui Media" width="140" style="display:block;" />
@@ -234,7 +234,7 @@ export async function sendPortalDeliveryEmail(to: string, clientName: string, jo
       ${buildGreeting(clientName)}
       ${bodyToHtml(bodyText)}
       <div style="text-align:left;margin:28px 0;">
-        <a href="${portalUrl}" style="display:inline-block;background:#7790ed;color:#fff;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">View Your Video</a>
+        <a href="${portalUrl}" style="display:inline-block;background:#7790ed;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:400;font-size:13px;">View Your Video</a>
       </div>
       <p style="color:#555;font-size:13px;margin:0;">If the button doesn't work, copy this link: <a href="${portalUrl}" style="color:#7790ed;text-decoration:none;">${portalUrl}</a></p>
     `),
@@ -295,7 +295,7 @@ export async function sendProposalEmail(to: string, clientName: string, jobName:
       ${buildGreeting(clientName)}
       ${bodyToHtml(bodyText)}
       <div style="text-align:left;margin:28px 0;">
-        <a href="${proposalUrl}" style="display:inline-block;background:#7790ed;color:#fff;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">View Proposal</a>
+        <a href="${proposalUrl}" style="display:inline-block;background:#7790ed;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:400;font-size:13px;">View Proposal</a>
       </div>
       <p style="color:#555;font-size:13px;margin:0;">If the button doesn't work, copy this link: <a href="${proposalUrl}" style="color:#7790ed;text-decoration:none;">${proposalUrl}</a></p>
     `),
@@ -432,7 +432,7 @@ export async function sendAdminDeliveryViewedEmail(clientName: string, jobName: 
     <h2 style="margin:0 0 20px;font-size:22px;color:#f5f5f5;font-weight:600;">Kia ora Arlo,</h2>
     <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;"><span style="color:#f5f5f5;font-weight:600;">${clientName}</span> just opened the portal and viewed <span style="color:#f5f5f5;">${fileName}</span> for <span style="color:#7790ed;">${jobName}</span>.</p>
     <div style="text-align:left;margin:24px 0;">
-      <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#7790ed;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Open dashboard</a>
+      <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#7790ed;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:400;font-size:13px;">Open dashboard</a>
     </div>
   `)
   await send({ to: ADMIN_INBOX, subject, html, type: 'admin_delivery_viewed', clientId, jobId })
@@ -444,7 +444,7 @@ export async function sendAdminDeliveryApprovedEmail(clientName: string, jobName
     <h2 style="margin:0 0 20px;font-size:22px;color:#f5f5f5;font-weight:600;">Kia ora Arlo,</h2>
     <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;"><span style="color:#f5f5f5;font-weight:600;">${clientName}</span> has approved <span style="color:#f5f5f5;">${fileName}</span> for <span style="color:#7790ed;">${jobName}</span>.</p>
     <div style="text-align:left;margin:24px 0;">
-      <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#7790ed;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Open dashboard</a>
+      <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#7790ed;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:400;font-size:13px;">Open dashboard</a>
     </div>
   `)
   await send({ to: ADMIN_INBOX, subject, html, type: 'admin_delivery_approved', clientId, jobId })
@@ -459,7 +459,7 @@ export async function sendAdminRevisionRequestedEmail(clientName: string, jobNam
       <p style="color:#d4d4d4;font-size:14px;line-height:1.6;margin:0;white-space:pre-wrap;">${request.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
     </div>
     <div style="text-align:left;margin:24px 0;">
-      <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#7790ed;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Open dashboard</a>
+      <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#7790ed;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:400;font-size:13px;">Open dashboard</a>
     </div>
   `)
   await send({ to: ADMIN_INBOX, subject, html, type: 'admin_revision_requested', clientId, jobId })
@@ -485,7 +485,7 @@ export async function sendDocumentToClientEmail({
   const portalUrl = portalToken ? `https://dashboard.tuimedia.nz/portal/client/${portalToken}` : null
   const buttonSection = portalUrl
     ? `<div style="text-align:left;margin:28px 0 0;">
-        <a href="${portalUrl}" target="_blank" style="display:inline-block;background:#7790ed;color:#fff;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">View & Sign Document</a>
+        <a href="${portalUrl}" target="_blank" style="display:inline-block;background:#7790ed;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:400;font-size:13px;">View & Sign Document</a>
       </div>`
     : ''
   const html = wrap(`

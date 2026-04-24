@@ -12,9 +12,7 @@ Font.register({
 
 Font.register({
   family: 'Patrick Hand',
-  fonts: [
-    { src: 'https://fonts.gstatic.com/s/patrickhand/v23/LDI1apSQOAYtSuYWp8ZhfYe8WcjKm7sp.ttf', fontWeight: 400 },
-  ],
+  src: typeof window !== 'undefined' ? `${window.location.origin}/fonts/patrick-hand.ttf` : '/fonts/patrick-hand.ttf',
 })
 
 const styles = StyleSheet.create({
