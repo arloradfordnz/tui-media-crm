@@ -10,9 +10,11 @@ Font.register({
   ],
 })
 
+// Load Patrick Hand from local /public so we don't depend on any external CDN
+// and it renders reliably in both dashboard and portal PDFs.
 Font.register({
   family: 'Patrick Hand',
-  src: typeof window !== 'undefined' ? `${window.location.origin}/fonts/patrick-hand.ttf` : '/fonts/patrick-hand.ttf',
+  src: '/fonts/patrick-hand.ttf',
 })
 
 const styles = StyleSheet.create({
@@ -35,7 +37,8 @@ const styles = StyleSheet.create({
   sectionHeading: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 },
   signatureBlock: { flexDirection: 'row', marginTop: 56, gap: 48 },
   signatureCol: { flex: 1 },
-  signatureTyped: { fontFamily: 'Patrick Hand', fontSize: 22, color: '#1a1a1a', marginBottom: 4, height: 28 },
+  signatureTyped: { fontFamily: 'Patrick Hand', fontSize: 24, color: '#1a1a1a', marginBottom: 2, lineHeight: 1.1 },
+  signatureDate: { fontFamily: 'Patrick Hand', fontSize: 14, color: '#333333', marginBottom: 6, lineHeight: 1.1 },
   signatureLine: { height: 1, backgroundColor: '#1a1a1a', marginBottom: 8 },
   signatureLabel: { fontSize: 10, color: '#888888', marginTop: 6 },
   signatureName: { fontSize: 13, fontWeight: 600, color: '#1a1a1a' },
@@ -188,17 +191,18 @@ export default function TuiDocument({ template, form }: { template: string; form
           <View style={styles.signatureBlock}>
             <View style={styles.signatureCol}>
               <Text style={styles.signatureTyped}>Arlo Radford</Text>
+              <Text style={styles.signatureDate}>{today}</Text>
               <View style={styles.signatureLine} />
               <Text style={styles.signatureName}>Arlo Radford</Text>
               <Text style={styles.signaturePrinted}>Tui Media</Text>
-              <Text style={styles.signatureLabel}>Signed {today}</Text>
             </View>
             <View style={styles.signatureCol}>
-              <Text style={styles.signatureTyped}>{form.clientSignature || ' '}</Text>
+              <Text style={styles.signatureTyped}>{form.clientSignature ? form.clientSignature : ' '}</Text>
+              <Text style={styles.signatureDate}>{form.clientSignature ? (form.clientSignedAt || today) : ' '}</Text>
               <View style={styles.signatureLine} />
               <Text style={styles.signatureName}>{form.contactPerson || form.clientName || 'Client'}</Text>
               <Text style={styles.signaturePrinted}>{form.contactPerson && form.clientName ? form.clientName : 'Client'}</Text>
-              <Text style={styles.signatureLabel}>{form.clientSignedAt ? `Signed ${form.clientSignedAt}` : 'Date: _______________'}</Text>
+              {!form.clientSignature && <Text style={styles.signatureLabel}>Date: _______________</Text>}
             </View>
           </View>
         </View>

@@ -29,6 +29,8 @@ export type DocFormShape = {
   shootDate: string
   location: string
   body: string
+  clientSignature: string
+  clientSignedAt: string
 }
 
 export type CreateMode = { kind: 'create'; initialClientId?: string }
@@ -53,6 +55,8 @@ const EMPTY_FORM: DocFormShape = {
   shootDate: '',
   location: '',
   body: '',
+  clientSignature: '',
+  clientSignedAt: '',
 }
 
 export default function DocumentForm({ clients, mode }: { clients: ClientOption[]; mode: CreateMode | EditMode }) {
