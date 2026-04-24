@@ -96,6 +96,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
 
   const portalData = {
     client: { name: client.name },
+    portalToken: token,
     jobs: jobsResolved,
     documents: (documents ?? []).map((d) => ({
       id: d.id,

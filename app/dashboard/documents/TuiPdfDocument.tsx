@@ -10,6 +10,13 @@ Font.register({
   ],
 })
 
+Font.register({
+  family: 'Patrick Hand',
+  fonts: [
+    { src: 'https://fonts.gstatic.com/s/patrickhand/v23/LDI1apSQOAYtSuYWp8ZhfYe8WcjKm7sp.ttf', fontWeight: 400 },
+  ],
+})
+
 const styles = StyleSheet.create({
   page: { fontFamily: 'Poppins', fontSize: 12, color: '#1a1a1a', paddingBottom: 70 },
   header: { paddingHorizontal: 48, paddingTop: 40, paddingBottom: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -30,7 +37,7 @@ const styles = StyleSheet.create({
   sectionHeading: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 },
   signatureBlock: { flexDirection: 'row', marginTop: 56, gap: 48 },
   signatureCol: { flex: 1 },
-  signatureTyped: { fontSize: 14, color: '#1a1a1a', marginBottom: 4, height: 18 },
+  signatureTyped: { fontFamily: 'Patrick Hand', fontSize: 22, color: '#1a1a1a', marginBottom: 4, height: 28 },
   signatureLine: { height: 1, backgroundColor: '#1a1a1a', marginBottom: 8 },
   signatureLabel: { fontSize: 10, color: '#888888', marginTop: 6 },
   signatureName: { fontSize: 13, fontWeight: 600, color: '#1a1a1a' },
@@ -49,6 +56,8 @@ type FormData = {
   shootDate: string
   location: string
   body: string
+  clientSignature?: string
+  clientSignedAt?: string
 }
 
 function TuiLogo() {
@@ -187,11 +196,11 @@ export default function TuiDocument({ template, form }: { template: string; form
               <Text style={styles.signatureLabel}>Signed {today}</Text>
             </View>
             <View style={styles.signatureCol}>
-              <Text style={styles.signatureTyped}> </Text>
+              <Text style={styles.signatureTyped}>{form.clientSignature || ' '}</Text>
               <View style={styles.signatureLine} />
               <Text style={styles.signatureName}>{form.contactPerson || form.clientName || 'Client'}</Text>
               <Text style={styles.signaturePrinted}>{form.contactPerson && form.clientName ? form.clientName : 'Client'}</Text>
-              <Text style={styles.signatureLabel}>Date: _______________</Text>
+              <Text style={styles.signatureLabel}>{form.clientSignedAt ? `Signed ${form.clientSignedAt}` : 'Date: _______________'}</Text>
             </View>
           </View>
         </View>

@@ -119,15 +119,7 @@ export default function DocumentForm({ clients, mode }: { clients: ClientOption[
     return await pdf(TuiDocument({ template, form }) as any).toBlob()
   }
 
-  async function blobToBase64(blob: Blob): Promise<string> {
-    const buf = await blob.arrayBuffer()
-    let binary = ''
-    const bytes = new Uint8Array(buf)
-    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i])
-    return btoa(binary)
-  }
-
-  async function persistNew() {
+async function persistNew() {
     await fetch('/api/documents/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -191,10 +183,21 @@ export default function DocumentForm({ clients, mode }: { clients: ClientOption[
       setEmailError('Add a client email first.')
       return
     }
+    if (!selectedClientId) {
+      setEmailError('Select a client so we can link the portal.')
+      return
+    }
+    const clientPortalToken = clients.find((c) => c.id === selectedClientId)?.portalToken || null
+    if (!clientPortalToken) {
+      setEmailError('This client has no portal link yet — open their record and generate one first.')
+      return
+    }
     setEmailing(true)
     try {
-      const blob = await buildPdfBlob()
-      const base64 = await blobToBase64(blob)
+      // Persist the doc first so it shows up in the portal when the client opens the link
+      if (mode.kind === 'create') await persistNew()
+      else await persistEdit()
+
       const res = await fetch('/api/documents/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -203,10 +206,8 @@ export default function DocumentForm({ clients, mode }: { clients: ClientOption[
           clientName: form.contactPerson || form.clientName,
           docName: inferredName,
           template,
-          fileName: fileNameSafe,
-          pdfBase64: base64,
-          clientId: selectedClientId || null,
-          portalToken: clients.find((c) => c.id === selectedClientId)?.portalToken || null,
+          clientId: selectedClientId,
+          portalToken: clientPortalToken,
         }),
       })
       if (!res.ok) {
@@ -214,9 +215,6 @@ export default function DocumentForm({ clients, mode }: { clients: ClientOption[
         setEmailError(data.error || 'Failed to send.')
       } else {
         setEmailSent(true)
-        // Persist a copy too so it's tracked
-        if (mode.kind === 'create') await persistNew()
-        else await persistEdit()
         setTimeout(() => setEmailSent(false), 3000)
       }
     } catch (err) {

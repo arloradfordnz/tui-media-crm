@@ -2,9 +2,10 @@
 
 import { useActionState, useEffect, useState } from 'react'
 import { approveDelivery, markViewed, requestDeliverableRevision } from '@/app/actions/portal'
+import { signDocumentByClient } from '@/app/actions/documents'
 import { statusLabel, statusBadgeClass, formatDate } from '@/lib/format'
 import Image from 'next/image'
-import { Briefcase, FileText, Film, Image as ImageIcon, File, Music, Download, ChevronDown, ChevronRight, Check, MessageSquare } from 'lucide-react'
+import { Briefcase, FileText, Film, Image as ImageIcon, File, Music, Download, ChevronDown, ChevronRight, Check, MessageSquare, PenLine } from 'lucide-react'
 
 type DeliveryFile = {
   id: string
@@ -56,6 +57,7 @@ type Document = {
 
 type PortalData = {
   client: { name: string }
+  portalToken: string
   jobs: Job[]
   documents: Document[]
 }
@@ -201,7 +203,7 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
             </div>
             <div className="space-y-2">
               {data.documents.map((doc) => (
-                <DocumentCard key={doc.id} doc={doc} />
+                <DocumentCard key={doc.id} doc={doc} portalToken={data.portalToken} />
               ))}
             </div>
           </div>
@@ -355,9 +357,12 @@ function RevisionPanel({ deliverable }: { deliverable: Deliverable }) {
   )
 }
 
-function DocumentCard({ doc }: { doc: Document }) {
+function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string }) {
   const [expanded, setExpanded] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [signing, setSigning] = useState(false)
+  const [signatureInput, setSignatureInput] = useState('')
+  const [signState, signAction, signPending] = useActionState(signDocumentByClient, undefined)
 
   const parsed = (() => {
     if (!doc.content) return null
@@ -379,12 +384,26 @@ function DocumentCard({ doc }: { doc: Document }) {
             shootDate: get('shootDate'),
             location: get('location'),
             body: get('body'),
+            clientSignature: get('clientSignature'),
+            clientSignedAt: get('clientSignedAt'),
           },
         }
       }
       return null
     } catch { return null }
   })()
+
+  const isSigned = !!parsed?.form.clientSignature
+  const canSign = !!parsed && doc.docType === 'contract' && !isSigned
+
+  useEffect(() => {
+    if (signState?.success) {
+      setSigning(false)
+      setSignatureInput('')
+      // Refresh to show the signed state and pick up updated content
+      window.location.reload()
+    }
+  }, [signState])
 
   async function handleDownload() {
     if (!parsed) return
@@ -418,14 +437,24 @@ function DocumentCard({ doc }: { doc: Document }) {
           <FileText className="w-4 h-4 shrink-0" style={{ color: 'var(--accent)' }} />
           <div className="min-w-0">
             <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{doc.name}</p>
-            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{statusLabel(doc.docType)} · {formatDate(doc.updatedAt)}</p>
+            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              {statusLabel(doc.docType)} · {formatDate(doc.updatedAt)}
+              {isSigned && <> · <span style={{ color: 'var(--accent)' }}>Signed {parsed?.form.clientSignedAt}</span></>}
+            </p>
           </div>
         </button>
-        {parsed && (
-          <button onClick={handleDownload} disabled={generating} className="btn-secondary text-sm">
-            <Download className="w-3.5 h-3.5" /> {generating ? 'Generating...' : 'Download PDF'}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {canSign && (
+            <button onClick={() => { setExpanded(true); setSigning(true) }} className="btn-primary text-sm">
+              <PenLine className="w-3.5 h-3.5" /> Sign
+            </button>
+          )}
+          {parsed && (
+            <button onClick={handleDownload} disabled={generating} className="btn-secondary text-sm">
+              <Download className="w-3.5 h-3.5" /> {generating ? 'Generating...' : 'Download PDF'}
+            </button>
+          )}
+        </div>
       </div>
 
       {expanded && (
@@ -446,6 +475,52 @@ function DocumentCard({ doc }: { doc: Document }) {
                   <p className="label mb-2">Content</p>
                   <p className="whitespace-pre-wrap text-sm" style={{ color: 'var(--text-primary)', lineHeight: 1.7 }}>{parsed.form.body}</p>
                 </div>
+              )}
+
+              {isSigned && (
+                <div className="rounded-lg p-4 flex items-start gap-3" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)' }}>
+                  <Check className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Signed by {parsed.form.clientSignature}</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{parsed.form.clientSignedAt}</p>
+                  </div>
+                </div>
+              )}
+
+              {canSign && signing && (
+                <form action={signAction} className="rounded-lg p-4 space-y-3" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)' }}>
+                  <input type="hidden" name="docId" value={doc.id} />
+                  <input type="hidden" name="portalToken" value={portalToken} />
+                  <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                    Type your full name to sign this {parsed.template.toLowerCase() || 'document'}. By signing, you confirm you have read and agree to the terms above.
+                  </p>
+                  <input
+                    name="signature"
+                    value={signatureInput}
+                    onChange={(e) => setSignatureInput(e.target.value)}
+                    placeholder="Your full name"
+                    className="input w-full"
+                    autoComplete="off"
+                    autoFocus
+                  />
+                  {signatureInput && (
+                    <div className="p-3 rounded-md" style={{ background: 'var(--bg-base)', border: '1px dashed var(--bg-border)' }}>
+                      <p className="text-xs mb-1" style={{ color: 'var(--text-tertiary)' }}>Signature preview</p>
+                      <p style={{ fontFamily: 'var(--font-patrick-hand), cursive', fontSize: '28px', color: 'var(--text-primary)', lineHeight: 1 }}>{signatureInput}</p>
+                    </div>
+                  )}
+                  {signState?.error && (
+                    <p className="text-xs" style={{ color: '#f87171' }}>{signState.error}</p>
+                  )}
+                  <div className="flex gap-2">
+                    <button type="submit" disabled={signPending || !signatureInput.trim()} className="btn-primary text-sm">
+                      <Check className="w-3.5 h-3.5" /> {signPending ? 'Signing...' : 'Sign Document'}
+                    </button>
+                    <button type="button" onClick={() => { setSigning(false); setSignatureInput('') }} className="btn-secondary text-sm">
+                      Cancel
+                    </button>
+                  </div>
+                </form>
               )}
             </div>
           ) : (

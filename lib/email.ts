@@ -470,8 +470,6 @@ export async function sendDocumentToClientEmail({
   clientName,
   docName,
   template,
-  fileName,
-  pdfBase64,
   clientId,
   portalToken,
 }: {
@@ -479,17 +477,15 @@ export async function sendDocumentToClientEmail({
   clientName: string
   docName: string
   template: string
-  fileName: string
-  pdfBase64: string
   clientId?: string
   portalToken?: string | null
 }) {
   const subject = `${docName} — Tui Media`
-  const intro = `Please find your ${template.toLowerCase()} attached. Let me know if anything needs changing or if you're happy to proceed.`
+  const intro = `Your ${template.toLowerCase()} is ready to view and sign. Click the button below to open it in your client portal — you can review the details and add your signature online. Let me know if anything needs changing.`
   const portalUrl = portalToken ? `https://dashboard.tuimedia.nz/portal/client/${portalToken}` : null
   const buttonSection = portalUrl
     ? `<div style="text-align:left;margin:28px 0 0;">
-        <a href="${portalUrl}" target="_blank" style="display:inline-block;background:#7790ed;color:#fff;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">View Document</a>
+        <a href="${portalUrl}" target="_blank" style="display:inline-block;background:#7790ed;color:#fff;padding:14px 36px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">View & Sign Document</a>
       </div>`
     : ''
   const html = wrap(`
@@ -503,7 +499,6 @@ export async function sendDocumentToClientEmail({
     html,
     type: 'document_to_client',
     clientId,
-    attachments: [{ filename: fileName, content: pdfBase64 }],
     rethrow: true,
   })
 }
