@@ -4,6 +4,7 @@ import { FileText } from 'lucide-react'
 import Link from 'next/link'
 import PdfGenerator from './PdfGenerator'
 import NewDocButton from './NewDocButton'
+import ClearAllButton from './ClearAllButton'
 
 export default async function DocumentsPage({ searchParams }: { searchParams: Promise<{ clientId?: string }> }) {
   const params = await searchParams
@@ -38,7 +39,10 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       {/* Saved Templates */}
       {documents.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Saved Templates</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Saved Templates</h2>
+            <ClearAllButton count={documents.length} />
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {documents.map((d) => {
               const clientName = d.clients?.name

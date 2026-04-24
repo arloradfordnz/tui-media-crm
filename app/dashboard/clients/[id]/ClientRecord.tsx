@@ -74,7 +74,20 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
   async function handleDelete() {
     if (!confirm('Delete this client and all their data? This cannot be undone.')) return
     setDeleting(true)
-    await deleteClient(client.id)
+    try {
+      const result = await deleteClient(client.id)
+      // On success, deleteClient calls redirect() which throws and never reaches here.
+      if (result && 'error' in result && result.error) {
+        alert(`Couldn't delete client: ${result.error}`)
+        setDeleting(false)
+      }
+    } catch (err) {
+      // Re-throw redirect errors so Next.js can handle them
+      if (err && typeof err === 'object' && 'digest' in err) throw err
+      console.error('Delete failed:', err)
+      alert('Failed to delete client. Check the console for details.')
+      setDeleting(false)
+    }
   }
 
   return (

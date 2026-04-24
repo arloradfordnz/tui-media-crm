@@ -98,9 +98,34 @@ export async function updateClientStatus(clientId: string, status: string) {
   return { ok: true }
 }
 
-export async function deleteClient(clientId: string) {
+export async function deleteClient(clientId: string): Promise<{ error?: string } | never> {
   const supabase = await createServerSupabaseClient()
-  await supabase.from('clients').delete().eq('id', clientId)
+
+  // Clear refs that would otherwise block the delete (email_logs.client_id has
+  // a plain FK with no ON DELETE action) or that we don't want to keep around.
+  await supabase.from('email_logs').update({ client_id: null }).eq('client_id', clientId)
+  await supabase.from('documents').delete().eq('client_id', clientId)
+  await supabase.from('notifications').delete().eq('client_id', clientId)
+
+  const { error } = await supabase.from('clients').delete().eq('id', clientId)
+  if (error) {
+    console.error('[deleteClient] failed:', error)
+    return { error: error.message }
+  }
+
   revalidatePath('/dashboard/clients')
   redirect('/dashboard/clients')
+}
+
+export async function deleteAllDocuments(): Promise<{ ok: true; count: number } | { error: string }> {
+  const supabase = await createServerSupabaseClient()
+  const { data: existing } = await supabase.from('documents').select('id')
+  const count = existing?.length ?? 0
+  const { error } = await supabase.from('documents').delete().not('id', 'is', null)
+  if (error) {
+    console.error('[deleteAllDocuments] failed:', error)
+    return { error: error.message }
+  }
+  revalidatePath('/dashboard/documents')
+  return { ok: true, count }
 }
