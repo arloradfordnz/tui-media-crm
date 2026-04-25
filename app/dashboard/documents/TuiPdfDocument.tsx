@@ -36,15 +36,14 @@ const styles = StyleSheet.create({
   h2: { fontSize: 16, fontWeight: 600, color: '#1a1a1a', marginTop: 16, marginBottom: 3 },
   h3: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginTop: 14, marginBottom: 2 },
   sectionHeading: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 },
-  signatureBlock: { flexDirection: 'row', marginTop: 56, gap: 48 },
+  signatureBlock: { flexDirection: 'row', marginTop: 32, gap: 36 },
   signatureCol: { flex: 1 },
-  signatureFieldWrap: { position: 'relative', marginBottom: 14 },
-  signatureFieldRow: { flexDirection: 'row', alignItems: 'flex-end', height: 22 },
-  signatureFieldLabel: { fontSize: 11, fontWeight: 600, color: '#1a1a1a', marginRight: 6, paddingBottom: 2 },
-  signatureFieldLine: { height: 1, backgroundColor: '#1a1a1a', flex: 1 },
-  signatureTyped: { position: 'absolute', left: 50, bottom: 1, fontFamily: 'Patrick Hand', fontSize: 22, color: '#1a1a1a', lineHeight: 1 },
-  signatureDateValue: { position: 'absolute', left: 50, bottom: 2, fontFamily: 'Patrick Hand', fontSize: 14, color: '#333333', lineHeight: 1 },
-  signatureName: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginTop: 4 },
+  signatureField: { position: 'relative', height: 24, marginBottom: 12 },
+  signatureFieldLine: { position: 'absolute', bottom: 0, left: 44, right: 0, height: 1, backgroundColor: '#1a1a1a' },
+  signatureFieldLabel: { position: 'absolute', bottom: 4, left: 0, fontSize: 11, fontWeight: 600, color: '#1a1a1a' },
+  signatureTyped: { position: 'absolute', bottom: 2, left: 50, fontFamily: 'Patrick Hand', fontSize: 18, color: '#1a1a1a', lineHeight: 1 },
+  signatureDateValue: { position: 'absolute', bottom: 3, left: 50, fontFamily: 'Patrick Hand', fontSize: 13, color: '#333333', lineHeight: 1 },
+  signatureName: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginTop: 8 },
   signaturePrinted: { fontSize: 11, color: '#666666', marginTop: 2 },
   footer: { position: 'absolute', bottom: 28, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: '#999999' },
 })
@@ -195,36 +194,28 @@ export default function TuiDocument({ template, form }: { template: string; form
 
           <View style={styles.signatureBlock}>
             <View style={styles.signatureCol}>
-              <View style={styles.signatureFieldWrap}>
-                <View style={styles.signatureFieldRow}>
-                  <Text style={styles.signatureFieldLabel}>Signed</Text>
-                  <View style={styles.signatureFieldLine} />
-                </View>
+              <View style={styles.signatureField}>
+                <View style={styles.signatureFieldLine} />
+                <Text style={styles.signatureFieldLabel}>Signed</Text>
                 <Text style={styles.signatureTyped}>Arlo Radford</Text>
               </View>
-              <View style={styles.signatureFieldWrap}>
-                <View style={styles.signatureFieldRow}>
-                  <Text style={styles.signatureFieldLabel}>Date</Text>
-                  <View style={styles.signatureFieldLine} />
-                </View>
+              <View style={styles.signatureField}>
+                <View style={styles.signatureFieldLine} />
+                <Text style={styles.signatureFieldLabel}>Date</Text>
                 <Text style={styles.signatureDateValue}>{today}</Text>
               </View>
               <Text style={styles.signatureName}>Arlo Radford</Text>
               <Text style={styles.signaturePrinted}>Tui Media</Text>
             </View>
             <View style={styles.signatureCol}>
-              <View style={styles.signatureFieldWrap}>
-                <View style={styles.signatureFieldRow}>
-                  <Text style={styles.signatureFieldLabel}>Signed</Text>
-                  <View style={styles.signatureFieldLine} />
-                </View>
+              <View style={styles.signatureField}>
+                <View style={styles.signatureFieldLine} />
+                <Text style={styles.signatureFieldLabel}>Signed</Text>
                 {form.clientSignature && <Text style={styles.signatureTyped}>{form.clientSignature}</Text>}
               </View>
-              <View style={styles.signatureFieldWrap}>
-                <View style={styles.signatureFieldRow}>
-                  <Text style={styles.signatureFieldLabel}>Date</Text>
-                  <View style={styles.signatureFieldLine} />
-                </View>
+              <View style={styles.signatureField}>
+                <View style={styles.signatureFieldLine} />
+                <Text style={styles.signatureFieldLabel}>Date</Text>
                 {form.clientSignature && <Text style={styles.signatureDateValue}>{form.clientSignedAt || today}</Text>}
               </View>
               <Text style={styles.signatureName}>{form.contactPerson || form.clientName || 'Client'}</Text>
