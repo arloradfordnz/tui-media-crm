@@ -265,7 +265,8 @@ async function persistNew() {
   }
 
   return (
-    <div className="card space-y-5">
+    <>
+    <div className="card space-y-5 lg:mr-[460px]">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
           {isEdit ? 'Edit Document' : 'Generate PDF'}
@@ -340,7 +341,7 @@ async function persistNew() {
             <button
               type="button"
               onClick={() => setAiOpen(true)}
-              className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md transition-colors"
+              className="lg:hidden inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md transition-colors"
               style={{ background: 'var(--surface)', color: 'var(--accent)', border: '1px solid var(--border)' }}
             >
               <Sparkles className="w-3.5 h-3.5" /> AI draft
@@ -373,14 +374,15 @@ async function persistNew() {
         )}
       </div>
 
-      <AIDocumentAssistant
-        open={aiOpen}
-        onClose={() => setAiOpen(false)}
-        template={template}
-        clientName={form.clientName}
-        businessName={form.businessName}
-        onInsert={(markdown) => update('body', form.body ? form.body + '\n\n' + markdown : markdown)}
-      />
     </div>
+    <AIDocumentAssistant
+      open={aiOpen}
+      onClose={() => setAiOpen(false)}
+      template={template}
+      clientName={form.clientName}
+      businessName={form.businessName}
+      onInsert={(markdown) => update('body', form.body ? form.body + '\n\n' + markdown : markdown)}
+    />
+    </>
   )
 }

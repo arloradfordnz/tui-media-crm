@@ -51,25 +51,18 @@ export default function AIDocumentAssistant({
   const startedRef = useRef(false)
 
   useEffect(() => {
-    if (!open) {
-      startedRef.current = false
-      setMessages([])
-      setInput('')
-      setError(null)
-      return
-    }
     if (startedRef.current) return
     startedRef.current = true
     void send([])
     setTimeout(() => inputRef.current?.focus(), 100)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  }, [])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages])
 
-  // Close on Escape
+  // Close on Escape (mobile drawer only)
   useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {
@@ -137,27 +130,26 @@ export default function AIDocumentAssistant({
 
   return (
     <>
-      {/* Backdrop — full overlay on mobile, none on desktop so the form stays usable */}
+      {/* Backdrop — mobile drawer only */}
       <div
         onClick={onClose}
-        className={`fixed inset-0 z-40 bg-black/50 transition-opacity sm:hidden ${
+        className={`fixed inset-0 z-40 bg-black/50 transition-opacity lg:hidden ${
           open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         aria-hidden="true"
       />
 
-      {/* Drawer */}
+      {/* Panel — mobile: slide-in drawer; desktop: sticky rounded card */}
       <aside
-        className={`fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] md:w-[440px] flex flex-col transform transition-transform duration-200 ease-out ${
+        className={`fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] flex flex-col transform transition-transform duration-200 ease-out ${
           open ? 'translate-x-0' : 'translate-x-full pointer-events-none'
-        }`}
+        } lg:translate-x-0 lg:pointer-events-auto lg:top-6 lg:bottom-6 lg:right-6 lg:w-[420px] lg:rounded-xl lg:overflow-hidden lg:z-30`}
         style={{
           background: 'var(--bg-surface)',
-          borderLeft: '1px solid var(--bg-border)',
-          boxShadow: '-12px 0 32px rgba(0,0,0,0.25)',
+          border: '1px solid var(--bg-border)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
         }}
-        role="dialog"
-        aria-modal="true"
+        role="complementary"
         aria-label="AI draft assistant"
       >
         {/* Header */}
@@ -172,7 +164,7 @@ export default function AIDocumentAssistant({
             </span>
             <span className="badge badge-muted shrink-0">{template}</span>
           </div>
-          <button onClick={onClose} className="btn-icon" aria-label="Close">
+          <button onClick={onClose} className="btn-icon lg:!hidden" aria-label="Close">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
