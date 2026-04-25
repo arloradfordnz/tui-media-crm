@@ -18,10 +18,11 @@ Font.register({
 })
 
 const styles = StyleSheet.create({
-  page: { fontFamily: 'Poppins', fontSize: 12, color: '#1a1a1a', paddingBottom: 70 },
-  header: { paddingHorizontal: 48, paddingTop: 40, paddingBottom: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  page: { fontFamily: 'Poppins', fontSize: 12, color: '#1a1a1a', paddingTop: 48, paddingBottom: 70 },
+  header: { paddingHorizontal: 48, paddingBottom: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerTitle: { color: '#1a1a1a', fontSize: 22, fontWeight: 600 },
   headerSub: { color: '#888888', fontSize: 11, marginTop: 6 },
+  headerMeta: { color: '#888888', fontSize: 10, marginTop: 2 },
   body: { paddingHorizontal: 48, paddingTop: 16 },
   section: { marginBottom: 28 },
   label: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginBottom: 6 },
@@ -37,11 +38,14 @@ const styles = StyleSheet.create({
   sectionHeading: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 },
   signatureBlock: { flexDirection: 'row', marginTop: 56, gap: 48 },
   signatureCol: { flex: 1 },
-  signatureTyped: { fontFamily: 'Patrick Hand', fontSize: 24, color: '#1a1a1a', marginBottom: 2, lineHeight: 1.1 },
-  signatureDate: { fontFamily: 'Patrick Hand', fontSize: 14, color: '#333333', marginBottom: 6, lineHeight: 1.1 },
-  signatureLine: { height: 1, backgroundColor: '#1a1a1a', marginBottom: 8 },
-  signatureLabel: { fontSize: 10, color: '#888888', marginTop: 6 },
-  signatureName: { fontSize: 13, fontWeight: 600, color: '#1a1a1a' },
+  signatureTyped: { fontFamily: 'Patrick Hand', fontSize: 24, color: '#1a1a1a', marginBottom: 2, lineHeight: 1.1, marginLeft: 56 },
+  signatureLineRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  signatureLineLabel: { fontSize: 11, color: '#1a1a1a', width: 50 },
+  signatureLine: { height: 1, backgroundColor: '#1a1a1a', flex: 1 },
+  signatureDateRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  signatureDateLabel: { fontSize: 11, color: '#1a1a1a', width: 50 },
+  signatureDateValue: { fontFamily: 'Patrick Hand', fontSize: 14, color: '#333333', lineHeight: 1.1 },
+  signatureName: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginTop: 4 },
   signaturePrinted: { fontSize: 11, color: '#666666', marginTop: 2 },
   footer: { position: 'absolute', bottom: 28, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: '#999999' },
 })
@@ -59,6 +63,7 @@ type FormData = {
   body: string
   clientSignature?: string
   clientSignedAt?: string
+  documentNumber?: string
 }
 
 function TuiLogo() {
@@ -138,6 +143,7 @@ export default function TuiDocument({ template, form }: { template: string; form
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={styles.headerTitle}>{template}</Text>
             <Text style={styles.headerSub}>{formattedDate}</Text>
+            {form.documentNumber && <Text style={styles.headerMeta}>No. {form.documentNumber}</Text>}
           </View>
         </View>
 
@@ -191,18 +197,29 @@ export default function TuiDocument({ template, form }: { template: string; form
           <View style={styles.signatureBlock}>
             <View style={styles.signatureCol}>
               <Text style={styles.signatureTyped}>Arlo Radford</Text>
-              <Text style={styles.signatureDate}>{today}</Text>
-              <View style={styles.signatureLine} />
+              <View style={styles.signatureLineRow}>
+                <Text style={styles.signatureLineLabel}>Signed:</Text>
+                <View style={styles.signatureLine} />
+              </View>
+              <View style={styles.signatureDateRow}>
+                <Text style={styles.signatureDateLabel}>Date:</Text>
+                <Text style={styles.signatureDateValue}>{today}</Text>
+              </View>
               <Text style={styles.signatureName}>Arlo Radford</Text>
               <Text style={styles.signaturePrinted}>Tui Media</Text>
             </View>
             <View style={styles.signatureCol}>
               <Text style={styles.signatureTyped}>{form.clientSignature ? form.clientSignature : ' '}</Text>
-              <Text style={styles.signatureDate}>{form.clientSignature ? (form.clientSignedAt || today) : ' '}</Text>
-              <View style={styles.signatureLine} />
+              <View style={styles.signatureLineRow}>
+                <Text style={styles.signatureLineLabel}>Signed:</Text>
+                <View style={styles.signatureLine} />
+              </View>
+              <View style={styles.signatureDateRow}>
+                <Text style={styles.signatureDateLabel}>Date:</Text>
+                <Text style={styles.signatureDateValue}>{form.clientSignature ? (form.clientSignedAt || today) : ' '}</Text>
+              </View>
               <Text style={styles.signatureName}>{form.contactPerson || form.clientName || 'Client'}</Text>
               <Text style={styles.signaturePrinted}>{form.contactPerson && form.clientName ? form.clientName : 'Client'}</Text>
-              {!form.clientSignature && <Text style={styles.signatureLabel}>Date: _______________</Text>}
             </View>
           </View>
         </View>

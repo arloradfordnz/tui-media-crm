@@ -386,6 +386,7 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
             body: get('body'),
             clientSignature: get('clientSignature'),
             clientSignedAt: get('clientSignedAt'),
+            documentNumber: get('documentNumber'),
           },
         }
       }

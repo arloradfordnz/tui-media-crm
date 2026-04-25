@@ -31,6 +31,18 @@ export type DocFormShape = {
   body: string
   clientSignature: string
   clientSignedAt: string
+  documentNumber: string
+}
+
+function generateDocumentNumber(): string {
+  const d = new Date()
+  const yy = String(d.getFullYear()).slice(-2)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let suffix = ''
+  for (let i = 0; i < 4; i++) suffix += alphabet[Math.floor(Math.random() * alphabet.length)]
+  return `TM-${yy}${mm}${dd}-${suffix}`
 }
 
 export type CreateMode = { kind: 'create'; initialClientId?: string }
@@ -57,6 +69,7 @@ const EMPTY_FORM: DocFormShape = {
   body: '',
   clientSignature: '',
   clientSignedAt: '',
+  documentNumber: '',
 }
 
 export default function DocumentForm({ clients, mode }: { clients: ClientOption[]; mode: CreateMode | EditMode }) {
@@ -69,7 +82,11 @@ export default function DocumentForm({ clients, mode }: { clients: ClientOption[
   const [template, setTemplate] = useState(mode.kind === 'edit' ? mode.initialTemplate || 'Contract' : 'Contract')
   const [selectedClientId, setSelectedClientId] = useState(initialClientId)
   const [form, setForm] = useState<DocFormShape>(() => {
-    if (mode.kind === 'edit') return { ...EMPTY_FORM, ...mode.initialForm }
+    if (mode.kind === 'edit') {
+      const merged = { ...EMPTY_FORM, ...mode.initialForm }
+      if (!merged.documentNumber) merged.documentNumber = generateDocumentNumber()
+      return merged
+    }
     return {
       ...EMPTY_FORM,
       clientName: initialClient?.name || '',
@@ -77,6 +94,7 @@ export default function DocumentForm({ clients, mode }: { clients: ClientOption[
       clientEmail: initialClient?.email || '',
       clientPhone: initialClient?.phone || '',
       location: initialClient?.location || '',
+      documentNumber: generateDocumentNumber(),
     }
   })
   const [docName, setDocName] = useState(mode.kind === 'edit' ? mode.docName : '')

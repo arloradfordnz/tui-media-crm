@@ -19,6 +19,7 @@ const EMPTY_FORM: DocFormShape = {
   body: '',
   clientSignature: '',
   clientSignedAt: '',
+  documentNumber: '',
 }
 
 function parseContent(content: string): { template: string; form: DocFormShape } | null {
@@ -43,6 +44,7 @@ function parseContent(content: string): { template: string; form: DocFormShape }
           body: get('body'),
           clientSignature: get('clientSignature'),
           clientSignedAt: get('clientSignedAt'),
+          documentNumber: get('documentNumber'),
         },
       }
     }
