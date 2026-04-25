@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Download, Save, Mail, Trash2, Check } from 'lucide-react'
+import { Download, Save, Mail, Trash2, Check, Sparkles } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
+import AIDocumentAssistant from './AIDocumentAssistant'
 
 const TEMPLATES = ['Contract', 'Quote', 'Call Sheet', 'General Document']
 
@@ -34,14 +35,14 @@ export type DocFormShape = {
   documentNumber: string
 }
 
-function generateDocumentNumber(): string {
-  const d = new Date()
-  const yyyy = d.getFullYear()
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  const hh = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  return `TM-${yyyy}${mm}${dd}-${hh}${min}`
+async function fetchNextDocumentNumber(): Promise<string> {
+  try {
+    const res = await fetch('/api/documents/next-number', { cache: 'no-store' })
+    if (!res.ok) throw new Error('failed')
+    const data = await res.json()
+    if (typeof data.number === 'string') return data.number
+  } catch { /* fall through */ }
+  return '#100'
 }
 
 export type CreateMode = { kind: 'create'; initialClientId?: string }
@@ -81,11 +82,7 @@ export default function DocumentForm({ clients, mode }: { clients: ClientOption[
   const [template, setTemplate] = useState(mode.kind === 'edit' ? mode.initialTemplate || 'Contract' : 'Contract')
   const [selectedClientId, setSelectedClientId] = useState(initialClientId)
   const [form, setForm] = useState<DocFormShape>(() => {
-    if (mode.kind === 'edit') {
-      const merged = { ...EMPTY_FORM, ...mode.initialForm }
-      if (!merged.documentNumber) merged.documentNumber = generateDocumentNumber()
-      return merged
-    }
+    if (mode.kind === 'edit') return { ...EMPTY_FORM, ...mode.initialForm }
     return {
       ...EMPTY_FORM,
       clientName: initialClient?.name || '',
@@ -93,9 +90,20 @@ export default function DocumentForm({ clients, mode }: { clients: ClientOption[
       clientEmail: initialClient?.email || '',
       clientPhone: initialClient?.phone || '',
       location: initialClient?.location || '',
-      documentNumber: generateDocumentNumber(),
     }
   })
+
+  // Fetch a fresh sequential document number whenever the form lacks one.
+  useEffect(() => {
+    let cancelled = false
+    if (form.documentNumber) return
+    void fetchNextDocumentNumber().then((n) => {
+      if (cancelled) return
+      setForm((prev) => (prev.documentNumber ? prev : { ...prev, documentNumber: n }))
+    })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [docName, setDocName] = useState(mode.kind === 'edit' ? mode.docName : '')
 
   const [generating, setGenerating] = useState(false)
@@ -104,6 +112,7 @@ export default function DocumentForm({ clients, mode }: { clients: ClientOption[
   const [emailSent, setEmailSent] = useState(false)
   const [emailError, setEmailError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [aiOpen, setAiOpen] = useState(false)
 
   function update<K extends keyof DocFormShape>(key: K, value: DocFormShape[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -326,8 +335,18 @@ async function persistNew() {
           <input value={form.location} onChange={(e) => update('location', e.target.value)} className="field-input" />
         </div>
         <div className="sm:col-span-2">
-          <label className="field-label">Content</label>
-          <textarea value={form.body} onChange={(e) => update('body', e.target.value)} rows={10} className="field-input" placeholder="Write your document content here...&#10;&#10;Formatting: # Heading, ## Subheading, ### Small heading, **bold text**" />
+          <div className="flex items-center justify-between mb-1">
+            <label className="field-label !mb-0">Content</label>
+            <button
+              type="button"
+              onClick={() => setAiOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md transition-colors"
+              style={{ background: 'var(--surface)', color: 'var(--accent)', border: '1px solid var(--border)' }}
+            >
+              <Sparkles className="w-3.5 h-3.5" /> AI draft
+            </button>
+          </div>
+          <textarea value={form.body} onChange={(e) => update('body', e.target.value)} rows={10} className="field-input" placeholder="Write your document content here, or click AI draft to have one generated for you.&#10;&#10;Formatting: # Heading, ## Subheading, ### Small heading, **bold text**" />
           <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>Formatting: <code># Heading</code>, <code>## Subheading</code>, <code>### Small heading</code>, <code>**bold**</code></p>
         </div>
       </div>
@@ -353,6 +372,15 @@ async function persistNew() {
           </button>
         )}
       </div>
+
+      <AIDocumentAssistant
+        open={aiOpen}
+        onClose={() => setAiOpen(false)}
+        template={template}
+        clientName={form.clientName}
+        businessName={form.businessName}
+        onInsert={(markdown) => update('body', form.body ? form.body + '\n\n' + markdown : markdown)}
+      />
     </div>
   )
 }
