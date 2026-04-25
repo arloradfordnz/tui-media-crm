@@ -36,13 +36,12 @@ export type DocFormShape = {
 
 function generateDocumentNumber(): string {
   const d = new Date()
-  const yy = String(d.getFullYear()).slice(-2)
+  const yyyy = d.getFullYear()
   const mm = String(d.getMonth() + 1).padStart(2, '0')
   const dd = String(d.getDate()).padStart(2, '0')
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  let suffix = ''
-  for (let i = 0; i < 4; i++) suffix += alphabet[Math.floor(Math.random() * alphabet.length)]
-  return `TM-${yy}${mm}${dd}-${suffix}`
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `TM-${yyyy}${mm}${dd}-${hh}${min}`
 }
 
 export type CreateMode = { kind: 'create'; initialClientId?: string }

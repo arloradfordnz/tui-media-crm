@@ -38,13 +38,12 @@ const styles = StyleSheet.create({
   sectionHeading: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 },
   signatureBlock: { flexDirection: 'row', marginTop: 56, gap: 48 },
   signatureCol: { flex: 1 },
-  signatureTyped: { fontFamily: 'Patrick Hand', fontSize: 24, color: '#1a1a1a', marginBottom: 2, lineHeight: 1.1, marginLeft: 56 },
-  signatureLineRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  signatureLineLabel: { fontSize: 11, color: '#1a1a1a', width: 50 },
-  signatureLine: { height: 1, backgroundColor: '#1a1a1a', flex: 1 },
-  signatureDateRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  signatureDateLabel: { fontSize: 11, color: '#1a1a1a', width: 50 },
-  signatureDateValue: { fontFamily: 'Patrick Hand', fontSize: 14, color: '#333333', lineHeight: 1.1 },
+  signatureFieldWrap: { position: 'relative', marginBottom: 14 },
+  signatureFieldRow: { flexDirection: 'row', alignItems: 'flex-end', height: 22 },
+  signatureFieldLabel: { fontSize: 11, color: '#1a1a1a', width: 50, paddingBottom: 1 },
+  signatureFieldLine: { height: 1, backgroundColor: '#1a1a1a', flex: 1 },
+  signatureTyped: { position: 'absolute', left: 54, bottom: 1, fontFamily: 'Patrick Hand', fontSize: 22, color: '#1a1a1a', lineHeight: 1 },
+  signatureDateValue: { position: 'absolute', left: 54, bottom: 2, fontFamily: 'Patrick Hand', fontSize: 14, color: '#333333', lineHeight: 1 },
   signatureName: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginTop: 4 },
   signaturePrinted: { fontSize: 11, color: '#666666', marginTop: 2 },
   footer: { position: 'absolute', bottom: 28, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: '#999999' },
@@ -196,27 +195,37 @@ export default function TuiDocument({ template, form }: { template: string; form
 
           <View style={styles.signatureBlock}>
             <View style={styles.signatureCol}>
-              <Text style={styles.signatureTyped}>Arlo Radford</Text>
-              <View style={styles.signatureLineRow}>
-                <Text style={styles.signatureLineLabel}>Signed:</Text>
-                <View style={styles.signatureLine} />
+              <View style={styles.signatureFieldWrap}>
+                <View style={styles.signatureFieldRow}>
+                  <Text style={styles.signatureFieldLabel}>Signed:</Text>
+                  <View style={styles.signatureFieldLine} />
+                </View>
+                <Text style={styles.signatureTyped}>Arlo Radford</Text>
               </View>
-              <View style={styles.signatureDateRow}>
-                <Text style={styles.signatureDateLabel}>Date:</Text>
+              <View style={styles.signatureFieldWrap}>
+                <View style={styles.signatureFieldRow}>
+                  <Text style={styles.signatureFieldLabel}>Date:</Text>
+                  <View style={styles.signatureFieldLine} />
+                </View>
                 <Text style={styles.signatureDateValue}>{today}</Text>
               </View>
               <Text style={styles.signatureName}>Arlo Radford</Text>
               <Text style={styles.signaturePrinted}>Tui Media</Text>
             </View>
             <View style={styles.signatureCol}>
-              <Text style={styles.signatureTyped}>{form.clientSignature ? form.clientSignature : ' '}</Text>
-              <View style={styles.signatureLineRow}>
-                <Text style={styles.signatureLineLabel}>Signed:</Text>
-                <View style={styles.signatureLine} />
+              <View style={styles.signatureFieldWrap}>
+                <View style={styles.signatureFieldRow}>
+                  <Text style={styles.signatureFieldLabel}>Signed:</Text>
+                  <View style={styles.signatureFieldLine} />
+                </View>
+                {form.clientSignature && <Text style={styles.signatureTyped}>{form.clientSignature}</Text>}
               </View>
-              <View style={styles.signatureDateRow}>
-                <Text style={styles.signatureDateLabel}>Date:</Text>
-                <Text style={styles.signatureDateValue}>{form.clientSignature ? (form.clientSignedAt || today) : ' '}</Text>
+              <View style={styles.signatureFieldWrap}>
+                <View style={styles.signatureFieldRow}>
+                  <Text style={styles.signatureFieldLabel}>Date:</Text>
+                  <View style={styles.signatureFieldLine} />
+                </View>
+                {form.clientSignature && <Text style={styles.signatureDateValue}>{form.clientSignedAt || today}</Text>}
               </View>
               <Text style={styles.signatureName}>{form.contactPerson || form.clientName || 'Client'}</Text>
               <Text style={styles.signaturePrinted}>{form.contactPerson && form.clientName ? form.clientName : 'Client'}</Text>
