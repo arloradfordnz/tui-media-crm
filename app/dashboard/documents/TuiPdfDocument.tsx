@@ -187,7 +187,6 @@ export default function TuiDocument({ template, form }: { template: string; form
 
           {form.body && (
             <View style={styles.section}>
-              <Text style={styles.sectionHeading}>Content</Text>
               {renderBody(form.body)}
             </View>
           )}
