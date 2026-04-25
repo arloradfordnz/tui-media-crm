@@ -143,7 +143,7 @@ export default function AIDocumentAssistant({
       <aside
         className={`fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] flex flex-col transform transition-transform duration-200 ease-out ${
           open ? 'translate-x-0' : 'translate-x-full pointer-events-none'
-        } lg:translate-x-0 lg:pointer-events-auto lg:top-6 lg:bottom-6 lg:right-6 lg:w-[420px] lg:rounded-xl lg:overflow-hidden lg:z-30`}
+        } lg:translate-x-0 lg:pointer-events-auto lg:inset-y-auto lg:top-[80px] lg:bottom-[96px] lg:right-6 lg:w-[420px] lg:rounded-xl lg:overflow-hidden lg:z-30`}
         style={{
           background: 'var(--bg-surface)',
           border: '1px solid var(--bg-border)',
