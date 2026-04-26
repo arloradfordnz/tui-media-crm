@@ -265,8 +265,8 @@ async function persistNew() {
   }
 
   return (
-    <div className="lg:mr-[472px]">
-    <div className="card space-y-5">
+    <div className="lg:flex lg:items-start lg:gap-8">
+    <div className="card space-y-5 lg:flex-1 lg:min-w-0">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
           {isEdit ? 'Edit Document' : 'Generate PDF'}
