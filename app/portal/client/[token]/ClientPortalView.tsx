@@ -56,7 +56,7 @@ type Document = {
 }
 
 type PortalData = {
-  client: { name: string }
+  client: { name: string; contactPerson: string | null }
   portalToken: string
   jobs: Job[]
   documents: Document[]
@@ -107,7 +107,7 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
         <div className="text-center">
           <p className="label mb-2">Client Portal</p>
           <h1 className="text-3xl font-semibold" style={{ letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
-            Welcome, {data.client.name}
+            Kia ora, {data.client.contactPerson || data.client.name}
           </h1>
           <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>
             View your projects, deliverables, and documents below.

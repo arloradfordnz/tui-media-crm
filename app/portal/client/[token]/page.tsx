@@ -8,7 +8,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
 
   const { data: client } = await supabase
     .from('clients')
-    .select('id, name, email, portal_token')
+    .select('id, name, email, contact_person, portal_token')
     .eq('portal_token', token)
     .single()
 
@@ -95,7 +95,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
   )
 
   const portalData = {
-    client: { name: client.name },
+    client: { name: client.name, contactPerson: client.contact_person ?? null },
     portalToken: token,
     jobs: jobsResolved,
     documents: (documents ?? []).map((d) => ({
