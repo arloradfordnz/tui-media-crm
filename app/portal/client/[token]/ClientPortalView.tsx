@@ -62,6 +62,25 @@ type PortalData = {
   documents: Document[]
 }
 
+function renderDocBody(text: string): string {
+  const lines = text.split('\n')
+  const out: string[] = []
+  for (const raw of lines) {
+    const escaped = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const inline = escaped.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
+    if (/^### .+/.test(raw)) {
+      out.push(`<h4 style="font-size:14px;font-weight:600;margin:14px 0 4px;color:var(--text-primary);">${inline.replace(/^### /, '')}</h4>`)
+    } else if (/^## .+/.test(raw)) {
+      out.push(`<h3 style="font-size:16px;font-weight:600;margin:18px 0 6px;color:var(--text-primary);">${inline.replace(/^## /, '')}</h3>`)
+    } else if (/^# .+/.test(raw)) {
+      out.push(`<h2 style="font-size:20px;font-weight:700;margin:22px 0 8px;color:var(--text-primary);letter-spacing:-0.01em;">${inline.replace(/^# /, '')}</h2>`)
+    } else {
+      out.push(inline)
+    }
+  }
+  return out.join('\n')
+}
+
 function fileKind(mime: string | null, name: string): 'video' | 'image' | 'audio' | 'pdf' | 'vimeo' | 'other' {
   const lower = (name || '').toLowerCase()
   const m = (mime || '').toLowerCase()
@@ -494,7 +513,11 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
               {parsed.form.body && (
                 <div className="rounded-lg p-3" style={{ background: 'var(--bg-elevated)' }}>
                   <p className="label mb-2">Content</p>
-                  <p className="whitespace-pre-wrap text-sm" style={{ color: 'var(--text-primary)', lineHeight: 1.7 }}>{parsed.form.body}</p>
+                  <div
+                    className="whitespace-pre-wrap text-sm"
+                    style={{ color: 'var(--text-primary)', lineHeight: 1.7 }}
+                    dangerouslySetInnerHTML={{ __html: renderDocBody(parsed.form.body) }}
+                  />
                 </div>
               )}
 

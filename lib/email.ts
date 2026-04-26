@@ -90,7 +90,7 @@ const SIGNOFF = `
 `
 
 const BRIEFING_SIGNOFF = `
-  <p style="color:#f5f5f5;font-size:15px;font-weight:600;margin:32px 0 0;">Arlo</p>
+  <p style="color:#f5f5f5;font-size:15px;font-weight:600;margin:32px 0 0;">Tui Media</p>
 `
 
 const NO_REPLY = `
@@ -410,7 +410,7 @@ export async function sendMorningBriefingEmail(data: MorningBriefingData) {
   const subject = `Morning briefing — ${dayLabel}`
 
   const html = wrap(`
-    <h2 style="margin:0 0 4px;font-size:22px;color:#f5f5f5;font-weight:600;">Kia ora Arlo,</h2>
+    <h2 style="margin:0 0 4px;font-size:22px;color:#f5f5f5;font-weight:600;">Good morning Arlo,</h2>
     <p style="color:#555;font-size:14px;margin:0;">${dayLabel}</p>
     ${section('Weather', weatherContent)}
     ${section('Revenue This Week', revenueContent)}
