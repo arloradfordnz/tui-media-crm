@@ -265,8 +265,8 @@ async function persistNew() {
   }
 
   return (
-    <>
-    <div className="card space-y-5 lg:mr-[480px]">
+    <div className="lg:flex lg:items-stretch lg:gap-8 lg:-mr-6">
+    <div className="card space-y-5 lg:flex-1 lg:min-w-0">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
           {isEdit ? 'Edit Document' : 'Generate PDF'}
@@ -383,6 +383,6 @@ async function persistNew() {
       businessName={form.businessName}
       onInsert={(markdown) => update('body', form.body ? form.body + '\n\n' + markdown : markdown)}
     />
-    </>
+    </div>
   )
 }
