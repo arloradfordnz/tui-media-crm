@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, MessageSquare } from 'lucide-react'
 import DocumentForm, { type ClientOption, type DocFormShape } from '../DocumentForm'
 
+type Feedback = { message: string; createdAt: string; author: string }
 type DocData = { id: string; name: string; docType: string; content: string; clientId: string | null }
 
 const EMPTY_FORM: DocFormShape = {
@@ -22,15 +23,24 @@ const EMPTY_FORM: DocFormShape = {
   documentNumber: '',
 }
 
-function parseContent(content: string): { template: string; form: DocFormShape } | null {
+function parseContent(content: string): { template: string; form: DocFormShape; feedback: Feedback[] } | null {
   if (!content) return null
   try {
     const obj = JSON.parse(content)
     if (obj && typeof obj === 'object' && 'template' in obj && 'form' in obj) {
       const f = (obj.form ?? {}) as Record<string, unknown>
       const get = (k: string) => (typeof f[k] === 'string' ? (f[k] as string) : '')
+      const rawFb = Array.isArray((obj as { feedback?: unknown }).feedback)
+        ? ((obj as { feedback: unknown[] }).feedback as Array<Record<string, unknown>>)
+        : []
+      const feedback: Feedback[] = rawFb.map((r) => ({
+        message: String(r.message ?? ''),
+        createdAt: String(r.createdAt ?? ''),
+        author: String(r.author ?? ''),
+      }))
       return {
         template: String(obj.template ?? 'Contract'),
+        feedback,
         form: {
           clientName: get('clientName'),
           contactPerson: get('contactPerson'),
@@ -63,6 +73,29 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
       <Link href="/dashboard/documents" className="inline-flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
         <ArrowLeft className="w-4 h-4" /> Back to Documents
       </Link>
+
+      {parsed?.feedback && parsed.feedback.length > 0 && (
+        <div className="card space-y-3">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+            <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Client feedback</h2>
+            <span className="badge badge-muted">{parsed.feedback.length}</span>
+          </div>
+          <div className="space-y-2">
+            {parsed.feedback.map((fb, i) => (
+              <div key={i} className="rounded-lg p-3" style={{ background: 'var(--bg-elevated)' }}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{fb.author}</span>
+                  <span className="text-xs ml-auto" style={{ color: 'var(--text-tertiary)' }}>
+                    {fb.createdAt ? new Date(fb.createdAt).toLocaleString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''}
+                  </span>
+                </div>
+                <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{fb.message}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <DocumentForm
         clients={clients}

@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from 'react'
 import { approveDelivery, markViewed, requestDeliverableRevision } from '@/app/actions/portal'
-import { signDocumentByClient } from '@/app/actions/documents'
+import { signDocumentByClient, submitDocumentFeedback } from '@/app/actions/documents'
 import { statusLabel, statusBadgeClass, formatDate } from '@/lib/format'
 import Image from 'next/image'
 import { Briefcase, FileText, Film, Image as ImageIcon, File, Music, Download, ChevronDown, ChevronRight, Check, MessageSquare, PenLine } from 'lucide-react'
@@ -363,6 +363,17 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
   const [signing, setSigning] = useState(false)
   const [signatureInput, setSignatureInput] = useState('')
   const [signState, signAction, signPending] = useActionState(signDocumentByClient, undefined)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [feedbackInput, setFeedbackInput] = useState('')
+  const [fbState, fbAction, fbPending] = useActionState(submitDocumentFeedback, undefined)
+
+  useEffect(() => {
+    if (fbState?.success) {
+      setFeedbackInput('')
+      setFeedbackOpen(false)
+      window.location.reload()
+    }
+  }, [fbState])
 
   const parsed = (() => {
     if (!doc.content) return null
@@ -371,8 +382,17 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
       if (obj && typeof obj === 'object' && 'template' in obj && 'form' in obj) {
         const f = (obj.form ?? {}) as Record<string, unknown>
         const get = (k: string) => (typeof f[k] === 'string' ? (f[k] as string) : '')
+        const rawFeedback = Array.isArray((obj as { feedback?: unknown }).feedback)
+          ? ((obj as { feedback: unknown[] }).feedback as Array<Record<string, unknown>>)
+          : []
+        const feedback = rawFeedback.map((r) => ({
+          message: String(r.message ?? ''),
+          createdAt: String(r.createdAt ?? ''),
+          author: String(r.author ?? ''),
+        }))
         return {
           template: String(obj.template ?? ''),
+          feedback,
           form: {
             clientName: get('clientName'),
             contactPerson: get('contactPerson'),
@@ -486,6 +506,50 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
                     <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{parsed.form.clientSignedAt}</p>
                   </div>
                 </div>
+              )}
+
+              {parsed.feedback && parsed.feedback.length > 0 && (
+                <div className="space-y-2">
+                  <p className="label">Your feedback</p>
+                  {parsed.feedback.map((fb, i) => (
+                    <div key={i} className="rounded-lg p-3" style={{ background: 'var(--bg-elevated)' }}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <MessageSquare className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+                        <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{fb.author}</span>
+                        <span className="text-xs ml-auto" style={{ color: 'var(--text-tertiary)' }}>{formatDate(fb.createdAt)}</span>
+                      </div>
+                      <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{fb.message}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!feedbackOpen ? (
+                <button onClick={() => setFeedbackOpen(true)} className="btn-secondary text-sm">
+                  <MessageSquare className="w-3.5 h-3.5" /> Leave feedback
+                </button>
+              ) : (
+                <form action={fbAction} className="rounded-lg p-4 space-y-3" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)' }}>
+                  <input type="hidden" name="docId" value={doc.id} />
+                  <input type="hidden" name="portalToken" value={portalToken} />
+                  <label className="label block">Your feedback</label>
+                  <textarea
+                    name="message"
+                    rows={4}
+                    required
+                    value={feedbackInput}
+                    onChange={(e) => setFeedbackInput(e.target.value)}
+                    className="field-input w-full"
+                    placeholder="Questions, suggested changes, or anything else you'd like to flag about this document..."
+                  />
+                  {fbState?.error && <p className="text-xs" style={{ color: 'var(--danger)' }}>{fbState.error}</p>}
+                  <div className="flex gap-2">
+                    <button type="submit" disabled={fbPending || !feedbackInput.trim()} className="btn-primary text-sm">
+                      {fbPending ? 'Sending...' : 'Send feedback'}
+                    </button>
+                    <button type="button" onClick={() => { setFeedbackOpen(false); setFeedbackInput('') }} className="btn-secondary text-sm">Cancel</button>
+                  </div>
+                </form>
               )}
 
               {canSign && signing && (

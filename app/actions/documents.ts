@@ -34,7 +34,23 @@ export async function updateDocument(prevState: { error?: string } | undefined, 
   if (!name) return { error: 'Name is required.' }
 
   const supabase = await createServerSupabaseClient()
-  await supabase.from('documents').update({ name, doc_type: docType || 'contract', content: content || '', client_id: clientId || null }).eq('id', docId)
+
+  // Preserve client-side feedback (and any other fields outside template/form) from being overwritten by the editor save
+  let mergedContent = content || ''
+  try {
+    const incoming = content ? JSON.parse(content) : null
+    if (incoming && typeof incoming === 'object') {
+      const { data: existing } = await supabase.from('documents').select('content').eq('id', docId).single()
+      if (existing?.content) {
+        const prior = JSON.parse(existing.content)
+        if (prior && typeof prior === 'object' && Array.isArray((prior as { feedback?: unknown }).feedback)) {
+          mergedContent = JSON.stringify({ ...incoming, feedback: (prior as { feedback: unknown[] }).feedback })
+        }
+      }
+    }
+  } catch { /* keep original content */ }
+
+  await supabase.from('documents').update({ name, doc_type: docType || 'contract', content: mergedContent, client_id: clientId || null }).eq('id', docId)
 
   revalidatePath('/dashboard/documents')
   revalidatePath(`/dashboard/documents/${docId}`)
@@ -102,5 +118,67 @@ export async function signDocumentByClient(
   })
 
   revalidatePath('/portal/')
+  return { success: true }
+}
+
+export async function submitDocumentFeedback(
+  prevState: { error?: string; success?: boolean } | undefined,
+  formData: FormData,
+) {
+  const docId = formData.get('docId') as string
+  const portalToken = formData.get('portalToken') as string
+  const message = ((formData.get('message') as string) || '').trim()
+
+  if (!docId || !portalToken) return { error: 'Missing document or portal token.' }
+  if (!message) return { error: 'Please type your feedback before sending.' }
+
+  const supabase = await createServerSupabaseClient()
+
+  const { data: doc } = await supabase
+    .from('documents')
+    .select('id, name, content, client_id')
+    .eq('id', docId)
+    .single()
+  if (!doc) return { error: 'Document not found.' }
+
+  const { data: client } = await supabase
+    .from('clients')
+    .select('id, name')
+    .eq('portal_token', portalToken)
+    .single()
+  if (!client || client.id !== doc.client_id) return { error: 'Not authorised.' }
+
+  type Feedback = { message: string; createdAt: string; author: string }
+  type DocContent = { template?: string; form?: Record<string, unknown>; feedback?: Feedback[] } & Record<string, unknown>
+  let parsed: DocContent = {}
+  try {
+    parsed = doc.content ? (JSON.parse(doc.content) as DocContent) : {}
+  } catch {
+    parsed = {}
+  }
+
+  const newEntry: Feedback = {
+    message,
+    createdAt: new Date().toISOString(),
+    author: client.name,
+  }
+  const nextFeedback = [...(parsed.feedback ?? []), newEntry]
+  const nextContent = JSON.stringify({ ...parsed, feedback: nextFeedback })
+
+  await supabase.from('documents').update({ content: nextContent }).eq('id', docId)
+  await supabase.from('activities').insert({
+    action: 'document_feedback',
+    details: `${client.name} left feedback on "${doc.name}"`,
+    client_id: client.id,
+  })
+  await supabase.from('notifications').insert({
+    title: 'Document Feedback',
+    message: `${client.name} left feedback on "${doc.name}"`,
+    type: 'document_feedback',
+    client_id: client.id,
+  })
+
+  revalidatePath('/portal/')
+  revalidatePath(`/dashboard/documents/${docId}`)
   return { success: true }
 }
