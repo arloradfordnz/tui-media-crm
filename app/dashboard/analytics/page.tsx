@@ -1,20 +1,19 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
-import AnalyticsView, { type SocialLink, type ClientOption } from './AnalyticsView'
+import AnalyticsView, { type SocialLink } from './AnalyticsView'
 import MigrationNotice from './MigrationNotice'
 
 export default async function AnalyticsPage() {
   const supabase = await createServerSupabaseClient()
 
-  const [linksRes, clientsRes, jobsRes, accountsRes] = await Promise.all([
+  const [linksRes, accountsRes] = await Promise.all([
     supabase
       .from('social_links')
+      // Only show posts pulled from a connected account — manual link upload
+      // is gone. Older rows stay in the table dormant.
       .select('id, platform, url, external_id, title, thumbnail_url, channel, published_at, views, likes, comments, duration_seconds, client_id, job_id, notes, last_synced_at, sync_error, created_at, source, clients(name), jobs(name)')
-      // Newest first by published date (when posted on the platform), falling
-      // back to when the row was added to our system for legacy rows.
+      .eq('source', 'connected')
       .order('published_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false }),
-    supabase.from('clients').select('id, name').order('name', { ascending: true }),
-    supabase.from('jobs').select('id, name').order('created_at', { ascending: false }),
     supabase.from('connected_accounts').select('id, platform, account_name, account_id, connected_at, expires_at'),
   ])
 
@@ -73,9 +72,6 @@ export default async function AnalyticsPage() {
     source: (r.source ?? 'manual') as 'manual' | 'connected',
   }))
 
-  const clients: ClientOption[] = (clientsRes.data ?? []).map((c) => ({ id: c.id, name: c.name }))
-  const jobs: ClientOption[] = (jobsRes.data ?? []).map((j) => ({ id: j.id, name: j.name }))
-
   type RawAccount = { id: string; platform: string; account_name: string | null; account_id: string | null; connected_at: string; expires_at: string | null }
   const accounts = ((accountsRes.data as RawAccount[] | null) ?? []).map((a) => ({
     id: a.id,
@@ -86,5 +82,5 @@ export default async function AnalyticsPage() {
     expiresAt: a.expires_at,
   }))
 
-  return <AnalyticsView links={links} clients={clients} jobs={jobs} accounts={accounts} />
+  return <AnalyticsView links={links} accounts={accounts} />
 }

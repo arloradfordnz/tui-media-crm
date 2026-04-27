@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import {
   BarChart3,
   Eye,
@@ -8,18 +8,14 @@ import {
   MessageSquare,
   RefreshCw,
   Trash2,
-  Plus,
   ExternalLink,
   AlertCircle,
   Clock,
 } from 'lucide-react'
 import PlatformIcon from '@/components/PlatformIcon'
-import CustomSelect from '@/components/CustomSelect'
 import {
-  trackSocialLink,
-  refreshSocialLink,
-  refreshAllSocialLinks,
   deleteSocialLink,
+  refreshAllConnectedAccounts,
   syncInstagramAccounts,
   disconnectAccount,
 } from '@/app/actions/analytics'
@@ -92,19 +88,15 @@ function formatDuration(seconds: number | null): string | null {
 
 export default function AnalyticsView({
   links,
-  clients,
-  jobs,
   accounts,
 }: {
   links: SocialLink[]
-  clients: ClientOption[]
-  jobs: ClientOption[]
   accounts: ConnectedAccount[]
 }) {
-  const [adding, setAdding] = useState(false)
   const [filterPlatform, setFilterPlatform] = useState<string | 'all'>('all')
   const [pending, startTransition] = useTransition()
   const [oauthMsg, setOauthMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
+  const [syncMsg, setSyncMsg] = useState<string | null>(null)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -147,12 +139,12 @@ export default function AnalyticsView({
     return links.filter((l) => l.platform === filterPlatform)
   }, [links, filterPlatform])
 
-  const connectedLinks = useMemo(() => visibleLinks.filter((l) => l.source === 'connected'), [visibleLinks])
-  const pastedLinks = useMemo(() => visibleLinks.filter((l) => l.source !== 'connected'), [visibleLinks])
-
-  function handleRefreshAll() {
+  function handleSyncAll() {
+    setSyncMsg(null)
     startTransition(async () => {
-      await refreshAllSocialLinks()
+      const result = await refreshAllConnectedAccounts()
+      if (result.error) setSyncMsg(result.error)
+      else setSyncMsg(`Synced ${result.ok} account${result.ok === 1 ? '' : 's'}${result.failed ? ` · ${result.failed} failed` : ''}.`)
     })
   }
 
@@ -166,16 +158,16 @@ export default function AnalyticsView({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={handleRefreshAll} disabled={pending || links.length === 0} className="btn-secondary text-sm">
+          <button onClick={handleSyncAll} disabled={pending || accounts.length === 0} className="btn-primary text-sm">
             <RefreshCw className={`w-3.5 h-3.5 ${pending ? 'animate-spin' : ''}`} />
-            {pending ? 'Refreshing...' : 'Refresh all'}
-          </button>
-          <button onClick={() => setAdding((v) => !v)} className="btn-primary text-sm">
-            <Plus className="w-3.5 h-3.5" />
-            {adding ? 'Close' : 'Add video link'}
+            {pending ? 'Syncing...' : 'Sync all accounts'}
           </button>
         </div>
       </div>
+
+      {syncMsg && (
+        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{syncMsg}</p>
+      )}
 
       {oauthMsg && (
         <div
@@ -193,8 +185,6 @@ export default function AnalyticsView({
           </button>
         </div>
       )}
-
-      {adding && <AddLinkForm clients={clients} jobs={jobs} onDone={() => setAdding(false)} />}
 
       {/* Totals */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -246,22 +236,15 @@ export default function AnalyticsView({
       {/* Connected accounts */}
       <ConnectedAccounts accounts={accounts} />
 
-      {/* Connected-account posts (auto-synced from your own accounts) */}
+      {/* Posts from connected accounts */}
       <LinkSection
-        heading="From your connected accounts"
-        subheading="Posts pulled from accounts you've connected. Click Sync on a connected account to refresh."
+        heading="Your posts"
+        subheading="Pulled automatically from the social accounts you've connected. Click Sync all accounts to refresh."
         platformFilterLabel={filterPlatform !== 'all' ? (PLATFORM_LABEL[filterPlatform] ?? filterPlatform) : null}
-        links={connectedLinks}
-        emptyText="No connected-account posts yet — connect a platform above and click Sync."
-      />
-
-      {/* Manually pasted client / competitor links */}
-      <LinkSection
-        heading="Pasted links"
-        subheading="Videos you've added by URL. Stats only auto-populate for YouTube and Vimeo; other platforms show metadata only (view counts aren't public)."
-        platformFilterLabel={filterPlatform !== 'all' ? (PLATFORM_LABEL[filterPlatform] ?? filterPlatform) : null}
-        links={pastedLinks}
-        emptyText="Paste a YouTube or Vimeo link above to start tracking."
+        links={visibleLinks}
+        emptyText={accounts.length === 0
+          ? 'Connect a social account above to start tracking your posts.'
+          : 'No posts yet — click Sync all accounts to pull them in.'}
       />
     </div>
   )
@@ -331,86 +314,8 @@ function TotalCard({
   )
 }
 
-function AddLinkForm({
-  clients,
-  jobs,
-  onDone,
-}: {
-  clients: ClientOption[]
-  jobs: ClientOption[]
-  onDone: () => void
-}) {
-  const [state, action, pending] = useActionState(trackSocialLink, undefined)
-  const [url, setUrl] = useState('')
-
-  if (state?.success) {
-    // Close on success — the server-action's revalidatePath rehydrates the list.
-    setTimeout(onDone, 0)
-  }
-
-  return (
-    <form action={action} className="card space-y-4">
-      <div>
-        <label className="label mb-2 block">Video URL</label>
-        <input
-          name="url"
-          required
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://www.youtube.com/watch?v=... or https://vimeo.com/..."
-          className="field-input w-full text-sm"
-          autoFocus
-        />
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="label mb-2 block">Link to client (optional)</label>
-          <CustomSelect
-            name="clientId"
-            placeholder="— None —"
-            searchable
-            options={clients.map((c) => ({ value: c.id, label: c.name }))}
-          />
-        </div>
-        <div>
-          <label className="label mb-2 block">Link to job (optional)</label>
-          <CustomSelect
-            name="jobId"
-            placeholder="— None —"
-            searchable
-            options={jobs.map((j) => ({ value: j.id, label: j.name }))}
-          />
-        </div>
-      </div>
-      <div>
-        <label className="label mb-2 block">Notes (optional)</label>
-        <input
-          name="notes"
-          className="field-input w-full text-sm"
-          placeholder="e.g. Brand launch teaser"
-        />
-      </div>
-      {state?.error && (
-        <p className="text-xs" style={{ color: 'var(--danger)' }}>{state.error}</p>
-      )}
-      <div className="flex gap-2">
-        <button type="submit" disabled={pending || !url.trim()} className="btn-primary text-sm">
-          {pending ? 'Fetching stats...' : 'Track this video'}
-        </button>
-        <button type="button" onClick={onDone} className="btn-secondary text-sm">Cancel</button>
-      </div>
-    </form>
-  )
-}
-
 function LinkCard({ link }: { link: SocialLink }) {
   const [pending, startTransition] = useTransition()
-
-  function handleRefresh() {
-    startTransition(async () => {
-      await refreshSocialLink(link.id)
-    })
-  }
 
   function handleDelete() {
     if (!confirm(`Stop tracking "${link.title || link.url}"?`)) return
@@ -494,9 +399,6 @@ function LinkCard({ link }: { link: SocialLink }) {
           <a href={link.url} target="_blank" rel="noopener noreferrer" className="btn-icon" title="Open">
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
-          <button onClick={handleRefresh} disabled={pending} className="btn-icon" title="Refresh">
-            <RefreshCw className={`w-3.5 h-3.5 ${pending ? 'animate-spin' : ''}`} />
-          </button>
           <button onClick={handleDelete} disabled={pending} className="btn-icon" title="Delete" style={{ color: 'var(--danger)' }}>
             <Trash2 className="w-3.5 h-3.5" />
           </button>
