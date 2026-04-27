@@ -38,12 +38,12 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
 
       {/* Saved Templates */}
       {documents.length > 0 && (
-        <div>
+        <div className="w-full">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Saved Templates</h2>
             <ClearAllButton count={documents.length} />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
             {documents.map((d) => {
               const clientName = d.clients?.name
               return (
