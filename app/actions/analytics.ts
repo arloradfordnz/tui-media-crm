@@ -132,8 +132,10 @@ export async function syncInstagramAccounts(): Promise<{ ok: number; failed: num
 
   for (const acct of accounts) {
     try {
+      // Instagram Login flow uses graph.instagram.com (not graph.facebook.com).
+      // The /me/media shortcut works because the token is scoped to one account.
       const fields = 'id,caption,media_type,media_product_type,permalink,thumbnail_url,media_url,timestamp,like_count,comments_count'
-      const mediaUrl = `https://graph.facebook.com/v19.0/${acct.account_id}/media?fields=${fields}&limit=50&access_token=${encodeURIComponent(acct.access_token)}`
+      const mediaUrl = `https://graph.instagram.com/v22.0/me/media?fields=${fields}&limit=50&access_token=${encodeURIComponent(acct.access_token)}`
       const res = await fetch(mediaUrl, { cache: 'no-store' })
       if (!res.ok) {
         failed++
@@ -144,14 +146,12 @@ export async function syncInstagramAccounts(): Promise<{ ok: number; failed: num
       // Pull insights per media item — different metrics depending on media type.
       const rows = await Promise.all((data.data ?? []).map(async (m) => {
         let views = 0
-        // For Reels and Videos, "plays" was deprecated in favour of "video_views" and now "ig_reels_video_view_total_count".
-        // Use the simplest available signal that still works on Graph v19.
         const isVideo = m.media_type === 'VIDEO' || m.media_product_type === 'REELS'
         try {
           if (isVideo) {
-            const metric = m.media_product_type === 'REELS' ? 'ig_reels_video_view_total_count' : 'video_views'
+            // 2026 metric naming: 'views' is the unified replacement for plays/video_views/reels_video_view_total_count.
             const insightsRes = await fetch(
-              `https://graph.facebook.com/v19.0/${m.id}/insights?metric=${metric}&access_token=${encodeURIComponent(acct.access_token)}`,
+              `https://graph.instagram.com/v22.0/${m.id}/insights?metric=views&access_token=${encodeURIComponent(acct.access_token)}`,
               { cache: 'no-store' },
             )
             if (insightsRes.ok) {
