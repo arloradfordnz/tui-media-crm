@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from 'react'
 import { approveDelivery, markViewed, requestDeliverableRevision } from '@/app/actions/portal'
 import { signDocumentByClient, submitDocumentFeedback } from '@/app/actions/documents'
+import { renderDocBody } from '@/lib/markdown'
 import { statusLabel, statusBadgeClass, formatDate } from '@/lib/format'
 import Image from 'next/image'
 import { Briefcase, FileText, Film, Image as ImageIcon, File, Music, Download, ChevronDown, ChevronRight, Check, MessageSquare, PenLine } from 'lucide-react'
@@ -60,25 +61,6 @@ type PortalData = {
   portalToken: string
   jobs: Job[]
   documents: Document[]
-}
-
-function renderDocBody(text: string): string {
-  const lines = text.split('\n')
-  const out: string[] = []
-  for (const raw of lines) {
-    const escaped = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    const inline = escaped.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
-    if (/^### .+/.test(raw)) {
-      out.push(`<h4 style="font-size:14px;font-weight:600;margin:14px 0 4px;color:var(--text-primary);">${inline.replace(/^### /, '')}</h4>`)
-    } else if (/^## .+/.test(raw)) {
-      out.push(`<h3 style="font-size:16px;font-weight:600;margin:18px 0 6px;color:var(--text-primary);">${inline.replace(/^## /, '')}</h3>`)
-    } else if (/^# .+/.test(raw)) {
-      out.push(`<h2 style="font-size:20px;font-weight:700;margin:22px 0 8px;color:var(--text-primary);letter-spacing:-0.01em;">${inline.replace(/^# /, '')}</h2>`)
-    } else {
-      out.push(inline)
-    }
-  }
-  return out.join('\n')
 }
 
 function fileKind(mime: string | null, name: string): 'video' | 'image' | 'audio' | 'pdf' | 'vimeo' | 'other' {

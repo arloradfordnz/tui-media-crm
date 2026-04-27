@@ -9,7 +9,7 @@ export default async function SettingsPage() {
 
   const { data: templates } = await supabase
     .from('email_templates')
-    .select('*')
+    .select('id, type, subject, body, updated_at')
     .order('type')
 
   return (

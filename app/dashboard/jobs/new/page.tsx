@@ -37,7 +37,7 @@ export default function NewJobPage() {
   const [deliverables, setDeliverables] = useState<TemplateDeliverable[]>([])
 
   useEffect(() => {
-    fetch('/api/clients').then((r) => r.json()).then(setClients).catch(() => {})
+    fetch('/api/clients').then((r) => r.json()).then(setClients).catch((err) => console.warn('Failed to load clients:', err))
   }, [])
 
   useEffect(() => {
@@ -48,7 +48,7 @@ export default function NewJobPage() {
           setTasks(data.tasks || [])
           setDeliverables(data.deliverables || [])
         })
-        .catch(() => {})
+        .catch((err) => console.warn('Failed to load template:', err))
     }
   }, [jobType])
 

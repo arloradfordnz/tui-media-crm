@@ -6,13 +6,31 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   const { id } = await params
   const supabase = await createServerSupabaseClient()
 
-  let { data: job } = await supabase
-    .from('jobs')
-    .select('id, name, job_type, status, shoot_date, shoot_location, quote_value, revision_limit, revisions_used, hourly_rate, estimated_hours, notes, client_id, clients(id, name)')
-    .eq('id', id)
-    .single()
+  // Fetch the job row alongside all related collections; everything keys off the route param.
+  const [
+    jobRes,
+    { data: tasks },
+    { data: deliverables },
+    { data: revisions },
+    { data: proposals },
+    { data: activities },
+    timeEntriesRes,
+  ] = await Promise.all([
+    supabase
+      .from('jobs')
+      .select('id, name, job_type, status, shoot_date, shoot_location, quote_value, revision_limit, revisions_used, hourly_rate, estimated_hours, notes, client_id, clients(id, name)')
+      .eq('id', id)
+      .single(),
+    supabase.from('job_tasks').select('id, phase, title, completed').eq('job_id', id).order('sort_order', { ascending: true }),
+    supabase.from('deliverables').select('id, title, description, completed, delivery_files(id, original_name, version_label, delivery_status, created_at, file_url, personal_note)').eq('job_id', id),
+    supabase.from('revisions').select('id, round, request, status, created_at').eq('job_id', id).order('round', { ascending: true }),
+    supabase.from('proposals').select('id, status, token, total_value, sent_at, responded_at, created_at').eq('job_id', id).order('created_at', { ascending: false }),
+    supabase.from('activities').select('id, action, details, created_at').eq('job_id', id).order('created_at', { ascending: false }).limit(20),
+    supabase.from('time_entries').select('id, description, category, started_at, ended_at, duration_seconds, billable, hourly_rate').eq('job_id', id).order('started_at', { ascending: false }),
+  ])
 
-  // Fallback if time-tracking columns don't exist yet (migration not run)
+  // Fallback if time-tracking columns don't exist yet (migration not run on legacy DBs)
+  let job = jobRes.data
   if (!job) {
     const res = await supabase
       .from('jobs')
@@ -23,22 +41,6 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   }
 
   if (!job) notFound()
-
-  const [
-    { data: tasks },
-    { data: deliverables },
-    { data: revisions },
-    { data: proposals },
-    { data: activities },
-    timeEntriesRes,
-  ] = await Promise.all([
-    supabase.from('job_tasks').select('id, phase, title, completed').eq('job_id', id).order('sort_order', { ascending: true }),
-    supabase.from('deliverables').select('id, title, description, completed, delivery_files(id, original_name, version_label, delivery_status, created_at, file_url, personal_note)').eq('job_id', id),
-    supabase.from('revisions').select('id, round, request, status, created_at').eq('job_id', id).order('round', { ascending: true }),
-    supabase.from('proposals').select('id, status, token, total_value, sent_at, responded_at, created_at').eq('job_id', id).order('created_at', { ascending: false }),
-    supabase.from('activities').select('id, action, details, created_at').eq('job_id', id).order('created_at', { ascending: false }).limit(20),
-    supabase.from('time_entries').select('id, description, category, started_at, ended_at, duration_seconds, billable, hourly_rate').eq('job_id', id).order('started_at', { ascending: false }),
-  ])
   const timeEntries = timeEntriesRes.data ?? []
 
   const client = job.clients as unknown as { id: string; name: string }

@@ -41,7 +41,9 @@ async function fetchNextDocumentNumber(): Promise<string> {
     if (!res.ok) throw new Error('failed')
     const data = await res.json()
     if (typeof data.number === 'string') return data.number
-  } catch { /* fall through */ }
+  } catch (err) {
+    console.warn('Failed to fetch next document number, using fallback:', err)
+  }
   return '#100'
 }
 

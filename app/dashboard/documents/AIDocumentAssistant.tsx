@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { X, Bot, User, Send, Check, Sparkles } from 'lucide-react'
+import { renderInline } from '@/lib/markdown'
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
@@ -20,11 +21,6 @@ function visibleText(text: string): string {
   const start = text.indexOf(DRAFT_START)
   if (start === -1) return text
   return text.slice(0, start).trim()
-}
-
-function renderInline(text: string): string {
-  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  return escaped.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
 }
 
 export default function AIDocumentAssistant({

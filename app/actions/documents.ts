@@ -77,19 +77,15 @@ export async function signDocumentByClient(
 
   const supabase = await createServerSupabaseClient()
 
-  // Authorise: the document's client must match the client the portal token belongs to
-  const { data: doc } = await supabase
-    .from('documents')
-    .select('id, content, client_id')
-    .eq('id', docId)
-    .single()
+  // Authorise: the document's client must match the client the portal token belongs to.
+  // Both reads are independent; run in parallel.
+  const [docRes, clientRes] = await Promise.all([
+    supabase.from('documents').select('id, content, client_id').eq('id', docId).single(),
+    supabase.from('clients').select('id, name').eq('portal_token', portalToken).single(),
+  ])
+  const doc = docRes.data
+  const client = clientRes.data
   if (!doc) return { error: 'Document not found.' }
-
-  const { data: client } = await supabase
-    .from('clients')
-    .select('id, name')
-    .eq('portal_token', portalToken)
-    .single()
   if (!client || client.id !== doc.client_id) return { error: 'Not authorised to sign this document.' }
 
   // Parse existing content, merge signature into the form
@@ -104,18 +100,20 @@ export async function signDocumentByClient(
   const nextForm = { ...(parsed.form || {}), clientSignature: signature, clientSignedAt: signedAt }
   const nextContent = JSON.stringify({ ...parsed, form: nextForm })
 
-  await supabase.from('documents').update({ content: nextContent, doc_type: 'contract' }).eq('id', docId)
-  await supabase.from('activities').insert({
-    action: 'document_signed',
-    details: `${client.name} signed "${signature}" on a document`,
-    client_id: client.id,
-  })
-  await supabase.from('notifications').insert({
-    title: 'Document Signed',
-    message: `${client.name} signed a document (${signature})`,
-    type: 'document_signed',
-    client_id: client.id,
-  })
+  await Promise.all([
+    supabase.from('documents').update({ content: nextContent, doc_type: 'contract' }).eq('id', docId),
+    supabase.from('activities').insert({
+      action: 'document_signed',
+      details: `${client.name} signed "${signature}" on a document`,
+      client_id: client.id,
+    }),
+    supabase.from('notifications').insert({
+      title: 'Document Signed',
+      message: `${client.name} signed a document (${signature})`,
+      type: 'document_signed',
+      client_id: client.id,
+    }),
+  ])
 
   revalidatePath('/portal/')
   return { success: true }
@@ -134,18 +132,13 @@ export async function submitDocumentFeedback(
 
   const supabase = await createServerSupabaseClient()
 
-  const { data: doc } = await supabase
-    .from('documents')
-    .select('id, name, content, client_id')
-    .eq('id', docId)
-    .single()
+  const [docRes, clientRes] = await Promise.all([
+    supabase.from('documents').select('id, name, content, client_id').eq('id', docId).single(),
+    supabase.from('clients').select('id, name').eq('portal_token', portalToken).single(),
+  ])
+  const doc = docRes.data
+  const client = clientRes.data
   if (!doc) return { error: 'Document not found.' }
-
-  const { data: client } = await supabase
-    .from('clients')
-    .select('id, name')
-    .eq('portal_token', portalToken)
-    .single()
   if (!client || client.id !== doc.client_id) return { error: 'Not authorised.' }
 
   type Feedback = { message: string; createdAt: string; author: string }
@@ -165,18 +158,20 @@ export async function submitDocumentFeedback(
   const nextFeedback = [...(parsed.feedback ?? []), newEntry]
   const nextContent = JSON.stringify({ ...parsed, feedback: nextFeedback })
 
-  await supabase.from('documents').update({ content: nextContent }).eq('id', docId)
-  await supabase.from('activities').insert({
-    action: 'document_feedback',
-    details: `${client.name} left feedback on "${doc.name}"`,
-    client_id: client.id,
-  })
-  await supabase.from('notifications').insert({
-    title: 'Document Feedback',
-    message: `${client.name} left feedback on "${doc.name}"`,
-    type: 'document_feedback',
-    client_id: client.id,
-  })
+  await Promise.all([
+    supabase.from('documents').update({ content: nextContent }).eq('id', docId),
+    supabase.from('activities').insert({
+      action: 'document_feedback',
+      details: `${client.name} left feedback on "${doc.name}"`,
+      client_id: client.id,
+    }),
+    supabase.from('notifications').insert({
+      title: 'Document Feedback',
+      message: `${client.name} left feedback on "${doc.name}"`,
+      type: 'document_feedback',
+      client_id: client.id,
+    }),
+  ])
 
   revalidatePath('/portal/')
   revalidatePath(`/dashboard/documents/${docId}`)

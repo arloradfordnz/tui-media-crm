@@ -31,8 +31,10 @@ export async function createJob(prevState: { error?: string } | undefined, formD
 
   if (tasksJson) {
     const tasks = JSON.parse(tasksJson) as { phase: string; title: string }[]
-    for (let i = 0; i < tasks.length; i++) {
-      await supabase.from('job_tasks').insert({ job_id: job.id, phase: tasks[i].phase, title: tasks[i].title, sort_order: i })
+    if (tasks.length > 0) {
+      await supabase.from('job_tasks').insert(
+        tasks.map((t, i) => ({ job_id: job.id, phase: t.phase, title: t.title, sort_order: i }))
+      )
     }
   } else if (jobType) {
     const { data: template } = await supabase
@@ -42,19 +44,29 @@ export async function createJob(prevState: { error?: string } | undefined, formD
       .single()
 
     if (template) {
-      for (const t of (template.template_tasks as { phase: string; title: string; sort_order: number }[])) {
-        await supabase.from('job_tasks').insert({ job_id: job.id, phase: t.phase, title: t.title, sort_order: t.sort_order })
-      }
-      for (const d of (template.template_deliverables as { title: string; description: string | null; sort_order: number }[])) {
-        await supabase.from('deliverables').insert({ job_id: job.id, title: d.title, description: d.description })
-      }
+      const templateTasks = template.template_tasks as { phase: string; title: string; sort_order: number }[]
+      const templateDeliverables = template.template_deliverables as { title: string; description: string | null; sort_order: number }[]
+      await Promise.all([
+        templateTasks?.length
+          ? supabase.from('job_tasks').insert(
+              templateTasks.map((t) => ({ job_id: job.id, phase: t.phase, title: t.title, sort_order: t.sort_order }))
+            ).then(() => null)
+          : Promise.resolve(null),
+        templateDeliverables?.length
+          ? supabase.from('deliverables').insert(
+              templateDeliverables.map((d) => ({ job_id: job.id, title: d.title, description: d.description }))
+            ).then(() => null)
+          : Promise.resolve(null),
+      ])
     }
   }
 
   if (deliverablesJson) {
     const deliverables = JSON.parse(deliverablesJson) as { title: string; description?: string }[]
-    for (const d of deliverables) {
-      await supabase.from('deliverables').insert({ job_id: job.id, title: d.title, description: d.description || null })
+    if (deliverables.length > 0) {
+      await supabase.from('deliverables').insert(
+        deliverables.map((d) => ({ job_id: job.id, title: d.title, description: d.description || null }))
+      )
     }
   }
 
@@ -99,13 +111,20 @@ export async function updateJob(prevState: { error?: string } | undefined, formD
   }).eq('id', jobId)
 
   if (statusChanged) {
-    await supabase.from('activities').insert({ action: 'status_changed', details: `Status changed to ${status}`, job_id: jobId, client_id: job.client_id })
-    await supabase.from('notifications').insert({ title: 'Job Status Updated', message: `"${name}" is now ${status}`, type: 'status_change', job_id: jobId, client_id: job.client_id })
+    await logStatusChange(jobId, job.client_id, name, status)
   }
 
   revalidatePath('/dashboard/jobs')
   revalidatePath(`/dashboard/jobs/${jobId}`)
   redirect(`/dashboard/jobs/${jobId}`)
+}
+
+async function logStatusChange(jobId: string, clientId: string | null, jobName: string, newStatus: string) {
+  const supabase = await createServerSupabaseClient()
+  await Promise.all([
+    supabase.from('activities').insert({ action: 'status_changed', details: `Status changed to ${newStatus}`, job_id: jobId, client_id: clientId }),
+    supabase.from('notifications').insert({ title: 'Job Status Updated', message: `"${jobName}" is now ${newStatus}`, type: 'status_change', job_id: jobId, client_id: clientId }),
+  ])
 }
 
 export async function updateJobStatus(jobId: string, newStatus: string) {
@@ -114,8 +133,7 @@ export async function updateJobStatus(jobId: string, newStatus: string) {
   if (!job) return
 
   await supabase.from('jobs').update({ status: newStatus }).eq('id', jobId)
-  await supabase.from('activities').insert({ action: 'status_changed', details: `Status changed to ${newStatus}`, job_id: jobId, client_id: job.client_id })
-  await supabase.from('notifications').insert({ title: 'Job Status Updated', message: `"${job.name}" is now ${newStatus}`, type: 'status_change', job_id: jobId, client_id: job.client_id })
+  await logStatusChange(jobId, job.client_id, job.name, newStatus)
 
   revalidatePath('/dashboard/jobs')
   revalidatePath(`/dashboard/jobs/${jobId}`)
@@ -151,10 +169,12 @@ export async function addRevision(prevState: { error?: string } | undefined, for
 
   const round = job.revisions_used + 1
 
-  await supabase.from('revisions').insert({ job_id: jobId, round, request })
-  await supabase.from('jobs').update({ revisions_used: round }).eq('id', jobId)
-  await supabase.from('activities').insert({ action: 'revision_requested', details: `Revision round ${round} requested`, job_id: jobId, client_id: job.client_id })
-  await supabase.from('notifications').insert({ title: 'Revision Requested', message: `Round ${round} for "${job.name}"`, type: 'revision_request', job_id: jobId, client_id: job.client_id })
+  await Promise.all([
+    supabase.from('revisions').insert({ job_id: jobId, round, request }),
+    supabase.from('jobs').update({ revisions_used: round }).eq('id', jobId),
+    supabase.from('activities').insert({ action: 'revision_requested', details: `Revision round ${round} requested`, job_id: jobId, client_id: job.client_id }),
+    supabase.from('notifications').insert({ title: 'Revision Requested', message: `Round ${round} for "${job.name}"`, type: 'revision_request', job_id: jobId, client_id: job.client_id }),
+  ])
 
   revalidatePath(`/dashboard/jobs/${jobId}`)
   return {}

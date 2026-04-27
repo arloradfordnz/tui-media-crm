@@ -12,18 +12,22 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
 
   type DocRow = { id: string; name: string; doc_type: string; updated_at: string; clients?: { name: string } | null }
 
-  // Try with client_id join, fall back to basic query if column doesn't exist yet
+  // Documents (with client join) and clients list run in parallel — they're independent.
+  const [docsRes, clientsRes] = await Promise.all([
+    supabase.from('documents').select('id, name, doc_type, updated_at, client_id, clients(name)').order('updated_at', { ascending: false }),
+    supabase.from('clients').select('id, name, contact_person, email, phone, location, portal_token').order('name', { ascending: true }),
+  ])
+
   let documents: DocRow[] = []
-  const { data: docsWithClient, error: docErr } = await supabase
-    .from('documents').select('id, name, doc_type, updated_at, client_id, clients(name)').order('updated_at', { ascending: false })
-  if (docErr) {
+  if (docsRes.error) {
+    // Legacy schema fallback: client_id column may not exist yet.
     const { data: docsBasic } = await supabase
       .from('documents').select('id, name, doc_type, updated_at').order('updated_at', { ascending: false })
     documents = (docsBasic ?? []) as DocRow[]
   } else {
-    documents = (docsWithClient ?? []) as unknown as DocRow[]
+    documents = (docsRes.data ?? []) as unknown as DocRow[]
   }
-  const { data: clients } = await supabase.from('clients').select('id, name, contact_person, email, phone, location, portal_token').order('name', { ascending: true })
+  const clients = clientsRes.data
   const clientOptions = (clients ?? []).map((c) => ({ id: c.id, name: c.name, contactPerson: c.contact_person, email: c.email, phone: c.phone, location: c.location, portalToken: c.portal_token ?? null }))
 
   return (

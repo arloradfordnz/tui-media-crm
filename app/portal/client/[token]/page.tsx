@@ -21,27 +21,27 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
     )
   }
 
-  // Fetch active jobs with deliverables
-  const { data: jobs } = await supabase
-    .from('jobs')
-    .select(`
-      id, name, status, job_type, shoot_date,
-      deliverables(
-        id, title, description, completed, revision_limit, revisions_used,
-        delivery_files(id, file_name, original_name, file_url, mime_type, version_label, delivery_status, download_enabled, personal_note, created_at),
-        revisions(id, round, request, status, created_at)
-      )
-    `)
-    .eq('client_id', client.id)
-    .not('status', 'in', '("archived")')
-    .order('created_at', { ascending: false })
-
-  // Fetch documents linked to this client
-  const { data: documents } = await supabase
-    .from('documents')
-    .select('id, name, doc_type, content, updated_at')
-    .eq('client_id', client.id)
-    .order('updated_at', { ascending: false })
+  // Fetch jobs (with deliverables) and documents in parallel — they don't depend on each other.
+  const [{ data: jobs }, { data: documents }] = await Promise.all([
+    supabase
+      .from('jobs')
+      .select(`
+        id, name, status, job_type, shoot_date,
+        deliverables(
+          id, title, description, completed, revision_limit, revisions_used,
+          delivery_files(id, file_name, original_name, file_url, mime_type, version_label, delivery_status, download_enabled, personal_note, created_at),
+          revisions(id, round, request, status, created_at)
+        )
+      `)
+      .eq('client_id', client.id)
+      .not('status', 'in', '("archived")')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('documents')
+      .select('id, name, doc_type, content, updated_at')
+      .eq('client_id', client.id)
+      .order('updated_at', { ascending: false }),
+  ])
 
   type RawDeliveryFile = { id: string; file_name: string; original_name: string; file_url: string | null; mime_type: string | null; version_label: string; delivery_status: string; download_enabled: boolean; personal_note: string | null; created_at: string }
   type RawRevision = { id: string; round: number; request: string; status: string; created_at: string }

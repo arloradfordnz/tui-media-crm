@@ -7,7 +7,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
   const supabase = await createServerSupabaseClient()
 
   const [{ data: doc }, { data: clients }] = await Promise.all([
-    supabase.from('documents').select('*').eq('id', id).single(),
+    supabase.from('documents').select('id, name, doc_type, content, client_id').eq('id', id).single(),
     supabase.from('clients').select('id, name, contact_person, email, phone, location, portal_token').order('name', { ascending: true }),
   ])
 
