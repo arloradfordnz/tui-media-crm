@@ -12,7 +12,16 @@ type Props = {
 }
 
 export default function PlatformIcon({ platform, className = 'w-4 h-4', style }: Props) {
-  const common = { className, style: { color: 'var(--accent)', ...style }, viewBox: '0 0 24 24', xmlns: 'http://www.w3.org/2000/svg' }
+  // Most brand glyphs run edge-to-edge of a 24×24 box, while Lucide icons
+  // ship with ~1.5px built-in padding. Use a slightly enlarged viewBox so
+  // these brand icons sit at the same visual size as the rest of the UI
+  // without clipping the camera lens / circle outlines.
+  const common = {
+    className,
+    style: { color: 'var(--accent)', ...style },
+    viewBox: '-1.5 -1.5 27 27',
+    xmlns: 'http://www.w3.org/2000/svg',
+  }
 
   if (platform === 'youtube') {
     return (
