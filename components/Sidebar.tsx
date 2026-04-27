@@ -20,6 +20,7 @@ import {
   CheckSquare,
   Activity,
   Layers,
+  BarChart3,
 } from 'lucide-react'
 
 const mainNav = [
@@ -32,6 +33,7 @@ const mainNav = [
 ]
 
 const businessNav = [
+  { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/dashboard/finance', label: 'Finance', icon: DollarSign },
   { href: '/dashboard/gear', label: 'Gear', icon: Camera },
   { href: '/dashboard/documents', label: 'Documents', icon: FileText },
