@@ -8,8 +8,11 @@ export default async function AnalyticsPage() {
   const [linksRes, clientsRes, jobsRes, accountsRes] = await Promise.all([
     supabase
       .from('social_links')
-      .select('id, platform, url, external_id, title, thumbnail_url, channel, published_at, views, likes, comments, duration_seconds, client_id, job_id, notes, last_synced_at, sync_error, created_at, clients(name), jobs(name)')
-      .order('views', { ascending: false }),
+      .select('id, platform, url, external_id, title, thumbnail_url, channel, published_at, views, likes, comments, duration_seconds, client_id, job_id, notes, last_synced_at, sync_error, created_at, source, clients(name), jobs(name)')
+      // Newest first by published date (when posted on the platform), falling
+      // back to when the row was added to our system for legacy rows.
+      .order('published_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false }),
     supabase.from('clients').select('id, name').order('name', { ascending: true }),
     supabase.from('jobs').select('id, name').order('created_at', { ascending: false }),
     supabase.from('connected_accounts').select('id, platform, account_name, account_id, connected_at, expires_at'),
@@ -41,6 +44,7 @@ export default async function AnalyticsPage() {
     last_synced_at: string | null
     sync_error: string | null
     created_at: string
+    source: string | null
     clients?: { name: string } | null
     jobs?: { name: string } | null
   }
@@ -66,6 +70,7 @@ export default async function AnalyticsPage() {
     lastSyncedAt: r.last_synced_at,
     syncError: r.sync_error,
     createdAt: r.created_at,
+    source: (r.source ?? 'manual') as 'manual' | 'connected',
   }))
 
   const clients: ClientOption[] = (clientsRes.data ?? []).map((c) => ({ id: c.id, name: c.name }))

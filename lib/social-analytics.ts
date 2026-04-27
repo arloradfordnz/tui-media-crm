@@ -201,10 +201,84 @@ async function fetchVimeo(parsed: ParsedLink): Promise<LinkStats> {
   }
 }
 
+/**
+ * Best-effort scrape of OpenGraph metadata from a public URL. Used for
+ * platforms whose public APIs don't expose stats for posts the user
+ * doesn't own (Instagram, TikTok, Facebook). We at least get a usable
+ * title + thumbnail for the analytics card.
+ */
+async function fetchOgMetadata(url: string): Promise<{ title: string | null; thumbnail: string | null; author: string | null; description: string | null }> {
+  try {
+    const res = await fetch(url, {
+      cache: 'no-store',
+      redirect: 'follow',
+      headers: {
+        'user-agent': 'Mozilla/5.0 (compatible; TuiMediaBot/1.0; +https://dashboard.tuimedia.nz)',
+        'accept-language': 'en-US,en;q=0.9',
+        accept: 'text/html,application/xhtml+xml',
+      },
+    })
+    if (!res.ok) return { title: null, thumbnail: null, author: null, description: null }
+    const html = await res.text()
+    const meta = (prop: string) => {
+      // Match both property="" and name="" with content="" in either order.
+      const a = html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]+content=["']([^"']+)["']`, 'i'))
+      if (a) return decodeHtmlEntities(a[1])
+      const b = html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${prop}["']`, 'i'))
+      return b ? decodeHtmlEntities(b[1]) : null
+    }
+    return {
+      title: meta('og:title') || meta('twitter:title'),
+      thumbnail: meta('og:image') || meta('twitter:image'),
+      author: meta('og:site_name') || meta('article:author'),
+      description: meta('og:description') || meta('twitter:description'),
+    }
+  } catch {
+    return { title: null, thumbnail: null, author: null, description: null }
+  }
+}
+
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(parseInt(d, 10)))
+}
+
+async function fetchOgFallback(parsed: ParsedLink, friendlyError: string): Promise<LinkStats> {
+  const og = await fetchOgMetadata(parsed.url)
+  return {
+    platform: parsed.platform,
+    externalId: parsed.externalId,
+    url: parsed.url,
+    title: og.title,
+    thumbnailUrl: og.thumbnail,
+    channel: og.author,
+    publishedAt: null,
+    views: 0,
+    likes: 0,
+    comments: 0,
+    durationSeconds: null,
+    error: friendlyError,
+  }
+}
+
 export async function fetchLinkStats(rawUrl: string): Promise<LinkStats> {
   const parsed = parseLink(rawUrl)
   if (parsed.platform === 'youtube') return fetchYouTube(parsed)
   if (parsed.platform === 'vimeo') return fetchVimeo(parsed)
+  if (parsed.platform === 'instagram') {
+    return fetchOgFallback(parsed, "View counts aren't available for IG posts you don't own — connect your account to auto-sync your own posts.")
+  }
+  if (parsed.platform === 'tiktok') {
+    return fetchOgFallback(parsed, "View counts aren't available for TikTok posts you don't own — TikTok analytics requires a paid third-party service.")
+  }
+  if (parsed.platform === 'facebook') {
+    return fetchOgFallback(parsed, "View counts aren't available for Facebook posts you don't own — connect your Page to auto-sync your own posts.")
+  }
   return {
     platform: parsed.platform,
     externalId: null,
@@ -217,9 +291,6 @@ export async function fetchLinkStats(rawUrl: string): Promise<LinkStats> {
     likes: 0,
     comments: 0,
     durationSeconds: null,
-    error:
-      parsed.platform === 'other'
-        ? 'Unsupported URL — paste a YouTube or Vimeo link.'
-        : `${parsed.platform[0].toUpperCase()}${parsed.platform.slice(1)} support is coming soon — connecting your account is required for stats.`,
+    error: 'Unsupported URL — paste a YouTube, Vimeo, Instagram, TikTok, or Facebook link.',
   }
 }

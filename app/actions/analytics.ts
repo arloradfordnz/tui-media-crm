@@ -37,6 +37,7 @@ export async function trackSocialLink(prevState: ActionResult | undefined, formD
       notes,
       last_synced_at: new Date().toISOString(),
       sync_error: stats.error,
+      source: 'manual',
     },
     { onConflict: 'platform,external_id', ignoreDuplicates: false },
   )
@@ -178,6 +179,7 @@ export async function syncInstagramAccounts(): Promise<{ ok: number; failed: num
           duration_seconds: null,
           last_synced_at: new Date().toISOString(),
           sync_error: null,
+          source: 'connected' as const,
         }
       }))
 

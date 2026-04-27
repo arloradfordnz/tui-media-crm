@@ -14,6 +14,7 @@ import {
   Clock,
 } from 'lucide-react'
 import PlatformIcon from '@/components/PlatformIcon'
+import CustomSelect from '@/components/CustomSelect'
 import {
   trackSocialLink,
   refreshSocialLink,
@@ -44,6 +45,7 @@ export type SocialLink = {
   lastSyncedAt: string | null
   syncError: string | null
   createdAt: string
+  source: 'manual' | 'connected'
 }
 
 export type ClientOption = { id: string; name: string }
@@ -145,6 +147,9 @@ export default function AnalyticsView({
     return links.filter((l) => l.platform === filterPlatform)
   }, [links, filterPlatform])
 
+  const connectedLinks = useMemo(() => visibleLinks.filter((l) => l.source === 'connected'), [visibleLinks])
+  const pastedLinks = useMemo(() => visibleLinks.filter((l) => l.source !== 'connected'), [visibleLinks])
+
   function handleRefreshAll() {
     startTransition(async () => {
       await refreshAllSocialLinks()
@@ -241,28 +246,64 @@ export default function AnalyticsView({
       {/* Connected accounts */}
       <ConnectedAccounts accounts={accounts} />
 
-      {/* Tracked links list */}
-      <div>
-        <h2 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-          Tracked videos
-          {filterPlatform !== 'all' && (
-            <span className="ml-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>· {PLATFORM_LABEL[filterPlatform] ?? filterPlatform} only</span>
+      {/* Connected-account posts (auto-synced from your own accounts) */}
+      <LinkSection
+        heading="From your connected accounts"
+        subheading="Posts pulled from accounts you've connected. Click Sync on a connected account to refresh."
+        platformFilterLabel={filterPlatform !== 'all' ? (PLATFORM_LABEL[filterPlatform] ?? filterPlatform) : null}
+        links={connectedLinks}
+        emptyText="No connected-account posts yet — connect a platform above and click Sync."
+      />
+
+      {/* Manually pasted client / competitor links */}
+      <LinkSection
+        heading="Pasted links"
+        subheading="Videos you've added by URL. Stats only auto-populate for YouTube and Vimeo; other platforms show metadata only (view counts aren't public)."
+        platformFilterLabel={filterPlatform !== 'all' ? (PLATFORM_LABEL[filterPlatform] ?? filterPlatform) : null}
+        links={pastedLinks}
+        emptyText="Paste a YouTube or Vimeo link above to start tracking."
+      />
+    </div>
+  )
+}
+
+function LinkSection({
+  heading,
+  subheading,
+  platformFilterLabel,
+  links,
+  emptyText,
+}: {
+  heading: string
+  subheading: string
+  platformFilterLabel: string | null
+  links: SocialLink[]
+  emptyText: string
+}) {
+  return (
+    <div>
+      <div className="mb-3">
+        <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+          {heading}
+          {platformFilterLabel && (
+            <span className="ml-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>· {platformFilterLabel} only</span>
           )}
+          <span className="ml-2 text-xs font-normal" style={{ color: 'var(--text-tertiary)' }}>({links.length})</span>
         </h2>
-        {visibleLinks.length === 0 ? (
-          <div className="card text-center py-12">
-            <BarChart3 className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-tertiary)' }} />
-            <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>No videos tracked yet</p>
-            <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>Paste a YouTube or Vimeo link to see all-time stats here.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {visibleLinks.map((link) => (
-              <LinkCard key={link.id} link={link} />
-            ))}
-          </div>
-        )}
+        <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{subheading}</p>
       </div>
+      {links.length === 0 ? (
+        <div className="card text-center py-8">
+          <BarChart3 className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--text-tertiary)' }} />
+          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{emptyText}</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {links.map((link) => (
+            <LinkCard key={link.id} link={link} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -324,21 +365,21 @@ function AddLinkForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="label mb-2 block">Link to client (optional)</label>
-          <select name="clientId" className="field-input w-full text-sm">
-            <option value="">— None —</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          <CustomSelect
+            name="clientId"
+            placeholder="— None —"
+            searchable
+            options={clients.map((c) => ({ value: c.id, label: c.name }))}
+          />
         </div>
         <div>
           <label className="label mb-2 block">Link to job (optional)</label>
-          <select name="jobId" className="field-input w-full text-sm">
-            <option value="">— None —</option>
-            {jobs.map((j) => (
-              <option key={j.id} value={j.id}>{j.name}</option>
-            ))}
-          </select>
+          <CustomSelect
+            name="jobId"
+            placeholder="— None —"
+            searchable
+            options={jobs.map((j) => ({ value: j.id, label: j.name }))}
+          />
         </div>
       </div>
       <div>
