@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useMemo, useState, useTransition } from 'react'
+import { useActionState, useEffect, useMemo, useState, useTransition } from 'react'
 import {
   BarChart3,
   Eye,
@@ -10,20 +10,17 @@ import {
   Trash2,
   Plus,
   ExternalLink,
-  Play,
-  Video,
-  Camera,
-  Music2,
-  MessageCircle,
-  Globe,
   AlertCircle,
   Clock,
 } from 'lucide-react'
+import PlatformIcon from '@/components/PlatformIcon'
 import {
   trackSocialLink,
   refreshSocialLink,
   refreshAllSocialLinks,
   deleteSocialLink,
+  syncInstagramAccounts,
+  disconnectAccount,
 } from '@/app/actions/analytics'
 
 export type SocialLink = {
@@ -51,6 +48,15 @@ export type SocialLink = {
 
 export type ClientOption = { id: string; name: string }
 
+export type ConnectedAccount = {
+  id: string
+  platform: string
+  accountName: string | null
+  accountId: string | null
+  connectedAt: string
+  expiresAt: string | null
+}
+
 const PLATFORM_LABEL: Record<string, string> = {
   youtube: 'YouTube',
   vimeo: 'Vimeo',
@@ -58,16 +64,6 @@ const PLATFORM_LABEL: Record<string, string> = {
   tiktok: 'TikTok',
   facebook: 'Facebook',
   other: 'Other',
-}
-
-function PlatformIcon({ platform, className = 'w-4 h-4' }: { platform: string; className?: string }) {
-  const style = { color: 'var(--accent)' }
-  if (platform === 'youtube') return <Play className={className} style={{ color: '#ff0033', fill: '#ff0033' }} />
-  if (platform === 'vimeo') return <Video className={className} style={{ color: '#1ab7ea' }} />
-  if (platform === 'instagram') return <Camera className={className} style={{ color: '#e1306c' }} />
-  if (platform === 'tiktok') return <Music2 className={className} style={style} />
-  if (platform === 'facebook') return <MessageCircle className={className} style={{ color: '#1877f2' }} />
-  return <Globe className={className} style={style} />
 }
 
 function compactNumber(n: number): string {
@@ -96,14 +92,30 @@ export default function AnalyticsView({
   links,
   clients,
   jobs,
+  accounts,
 }: {
   links: SocialLink[]
   clients: ClientOption[]
   jobs: ClientOption[]
+  accounts: ConnectedAccount[]
 }) {
   const [adding, setAdding] = useState(false)
   const [filterPlatform, setFilterPlatform] = useState<string | 'all'>('all')
   const [pending, startTransition] = useTransition()
+  const [oauthMsg, setOauthMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('ig_connected') === '1') {
+      setOauthMsg({ kind: 'success', text: 'Instagram connected. Click Sync to pull your posts.' })
+    } else if (params.has('ig_error')) {
+      setOauthMsg({ kind: 'error', text: params.get('ig_error') || 'Couldn\'t connect Instagram.' })
+    }
+    if (params.has('ig_connected') || params.has('ig_error')) {
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
 
   const totals = useMemo(() => {
     return links.reduce(
@@ -160,6 +172,23 @@ export default function AnalyticsView({
         </div>
       </div>
 
+      {oauthMsg && (
+        <div
+          className="rounded-lg p-3 text-sm flex items-center gap-2"
+          style={{
+            background: 'var(--bg-elevated)',
+            border: `1px solid ${oauthMsg.kind === 'success' ? 'var(--accent)' : 'var(--danger)'}`,
+            color: 'var(--text-primary)',
+          }}
+        >
+          <AlertCircle className="w-4 h-4 shrink-0" style={{ color: oauthMsg.kind === 'success' ? 'var(--accent)' : 'var(--danger)' }} />
+          <span className="flex-1">{oauthMsg.text}</span>
+          <button onClick={() => setOauthMsg(null)} className="btn-icon" aria-label="Dismiss">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {adding && <AddLinkForm clients={clients} jobs={jobs} onDone={() => setAdding(false)} />}
 
       {/* Totals */}
@@ -209,8 +238,8 @@ export default function AnalyticsView({
         </div>
       )}
 
-      {/* Connect-account placeholders for OAuth-only platforms */}
-      <ConnectStubs />
+      {/* Connected accounts */}
+      <ConnectedAccounts accounts={accounts} />
 
       {/* Tracked links list */}
       <div>
@@ -448,32 +477,105 @@ function Stat({ icon: Icon, label, value }: { icon: React.ComponentType<{ classN
   )
 }
 
-function ConnectStubs() {
-  // OAuth-required platforms — show as placeholders so the user can see the
-  // roadmap without us needing to ship Meta / TikTok auth flows yet.
-  const platforms = [
-    { id: 'instagram', label: 'Instagram', note: 'Requires a Business or Creator account.' },
-    { id: 'tiktok', label: 'TikTok', note: 'Requires TikTok Business approval.' },
-    { id: 'facebook', label: 'Facebook', note: 'Requires a connected Page.' },
-  ]
+function ConnectedAccounts({ accounts }: { accounts: ConnectedAccount[] }) {
+  const [pending, startTransition] = useTransition()
+  const [syncMsg, setSyncMsg] = useState<string | null>(null)
+
+  const igAccount = accounts.find((a) => a.platform === 'instagram')
+  const fbAccount = accounts.find((a) => a.platform === 'facebook')
+  const ttAccount = accounts.find((a) => a.platform === 'tiktok')
+
+  function handleSyncIg() {
+    setSyncMsg(null)
+    startTransition(async () => {
+      const result = await syncInstagramAccounts()
+      if (result.error) setSyncMsg(result.error)
+      else setSyncMsg(`Synced ${result.ok} account${result.ok === 1 ? '' : 's'}${result.failed ? ` · ${result.failed} failed` : ''}.`)
+    })
+  }
+
+  function handleDisconnect(id: string) {
+    if (!confirm('Disconnect this account? Stored posts will stay but stats will stop refreshing.')) return
+    startTransition(async () => {
+      await disconnectAccount(id)
+    })
+  }
+
   return (
     <div className="card">
-      <h2 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Connect a social account</h2>
+      <h2 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Connected accounts</h2>
       <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>
-        For now, paste any public YouTube or Vimeo link to track stats automatically. Channel-level analytics will come once you connect an account below.
+        Connect a platform to pull your channel-level posts and stats automatically. Public YouTube / Vimeo links don&apos;t need a connection — just paste them above.
       </p>
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {platforms.map((p) => (
-          <div key={p.id} className="rounded-lg p-3 flex items-center gap-3" style={{ background: 'var(--bg-elevated)' }}>
-            <PlatformIcon platform={p.id} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{p.label}</p>
-              <p className="text-xs truncate" style={{ color: 'var(--text-tertiary)' }}>{p.note}</p>
-            </div>
-            <span className="badge badge-muted shrink-0">Soon</span>
-          </div>
-        ))}
+        <AccountCard
+          platform="instagram"
+          label="Instagram"
+          subline={igAccount ? `@${igAccount.accountName ?? '—'}` : 'Business or Creator account required'}
+          connected={!!igAccount}
+          actions={
+            igAccount ? (
+              <div className="flex gap-1.5">
+                <button onClick={handleSyncIg} disabled={pending} className="btn-secondary text-xs" style={{ padding: '4px 8px' }}>
+                  <RefreshCw className={`w-3 h-3 ${pending ? 'animate-spin' : ''}`} />
+                  Sync
+                </button>
+                <button onClick={() => handleDisconnect(igAccount.id)} disabled={pending} className="btn-icon" style={{ color: 'var(--danger)' }} title="Disconnect">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <a href="/api/auth/instagram/start" className="btn-primary text-xs" style={{ padding: '4px 10px' }}>Connect</a>
+            )
+          }
+        />
+        <AccountCard
+          platform="facebook"
+          label="Facebook"
+          subline={fbAccount ? fbAccount.accountName ?? '—' : 'Connect via Instagram (uses Page)'}
+          connected={!!fbAccount}
+          comingSoon
+        />
+        <AccountCard
+          platform="tiktok"
+          label="TikTok"
+          subline={ttAccount ? ttAccount.accountName ?? '—' : 'TikTok Business approval required'}
+          connected={!!ttAccount}
+          comingSoon
+        />
       </div>
+
+      {syncMsg && (
+        <p className="text-xs mt-3" style={{ color: 'var(--text-secondary)' }}>{syncMsg}</p>
+      )}
+    </div>
+  )
+}
+
+function AccountCard({
+  platform,
+  label,
+  subline,
+  connected,
+  comingSoon,
+  actions,
+}: {
+  platform: string
+  label: string
+  subline: string
+  connected: boolean
+  comingSoon?: boolean
+  actions?: React.ReactNode
+}) {
+  return (
+    <div className="rounded-lg p-3 flex items-center gap-3" style={{ background: 'var(--bg-elevated)' }}>
+      <PlatformIcon platform={platform} className="w-5 h-5" style={{ color: 'var(--text-primary)' }} />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{label}</p>
+        <p className="text-xs truncate" style={{ color: connected ? 'var(--accent)' : 'var(--text-tertiary)' }}>{subline}</p>
+      </div>
+      {actions ? actions : comingSoon ? <span className="badge badge-muted shrink-0">Soon</span> : null}
     </div>
   )
 }
