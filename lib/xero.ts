@@ -14,15 +14,17 @@
 
 import { createClient } from '@supabase/supabase-js'
 
-// Xero requires `openid` whenever `offline_access` is requested (to receive a
-// refresh_token). Without it the auth endpoint returns
-// `unauthorized_client / Invalid scope for client`.
+// Xero apps registered after 2 March 2026 can only request the new granular
+// scopes — the old broad `accounting.transactions.read` / `.reports.read`
+// names are rejected with `unauthorized_client / Invalid scope for client`.
+// Identity scopes (openid) are still required when requesting offline_access
+// so we receive a refresh_token in the token response.
 export const XERO_SCOPES = [
   'openid',
   'offline_access',
-  'accounting.reports.read',
-  'accounting.transactions.read',
-  'accounting.settings.read',
+  'accounting.invoices.read',
+  'accounting.reports.profitandloss.read',
+  'accounting.reports.banksummary.read',
 ].join(' ')
 
 const XERO_AUTH_URL = 'https://login.xero.com/identity/connect/authorize'
