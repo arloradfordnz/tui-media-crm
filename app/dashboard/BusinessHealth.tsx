@@ -86,8 +86,20 @@ export default async function BusinessHealth() {
     views_last_30d?: number
     avg_engagement_per_post_last_30d?: number
   }
-  const integrations = (signals.integrations ?? {}) as Record<string, IgIntegration>
+  type XeroIntegration = {
+    connected?: boolean
+    org_name?: string | null
+    revenue_this_month_nzd?: number | null
+    net_profit_this_month_nzd?: number | null
+    outstanding_invoices_nzd?: number
+    outstanding_invoice_count?: number
+    overdue_invoices_nzd?: number
+    overdue_invoice_count?: number
+    bank_balance_nzd?: number | null
+  }
+  const integrations = (signals.integrations ?? {}) as Record<string, IgIntegration & XeroIntegration>
   const ig = integrations.instagram ?? { connected: false }
+  const xero = integrations.xero ?? { connected: false }
   const connectedCount = SOURCES.filter((s) => integrations[s.key]?.connected).length
   const disconnected = SOURCES.filter((s) => !integrations[s.key]?.connected)
 
@@ -137,10 +149,27 @@ export default async function BusinessHealth() {
 
       {/* Signal chips */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-        <SignalChip label="Revenue MTD" value={nzd(signals.revenue_this_month_nzd as number)} />
+        <SignalChip
+          label="Revenue MTD"
+          value={nzd(xero.connected ? xero.revenue_this_month_nzd ?? null : (signals.revenue_this_month_nzd as number))}
+        />
         <SignalChip label="Pipeline value" value={nzd(signals.pipeline_value_nzd as number)} />
         <SignalChip label="Active jobs" value={String((signals.active_jobs as number) ?? '—')} />
         <SignalChip label="Leads" value={String((signals.leads_in_pipeline as number) ?? '—')} />
+        {xero.connected && (
+          <>
+            <SignalChip label="Net profit MTD" value={nzd(xero.net_profit_this_month_nzd ?? null)} />
+            <SignalChip label="Bank balance" value={nzd(xero.bank_balance_nzd ?? null)} />
+            <SignalChip
+              label="Outstanding"
+              value={nzd(xero.outstanding_invoices_nzd ?? 0)}
+            />
+            <SignalChip
+              label="Overdue"
+              value={nzd(xero.overdue_invoices_nzd ?? 0)}
+            />
+          </>
+        )}
         {ig.connected && (
           <>
             <SignalChip label="IG posts (30d)" value={String(ig.posts_last_30d ?? 0)} />

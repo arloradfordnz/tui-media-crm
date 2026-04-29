@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
+import { fetchXeroSummary } from '@/lib/xero'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -84,6 +85,15 @@ export async function GET(req: NextRequest) {
     .reduce((s, j) => s + ((j as { quote_value?: number }).quote_value || 0), 0)
   const activeJobs = (pipelineJobs ?? []).filter((j) => !['delivered', 'archived'].includes(j.status)).length
 
+  // Xero pull runs in parallel with the rest of signal aggregation. Failures
+  // are tolerated so the report still generates if Xero is unreachable.
+  let xeroSummary: Awaited<ReturnType<typeof fetchXeroSummary>> = null
+  try {
+    xeroSummary = await fetchXeroSummary()
+  } catch (e) {
+    console.error('[business-health] Xero fetch failed:', (e as Error).message)
+  }
+
   const igConnected = (igAccounts ?? []).length > 0
   const sumPosts = (rows: { likes?: number | null; comments?: number | null; views?: number | null }[]) => {
     return rows.reduce(
@@ -114,7 +124,19 @@ export async function GET(req: NextRequest) {
     new_clients_this_month: newClientsMonth ?? 0,
     activity_events_last_30d: (recentActivity ?? []).length,
     integrations: {
-      xero: { connected: false },
+      xero: xeroSummary
+        ? {
+            connected: true,
+            org_name: xeroSummary.org_name,
+            revenue_this_month_nzd: xeroSummary.revenue_this_month_nzd,
+            net_profit_this_month_nzd: xeroSummary.net_profit_this_month_nzd,
+            outstanding_invoices_nzd: xeroSummary.outstanding_invoices_nzd,
+            outstanding_invoice_count: xeroSummary.outstanding_invoice_count,
+            overdue_invoices_nzd: xeroSummary.overdue_invoices_nzd,
+            overdue_invoice_count: xeroSummary.overdue_invoice_count,
+            bank_balance_nzd: xeroSummary.bank_balance_nzd,
+          }
+        : { connected: false },
       instagram: igConnected
         ? {
             connected: true,
@@ -149,9 +171,9 @@ Output strict JSON only, no prose outside the JSON. Schema:
 }
 
 Scoring rubric:
-- Revenue trend vs prior months (heavy weight)
+- Financial reality (heavy): when Xero is connected, prefer integrations.xero.revenue_this_month_nzd, net_profit_this_month_nzd and bank_balance_nzd over the CRM revenue figure (which is delivered-job quote totals, not actual receipts). Penalise hard for negative net profit, low bank balance, or large overdue AR.
 - Pipeline volume and value (medium)
-- Operational hygiene: overdue todos, jobs stuck in review (medium — penalise)
+- Operational hygiene: overdue todos, jobs stuck in review, overdue invoices (medium — penalise)
 - Lead flow + new clients (light)
 - Instagram engagement trend if connected — compare avg_engagement_per_post_last_30d to avg_engagement_per_post_30_60d_ago and posting cadence (light, but call out a clear up/down trend)
 
