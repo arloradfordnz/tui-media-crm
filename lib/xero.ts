@@ -14,7 +14,11 @@
 
 import { createClient } from '@supabase/supabase-js'
 
+// Xero requires `openid` whenever `offline_access` is requested (to receive a
+// refresh_token). Without it the auth endpoint returns
+// `unauthorized_client / Invalid scope for client`.
 export const XERO_SCOPES = [
+  'openid',
   'offline_access',
   'accounting.reports.read',
   'accounting.transactions.read',
