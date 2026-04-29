@@ -78,7 +78,16 @@ export default async function BusinessHealth() {
 
   const report = (data ?? null) as Report | null
   const signals = (report?.signals ?? {}) as Record<string, number | Record<string, { connected?: boolean }>>
-  const integrations = (signals.integrations ?? {}) as Record<string, { connected?: boolean }>
+  type IgIntegration = {
+    connected?: boolean
+    posts_last_30d?: number
+    likes_last_30d?: number
+    comments_last_30d?: number
+    views_last_30d?: number
+    avg_engagement_per_post_last_30d?: number
+  }
+  const integrations = (signals.integrations ?? {}) as Record<string, IgIntegration>
+  const ig = integrations.instagram ?? { connected: false }
   const connectedCount = SOURCES.filter((s) => integrations[s.key]?.connected).length
   const disconnected = SOURCES.filter((s) => !integrations[s.key]?.connected)
 
@@ -132,6 +141,14 @@ export default async function BusinessHealth() {
         <SignalChip label="Pipeline value" value={nzd(signals.pipeline_value_nzd as number)} />
         <SignalChip label="Active jobs" value={String((signals.active_jobs as number) ?? '—')} />
         <SignalChip label="Leads" value={String((signals.leads_in_pipeline as number) ?? '—')} />
+        {ig.connected && (
+          <>
+            <SignalChip label="IG posts (30d)" value={String(ig.posts_last_30d ?? 0)} />
+            <SignalChip label="IG likes (30d)" value={String(ig.likes_last_30d ?? 0)} />
+            <SignalChip label="IG comments (30d)" value={String(ig.comments_last_30d ?? 0)} />
+            <SignalChip label="Avg engagement" value={String(ig.avg_engagement_per_post_last_30d ?? 0)} />
+          </>
+        )}
       </div>
 
       {/* Integration status strip */}

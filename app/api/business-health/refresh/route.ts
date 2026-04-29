@@ -49,6 +49,8 @@ export async function GET(req: NextRequest) {
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000).toISOString()
   const ninetyDaysAgo = new Date(now.getTime() - 90 * 86400000).toISOString()
 
+  const sixtyDaysAgo = new Date(now.getTime() - 60 * 86400000).toISOString()
+
   const [
     { data: deliveredMonth },
     { data: deliveredPrev },
@@ -58,6 +60,9 @@ export async function GET(req: NextRequest) {
     { count: overdueTodos },
     { count: newClientsMonth },
     { data: recentActivity },
+    { data: igAccounts },
+    { data: igPostsRecent },
+    { data: igPostsPrior },
   ] = await Promise.all([
     supabase.from('jobs').select('quote_value, updated_at').eq('status', 'delivered').gte('updated_at', startOfMonth),
     supabase.from('jobs').select('quote_value, updated_at').eq('status', 'delivered').gte('updated_at', ninetyDaysAgo).lt('updated_at', startOfMonth),
@@ -67,6 +72,9 @@ export async function GET(req: NextRequest) {
     supabase.from('todos').select('*', { count: 'exact', head: true }).eq('completed', false).not('due_date', 'is', null).lt('due_date', todayISO),
     supabase.from('clients').select('*', { count: 'exact', head: true }).gte('created_at', startOfMonth),
     supabase.from('activities').select('action, created_at').gte('created_at', thirtyDaysAgo),
+    supabase.from('connected_accounts').select('id, account_name, connected_at, meta').eq('platform', 'instagram'),
+    supabase.from('social_links').select('likes, comments, views, published_at').eq('platform', 'instagram').gte('published_at', thirtyDaysAgo),
+    supabase.from('social_links').select('likes, comments, views, published_at').eq('platform', 'instagram').gte('published_at', sixtyDaysAgo).lt('published_at', thirtyDaysAgo),
   ])
 
   const revenueMonth = (deliveredMonth ?? []).reduce((s, j) => s + (j.quote_value || 0), 0)
@@ -75,6 +83,24 @@ export async function GET(req: NextRequest) {
     .filter((j) => !['delivered', 'archived'].includes(j.status))
     .reduce((s, j) => s + ((j as { quote_value?: number }).quote_value || 0), 0)
   const activeJobs = (pipelineJobs ?? []).filter((j) => !['delivered', 'archived'].includes(j.status)).length
+
+  const igConnected = (igAccounts ?? []).length > 0
+  const sumPosts = (rows: { likes?: number | null; comments?: number | null; views?: number | null }[]) => {
+    return rows.reduce(
+      (acc, r) => {
+        acc.likes += r.likes ?? 0
+        acc.comments += r.comments ?? 0
+        acc.views += r.views ?? 0
+        acc.count += 1
+        return acc
+      },
+      { likes: 0, comments: 0, views: 0, count: 0 },
+    )
+  }
+  const igRecent = sumPosts(igPostsRecent ?? [])
+  const igPrior = sumPosts(igPostsPrior ?? [])
+  const igAvgEngagement = igRecent.count ? Math.round((igRecent.likes + igRecent.comments) / igRecent.count) : 0
+  const igPriorAvgEngagement = igPrior.count ? Math.round((igPrior.likes + igPrior.comments) / igPrior.count) : 0
 
   const signals = {
     date: todayISO,
@@ -89,7 +115,19 @@ export async function GET(req: NextRequest) {
     activity_events_last_30d: (recentActivity ?? []).length,
     integrations: {
       xero: { connected: false },
-      instagram: { connected: false },
+      instagram: igConnected
+        ? {
+            connected: true,
+            account_name: igAccounts![0].account_name,
+            posts_last_30d: igRecent.count,
+            posts_30_60d_ago: igPrior.count,
+            likes_last_30d: igRecent.likes,
+            comments_last_30d: igRecent.comments,
+            views_last_30d: igRecent.views,
+            avg_engagement_per_post_last_30d: igAvgEngagement,
+            avg_engagement_per_post_30_60d_ago: igPriorAvgEngagement,
+          }
+        : { connected: false },
       facebook: { connected: false },
       google_reviews: { connected: false },
     },
@@ -115,6 +153,7 @@ Scoring rubric:
 - Pipeline volume and value (medium)
 - Operational hygiene: overdue todos, jobs stuck in review (medium — penalise)
 - Lead flow + new clients (light)
+- Instagram engagement trend if connected — compare avg_engagement_per_post_last_30d to avg_engagement_per_post_30_60d_ago and posting cadence (light, but call out a clear up/down trend)
 
 Note any disconnected integrations briefly so the user sees what they're missing — but don't dwell.
 Avoid hedging language. Be specific with numbers. No emojis. No markdown. JSON only.`,
