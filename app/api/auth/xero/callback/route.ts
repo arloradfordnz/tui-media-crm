@@ -23,8 +23,11 @@ export async function GET(req: NextRequest) {
   if (!code || !state) return errorRedirect(req, 'missing_code_or_state')
 
   const cookieState = req.cookies.get('xero_oauth_state')?.value
-  if (!cookieState || cookieState !== state) {
-    return errorRedirect(req, 'state_mismatch')
+  if (!cookieState) {
+    return errorRedirect(req, 'state_cookie_missing — your browser did not return the CSRF cookie. Try again in a fresh tab; if it persists, check 3rd-party cookie settings.')
+  }
+  if (cookieState !== state) {
+    return errorRedirect(req, 'state_value_mismatch')
   }
 
   let tokens
