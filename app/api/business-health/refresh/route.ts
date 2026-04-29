@@ -95,8 +95,9 @@ export async function GET(req: NextRequest) {
   }
 
   const igConnected = (igAccounts ?? []).length > 0
-  const sumPosts = (rows: { likes?: number | null; comments?: number | null; views?: number | null }[]) => {
-    return rows.reduce(
+  type PostAggregate = { likes: number; comments: number; views: number; count: number }
+  const sumPosts = (rows: { likes?: number | null; comments?: number | null; views?: number | null }[]): PostAggregate => {
+    return rows.reduce<PostAggregate>(
       (acc, r) => {
         acc.likes += r.likes ?? 0
         acc.comments += r.comments ?? 0
