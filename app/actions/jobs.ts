@@ -11,6 +11,8 @@ export async function createJob(prevState: { error?: string } | undefined, formD
   const shootDate = formData.get('shootDate') as string
   const shootLocation = formData.get('shootLocation') as string
   const quoteValue = formData.get('quoteValue') as string
+  const expectedAmount = formData.get('expectedAmount') as string
+  const expectedPaymentDate = formData.get('expectedPaymentDate') as string
   const tasksJson = formData.get('tasks') as string
   const deliverablesJson = formData.get('deliverables') as string
 
@@ -25,6 +27,8 @@ export async function createJob(prevState: { error?: string } | undefined, formD
     shoot_date: shootDate ? new Date(shootDate).toISOString() : null,
     shoot_location: shootLocation || null,
     quote_value: quoteValue ? parseFloat(quoteValue) : null,
+    expected_amount: expectedAmount ? parseFloat(expectedAmount) : null,
+    expected_payment_date: expectedPaymentDate || null,
   }).select('id').single()
 
   if (error || !job) return { error: error?.message || 'Failed to create job.' }
@@ -88,6 +92,8 @@ export async function updateJob(prevState: { error?: string } | undefined, formD
   const shootDate = formData.get('shootDate') as string
   const shootLocation = formData.get('shootLocation') as string
   const quoteValue = formData.get('quoteValue') as string
+  const expectedAmount = formData.get('expectedAmount') as string
+  const expectedPaymentDate = formData.get('expectedPaymentDate') as string
   const estimatedHours = formData.get('estimatedHours') as string
   const notes = formData.get('notes') as string
   const status = formData.get('status') as string
@@ -105,6 +111,8 @@ export async function updateJob(prevState: { error?: string } | undefined, formD
     shoot_date: shootDate ? new Date(shootDate).toISOString() : null,
     shoot_location: shootLocation || null,
     quote_value: quoteValue ? parseFloat(quoteValue) : null,
+    expected_amount: expectedAmount ? parseFloat(expectedAmount) : null,
+    expected_payment_date: expectedPaymentDate || null,
     estimated_hours: estimatedHours ? parseFloat(estimatedHours) : 0,
     notes: notes || null,
     ...(status ? { status } : {}),

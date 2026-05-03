@@ -31,7 +31,7 @@ export async function createProposal(jobId: string) {
     cover_note: `Dear ${client.name},\n\nThank you for choosing Tui Media. We're excited to work with you on this project. Please find our proposal below.`,
     services,
     total_value: job.quote_value || 0,
-    inclusions: 'Full videography coverage as outlined\nProfessional colour grading\nLicensed music\nTwo rounds of revisions\nFinal delivery via secure client portal',
+    inclusions: 'Full coverage as outlined\nProfessional editing &amp; colour grading\nLicensed music where applicable\nTwo rounds of revisions\nFinal delivery via secure client portal',
   }).select('id').single()
 
   if (error || !proposal) return { error: error?.message || 'Failed to create proposal.' }

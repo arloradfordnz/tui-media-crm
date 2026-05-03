@@ -18,7 +18,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   ] = await Promise.all([
     supabase
       .from('jobs')
-      .select('id, name, job_type, status, shoot_date, shoot_location, quote_value, revision_limit, revisions_used, hourly_rate, estimated_hours, notes, client_id, clients(id, name)')
+      .select('id, name, job_type, status, shoot_date, shoot_location, quote_value, expected_amount, expected_payment_date, revision_limit, revisions_used, hourly_rate, estimated_hours, notes, client_id, clients(id, name)')
       .eq('id', id)
       .single(),
     supabase.from('job_tasks').select('id, phase, title, completed').eq('job_id', id).order('sort_order', { ascending: true }),
@@ -37,7 +37,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
       .select('id, name, job_type, status, shoot_date, shoot_location, quote_value, revision_limit, revisions_used, notes, client_id, clients(id, name)')
       .eq('id', id)
       .single()
-    job = res.data ? { ...res.data, hourly_rate: 0, estimated_hours: 0 } : null
+    job = res.data ? { ...res.data, hourly_rate: 0, estimated_hours: 0, expected_amount: null, expected_payment_date: null } : null
   }
 
   if (!job) notFound()
@@ -53,6 +53,8 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     shootDate: job.shoot_date,
     shootLocation: job.shoot_location,
     quoteValue: job.quote_value,
+    expectedAmount: job.expected_amount as number | null,
+    expectedPaymentDate: (job.expected_payment_date as string | null) ?? null,
     revisionLimit: job.revision_limit,
     revisionsUsed: job.revisions_used,
     hourlyRate: Number(job.hourly_rate ?? 0),

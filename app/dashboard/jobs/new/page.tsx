@@ -33,6 +33,8 @@ export default function NewJobPage() {
   const [shootDate, setShootDate] = useState('')
   const [shootLocation, setShootLocation] = useState('')
   const [quoteValue, setQuoteValue] = useState('')
+  const [expectedAmount, setExpectedAmount] = useState('')
+  const [expectedPaymentDate, setExpectedPaymentDate] = useState('')
   const [tasks, setTasks] = useState<TemplateTask[]>([])
   const [deliverables, setDeliverables] = useState<TemplateDeliverable[]>([])
 
@@ -99,7 +101,7 @@ export default function NewJobPage() {
           </div>
           <div>
             <label className="field-label">Job Name *</label>
-            <input value={jobName} onChange={(e) => setJobName(e.target.value)} className="field-input" placeholder="e.g. Smith Wedding — Highlight Film" />
+            <input value={jobName} onChange={(e) => setJobName(e.target.value)} className="field-input" placeholder="e.g. Smith Wedding — Highlight" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -114,6 +116,16 @@ export default function NewJobPage() {
           <div>
             <label className="field-label">Shoot Location</label>
             <input value={shootLocation} onChange={(e) => setShootLocation(e.target.value)} className="field-input" placeholder="Venue, City" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="field-label">Expected Payment (NZD)</label>
+              <input type="number" step="0.01" value={expectedAmount} onChange={(e) => setExpectedAmount(e.target.value)} className="field-input" placeholder="Defaults to quote" />
+            </div>
+            <div>
+              <label className="field-label">Expected Payment Date</label>
+              <DatePicker value={expectedPaymentDate} onChange={setExpectedPaymentDate} className="field-input" />
+            </div>
           </div>
         </div>
       )}
@@ -192,6 +204,8 @@ export default function NewJobPage() {
           <input type="hidden" name="shootDate" value={shootDate} />
           <input type="hidden" name="shootLocation" value={shootLocation} />
           <input type="hidden" name="quoteValue" value={quoteValue} />
+          <input type="hidden" name="expectedAmount" value={expectedAmount} />
+          <input type="hidden" name="expectedPaymentDate" value={expectedPaymentDate} />
           <input type="hidden" name="tasks" value={JSON.stringify(tasks)} />
           <input type="hidden" name="deliverables" value={JSON.stringify(deliverables)} />
 

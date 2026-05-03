@@ -85,13 +85,12 @@ export async function GET(req: NextRequest) {
     .reduce((s, j) => s + ((j as { quote_value?: number }).quote_value || 0), 0)
   const activeJobs = (pipelineJobs ?? []).filter((j) => !['delivered', 'archived'].includes(j.status)).length
 
-  // Xero pull runs in parallel with the rest of signal aggregation. Failures
-  // are tolerated so the report still generates if Xero is unreachable.
+  // Xero pull. Failures are tolerated so the report still generates.
   let xeroSummary: Awaited<ReturnType<typeof fetchXeroSummary>> = null
   try {
     xeroSummary = await fetchXeroSummary()
-  } catch (e) {
-    console.error('[business-health] Xero fetch failed:', (e as Error).message)
+  } catch (err) {
+    console.error('[business-health] Xero fetch failed:', err instanceof Error ? err.message : err)
   }
 
   const igConnected = (igAccounts ?? []).length > 0
@@ -151,8 +150,6 @@ export async function GET(req: NextRequest) {
             avg_engagement_per_post_30_60d_ago: igPriorAvgEngagement,
           }
         : { connected: false },
-      facebook: { connected: false },
-      google_reviews: { connected: false },
     },
   }
 
@@ -161,7 +158,7 @@ export async function GET(req: NextRequest) {
   const message = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 600,
-    system: `You are a business health analyst for Tui Media (videography/photography, Nelson NZ — sole operator Arlo Radford).
+    system: `You are a business health analyst for Tui Media (videography, photography and marketing, Nelson NZ — sole operator Arlo Radford).
 Your job: read the daily snapshot and produce a tight, honest assessment.
 
 Output strict JSON only, no prose outside the JSON. Schema:

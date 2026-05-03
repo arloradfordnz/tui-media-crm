@@ -42,7 +42,7 @@ export default async function DashboardPage() {
     supabase.from('jobs').select('status, quote_value'),
     supabase.from('events').select('id, title, start_time, end_time, job_id, jobs(id, name)').eq('event_type', 'shoot').gte('date', todayStart).lt('date', todayEnd).order('start_time', { ascending: true }),
     supabase.from('events').select('id, title, event_type, date, start_time, job_id, jobs(id, name)').gte('date', todayStart).order('date', { ascending: true }).limit(5),
-    supabase.from('activities').select('id, action, details, created_at, job_id, jobs(id, name), client_id, clients(id, name)').order('created_at', { ascending: false }).limit(10),
+    supabase.from('activities').select('id, action, details, created_at, job_id, jobs(id, name), client_id, clients(id, name)').order('created_at', { ascending: false }).limit(5),
   ])
 
   const revenueThisMonth = (deliveredThisMonth ?? []).reduce((sum, j) => sum + (j.quote_value || 0), 0)
@@ -80,77 +80,77 @@ export default async function DashboardPage() {
         <StatCard icon={TrendingUp} value={formatNZD(pipelineValue)} label="Pipeline Value" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          {/* To Do List */}
-          <TodoWidget />
+      {/* To Do List */}
+      <TodoWidget />
 
-          {/* Today's Shoots */}
-          <div className="card">
-            <div className="flex items-center gap-2 mb-4">
-              <Camera className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-              <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Today&apos;s Shoots</h2>
-            </div>
-            {(todayShoots ?? []).length === 0 ? (
-              <p className="text-sm py-4" style={{ color: 'var(--text-tertiary)' }}>No shoots scheduled for today.</p>
-            ) : (
-              <div className="space-y-3">
-                {(todayShoots ?? []).map((e) => {
-                  const job = e.jobs as unknown as { id: string; name: string } | null
-                  return (
-                    <div key={e.id} className="flex items-center gap-3 py-2" style={{ background: 'var(--bg-elevated)', borderRadius: '8px', padding: '8px 12px', marginBottom: '4px' }}>
-                      <div className="w-2 h-2 rounded-full" style={{ background: 'var(--success)' }} />
-                      <div className="flex-1">
-                        <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{e.title}</span>
-                        {job && (
-                          <Link href={`/dashboard/jobs/${job.id}`} className="text-xs ml-2 link-subtle">{job.name}</Link>
-                        )}
-                      </div>
-                      {e.start_time && (
-                        <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          {e.start_time}{e.end_time ? ` – ${e.end_time}` : ''}
-                        </span>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Upcoming Schedule */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <CalendarDays className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-                <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Upcoming</h2>
-              </div>
-              <Link href="/dashboard/calendar" className="text-xs" style={{ color: 'var(--accent)' }}>View Calendar &rarr;</Link>
-            </div>
-            {(upcomingEvents ?? []).length === 0 ? (
-              <p className="text-sm py-4" style={{ color: 'var(--text-tertiary)' }}>No upcoming events.</p>
-            ) : (
-              <div className="space-y-3">
-                {(upcomingEvents ?? []).map((e) => (
-                  <div key={e.id} className="flex items-center gap-3 py-2" style={{ background: 'var(--bg-elevated)', borderRadius: '8px', padding: '8px 12px', marginBottom: '4px' }}>
-                    <span className={`badge ${statusBadgeClass(e.event_type)}`}>{statusLabel(e.event_type)}</span>
-                    <span className="text-sm font-medium flex-1" style={{ color: 'var(--text-primary)' }}>{e.title}</span>
-                    <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{formatDate(e.date)}</span>
-                    {e.start_time && (
-                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{e.start_time}</span>
+      {/* Today's Shoots */}
+      <div className="card">
+        <div className="flex items-center gap-2 mb-4">
+          <Camera className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+          <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Today&apos;s Shoots</h2>
+        </div>
+        {(todayShoots ?? []).length === 0 ? (
+          <p className="text-sm py-4" style={{ color: 'var(--text-tertiary)' }}>No shoots scheduled for today.</p>
+        ) : (
+          <div className="space-y-3">
+            {(todayShoots ?? []).map((e) => {
+              const job = e.jobs as unknown as { id: string; name: string } | null
+              return (
+                <div key={e.id} className="flex items-center gap-3 py-2" style={{ background: 'var(--bg-elevated)', borderRadius: '8px', padding: '8px 12px', marginBottom: '4px' }}>
+                  <div className="w-2 h-2 rounded-full" style={{ background: 'var(--success)' }} />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{e.title}</span>
+                    {job && (
+                      <Link href={`/dashboard/jobs/${job.id}`} className="text-xs ml-2 link-subtle">{job.name}</Link>
                     )}
                   </div>
-                ))}
-              </div>
-            )}
+                  {e.start_time && (
+                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                      {e.start_time}{e.end_time ? ` – ${e.end_time}` : ''}
+                    </span>
+                  )}
+                </div>
+              )
+            })}
           </div>
+        )}
+      </div>
+
+      {/* Upcoming + Recent Activity — paired so the cards stay equal height */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="card">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+              <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Upcoming</h2>
+            </div>
+            <Link href="/dashboard/calendar" className="text-xs" style={{ color: 'var(--accent)' }}>View Calendar &rarr;</Link>
+          </div>
+          {(upcomingEvents ?? []).length === 0 ? (
+            <p className="text-sm py-4" style={{ color: 'var(--text-tertiary)' }}>No upcoming events.</p>
+          ) : (
+            <div className="space-y-3">
+              {(upcomingEvents ?? []).map((e) => (
+                <div key={e.id} className="flex items-center gap-3 py-2" style={{ background: 'var(--bg-elevated)', borderRadius: '8px', padding: '8px 12px', marginBottom: '4px' }}>
+                  <span className={`badge ${statusBadgeClass(e.event_type)}`}>{statusLabel(e.event_type)}</span>
+                  <span className="text-sm font-medium flex-1" style={{ color: 'var(--text-primary)' }}>{e.title}</span>
+                  <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{formatDate(e.date)}</span>
+                  {e.start_time && (
+                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{e.start_time}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Recent Activity */}
         <div className="card">
-          <div className="flex items-center gap-2 mb-4">
-            <Activity className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-            <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Recent Activity</h2>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+              <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Recent Activity</h2>
+            </div>
+            <Link href="/dashboard/activity" className="text-xs" style={{ color: 'var(--accent)' }}>View All &rarr;</Link>
           </div>
           {(recentActivity ?? []).length === 0 ? (
             <p className="text-sm py-4" style={{ color: 'var(--text-tertiary)' }}>No activity yet.</p>

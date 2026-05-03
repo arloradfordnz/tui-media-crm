@@ -15,8 +15,6 @@ type Report = {
 const SOURCES = [
   { key: 'xero', label: 'Xero', href: '/dashboard/finance' },
   { key: 'instagram', label: 'Instagram', href: '/dashboard/settings#integrations' },
-  { key: 'facebook', label: 'Facebook', href: '/dashboard/settings#integrations' },
-  { key: 'google_reviews', label: 'Google Reviews', href: '/dashboard/settings#integrations' },
 ] as const
 
 function HealthScoreRing({ score }: { score: number | null }) {
@@ -78,27 +76,16 @@ export default async function BusinessHealth() {
 
   const report = (data ?? null) as Report | null
   const signals = (report?.signals ?? {}) as Record<string, number | Record<string, { connected?: boolean }>>
-  type IgIntegration = {
-    connected?: boolean
-    posts_last_30d?: number
-    likes_last_30d?: number
-    comments_last_30d?: number
-    views_last_30d?: number
-    avg_engagement_per_post_last_30d?: number
-  }
   type XeroIntegration = {
     connected?: boolean
     org_name?: string | null
     revenue_this_month_nzd?: number | null
     net_profit_this_month_nzd?: number | null
     outstanding_invoices_nzd?: number
-    outstanding_invoice_count?: number
     overdue_invoices_nzd?: number
-    overdue_invoice_count?: number
     bank_balance_nzd?: number | null
   }
-  const integrations = (signals.integrations ?? {}) as Record<string, IgIntegration & XeroIntegration>
-  const ig = integrations.instagram ?? { connected: false }
+  const integrations = (signals.integrations ?? {}) as Record<string, XeroIntegration>
   const xero = integrations.xero ?? { connected: false }
   const connectedCount = SOURCES.filter((s) => integrations[s.key]?.connected).length
   const disconnected = SOURCES.filter((s) => !integrations[s.key]?.connected)
@@ -147,7 +134,8 @@ export default async function BusinessHealth() {
         </div>
       </div>
 
-      {/* Signal chips */}
+      {/* Signal chips — only the headline numbers. Detailed breakdowns
+          (engagement, comments, total reviews, etc.) live on dedicated pages. */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
         <SignalChip
           label="Revenue MTD"
@@ -160,22 +148,7 @@ export default async function BusinessHealth() {
           <>
             <SignalChip label="Net profit MTD" value={nzd(xero.net_profit_this_month_nzd ?? null)} />
             <SignalChip label="Bank balance" value={nzd(xero.bank_balance_nzd ?? null)} />
-            <SignalChip
-              label="Outstanding"
-              value={nzd(xero.outstanding_invoices_nzd ?? 0)}
-            />
-            <SignalChip
-              label="Overdue"
-              value={nzd(xero.overdue_invoices_nzd ?? 0)}
-            />
-          </>
-        )}
-        {ig.connected && (
-          <>
-            <SignalChip label="IG posts (30d)" value={String(ig.posts_last_30d ?? 0)} />
-            <SignalChip label="IG likes (30d)" value={String(ig.likes_last_30d ?? 0)} />
-            <SignalChip label="IG comments (30d)" value={String(ig.comments_last_30d ?? 0)} />
-            <SignalChip label="Avg engagement" value={String(ig.avg_engagement_per_post_last_30d ?? 0)} />
+            <SignalChip label="Overdue" value={nzd(xero.overdue_invoices_nzd ?? 0)} />
           </>
         )}
       </div>

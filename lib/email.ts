@@ -163,8 +163,8 @@ const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }> = {
     body: '{{clientName}} has accepted the proposal for {{jobName}}.\n\nThe job has been moved to Booked status.',
   },
   delivery: {
-    subject: 'Your video is ready for review — {{jobName}}',
-    body: 'Your video for {{jobName}} is ready for review. Use the link below to watch it and share your feedback.',
+    subject: 'Your project is ready for review — {{jobName}}',
+    body: 'Your project for {{jobName}} is ready for review. Use the link below to take a look and share your feedback.',
   },
   revision: {
     subject: 'Revision request received — {{jobName}}',
@@ -234,7 +234,7 @@ export async function sendPortalDeliveryEmail(to: string, clientName: string, jo
       ${buildGreeting(clientName)}
       ${bodyToHtml(bodyText)}
       <div style="text-align:left;margin:28px 0;">
-        <a href="${portalUrl}" style="display:inline-block;background:#7790ed;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:400;font-size:13px;">View Your Video</a>
+        <a href="${portalUrl}" style="display:inline-block;background:#7790ed;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:400;font-size:13px;">View Your Project</a>
       </div>
       <p style="color:#555;font-size:13px;margin:0;">If the button doesn't work, copy this link: <a href="${portalUrl}" style="color:#7790ed;text-decoration:none;">${portalUrl}</a></p>
     `),
@@ -325,6 +325,8 @@ type BriefingEvent = { title: string; startTime: string | null; jobName: string 
 type BriefingUpcoming = { title: string; date: string; jobName: string | null }
 type BriefingJob = { name: string; clientName: string | null }
 
+type BriefingPayment = { name: string; clientName: string | null; amount: number; dueDate: string }
+
 export type MorningBriefingData = {
   date: Date
   weather: { temp: number; description: string; windKph: number } | null
@@ -334,6 +336,16 @@ export type MorningBriefingData = {
   upcomingEvents: BriefingUpcoming[]
   reviewJobs: BriefingJob[]
   weekJobCount: number
+  income?: {
+    expectedThisWeek: number
+    expectedThisMonth: number
+    upcomingPayments: BriefingPayment[]
+  }
+  aiSummary?: string | null
+}
+
+function fmtNZD(n: number) {
+  return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 }).format(n)
 }
 
 function fmtShortDate(d: string) {
@@ -350,7 +362,7 @@ function section(label: string, content: string) {
 }
 
 export async function sendMorningBriefingEmail(data: MorningBriefingData) {
-  const { date, weather, todos, overdueCount, todayEvents, upcomingEvents, reviewJobs, weekJobCount } = data
+  const { date, weather, todos, overdueCount, todayEvents, upcomingEvents, reviewJobs, weekJobCount, income, aiSummary } = data
 
   const dayLabel = date.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   const shortDay = date.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })
@@ -389,11 +401,28 @@ export async function sendMorningBriefingEmail(data: MorningBriefingData) {
         return `<p style="color:#a3a3a3;font-size:15px;line-height:1.6;margin:0 0 10px;"><span style="color:#555;font-size:13px;">${fmtShortDate(e.date)} &mdash;</span> ${e.title}${jobPart}</p>`
       }).join('')
 
-  // Revenue placeholder
-  const revenueContent = `
-    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 8px;">Not connected &mdash; link Xero to track revenue.</p>
-    <p style="color:#555;font-size:13px;margin:0;">Jobs active this week: <span style="color:#f5f5f5;">${weekJobCount}</span></p>
-  `
+  // Income forecast — built from job.expected_amount + job.expected_payment_date.
+  const hasIncome = !!income && (income.expectedThisWeek > 0 || income.expectedThisMonth > 0 || income.upcomingPayments.length > 0)
+  const upcomingPaymentsHtml = income && income.upcomingPayments.length > 0
+    ? income.upcomingPayments.map((p) => {
+        const clientPart = p.clientName ? ` <span style="color:#555;font-size:13px;">&mdash; ${p.clientName}</span>` : ''
+        return `<p style="color:#a3a3a3;font-size:14px;line-height:1.6;margin:0 0 6px;"><span style="color:#555;font-size:13px;">${fmtShortDate(p.dueDate)} &mdash;</span> ${p.name}${clientPart} <span style="color:#f5f5f5;">${fmtNZD(p.amount)}</span></p>`
+      }).join('')
+    : ''
+  const revenueContent = hasIncome && income
+    ? `
+        <p style="color:#f5f5f5;font-size:22px;font-weight:700;margin:0 0 4px;">${fmtNZD(income.expectedThisMonth)} <span style="color:#555;font-size:13px;font-weight:400;">expected this month</span></p>
+        <p style="color:#a3a3a3;font-size:14px;margin:0 0 14px;">${fmtNZD(income.expectedThisWeek)} expected this week &middot; ${weekJobCount} active job${weekJobCount === 1 ? '' : 's'}</p>
+        ${upcomingPaymentsHtml}
+      `
+    : `
+        <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 8px;">Add an expected amount &amp; payment date to your jobs to see your forecast here.</p>
+        <p style="color:#555;font-size:13px;margin:0;">Active jobs this week: <span style="color:#f5f5f5;">${weekJobCount}</span></p>
+      `
+
+  const aiSummaryContent = aiSummary
+    ? `<p style="color:#d4d4d4;font-size:15px;line-height:1.7;margin:0;">${aiSummary.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>')}</p>`
+    : ''
 
   // Review jobs
   const reviewContent = reviewJobs.length === 0
@@ -413,7 +442,8 @@ export async function sendMorningBriefingEmail(data: MorningBriefingData) {
     <h2 style="margin:0 0 4px;font-size:22px;color:#f5f5f5;font-weight:600;">Good morning Arlo,</h2>
     <p style="color:#555;font-size:14px;margin:0;">${dayLabel}</p>
     ${section('Weather', weatherContent)}
-    ${section('Revenue This Week', revenueContent)}
+    ${aiSummaryContent ? section('Focus For Today', aiSummaryContent) : ''}
+    ${section('Income Forecast', revenueContent)}
     ${section(`To Do — ${todoLabel}`, todoContent)}
     ${section("Today's Schedule", todayContent)}
     ${section('Coming Up This Week', upcomingContent)}
@@ -465,6 +495,23 @@ export async function sendAdminRevisionRequestedEmail(clientName: string, jobNam
   await send({ to: ADMIN_INBOX, subject, html, type: 'admin_revision_requested', clientId, jobId })
 }
 
+export async function sendAdminDocumentSignedEmail(clientName: string, docName: string, signature: string, signedAt: string, clientId?: string) {
+  const subject = `Document signed — ${docName}`
+  const safeSignature = signature.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const html = wrap(`
+    <h2 style="margin:0 0 20px;font-size:22px;color:#f5f5f5;font-weight:600;">Kia ora Arlo,</h2>
+    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;"><span style="color:#f5f5f5;font-weight:600;">${clientName}</span> just signed <span style="color:#7790ed;">${docName}</span> on ${signedAt}.</p>
+    <div style="background:#111;border-radius:8px;padding:16px;margin:16px 0;">
+      <p style="color:#a3a3a3;font-size:12px;margin:0 0 6px;text-transform:uppercase;letter-spacing:0.04em;">Signature</p>
+      <p style="color:#f5f5f5;font-size:20px;line-height:1.3;margin:0;font-family:'Patrick Hand',cursive;">${safeSignature}</p>
+    </div>
+    <div style="text-align:left;margin:24px 0;">
+      <a href="https://dashboard.tuimedia.nz/dashboard/documents" style="display:inline-block;background:#7790ed;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:400;font-size:13px;">Open dashboard</a>
+    </div>
+  `)
+  await send({ to: ADMIN_INBOX, subject, html, type: 'admin_document_signed', clientId })
+}
+
 export async function sendDocumentToClientEmail({
   to,
   clientName,
@@ -501,6 +548,28 @@ export async function sendDocumentToClientEmail({
     clientId,
     rethrow: true,
   })
+}
+
+export async function sendDeliveryReminderEmail(
+  to: string,
+  clientName: string,
+  jobName: string,
+  portalUrl: string,
+  daysSinceViewed: number,
+  clientId?: string,
+  jobId?: string,
+) {
+  const subject = `Just checking in — ${jobName}`
+  const html = wrap(`
+    ${buildGreeting(clientName)}
+    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;">Just a friendly nudge — I noticed you took a look at your project for <span style="color:#f5f5f5;">${jobName}</span> ${daysSinceViewed === 1 ? 'a day' : `${daysSinceViewed} days`} ago but haven't had a chance to come back to it yet.</p>
+    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;">No rush at all — whenever you're ready, you can approve it or send through any feedback right from the portal.</p>
+    <div style="text-align:left;margin:28px 0;">
+      <a href="${portalUrl}" style="display:inline-block;background:#7790ed;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:400;font-size:13px;">Open Your Portal</a>
+    </div>
+    <p style="color:#555;font-size:13px;margin:0;">If anything's unclear or you'd rather chat it through, just reply to <a href="mailto:hello@tuimedia.nz" style="color:#7790ed;text-decoration:none;">hello@tuimedia.nz</a>.</p>
+  `)
+  await send({ to, subject, html, type: 'delivery_reminder', clientId, jobId })
 }
 
 export async function sendProposalAcceptedEmail(to: string, clientName: string, jobName: string, clientId?: string, jobId?: string) {

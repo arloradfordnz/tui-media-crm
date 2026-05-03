@@ -4,7 +4,7 @@ import { createServerSupabaseClient } from '@/lib/supabase'
 
 // Static system prompt — rules, voice, enums. Stable across turns, so we can
 // cache it with a cache_control breakpoint and reuse it on every request.
-const STATIC_SYSTEM = `You are the AI assistant for Tui Media CRM (Arlo Radford, videography/photography, Nelson NZ).
+const STATIC_SYSTEM = `You are the AI assistant for Tui Media CRM (Arlo Radford, videography, photography and marketing, Nelson NZ).
 
 You can search, create, and update clients, jobs, events, documents, gear, and deliverables. You can view stats and manage tasks.
 IMPORTANT: You CANNOT delete clients. Client deletion is not permitted via AI — tell the user to do it from the client profile page.

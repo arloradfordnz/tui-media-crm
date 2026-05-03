@@ -24,6 +24,8 @@ type JobData = {
   shootDate: string | null
   shootLocation: string | null
   quoteValue: number | null
+  expectedAmount: number | null
+  expectedPaymentDate: string | null
   revisionLimit: number
   revisionsUsed: number
   hourlyRate: number
@@ -310,6 +312,14 @@ export default function JobRecord({ job }: { job: JobData }) {
           <div>
             <label className="field-label">Quote Value (NZD)</label>
             <input name="quoteValue" type="number" step="0.01" defaultValue={job.quoteValue || ''} className="field-input" />
+          </div>
+          <div>
+            <label className="field-label">Expected Payment (NZD)</label>
+            <input name="expectedAmount" type="number" step="0.01" defaultValue={job.expectedAmount ?? ''} className="field-input" placeholder="Defaults to quote" />
+          </div>
+          <div>
+            <label className="field-label">Expected Payment Date</label>
+            <DatePicker name="expectedPaymentDate" defaultValue={job.expectedPaymentDate ?? ''} className="field-input" />
           </div>
           <div>
             <label className="field-label">Estimated Hours</label>

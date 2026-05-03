@@ -6,7 +6,7 @@ const DRAFT_END = '===DRAFT END==='
 
 function systemPrompt(template: string, ctx: { clientName?: string; businessName?: string }): string {
   const today = new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
-  return `You are helping Arlo Radford at Tui Media (Nelson NZ videography/photography) draft the body of a ${template}.
+  return `You are helping Arlo Radford at Tui Media (Nelson NZ videography, photography and marketing) draft the body of a ${template}.
 
 Today is ${today}.${ctx.clientName ? ` The client is ${ctx.clientName}.` : ''} The business is ${ctx.businessName || 'Tui Media'}.
 
