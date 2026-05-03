@@ -1,22 +1,21 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@/lib/format'
-import { Briefcase, Clock, DollarSign, Users, CalendarDays, Activity, Plus, UserPlus, Camera, CheckSquare, TrendingUp } from 'lucide-react'
+import { Briefcase, Clock, DollarSign, Users, CalendarDays, Activity, Plus, UserPlus, Camera, TrendingUp, ArrowRight } from 'lucide-react'
 import TodoWidget from './TodoWidget'
 import BusinessHealth from './BusinessHealth'
 import Link from 'next/link'
 
-const JOB_PIPELINE = ['enquiry', 'booked', 'preproduction', 'shootday', 'editing', 'review', 'approved', 'delivered', 'archived']
-const PIPELINE_COLORS: Record<string, string> = {
-  enquiry: 'var(--accent)',
-  booked: 'var(--accent-hover)',
-  preproduction: 'var(--warning)',
-  shootday: '#f59e0b',
-  editing: 'var(--warning)',
-  review: '#fb923c',
-  approved: 'var(--success)',
-  delivered: '#22c55e',
-  archived: 'var(--text-tertiary)',
-}
+// Pipeline shown on the dashboard collapses 9 internal statuses into the 6
+// stages that map to actual workflow steps. `archived` is omitted — those jobs
+// are no longer "in flight". The status->stage map drives the per-stage counts.
+const PIPELINE_STAGES = [
+  { key: 'enquiry',    label: 'Enquiry',     statuses: ['enquiry'],                              color: 'var(--accent)' },
+  { key: 'booked',     label: 'Booked',      statuses: ['booked'],                               color: 'var(--accent-hover)' },
+  { key: 'production', label: 'In Production', statuses: ['preproduction', 'shootday', 'editing'], color: 'var(--warning)' },
+  { key: 'review',     label: 'Client Review', statuses: ['review'],                             color: '#fb923c' },
+  { key: 'approved',   label: 'Approved',    statuses: ['approved'],                             color: 'var(--success)' },
+  { key: 'delivered',  label: 'Delivered',   statuses: ['delivered'],                            color: '#22c55e' },
+] as const
 
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient()
@@ -50,12 +49,14 @@ export default async function DashboardPage() {
     .filter((j) => !['delivered', 'archived'].includes(j.status))
     .reduce((sum, j) => sum + ((j as { status: string; quote_value?: number }).quote_value || 0), 0)
 
-  const pipelineCounts: Record<string, number> = {}
-  for (const s of JOB_PIPELINE) pipelineCounts[s] = 0
+  // Count jobs per dashboard stage (collapsing the 9 raw statuses into 6).
+  const stageCounts: Record<string, number> = {}
+  for (const stage of PIPELINE_STAGES) stageCounts[stage.key] = 0
   for (const j of pipelineJobs ?? []) {
-    if (pipelineCounts[j.status] !== undefined) pipelineCounts[j.status]++
+    const stage = PIPELINE_STAGES.find((s) => (s.statuses as readonly string[]).includes(j.status))
+    if (stage) stageCounts[stage.key]++
   }
-  const totalJobs = (pipelineJobs ?? []).length || 1
+  const inFlightJobs = PIPELINE_STAGES.reduce((sum, s) => sum + stageCounts[s.key], 0)
 
   return (
     <div className="space-y-6">
@@ -184,32 +185,41 @@ export default async function DashboardPage() {
       {/* Business Health */}
       <BusinessHealth />
 
-      {/* Pipeline Snapshot */}
+      {/* Pipeline Snapshot — six stages, left-to-right, count per stage */}
       <div className="card">
-        <h2 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Job Pipeline</h2>
-        <div className="pipeline-bar mb-4">
-          {JOB_PIPELINE.map((s) => {
-            const pct = (pipelineCounts[s] / totalJobs) * 100
-            if (pct === 0) return null
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Job Pipeline</h2>
+          <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            {inFlightJobs} job{inFlightJobs === 1 ? '' : 's'} in flight
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          {PIPELINE_STAGES.map((stage, i) => {
+            const count = stageCounts[stage.key]
+            const isLast = i === PIPELINE_STAGES.length - 1
             return (
-              <div
-                key={s}
-                className="pipeline-segment"
-                style={{ width: `${pct}%`, background: PIPELINE_COLORS[s] }}
-                title={`${statusLabel(s)}: ${pipelineCounts[s]}`}
-              />
+              <Link
+                key={stage.key}
+                href={`/dashboard/jobs?status=${stage.statuses[0]}`}
+                className="relative rounded-lg px-3 py-3 transition-colors hover:opacity-90"
+                style={{
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--bg-border)',
+                  borderTop: `3px solid ${stage.color}`,
+                }}
+              >
+                <div className="text-xs uppercase tracking-wide mb-1" style={{ color: 'var(--text-tertiary)' }}>
+                  {stage.label}
+                </div>
+                <div className="text-2xl font-semibold tabular-nums" style={{ color: count > 0 ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>
+                  {count}
+                </div>
+                {!isLast && (
+                  <ArrowRight className="hidden lg:block absolute top-1/2 -right-2.5 w-3 h-3 -translate-y-1/2" style={{ color: 'var(--text-tertiary)' }} />
+                )}
+              </Link>
             )
           })}
-        </div>
-        <div className="flex flex-wrap gap-4">
-          {JOB_PIPELINE.map((s) => (
-            <div key={s} className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full" style={{ background: PIPELINE_COLORS[s] }} />
-              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                {statusLabel(s)} <span style={{ color: 'var(--text-tertiary)' }}>({pipelineCounts[s]})</span>
-              </span>
-            </div>
-          ))}
         </div>
       </div>
     </div>
