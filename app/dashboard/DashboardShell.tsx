@@ -19,10 +19,11 @@ export default function DashboardShell({ children }: { children: React.ReactNode
       <div className="flex-1 desktop-margin" style={{ marginLeft: 'var(--sidebar-width)' }}>
         {/* Top bar */}
         <header
-          className="sticky top-0 z-30 flex items-center justify-between px-6 py-3 top-bar-mobile"
+          className="sticky top-0 z-30 flex items-center justify-between px-6 py-4 top-bar-mobile"
           style={{
-            background: 'var(--bg-base)',
-            borderBottom: '1px solid var(--bg-border)',
+            background: 'color-mix(in srgb, var(--bg-base) 80%, transparent)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
           }}
         >
           {/* Mobile hamburger */}

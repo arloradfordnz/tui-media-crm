@@ -1,5 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
-import { CheckSquare } from 'lucide-react'
+import { CheckSquare, ArrowUpRight } from 'lucide-react'
 import Link from 'next/link'
 import TodoItem from './TodoItem'
 import TodoQuickAdd from './TodoQuickAdd'
@@ -28,18 +28,25 @@ export default async function TodoWidget() {
 
   return (
     <div className="card">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <CheckSquare className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-          <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>To Do</h2>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          <div className="stat-icon-bubble bubble-sm">
+            <CheckSquare className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>To Do</h2>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{sorted.length} open task{sorted.length === 1 ? '' : 's'}</p>
+          </div>
         </div>
-        <Link href="/dashboard/todos" className="text-xs" style={{ color: 'var(--accent)' }}>View all &rarr;</Link>
+        <Link href="/dashboard/todos" className="btn-ghost btn-ghost-accent">
+          View all <ArrowUpRight className="w-3.5 h-3.5" />
+        </Link>
       </div>
 
       <TodoQuickAdd />
 
       {sorted.length > 0 && (
-        <div className="space-y-1" style={{ borderTop: '1px solid var(--bg-border)', paddingTop: '8px', marginTop: '4px' }}>
+        <div className="space-y-1 mt-3 pt-3" style={{ borderTop: '1px solid var(--bg-border)' }}>
           {sorted.map((t) => {
             const job = t.jobs as unknown as { id: string; name: string } | null
             const client = t.clients as unknown as { id: string; name: string } | null

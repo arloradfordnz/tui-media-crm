@@ -12,6 +12,7 @@ type DeliveryFile = {
   id: string
   originalName: string
   fileUrl: string | null
+  downloadUrl: string | null
   mimeType: string | null
   versionLabel: string
   deliveryStatus: string
@@ -100,25 +101,31 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg-base)' }}>
-      <header className="py-6 px-6 flex items-center justify-center" style={{ borderBottom: '1px solid var(--bg-border)' }}>
-        <Image src="/Primary_White.svg" alt="Tui Media" width={140} height={30} style={{ height: 'auto' }} />
+      <header className="py-5 px-6 flex items-center justify-center">
+        <Image src="/Primary_White.svg" alt="Tui Media" width={130} height={28} style={{ height: 'auto' }} />
       </header>
 
-      <div className="max-w-3xl mx-auto px-6 py-10 space-y-8 animate-fade-in">
-        <div className="text-center">
-          <p className="label mb-2">Client Portal</p>
-          <h1 className="text-3xl font-semibold" style={{ letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+      <div className="max-w-3xl mx-auto px-6 py-6 space-y-6 animate-fade-in">
+        {/* Hero greeting */}
+        <div className="card-hero">
+          <p className="text-xs uppercase tracking-wider font-semibold opacity-80 mb-2">Client Portal</p>
+          <h1 className="text-3xl md:text-4xl font-semibold" style={{ letterSpacing: '-0.03em', lineHeight: 1.1 }}>
             Kia ora, {data.client.contactPerson || data.client.name}
           </h1>
-          <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>
+          <p className="text-sm md:text-base opacity-90 mt-2 max-w-md">
             View your projects, deliverables, and documents below.
           </p>
         </div>
 
         <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Briefcase className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-            <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Your Projects</h2>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="stat-icon-bubble bubble-sm">
+              <Briefcase className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Your Projects</h2>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{data.jobs.length} project{data.jobs.length === 1 ? '' : 's'}</p>
+            </div>
           </div>
 
           {data.jobs.length === 0 ? (
@@ -198,9 +205,14 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
 
         {data.documents.length > 0 && (
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <FileText className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-              <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Your Documents</h2>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="stat-icon-bubble bubble-sm">
+                <FileText className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Your Documents</h2>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{data.documents.length} document{data.documents.length === 1 ? '' : 's'}</p>
+              </div>
             </div>
             <div className="space-y-2">
               {data.documents.map((doc) => (
@@ -221,9 +233,31 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
 function FileCard({ file, jobId, onApprove }: { file: DeliveryFile; jobId: string; onApprove: (fileId: string, jobId: string) => void }) {
   const kind = file.fileUrl && file.fileUrl.includes('vimeo') ? 'vimeo' : fileKind(file.mimeType, file.originalName)
   const canApprove = file.deliveryStatus === 'sent' || file.deliveryStatus === 'viewed'
+  const [downloading, setDownloading] = useState(false)
+
+  async function handleDownload() {
+    const url = file.downloadUrl || file.fileUrl
+    if (!url) return
+    setDownloading(true)
+    try {
+      const res = await fetch(url)
+      const blob = await res.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = objectUrl
+      a.download = file.originalName
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(objectUrl)
+    } catch (err) {
+      console.error('Download error:', err)
+    }
+    setDownloading(false)
+  }
 
   return (
-    <div className="rounded-lg p-4" style={{ background: 'var(--bg-elevated)' }}>
+    <div className="box-inset-lg">
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <KindIcon kind={kind} />
         <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)', maxWidth: 240 }}>{file.originalName}</span>
@@ -279,10 +313,10 @@ function FileCard({ file, jobId, onApprove }: { file: DeliveryFile; jobId: strin
       )}
 
       <div className="flex gap-2 flex-wrap">
-        {file.fileUrl && (
-          <a href={file.fileUrl} target="_blank" rel="noreferrer" download={file.originalName} className="btn-secondary text-sm">
-            <Download className="w-3.5 h-3.5" /> Download
-          </a>
+        {(file.downloadUrl || file.fileUrl) && (
+          <button onClick={handleDownload} disabled={downloading} className="btn-secondary text-sm">
+            <Download className="w-3.5 h-3.5" /> {downloading ? 'Downloading...' : 'Download'}
+          </button>
         )}
         {canApprove && (
           <button onClick={() => onApprove(file.id, jobId)} className="btn-primary text-sm">
@@ -380,7 +414,10 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
     if (!doc.content) return null
     try {
       const obj = JSON.parse(doc.content)
-      if (obj && typeof obj === 'object' && 'template' in obj && 'form' in obj) {
+      // Accept docs that have a form even if `template` was lost — older saves
+      // and bug-affected rows may be missing it. We default the template so
+      // signed state still renders correctly.
+      if (obj && typeof obj === 'object' && 'form' in obj) {
         const f = (obj.form ?? {}) as Record<string, unknown>
         const get = (k: string) => (typeof f[k] === 'string' ? (f[k] as string) : '')
         const rawFeedback = Array.isArray((obj as { feedback?: unknown }).feedback)
@@ -392,7 +429,7 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
           author: String(r.author ?? ''),
         }))
         return {
-          template: String(obj.template ?? ''),
+          template: String(obj.template ?? 'Contract'),
           feedback,
           form: {
             clientName: get('clientName'),

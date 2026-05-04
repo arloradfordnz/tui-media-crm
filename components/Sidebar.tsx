@@ -73,15 +73,16 @@ export default function Sidebar({ onLogout, mobileOpen, onClose }: { onLogout: (
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar — floating island */}
       <aside
-        className={`sidebar fixed top-0 left-0 h-full z-50 flex flex-col transition-transform duration-200 ${
+        className={`sidebar sidebar-island fixed z-50 flex flex-col transition-transform duration-200 ${
           mobileOpen ? 'sidebar-open' : ''
         }`}
         style={{
-          width: 'var(--sidebar-width)',
-          background: 'var(--bg-surface)',
-          borderRight: '1px solid var(--bg-border)',
+          width: 'calc(var(--sidebar-width) - var(--sidebar-inset) * 2)',
+          top: 'var(--sidebar-inset)',
+          left: 'var(--sidebar-inset)',
+          height: 'calc(100vh - var(--sidebar-inset) * 2)',
         }}
       >
         {/* Mobile close */}
@@ -94,12 +95,12 @@ export default function Sidebar({ onLogout, mobileOpen, onClose }: { onLogout: (
         </button>
 
         {/* Logo */}
-        <div className="px-5 py-6" style={{ borderBottom: '1px solid var(--bg-border)' }}>
-          <Image src="/Primary_White.svg" alt="Tui Media" width={120} height={25} style={{ height: 'auto' }} />
+        <div className="px-5 pt-5 pb-3">
+          <Image src="/Primary_White.svg" alt="Tui Media" width={120} height={26} style={{ height: 'auto' }} />
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-2">
+        <nav className="flex-1 overflow-hidden px-3 pb-1">
           <div className="nav-section-label">Main</div>
           {mainNav.map((item) => (
             <NavLink key={item.href} {...item} onClick={onClose} />
@@ -117,9 +118,13 @@ export default function Sidebar({ onLogout, mobileOpen, onClose }: { onLogout: (
         </nav>
 
         {/* Bottom */}
-        <div className="px-3 py-4" style={{ borderTop: '1px solid var(--bg-border)' }}>
-          <button onClick={onLogout} className="nav-item w-full" style={{ color: 'var(--text-secondary)' }}>
-            <LogOut className="w-[18px] h-[18px] shrink-0" />
+        <div className="px-3 pb-3 pt-2">
+          <button
+            onClick={onLogout}
+            className="w-full inline-flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-medium transition-colors"
+            style={{ color: 'var(--text-secondary)', background: 'var(--bg-elevated)' }}
+          >
+            <LogOut className="w-3.5 h-3.5" />
             <span>Sign out</span>
           </button>
         </div>

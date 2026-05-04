@@ -18,8 +18,8 @@ const SOURCES = [
 ] as const
 
 function HealthScoreRing({ score }: { score: number | null }) {
-  const size = 96
-  const stroke = 9
+  const size = 120
+  const stroke = 10
   const radius = (size - stroke) / 2
   const circumference = 2 * Math.PI * radius
   const pct = score == null ? 0 : Math.max(0, Math.min(100, score))
@@ -34,14 +34,14 @@ function HealthScoreRing({ score }: { score: number | null }) {
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--bg-elevated)" strokeWidth={stroke} />
-        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={colour} strokeWidth={stroke} strokeDasharray={`${dash} ${circumference}`} strokeLinecap="round" />
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--bg-border)" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={colour} strokeWidth={stroke} strokeDasharray={`${dash} ${circumference}`} strokeLinecap="round" style={{ transition: 'stroke-dasharray 400ms ease' }} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+        <span className="text-3xl font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
           {score == null ? '—' : score}
         </span>
-        <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-tertiary)' }}>Score</span>
+        <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-tertiary)' }}>Score</span>
       </div>
     </div>
   )
@@ -49,12 +49,9 @@ function HealthScoreRing({ score }: { score: number | null }) {
 
 function SignalChip({ label, value }: { label: string; value: string }) {
   return (
-    <div
-      className="rounded-lg px-3 py-2"
-      style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)' }}
-    >
-      <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{value}</div>
-      <div className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-tertiary)' }}>{label}</div>
+    <div className="box-inset">
+      <div className="text-base font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{value}</div>
+      <div className="text-[10px] uppercase tracking-wider font-semibold mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{label}</div>
     </div>
   )
 }
@@ -92,20 +89,28 @@ export default async function BusinessHealth() {
 
   return (
     <div className="card">
-      <div className="flex items-start justify-between gap-4 mb-4">
-        <div className="flex items-center gap-2">
-          <Heart className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-          <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Business Health</h2>
+      <div className="flex items-center justify-between gap-3 mb-5">
+        <div className="flex items-center gap-3">
+          <div className="stat-icon-bubble bubble-sm">
+            <Heart className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Business Health</h2>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+              {report ? `Updated ${timeAgo(report.generated_at)}` : 'Awaiting first run'}
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-          <RefreshCw className="w-3 h-3" />
-          {report ? `Updated ${timeAgo(report.generated_at)}` : 'Awaiting first run'}
-        </div>
+        <span className="btn-ghost">
+          <RefreshCw className="w-3.5 h-3.5" />
+          Daily
+        </span>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-5 items-start mb-5">
+      {/* Score + summary in nested box */}
+      <div className="box-inset-lg flex flex-col sm:flex-row gap-5 items-center sm:items-start mb-4">
         <HealthScoreRing score={report?.score ?? null} />
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 text-center sm:text-left">
           {report ? (
             <>
               {report.headline && (
@@ -116,9 +121,9 @@ export default async function BusinessHealth() {
               <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                 {report.summary}
               </p>
-              <div className="flex items-center gap-1.5 mt-3 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+              <div className="flex items-center justify-center sm:justify-start gap-1.5 mt-3 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
                 <Sparkles className="w-3 h-3" />
-                AI-generated daily at midnight from your CRM data and connected sources.
+                AI-generated daily at midnight from your CRM and connected sources.
               </div>
             </>
           ) : (
@@ -134,8 +139,7 @@ export default async function BusinessHealth() {
         </div>
       </div>
 
-      {/* Signal chips — only the headline numbers. Detailed breakdowns
-          (engagement, comments, total reviews, etc.) live on dedicated pages. */}
+      {/* Signal chips */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
         <SignalChip
           label="Revenue MTD"
@@ -153,21 +157,18 @@ export default async function BusinessHealth() {
         )}
       </div>
 
-      {/* Integration status strip */}
-      <div
-        className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-3 text-xs"
-        style={{ borderTop: '1px solid var(--bg-border)', color: 'var(--text-tertiary)' }}
-      >
+      {/* Integration status — nested box */}
+      <div className="box-inset flex flex-wrap items-center gap-x-4 gap-y-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>
         <span>{connectedCount} of {SOURCES.length} sources connected</span>
         {disconnected.length > 0 && (
           <span className="flex flex-wrap items-center gap-2">
-            <span style={{ color: 'var(--text-tertiary)' }}>·</span>
+            <span>·</span>
             {disconnected.map((s, i) => (
               <span key={s.key} className="inline-flex items-center gap-1">
                 <Link href={s.href} className="inline-flex items-center gap-1" style={{ color: 'var(--accent)' }}>
-                  <Plug className="w-3 h-3" /> {s.label}
+                  <Plug className="w-3 h-3" /> Connect {s.label}
                 </Link>
-                {i < disconnected.length - 1 && <span style={{ color: 'var(--text-tertiary)' }}>·</span>}
+                {i < disconnected.length - 1 && <span>·</span>}
               </span>
             ))}
           </span>
