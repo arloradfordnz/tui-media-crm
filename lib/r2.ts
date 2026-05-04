@@ -40,6 +40,23 @@ export async function signedDownloadUrl(key: string, expiresInSeconds = 60 * 60 
   )
 }
 
+// Force-download URL — sets Content-Disposition: attachment so mobile browsers
+// (iOS Safari, Android Chrome) save the file instead of opening it inline.
+// The HTML `download` attribute is ignored for cross-origin links, so we need
+// the header on the response itself.
+export async function signedDownloadUrlAttachment(key: string, filename?: string, expiresInSeconds = 60 * 60 * 24 * 7) {
+  const safe = (filename || key.split('/').pop() || 'download').replace(/"/g, '')
+  return getSignedUrl(
+    r2,
+    new GetObjectCommand({
+      Bucket: R2_BUCKET,
+      Key: key,
+      ResponseContentDisposition: `attachment; filename="${safe}"`,
+    }),
+    { expiresIn: expiresInSeconds }
+  )
+}
+
 export async function deleteObject(key: string) {
   await r2.send(new DeleteObjectCommand({ Bucket: R2_BUCKET, Key: key }))
 }

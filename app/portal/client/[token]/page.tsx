@@ -1,5 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
-import { signedDownloadUrl } from '@/lib/r2'
+import { signedDownloadUrl, signedDownloadUrlAttachment } from '@/lib/r2'
 import ClientPortalView from './ClientPortalView'
 
 export default async function ClientPortalPage({ params }: { params: Promise<{ token: string }> }) {
@@ -55,6 +55,14 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
     if (!key) return null
     try { return await signedDownloadUrl(key) } catch { return null }
   }
+  // Force-download URL — used by the Download button so mobile browsers save
+  // the file rather than opening it inline (the HTML `download` attribute is
+  // ignored on cross-origin links).
+  const resolveDownloadUrl = async (key: string | null, legacyUrl: string | null, originalName: string): Promise<string | null> => {
+    if (legacyUrl && /^https?:\/\//.test(legacyUrl)) return legacyUrl
+    if (!key) return null
+    try { return await signedDownloadUrlAttachment(key, originalName) } catch { return null }
+  }
 
   const jobsResolved = await Promise.all(
     ((jobs as unknown as RawJob[]) ?? []).map(async (j) => ({
@@ -83,6 +91,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
             id: f.id,
             originalName: f.original_name,
             fileUrl: await resolveFileUrl(f.file_name, f.file_url),
+            downloadUrl: await resolveDownloadUrl(f.file_name, f.file_url, f.original_name),
             mimeType: f.mime_type,
             versionLabel: f.version_label,
             deliveryStatus: f.delivery_status,
