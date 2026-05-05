@@ -23,8 +23,13 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  // Refresh session — do not remove this line
-  const { data: { user } } = await supabase.auth.getUser()
+  // Cookie-local session lookup — no network roundtrip.
+  // getUser() validates with the auth server (~200-500ms) which we previously
+  // ran on every navigation; we only need that level of trust for actual data
+  // access, which the page-level Supabase client still does. Routing decisions
+  // can rely on the signed cookie.
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user ?? null
 
   const { pathname } = request.nextUrl
 

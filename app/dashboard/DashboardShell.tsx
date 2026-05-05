@@ -42,7 +42,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         </header>
 
         {/* Page content */}
-        <main className="p-6 animate-fade-in">
+        <main className="p-6">
           {children}
         </main>
       </div>

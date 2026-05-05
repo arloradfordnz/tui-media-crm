@@ -1,13 +1,7 @@
-import { createServerSupabaseClient } from '@/lib/supabase'
-import { redirect } from 'next/navigation'
 import DashboardShell from './DashboardShell'
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    redirect('/login')
-  }
-
+// Auth is enforced by middleware (proxy.ts) — no need to repeat the
+// getUser() round trip here; doing so doubled latency on every nav.
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return <DashboardShell>{children}</DashboardShell>
 }
