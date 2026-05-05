@@ -21,6 +21,7 @@ import {
   Activity,
   Layers,
   BarChart3,
+  NotebookPen,
 } from 'lucide-react'
 
 const mainNav = [
@@ -28,6 +29,7 @@ const mainNav = [
   { href: '/dashboard/clients', label: 'Clients', icon: Users },
   { href: '/dashboard/jobs', label: 'Jobs', icon: Briefcase },
   { href: '/dashboard/todos', label: 'To Do', icon: CheckSquare },
+  { href: '/dashboard/notes', label: 'Notes', icon: NotebookPen },
   { href: '/dashboard/calendar', label: 'Calendar', icon: Calendar },
   { href: '/dashboard/ai', label: 'AI Assistant', icon: Bot },
 ]
