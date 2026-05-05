@@ -24,7 +24,7 @@ export async function createNote(kind: NoteKind = 'general'): Promise<void> {
 
 export async function updateNote(
   id: string,
-  data: { title: string; body: string; kind: NoteKind; meeting_date: string | null; attendees: string | null },
+  data: { title: string; body: string; kind: NoteKind; meeting_date: string | null; attendees: string | null; client_id: string | null },
 ): Promise<{ error?: string; ok?: true }> {
   const title = data.title?.trim() || 'Untitled note'
   const supabase = await createServerSupabaseClient()
@@ -36,10 +36,12 @@ export async function updateNote(
       kind: data.kind,
       meeting_date: data.kind === 'meeting' ? (data.meeting_date || null) : null,
       attendees: data.kind === 'meeting' ? (data.attendees || null) : null,
+      client_id: data.client_id || null,
     })
     .eq('id', id)
   if (error) return { error: error.message }
   revalidatePath('/dashboard/notes')
+  if (data.client_id) revalidatePath(`/dashboard/clients/${data.client_id}`)
   return { ok: true }
 }
 

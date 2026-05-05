@@ -12,6 +12,8 @@ type Note = {
   kind: 'general' | 'meeting'
   meeting_date: string | null
   attendees: string | null
+  client_id: string | null
+  clients: { id: string; name: string } | null
   created_at: string
   updated_at: string
 }
@@ -19,12 +21,16 @@ type Note = {
 export default async function NotesPage({ searchParams }: { searchParams: Promise<{ id?: string; kind?: string }> }) {
   const params = await searchParams
   const supabase = await createServerSupabaseClient()
-  const { data: notes } = await supabase
-    .from('notes')
-    .select('id, title, body, kind, meeting_date, attendees, created_at, updated_at')
-    .order('updated_at', { ascending: false })
+  const [{ data: notes }, { data: clientsList }] = await Promise.all([
+    supabase
+      .from('notes')
+      .select('id, title, body, kind, meeting_date, attendees, client_id, created_at, updated_at, clients:client_id(id, name)')
+      .order('updated_at', { ascending: false }),
+    supabase.from('clients').select('id, name').order('name', { ascending: true }),
+  ])
 
-  const all = (notes ?? []) as Note[]
+  const all = (notes ?? []) as unknown as Note[]
+  const clients = (clientsList ?? []) as { id: string; name: string }[]
   const filterKind = params.kind === 'meeting' || params.kind === 'general' ? params.kind : null
   const filtered = filterKind ? all.filter((n) => n.kind === filterKind) : all
   const selected = params.id ? all.find((n) => n.id === params.id) ?? null : filtered[0] ?? null
@@ -106,6 +112,8 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
                       </span>
                     </div>
                     <p className="text-xs truncate" style={{ color: 'var(--text-tertiary)' }}>
+                      {n.clients ? <span style={{ color: 'var(--accent)' }}>{n.clients.name}</span> : null}
+                      {n.clients && (preview || true) ? ' · ' : ''}
                       {preview || `Updated ${timeAgo(n.updated_at)}`}
                     </p>
                   </Link>
@@ -118,7 +126,7 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
         {/* Editor */}
         <div>
           {selected ? (
-            <NoteEditor key={selected.id} note={selected} />
+            <NoteEditor key={selected.id} note={selected} clients={clients} />
           ) : (
             <div className="card flex items-center justify-center" style={{ minHeight: 400 }}>
               <div className="text-center">

@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
-import { Eye, Pencil, Save, Trash2, Users, FileText, Calendar, Check } from 'lucide-react'
+import { Eye, Pencil, Save, Trash2, Users, FileText, Calendar, Check, User, Lock } from 'lucide-react'
 import { renderDocBody } from '@/lib/markdown'
 import { updateNote, deleteNote } from '@/app/actions/notes'
 import { timeAgo } from '@/lib/format'
+import CustomSelect from '@/components/CustomSelect'
 
 type Note = {
   id: string
@@ -13,20 +14,24 @@ type Note = {
   kind: 'general' | 'meeting'
   meeting_date: string | null
   attendees: string | null
+  client_id: string | null
   updated_at: string
 }
 
-export default function NoteEditor({ note }: { note: Note }) {
+type Client = { id: string; name: string }
+
+export default function NoteEditor({ note, clients }: { note: Note; clients: Client[] }) {
   const [title, setTitle] = useState(note.title)
   const [body, setBody] = useState(note.body || '')
   const [kind, setKind] = useState<'general' | 'meeting'>(note.kind)
   const [meetingDate, setMeetingDate] = useState(note.meeting_date || '')
   const [attendees, setAttendees] = useState(note.attendees || '')
+  const [clientId, setClientId] = useState(note.client_id || '')
   const [mode, setMode] = useState<'edit' | 'preview'>('edit')
   const [saved, setSaved] = useState(false)
   const [pending, startTransition] = useTransition()
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lastSavedRef = useRef({ title, body, kind, meetingDate, attendees })
+  const lastSavedRef = useRef({ title, body, kind, meetingDate, attendees, clientId })
 
   // Debounced auto-save
   useEffect(() => {
@@ -36,7 +41,8 @@ export default function NoteEditor({ note }: { note: Note }) {
       last.body === body &&
       last.kind === kind &&
       last.meetingDate === meetingDate &&
-      last.attendees === attendees
+      last.attendees === attendees &&
+      last.clientId === clientId
     ) return
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
@@ -47,8 +53,9 @@ export default function NoteEditor({ note }: { note: Note }) {
           kind,
           meeting_date: meetingDate || null,
           attendees: attendees || null,
+          client_id: clientId || null,
         })
-        lastSavedRef.current = { title, body, kind, meetingDate, attendees }
+        lastSavedRef.current = { title, body, kind, meetingDate, attendees, clientId }
         setSaved(true)
         setTimeout(() => setSaved(false), 1500)
       })
@@ -56,7 +63,7 @@ export default function NoteEditor({ note }: { note: Note }) {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [title, body, kind, meetingDate, attendees, note.id])
+  }, [title, body, kind, meetingDate, attendees, clientId, note.id])
 
   function handleDelete() {
     if (!confirm('Delete this note? This cannot be undone.')) return
@@ -99,6 +106,26 @@ export default function NoteEditor({ note }: { note: Note }) {
         className="w-full bg-transparent border-0 outline-none text-2xl font-semibold mb-3"
         style={{ letterSpacing: '-0.02em', color: 'var(--text-primary)' }}
       />
+
+      {/* Client link — admin-only, never visible in client portal */}
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 mb-3 items-end">
+        <div className="box-inset">
+          <label className="block text-[10px] uppercase tracking-wider font-semibold mb-1" style={{ color: 'var(--text-tertiary)' }}>
+            <User className="w-3 h-3 inline mr-1 -mt-0.5" /> Linked client
+          </label>
+          <CustomSelect
+            value={clientId}
+            onChange={setClientId}
+            placeholder="None"
+            searchable
+            options={[{ value: '', label: 'None' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
+          />
+        </div>
+        <div className="inline-flex items-center gap-1.5 text-[11px] px-3 py-2 rounded-full self-end" style={{ background: 'var(--bg-elevated)', color: 'var(--text-tertiary)' }}>
+          <Lock className="w-3 h-3" />
+          Admin only · not shown in portal
+        </div>
+      </div>
 
       {/* Meeting metadata */}
       {kind === 'meeting' && (
@@ -160,6 +187,7 @@ export default function NoteEditor({ note }: { note: Note }) {
               title, body, kind,
               meeting_date: meetingDate || null,
               attendees: attendees || null,
+              client_id: clientId || null,
             })
             setSaved(true)
             setTimeout(() => setSaved(false), 1500)
