@@ -22,6 +22,7 @@ import {
   Layers,
   BarChart3,
   NotebookPen,
+  Send,
 } from 'lucide-react'
 
 const mainNav = [
@@ -32,6 +33,7 @@ const mainNav = [
   { href: '/dashboard/notes', label: 'Notes', icon: NotebookPen },
   { href: '/dashboard/calendar', label: 'Calendar', icon: Calendar },
   { href: '/dashboard/ai', label: 'AI Assistant', icon: Bot },
+  { href: '/dashboard/outreach', label: 'Outreach Drafts', icon: Send },
 ]
 
 const businessNav = [
