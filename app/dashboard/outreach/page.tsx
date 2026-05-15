@@ -13,13 +13,23 @@ type Draft = {
 }
 
 export function parseDraft(details: string) {
+  // New format: SUBJECT: ...\n\nTO: ...\n\nBODY:\n...
   const subjectMatch = details.match(/^SUBJECT:\s*(.+)/m)
   const toMatch = details.match(/^TO:\s*(.+)/m)
   const bodyMatch = details.match(/BODY:\n([\s\S]+)$/)
+  if (subjectMatch) {
+    return {
+      subject: subjectMatch[1].trim(),
+      to: toMatch?.[1]?.trim() ?? '',
+      body: bodyMatch?.[1]?.trim() ?? '',
+    }
+  }
+  // Legacy format: "Kotare drafted pitch email. ... Subject: XYZ"
+  const legacySubject = details.match(/Subject:\s*(.+)/i)
   return {
-    subject: subjectMatch?.[1]?.trim() ?? '',
-    to: toMatch?.[1]?.trim() ?? '',
-    body: bodyMatch?.[1]?.trim() ?? details,
+    subject: legacySubject?.[1]?.trim() ?? '',
+    to: '',
+    body: '',
   }
 }
 
@@ -29,7 +39,7 @@ export default async function OutreachDraftsPage() {
   const { data } = await supabase
     .from('activities')
     .select('id, created_at, details, client_id, clients(id, name, contact_person)')
-    .eq('action', 'outreach_draft')
+    .in('action', ['outreach_draft', 'draft_email'])
     .order('created_at', { ascending: false })
     .limit(100)
 
@@ -108,13 +118,14 @@ export default async function OutreachDraftsPage() {
                 className="rounded-xl p-4 text-sm whitespace-pre-wrap leading-relaxed"
                 style={{
                   background: 'var(--bg-elevated)',
-                  color: 'var(--text-secondary)',
+                  color: draft.parsed.body ? 'var(--text-secondary)' : 'var(--text-tertiary)',
                   fontFamily: 'inherit',
                   borderLeft: '2px solid var(--accent)',
                   paddingLeft: '1rem',
+                  fontStyle: draft.parsed.body ? 'normal' : 'italic',
                 }}
               >
-                {draft.parsed.body || draft.details}
+                {draft.parsed.body || 'Full email not stored — draft was saved to Apple Mail directly. Future drafts will show the full email here.'}
               </div>
             </div>
           ))}
