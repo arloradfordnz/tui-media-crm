@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@/lib/format'
-import { Plus, UserPlus, ArrowRight, Sparkles, ArrowUpRight } from 'lucide-react'
+import { Plus, UserPlus, ArrowRight, ArrowUpRight } from 'lucide-react'
 import TodoWidget from './TodoWidget'
 import BusinessHealth from './BusinessHealth'
 import Link from 'next/link'
@@ -91,27 +91,24 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Hero greeting */}
-      <div className="card-hero flex flex-col md:flex-row md:items-end md:justify-between gap-5">
+      {/* Greeting header */}
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-sm opacity-90 mb-2">
-            <Sparkles className="w-4 h-4" />
-            <span>{todayLabel}</span>
-          </div>
-          <h1 className="text-3xl md:text-4xl font-semibold" style={{ letterSpacing: '-0.03em', lineHeight: 1.1 }}>
+          <p className="text-sm mb-1" style={{ color: 'var(--text-tertiary)' }}>{todayLabel}</p>
+          <h1 className="text-3xl font-semibold" style={{ letterSpacing: '-0.03em', lineHeight: 1.1 }}>
             {greeting(now)}, Arlo.
           </h1>
-          <p className="text-sm md:text-base opacity-90 mt-2 max-w-md">
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
             {inFlightJobs > 0
               ? `You've got ${inFlightJobs} job${inFlightJobs === 1 ? '' : 's'} in flight and ${reviewJobs ?? 0} awaiting your review.`
               : `Quiet day — perfect time to chase leads or plan the next shoot.`}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard/clients/new" className="btn-hero-light">
+        <div className="flex items-center gap-3 shrink-0">
+          <Link href="/dashboard/clients/new" className="btn-secondary">
             <UserPlus className="w-4 h-4" /> New Client
           </Link>
-          <Link href="/dashboard/jobs/new" className="btn-hero-solid">
+          <Link href="/dashboard/jobs/new" className="btn-primary">
             <Plus className="w-4 h-4" /> New Job
           </Link>
         </div>
