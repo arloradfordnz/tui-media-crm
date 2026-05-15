@@ -1,4 +1,4 @@
-import { Heart, Sparkles, Plug, RefreshCw } from 'lucide-react'
+import { Sparkles, Plug, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { timeAgo } from '@/lib/format'
@@ -90,16 +90,11 @@ export default async function BusinessHealth() {
   return (
     <div className="card">
       <div className="flex items-center justify-between gap-3 mb-5">
-        <div className="flex items-center gap-3">
-          <div className="stat-icon-bubble bubble-sm">
-            <Heart className="w-4 h-4" />
-          </div>
-          <div>
-            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Business Health</h2>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-              {report ? `Updated ${timeAgo(report.generated_at)}` : 'Awaiting first run'}
-            </p>
-          </div>
+        <div>
+          <h2 className="text-xl font-semibold" style={{ letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>Business Health</h2>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+            {report ? `Updated ${timeAgo(report.generated_at)}` : 'Awaiting first run'}
+          </p>
         </div>
         <span className="btn-ghost">
           <RefreshCw className="w-3.5 h-3.5" />

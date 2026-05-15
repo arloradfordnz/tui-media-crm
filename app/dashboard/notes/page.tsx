@@ -45,16 +45,11 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="stat-icon-bubble">
-            <NotebookPen className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-2xl font-semibold truncate" style={{ letterSpacing: '-0.02em' }}>Notes</h1>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-              {all.length} note{all.length === 1 ? '' : 's'} · {meetingCount} meeting · {generalCount} general
-            </p>
-          </div>
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold truncate" style={{ letterSpacing: '-0.02em' }}>Notes</h1>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+            {all.length} note{all.length === 1 ? '' : 's'} · {meetingCount} meeting · {generalCount} general
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <form action={newMeeting}>

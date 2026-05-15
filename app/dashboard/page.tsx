@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@/lib/format'
-import { Briefcase, Clock, DollarSign, Users, CalendarDays, Activity, Plus, UserPlus, Camera, TrendingUp, ArrowRight, Sparkles, ArrowUpRight, Repeat } from 'lucide-react'
+import { Plus, UserPlus, ArrowRight, Sparkles, ArrowUpRight } from 'lucide-react'
 import TodoWidget from './TodoWidget'
 import BusinessHealth from './BusinessHealth'
 import Link from 'next/link'
@@ -138,25 +138,20 @@ export default async function DashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-4">
-          <StatCard icon={Repeat} value={formatNZD(mrr)} label="Monthly retainers" />
-          <StatCard icon={TrendingUp} value={formatNZD(pipelineValue)} label="Pipeline value" />
+          <StatCard value={formatNZD(mrr)} label="Monthly retainers" />
+          <StatCard value={formatNZD(pipelineValue)} label="Pipeline value" />
         </div>
       </div>
 
       {/* Secondary stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Briefcase} value={activeJobs ?? 0} label="Active jobs" />
-        <StatCard icon={Clock} value={reviewJobs ?? 0} label="Awaiting review" />
-        <StatCard icon={Users} value={leadsInPipeline ?? 0} label="Leads in pipeline" />
+        <StatCard value={activeJobs ?? 0} label="Active jobs" />
+        <StatCard value={reviewJobs ?? 0} label="Awaiting review" />
+        <StatCard value={leadsInPipeline ?? 0} label="Leads in pipeline" />
         <div className="card flex flex-col">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="stat-icon-bubble bubble-sm">
-              <Camera className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Shoots today</p>
-              <p className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>{(todayShoots ?? []).length} scheduled</p>
-            </div>
+          <div className="mb-3">
+            <p className="text-xl font-semibold" style={{ letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>Shoots today</p>
+            <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{(todayShoots ?? []).length} scheduled</p>
           </div>
           {(todayShoots ?? []).length === 0 ? (
             <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Nothing today.</p>
@@ -179,7 +174,7 @@ export default async function DashboardPage() {
       {/* Upcoming + Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card">
-          <SectionHeader icon={CalendarDays} title="Upcoming">
+          <SectionHeader title="Upcoming">
             <Link href="/dashboard/calendar" className="btn-ghost btn-ghost-accent">
               View calendar <ArrowUpRight className="w-3.5 h-3.5" />
             </Link>
@@ -201,7 +196,7 @@ export default async function DashboardPage() {
         </div>
 
         <div className="card">
-          <SectionHeader icon={Activity} title="Recent activity">
+          <SectionHeader title="Recent activity">
             <Link href="/dashboard/activity" className="btn-ghost btn-ghost-accent">
               View all <ArrowUpRight className="w-3.5 h-3.5" />
             </Link>
@@ -235,7 +230,7 @@ export default async function DashboardPage() {
 
       {/* Pipeline Snapshot */}
       <div className="card">
-        <SectionHeader icon={Briefcase} title="Job pipeline" subtitle={`${inFlightJobs} job${inFlightJobs === 1 ? '' : 's'} in flight`}>
+        <SectionHeader title="Job pipeline" subtitle={`${inFlightJobs} job${inFlightJobs === 1 ? '' : 's'} in flight`}>
           <Link href="/dashboard/jobs" className="btn-ghost btn-ghost-accent">
             View all jobs <ArrowUpRight className="w-3.5 h-3.5" />
           </Link>
@@ -269,36 +264,25 @@ export default async function DashboardPage() {
   )
 }
 
-function SectionHeader({ icon: Icon, title, subtitle, children }: {
-  icon: React.ComponentType<{ className?: string }>
+function SectionHeader({ title, subtitle, children }: {
   title: string
   subtitle?: string
   children?: React.ReactNode
 }) {
   return (
     <div className="flex items-center justify-between gap-3 mb-4">
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="stat-icon-bubble bubble-sm">
-          <Icon className="w-4 h-4" />
-        </div>
-        <div className="min-w-0">
-          <h2 className="text-base font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{title}</h2>
-          {subtitle && <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-tertiary)' }}>{subtitle}</p>}
-        </div>
+      <div className="min-w-0">
+        <h2 className="text-xl font-semibold truncate" style={{ letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>{title}</h2>
+        {subtitle && <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-tertiary)' }}>{subtitle}</p>}
       </div>
       {children}
     </div>
   )
 }
 
-function StatCard({ icon: Icon, value, label }: { icon: React.ComponentType<{ className?: string }>; value: string | number; label: string }) {
+function StatCard({ value, label }: { value: string | number; label: string }) {
   return (
     <div className="stat-card">
-      <div className="flex items-center justify-between mb-3">
-        <div className="stat-icon-bubble">
-          <Icon className="w-5 h-5" />
-        </div>
-      </div>
       <div className="stat-value truncate">{value}</div>
       <div className="stat-label">{label}</div>
     </div>

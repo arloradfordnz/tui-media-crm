@@ -25,6 +25,7 @@ export const XERO_SCOPES = [
   'accounting.invoices.read',
   'accounting.reports.profitandloss.read',
   'accounting.reports.banksummary.read',
+  'accounting.banktransactions.read',
 ].join(' ')
 
 const XERO_AUTH_URL = 'https://login.xero.com/identity/connect/authorize'
@@ -326,4 +327,157 @@ export async function fetchXeroSummary(): Promise<XeroSummary | null> {
     revenue_this_month_nzd: revenueMonth == null ? null : Math.round(revenueMonth),
     net_profit_this_month_nzd: netProfitMonth == null ? null : Math.round(netProfitMonth),
   }
+}
+
+export type XeroTransaction = {
+  id: string
+  date: string          // ISO date YYYY-MM-DD
+  type: 'in' | 'out'
+  description: string   // contact name or invoice number
+  reference: string | null
+  status: string
+  amount: number        // always positive
+  currency: string
+}
+
+type RawInvoice = {
+  InvoiceID: string
+  Type: string
+  Status: string
+  Date?: string
+  DueDateString?: string
+  DateString?: string
+  Contact?: { Name?: string }
+  InvoiceNumber?: string
+  Reference?: string
+  Total?: number
+  AmountPaid?: number
+  AmountDue?: number
+  CurrencyCode?: string
+}
+
+type RawBankTx = {
+  BankTransactionID: string
+  Type: string
+  Status: string
+  Date?: string
+  DateString?: string
+  Contact?: { Name?: string }
+  Reference?: string
+  Total?: number
+  CurrencyCode?: string
+}
+
+function parseXeroDate(raw: string): string {
+  const msMatch = raw.match(/\/Date\((\d+)/)
+  if (msMatch) return new Date(parseInt(msMatch[1])).toISOString().slice(0, 10)
+  if (raw.length > 10) return raw.slice(0, 10)
+  return raw
+}
+
+async function fetchInvoiceTransactions(
+  accessToken: string,
+  tenantId: string,
+): Promise<XeroTransaction[]> {
+  const results: XeroTransaction[] = []
+  for (let page = 1; page <= 4; page++) {
+    let pageData: RawInvoice[]
+    try {
+      const res = await xeroGet<{ Invoices?: RawInvoice[] }>(
+        `/Invoices?Statuses=PAID,AUTHORISED&page=${page}&pageSize=200&order=Date+DESC`,
+        accessToken,
+        tenantId,
+      )
+      pageData = res.Invoices ?? []
+    } catch {
+      break
+    }
+    if (pageData.length === 0) break
+    for (const inv of pageData) {
+      const amount = inv.Total ?? 0
+      if (amount === 0) continue
+      results.push({
+        id: inv.InvoiceID,
+        date: parseXeroDate(inv.DateString ?? inv.Date ?? ''),
+        type: inv.Type === 'ACCREC' ? 'in' : 'out',
+        description: inv.Contact?.Name ?? inv.InvoiceNumber ?? 'Unknown',
+        reference: inv.Reference ?? inv.InvoiceNumber ?? null,
+        status: inv.Status,
+        amount: Math.round(amount * 100) / 100,
+        currency: inv.CurrencyCode ?? 'NZD',
+      })
+    }
+    if (pageData.length < 200) break
+  }
+  return results
+}
+
+/**
+ * Fetch Spend Money bank transactions — the most common way solo operators
+ * record expenses in Xero (vs formal bills / ACCPAY invoices).
+ * Requires the accounting.banktransactions.read scope (added post-March 2026).
+ * Falls back gracefully if the scope is missing.
+ */
+async function fetchBankTransactions(
+  accessToken: string,
+  tenantId: string,
+): Promise<XeroTransaction[]> {
+  const results: XeroTransaction[] = []
+  for (let page = 1; page <= 4; page++) {
+    let pageData: RawBankTx[]
+    try {
+      const res = await xeroGet<{ BankTransactions?: RawBankTx[] }>(
+        `/BankTransactions?Type=SPEND&page=${page}&pageSize=200&order=Date+DESC`,
+        accessToken,
+        tenantId,
+      )
+      pageData = res.BankTransactions ?? []
+    } catch {
+      break
+    }
+    if (pageData.length === 0) break
+    for (const tx of pageData) {
+      if (tx.Status === 'DELETED') continue
+      const amount = tx.Total ?? 0
+      if (amount === 0) continue
+      results.push({
+        id: tx.BankTransactionID,
+        date: parseXeroDate(tx.DateString ?? tx.Date ?? ''),
+        type: 'out',
+        description: tx.Contact?.Name ?? 'Bank payment',
+        reference: tx.Reference ?? null,
+        // Bank transactions that are AUTHORISED represent settled payments
+        status: 'PAID',
+        amount: Math.round(amount * 100) / 100,
+        currency: tx.CurrencyCode ?? 'NZD',
+      })
+    }
+    if (pageData.length < 200) break
+  }
+  return results
+}
+
+/**
+ * Fetch all cashflow transactions: sales invoices, supplier bills, and
+ * Spend Money bank transactions. Returns combined + date-sorted list.
+ */
+export async function fetchXeroTransactions(): Promise<XeroTransaction[] | null> {
+  const account = await getValidXeroAccount()
+  if (!account || !account.account_id) return null
+
+  const accessToken = account.access_token
+  const tenantId = account.account_id
+
+  const [invoices, bankTxs] = await Promise.allSettled([
+    fetchInvoiceTransactions(accessToken, tenantId),
+    fetchBankTransactions(accessToken, tenantId),
+  ])
+
+  const results: XeroTransaction[] = [
+    ...(invoices.status === 'fulfilled' ? invoices.value : []),
+    ...(bankTxs.status === 'fulfilled' ? bankTxs.value : []),
+  ]
+
+  results.sort((a, b) => b.date.localeCompare(a.date))
+  return results
 }

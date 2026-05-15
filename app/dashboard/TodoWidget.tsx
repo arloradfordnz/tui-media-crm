@@ -1,5 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
-import { CheckSquare, ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight } from 'lucide-react'
 import Link from 'next/link'
 import TodoItem from './TodoItem'
 import TodoQuickAdd from './TodoQuickAdd'
@@ -29,14 +29,9 @@ export default async function TodoWidget() {
   return (
     <div className="card">
       <div className="flex items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-3">
-          <div className="stat-icon-bubble bubble-sm">
-            <CheckSquare className="w-4 h-4" />
-          </div>
-          <div>
-            <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>To Do</h2>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{sorted.length} open task{sorted.length === 1 ? '' : 's'}</p>
-          </div>
+        <div>
+          <h2 className="text-xl font-semibold" style={{ letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>To Do</h2>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{sorted.length} open task{sorted.length === 1 ? '' : 's'}</p>
         </div>
         <Link href="/dashboard/todos" className="btn-ghost btn-ghost-accent">
           View all <ArrowUpRight className="w-3.5 h-3.5" />
