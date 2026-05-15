@@ -26,6 +26,7 @@ export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient()
   const now = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+  const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
   const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString()
   const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString()
@@ -35,6 +36,7 @@ export default async function DashboardPage() {
     { count: reviewJobs },
     { count: leadsInPipeline },
     { data: deliveredThisMonth },
+    { data: deliveredPrevMonth },
     { data: pipelineJobs },
     { data: todayShoots },
     { data: upcomingEvents },
@@ -45,16 +47,21 @@ export default async function DashboardPage() {
     supabase.from('jobs').select('*', { count: 'exact', head: true }).not('status', 'in', '("delivered","archived")'),
     supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('status', 'review'),
     supabase.from('clients').select('*', { count: 'exact', head: true }).eq('status', 'lead'),
-    supabase.from('jobs').select('quote_value').eq('status', 'delivered').gte('created_at', startOfMonth),
+    supabase.from('jobs').select('quote_value').eq('status', 'delivered').gte('updated_at', startOfMonth),
+    supabase.from('jobs').select('quote_value').eq('status', 'delivered').gte('updated_at', startOfPrevMonth).lt('updated_at', startOfMonth),
     supabase.from('jobs').select('status, quote_value'),
     supabase.from('events').select('id, title, start_time, end_time, job_id, jobs(id, name)').eq('event_type', 'shoot').gte('date', todayStart).lt('date', todayEnd).order('start_time', { ascending: true }),
     supabase.from('events').select('id, title, event_type, date, start_time, job_id, jobs(id, name)').gte('date', todayStart).order('date', { ascending: true }).limit(5),
     supabase.from('activities').select('id, action, details, created_at, job_id, jobs(id, name), client_id, clients(id, name)').order('created_at', { ascending: false }).limit(5),
-    supabase.from('jobs').select('quote_value, created_at').eq('status', 'delivered').gte('created_at', sixMonthsAgo),
+    supabase.from('jobs').select('quote_value, updated_at').eq('status', 'delivered').gte('updated_at', sixMonthsAgo),
     supabase.from('clients').select('id, name, monthly_retainer').eq('status', 'retainer'),
   ])
 
   const revenueThisMonth = (deliveredThisMonth ?? []).reduce((sum, j) => sum + (j.quote_value || 0), 0)
+  const revenuePrevMonth = (deliveredPrevMonth ?? []).reduce((sum, j) => sum + (j.quote_value || 0), 0)
+  const revenueChangePct = revenuePrevMonth > 0
+    ? ((revenueThisMonth - revenuePrevMonth) / revenuePrevMonth) * 100
+    : revenueThisMonth > 0 ? 100 : 0
   const mrr = (retainerClients ?? []).reduce((sum, c) => sum + ((c as { monthly_retainer?: number }).monthly_retainer || 0), 0)
   const pipelineValue = (pipelineJobs ?? [])
     .filter((j) => !['delivered', 'archived'].includes(j.status))
@@ -74,7 +81,7 @@ export default async function DashboardPage() {
     months.push({ label: d.toLocaleString('en-NZ', { month: 'short' }), value: 0 })
   }
   for (const j of revenueHistory ?? []) {
-    const d = new Date(j.created_at)
+    const d = new Date(j.updated_at)
     const idx = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth())
     const slot = 5 - idx
     if (slot >= 0 && slot < 6) months[slot].value += j.quote_value || 0
@@ -110,43 +117,59 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatCard icon={DollarSign} value={formatNZD(revenueThisMonth)} label="Revenue this month" />
-        <StatCard icon={TrendingUp} value={formatNZD(pipelineValue)} label="Pipeline value" />
-        <StatCard icon={Repeat} value={formatNZD(mrr)} label="Monthly retainers" />
-        <StatCard icon={Users} value={activeJobs ?? 0} label="Active jobs" />
-        <StatCard icon={Clock} value={reviewJobs ?? 0} label="Awaiting review" />
-      </div>
-
-      {/* Revenue chart + side stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="card lg:col-span-2">
-          <SectionHeader icon={TrendingUp} title="Revenue trend" subtitle="Delivered jobs · last 6 months">
-            <span className="badge badge-accent">{formatNZD(months.reduce((s, m) => s + m.value, 0))}</span>
-          </SectionHeader>
+      {/* Revenue chart hero + side stats */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="card lg:col-span-2 space-y-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="stat-label" style={{ margin: 0 }}>Revenue</p>
+              <div className="flex items-baseline gap-3 mt-2">
+                <span className="text-4xl md:text-5xl font-semibold tabular-nums" style={{ letterSpacing: '-0.03em', color: 'var(--text-primary)', lineHeight: 1 }}>
+                  {formatNZD(revenueThisMonth)}
+                </span>
+                <ChangeBadge pct={revenueChangePct} />
+              </div>
+              <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)' }}>
+                from {formatNZD(revenuePrevMonth)} last month
+              </p>
+            </div>
+          </div>
           <RevenueChart data={months} />
         </div>
 
-        <div className="grid grid-cols-1 gap-4 grid-rows-[auto_1fr]">
-          <StatCard icon={Users} value={leadsInPipeline ?? 0} label="Leads in pipeline" />
-          <div className="card flex flex-col">
-            <SectionHeader icon={Camera} title="Shoots today" subtitle={`${(todayShoots ?? []).length} scheduled`} />
-            {(todayShoots ?? []).length === 0 ? (
-              <div className="box-inset text-xs flex-1 flex items-center justify-center text-center" style={{ color: 'var(--text-tertiary)' }}>
-                Nothing on the schedule today.
-              </div>
-            ) : (
-              <div className="space-y-2 flex-1">
-                {(todayShoots ?? []).slice(0, 3).map((e) => (
-                  <div key={e.id} className="box-inset flex items-center justify-between gap-2">
-                    <span className="text-sm truncate" style={{ color: 'var(--text-primary)' }}>{e.title}</span>
-                    {e.start_time && <span className="text-xs whitespace-nowrap" style={{ color: 'var(--text-tertiary)' }}>{e.start_time}</span>}
-                  </div>
-                ))}
-              </div>
-            )}
+        <div className="grid grid-cols-1 gap-4">
+          <StatCard icon={Repeat} value={formatNZD(mrr)} label="Monthly retainers" />
+          <StatCard icon={TrendingUp} value={formatNZD(pipelineValue)} label="Pipeline value" />
+        </div>
+      </div>
+
+      {/* Secondary stat cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard icon={Briefcase} value={activeJobs ?? 0} label="Active jobs" />
+        <StatCard icon={Clock} value={reviewJobs ?? 0} label="Awaiting review" />
+        <StatCard icon={Users} value={leadsInPipeline ?? 0} label="Leads in pipeline" />
+        <div className="card flex flex-col">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="stat-icon-bubble bubble-sm">
+              <Camera className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Shoots today</p>
+              <p className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>{(todayShoots ?? []).length} scheduled</p>
+            </div>
           </div>
+          {(todayShoots ?? []).length === 0 ? (
+            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Nothing today.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {(todayShoots ?? []).slice(0, 2).map((e) => (
+                <div key={e.id} className="flex items-center justify-between gap-2">
+                  <span className="text-xs truncate" style={{ color: 'var(--text-primary)' }}>{e.title}</span>
+                  {e.start_time && <span className="text-[11px] whitespace-nowrap" style={{ color: 'var(--text-tertiary)' }}>{e.start_time}</span>}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -225,7 +248,7 @@ export default async function DashboardPage() {
               <Link
                 key={stage.key}
                 href={`/dashboard/jobs?status=${stage.statuses[0]}`}
-                className="relative box-inset-lg transition-all hover:-translate-y-0.5"
+                className="relative box-inset-lg"
                 style={{ borderTop: '3px solid var(--accent)' }}
               >
                 <div className="text-[10px] uppercase tracking-wider mb-1.5 font-semibold" style={{ color: 'var(--text-tertiary)' }}>
@@ -280,4 +303,14 @@ function StatCard({ icon: Icon, value, label }: { icon: React.ComponentType<{ cl
       <div className="stat-label">{label}</div>
     </div>
   )
+}
+
+function ChangeBadge({ pct }: { pct: number }) {
+  const rounded = Math.abs(pct) >= 100 ? Math.round(pct) : Math.round(pct * 10) / 10
+  if (pct === 0) {
+    return <span className="stat-change stat-change-flat">0%</span>
+  }
+  const cls = pct > 0 ? 'stat-change-up' : 'stat-change-down'
+  const arrow = pct > 0 ? '↑' : '↓'
+  return <span className={`stat-change ${cls}`}>{arrow} {Math.abs(rounded)}%</span>
 }
