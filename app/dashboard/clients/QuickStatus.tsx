@@ -6,7 +6,7 @@ import { Check } from 'lucide-react'
 import { updateClientStatus } from '@/app/actions/clients'
 import { statusLabel, statusBadgeClass } from '@/lib/format'
 
-const OPTIONS = ['active', 'lead', 'past', 'archived']
+const OPTIONS = ['active', 'retainer', 'marketing', 'lead', 'past', 'archived']
 
 export default function QuickStatus({ clientId, status }: { clientId: string; status: string }) {
   const [current, setCurrent] = useState(status)

@@ -24,6 +24,7 @@ type ClientData = {
   pipelineStage: string
   status: string
   lifetimeValue: number
+  monthlyRetainer: number | null
   notes: string | null
   tags: string | null
   portalToken: string | null
@@ -198,7 +199,19 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
               <CustomSelect
                 name="status"
                 defaultValue={client.status}
-                options={['lead', 'active', 'past', 'archived'].map((s) => ({ value: s, label: statusLabel(s) }))}
+                options={['lead', 'active', 'retainer', 'marketing', 'past', 'archived'].map((s) => ({ value: s, label: statusLabel(s) }))}
+              />
+            </div>
+            <div>
+              <label className="field-label">Monthly Retainer</label>
+              <input
+                name="monthlyRetainer"
+                type="number"
+                min="0"
+                step="0.01"
+                defaultValue={client.monthlyRetainer ?? ''}
+                className="field-input"
+                placeholder="e.g. 480 — leave blank if not a retainer"
               />
             </div>
           </div>

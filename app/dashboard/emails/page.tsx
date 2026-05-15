@@ -12,6 +12,12 @@ const TYPE_BADGE: Record<string, string> = {
   delivery: 'badge-accent',
   revision: 'badge-warning',
   approval: 'badge-success',
+  document_to_client: 'badge-accent',
+  admin_document_signed: 'badge-success',
+  admin_delivery_viewed: 'badge-muted',
+  admin_delivery_approved: 'badge-success',
+  admin_revision_requested: 'badge-warning',
+  morning_briefing: 'badge-muted',
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -21,6 +27,12 @@ const TYPE_LABEL: Record<string, string> = {
   delivery: 'Delivery',
   revision: 'Revision',
   approval: 'Approval',
+  document_to_client: 'Document',
+  admin_document_signed: 'Signed',
+  admin_delivery_viewed: 'Viewed',
+  admin_delivery_approved: 'Approved (admin)',
+  admin_revision_requested: 'Revision (admin)',
+  morning_briefing: 'Briefing',
 }
 
 type EmailLog = {

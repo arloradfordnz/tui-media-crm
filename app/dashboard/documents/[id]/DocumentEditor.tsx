@@ -27,7 +27,9 @@ function parseContent(content: string): { template: string; form: DocFormShape; 
   if (!content) return null
   try {
     const obj = JSON.parse(content)
-    if (obj && typeof obj === 'object' && 'template' in obj && 'form' in obj) {
+    // Accept docs missing `template` (older or bug-affected rows) — default
+    // the template so the editor and parsed form still render.
+    if (obj && typeof obj === 'object' && 'form' in obj) {
       const f = (obj.form ?? {}) as Record<string, unknown>
       const get = (k: string) => (typeof f[k] === 'string' ? (f[k] as string) : '')
       const rawFb = Array.isArray((obj as { feedback?: unknown }).feedback)

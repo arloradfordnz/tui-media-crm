@@ -8,6 +8,8 @@ import QuickStatus from './QuickStatus'
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
+  { value: 'retainer', label: 'Retainer' },
+  { value: 'marketing', label: 'Marketing' },
   { value: 'lead', label: 'Lead' },
   { value: 'past', label: 'Past' },
   { value: 'archived', label: 'Archived' },

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
 import { sendMorningBriefingEmail } from '@/lib/email'
+import { fetchXeroSummary } from '@/lib/xero'
 
 const LAT = -41.2706
 const LNG = 173.2840
@@ -52,8 +53,9 @@ export async function GET(req: NextRequest) {
     reviewRes,
     overdueRes,
     weekJobsRes,
-    incomeJobsRes,
     leadsRes,
+    pendingRevisionsRes,
+    xeroSummary,
   ] = await Promise.all([
     fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LNG}&current=temperature_2m,weather_code,wind_speed_10m&timezone=Pacific%2FAuckland`),
     supabase.from('todos').select('title, due_date, jobs:linked_job_id(name)').eq('completed', false).order('due_date', { ascending: true, nullsFirst: false }).limit(20),
@@ -62,13 +64,17 @@ export async function GET(req: NextRequest) {
     supabase.from('jobs').select('name, clients(name)').eq('status', 'review'),
     supabase.from('todos').select('id').eq('completed', false).not('due_date', 'is', null).lt('due_date', todayISO),
     supabase.from('jobs').select('id').gte('updated_at', weekAgoISO).not('status', 'in', '("delivered","archived")'),
-    // Pull every unpaid job with predicted-income fields. Falls back to an empty list if
-    // the migration_morning_brief.sql columns aren't in the database yet.
-    supabase.from('jobs').select('name, status, quote_value, expected_amount, expected_payment_date, paid_at, clients(name)').is('paid_at', null).not('status', 'eq', 'archived').then(
-      (r) => r,
-      () => ({ data: [], error: { message: 'income query failed' } } as { data: unknown[]; error: { message: string } }),
-    ),
     supabase.from('clients').select('id').eq('status', 'lead'),
+    // Pending revisions — revisions on jobs still in 'editing' status
+    supabase.from('revisions')
+      .select('round, request, created_at, jobs(name, status, clients(name))')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(10),
+    fetchXeroSummary().catch((err) => {
+      console.error('[morning brief] Xero fetch failed:', err)
+      return null
+    }),
   ])
 
   const raw = weatherRes.ok ? await weatherRes.json() : null
@@ -78,42 +84,14 @@ export async function GET(req: NextRequest) {
     windKph: Math.round(raw.current.wind_speed_10m),
   } : null
 
-  // ── Income forecast ───────────────────────────────────────────────────────
-  type IncomeJob = {
-    name: string
-    status: string
-    quote_value: number | null
-    expected_amount: number | null
-    expected_payment_date: string | null
-    clients: { name: string } | null
+  // ── Pending revisions ─────────────────────────────────────────────────────
+  type PendingRevision = {
+    round: number
+    request: string
+    created_at: string
+    jobs: { name: string; status: string; clients: { name: string } | null } | null
   }
-  if (incomeJobsRes.error) {
-    console.warn('[morning brief] income query skipped — run supabase/migration_morning_brief.sql:', incomeJobsRes.error.message)
-  }
-  const incomeJobs = ((incomeJobsRes.data ?? []) as unknown) as IncomeJob[]
-
-  const amountFor = (j: IncomeJob) => Number(j.expected_amount ?? j.quote_value ?? 0)
-  const inRange = (date: string | null, fromISO: string, toISO: string) =>
-    !!date && date >= fromISO && date <= toISO
-
-  const expectedThisWeek = incomeJobs
-    .filter((j) => inRange(j.expected_payment_date, todayISO, weekAheadISO))
-    .reduce((sum, j) => sum + amountFor(j), 0)
-
-  const expectedThisMonth = incomeJobs
-    .filter((j) => inRange(j.expected_payment_date, monthStart, monthEnd))
-    .reduce((sum, j) => sum + amountFor(j), 0)
-
-  const upcomingPayments = incomeJobs
-    .filter((j) => j.expected_payment_date && j.expected_payment_date >= todayISO)
-    .sort((a, b) => (a.expected_payment_date ?? '').localeCompare(b.expected_payment_date ?? ''))
-    .slice(0, 5)
-    .map((j) => ({
-      name: j.name,
-      clientName: j.clients?.name ?? null,
-      amount: amountFor(j),
-      dueDate: j.expected_payment_date!,
-    }))
+  const pendingRevisions = ((pendingRevisionsRes.data ?? []) as unknown) as PendingRevision[]
 
   // ── AI summary (best-effort; never fail the cron) ─────────────────────────
   let aiSummary: string | null = null
@@ -125,20 +103,25 @@ export async function GET(req: NextRequest) {
         open_todos: (todosRes.data ?? []).length,
         overdue_todos: (overdueRes.data ?? []).length,
         events_today: (todayEventsRes.data ?? []).length,
-        events_this_week: (upcomingRes.data ?? []).length,
         jobs_active_this_week: (weekJobsRes.data ?? []).length,
         jobs_in_review: (reviewRes.data ?? []).length,
-        new_leads_open: (leadsRes.data ?? []).length,
-        income_expected_this_week_nzd: Math.round(expectedThisWeek),
-        income_expected_this_month_nzd: Math.round(expectedThisMonth),
-        upcoming_payments: upcomingPayments.map((p) => ({ job: p.name, amount: p.amount, due: p.dueDate })),
+        pending_revisions: pendingRevisions.length,
+        open_leads: (leadsRes.data ?? []).length,
+        xero: xeroSummary ? {
+          bank_balance_nzd: xeroSummary.bank_balance_nzd,
+          outstanding_invoices_nzd: xeroSummary.outstanding_invoices_nzd,
+          outstanding_invoice_count: xeroSummary.outstanding_invoice_count,
+          overdue_invoices_nzd: xeroSummary.overdue_invoices_nzd,
+          revenue_this_month_nzd: xeroSummary.revenue_this_month_nzd,
+          net_profit_this_month_nzd: xeroSummary.net_profit_this_month_nzd,
+        } : null,
       }
       const message = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 350,
-        system: `You are Arlo's morning advisor for Tui Media (videography, photography and marketing — sole operator, Nelson NZ). Read the snapshot and give 2-4 short sentences of practical focus for the day: what to prioritise, what to nudge forward, and one specific business-health observation if anything stands out (cashflow gap, stale review, lead drought, etc). NZ tone, direct, no filler, no markdown, no greetings.`,
+        max_tokens: 120,
+        system: `You are Arlo's morning advisor for Tui Media (videography/photography/marketing, sole operator, Nelson NZ). Give 1-2 punchy sentences on what to focus on today. Prioritise: overdue items, pending client revisions, overdue invoices. NZ tone, no fluff, no markdown, no greeting.`,
         messages: [
-          { role: 'user', content: `Today's snapshot:\n\n${JSON.stringify(snapshot, null, 2)}` },
+          { role: 'user', content: JSON.stringify(snapshot) },
         ],
       })
       aiSummary = message.content
@@ -176,11 +159,13 @@ export async function GET(req: NextRequest) {
       clientName: (j.clients as unknown as { name: string } | null)?.name ?? null,
     })),
     weekJobCount: (weekJobsRes.data ?? []).length,
-    income: {
-      expectedThisWeek,
-      expectedThisMonth,
-      upcomingPayments,
-    },
+    xero: xeroSummary,
+    pendingRevisions: pendingRevisions.map((r) => ({
+      round: r.round,
+      request: r.request,
+      jobName: (r.jobs as unknown as { name: string } | null)?.name ?? null,
+      clientName: (r.jobs as unknown as { clients: { name: string } | null } | null)?.clients?.name ?? null,
+    })),
     aiSummary,
   })
 
@@ -192,7 +177,8 @@ export async function GET(req: NextRequest) {
       todayEvents: (todayEventsRes.data ?? []).length,
       upcomingEvents: (upcomingRes.data ?? []).length,
       reviewJobs: (reviewRes.data ?? []).length,
-      upcomingPayments: upcomingPayments.length,
+      pendingRevisions: pendingRevisions.length,
+      xeroConnected: !!xeroSummary,
     },
   })
 }

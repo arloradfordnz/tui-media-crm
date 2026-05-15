@@ -324,8 +324,18 @@ type BriefingTodo = { title: string; dueDate: string | null; isOverdue: boolean;
 type BriefingEvent = { title: string; startTime: string | null; jobName: string | null }
 type BriefingUpcoming = { title: string; date: string; jobName: string | null }
 type BriefingJob = { name: string; clientName: string | null }
+type BriefingRevision = { round: number; request: string; jobName: string | null; clientName: string | null }
 
-type BriefingPayment = { name: string; clientName: string | null; amount: number; dueDate: string }
+type XeroSummaryData = {
+  org_name: string | null
+  bank_balance_nzd: number | null
+  outstanding_invoices_nzd: number
+  outstanding_invoice_count: number
+  overdue_invoices_nzd: number
+  overdue_invoice_count: number
+  revenue_this_month_nzd: number | null
+  net_profit_this_month_nzd: number | null
+}
 
 export type MorningBriefingData = {
   date: Date
@@ -336,11 +346,8 @@ export type MorningBriefingData = {
   upcomingEvents: BriefingUpcoming[]
   reviewJobs: BriefingJob[]
   weekJobCount: number
-  income?: {
-    expectedThisWeek: number
-    expectedThisMonth: number
-    upcomingPayments: BriefingPayment[]
-  }
+  xero?: XeroSummaryData | null
+  pendingRevisions?: BriefingRevision[]
   aiSummary?: string | null
 }
 
@@ -362,7 +369,7 @@ function section(label: string, content: string) {
 }
 
 export async function sendMorningBriefingEmail(data: MorningBriefingData) {
-  const { date, weather, todos, overdueCount, todayEvents, upcomingEvents, reviewJobs, weekJobCount, income, aiSummary } = data
+  const { date, weather, todos, overdueCount, todayEvents, upcomingEvents, reviewJobs, weekJobCount, xero, pendingRevisions, aiSummary } = data
 
   const dayLabel = date.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   const shortDay = date.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })
@@ -401,24 +408,41 @@ export async function sendMorningBriefingEmail(data: MorningBriefingData) {
         return `<p style="color:#a3a3a3;font-size:15px;line-height:1.6;margin:0 0 10px;"><span style="color:#555;font-size:13px;">${fmtShortDate(e.date)} &mdash;</span> ${e.title}${jobPart}</p>`
       }).join('')
 
-  // Income forecast — built from job.expected_amount + job.expected_payment_date.
-  const hasIncome = !!income && (income.expectedThisWeek > 0 || income.expectedThisMonth > 0 || income.upcomingPayments.length > 0)
-  const upcomingPaymentsHtml = income && income.upcomingPayments.length > 0
-    ? income.upcomingPayments.map((p) => {
-        const clientPart = p.clientName ? ` <span style="color:#555;font-size:13px;">&mdash; ${p.clientName}</span>` : ''
-        return `<p style="color:#a3a3a3;font-size:14px;line-height:1.6;margin:0 0 6px;"><span style="color:#555;font-size:13px;">${fmtShortDate(p.dueDate)} &mdash;</span> ${p.name}${clientPart} <span style="color:#f5f5f5;">${fmtNZD(p.amount)}</span></p>`
-      }).join('')
-    : ''
-  const revenueContent = hasIncome && income
+  // Financials — from Xero
+  const revenueContent = xero
     ? `
-        <p style="color:#f5f5f5;font-size:22px;font-weight:700;margin:0 0 4px;">${fmtNZD(income.expectedThisMonth)} <span style="color:#555;font-size:13px;font-weight:400;">expected this month</span></p>
-        <p style="color:#a3a3a3;font-size:14px;margin:0 0 14px;">${fmtNZD(income.expectedThisWeek)} expected this week &middot; ${weekJobCount} active job${weekJobCount === 1 ? '' : 's'}</p>
-        ${upcomingPaymentsHtml}
+        ${xero.revenue_this_month_nzd != null
+          ? `<p style="color:#f5f5f5;font-size:22px;font-weight:700;margin:0 0 4px;">${fmtNZD(xero.revenue_this_month_nzd)} <span style="color:#555;font-size:13px;font-weight:400;">revenue this month</span></p>`
+          : ''}
+        ${xero.net_profit_this_month_nzd != null
+          ? `<p style="color:#a3a3a3;font-size:14px;margin:0 0 12px;">Net profit: <span style="color:#f5f5f5;">${fmtNZD(xero.net_profit_this_month_nzd)}</span></p>`
+          : ''}
+        ${xero.bank_balance_nzd != null
+          ? `<p style="color:#a3a3a3;font-size:14px;margin:0 0 12px;">Bank: <span style="color:#f5f5f5;">${fmtNZD(xero.bank_balance_nzd)}</span></p>`
+          : ''}
+        ${xero.outstanding_invoice_count > 0
+          ? `<p style="color:#a3a3a3;font-size:14px;margin:0 0 6px;">Outstanding invoices: <span style="color:#f5f5f5;">${fmtNZD(xero.outstanding_invoices_nzd)}</span> &middot; ${xero.outstanding_invoice_count} invoice${xero.outstanding_invoice_count !== 1 ? 's' : ''}</p>`
+          : ''}
+        ${xero.overdue_invoice_count > 0
+          ? `<p style="color:#f87171;font-size:14px;margin:0 0 6px;">Overdue: ${fmtNZD(xero.overdue_invoices_nzd)} &middot; ${xero.overdue_invoice_count} invoice${xero.overdue_invoice_count !== 1 ? 's' : ''}</p>`
+          : ''}
+        <p style="color:#555;font-size:13px;margin:8px 0 0;">Active jobs this week: <span style="color:#f5f5f5;">${weekJobCount}</span></p>
       `
-    : `
-        <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 8px;">Add an expected amount &amp; payment date to your jobs to see your forecast here.</p>
-        <p style="color:#555;font-size:13px;margin:0;">Active jobs this week: <span style="color:#f5f5f5;">${weekJobCount}</span></p>
-      `
+    : `<p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 8px;">Connect Xero in settings to see live financials here.</p>
+       <p style="color:#555;font-size:13px;margin:0;">Active jobs this week: <span style="color:#f5f5f5;">${weekJobCount}</span></p>`
+
+  // Pending client revisions
+  const revisionsContent = pendingRevisions && pendingRevisions.length > 0
+    ? pendingRevisions.map((r) => {
+        const who = r.clientName ? `<span style="color:#7790ed;font-size:13px;">${r.clientName}</span>` : ''
+        const job = r.jobName ? `<span style="color:#f5f5f5;font-size:14px;">${r.jobName}</span>` : ''
+        const preview = r.request.length > 120 ? r.request.slice(0, 120) + '…' : r.request
+        return `<div style="margin:0 0 14px;">
+          <p style="color:#a3a3a3;font-size:14px;margin:0 0 4px;">${job}${who ? ' &mdash; ' : ''}${who} <span style="color:#555;font-size:12px;">Round ${r.round}</span></p>
+          <p style="color:#555;font-size:13px;line-height:1.5;margin:0;">${preview.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+        </div>`
+      }).join('')
+    : null
 
   const aiSummaryContent = aiSummary
     ? `<p style="color:#d4d4d4;font-size:15px;line-height:1.7;margin:0;">${aiSummary.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>')}</p>`
@@ -443,7 +467,8 @@ export async function sendMorningBriefingEmail(data: MorningBriefingData) {
     <p style="color:#555;font-size:14px;margin:0;">${dayLabel}</p>
     ${section('Weather', weatherContent)}
     ${aiSummaryContent ? section('Focus For Today', aiSummaryContent) : ''}
-    ${section('Income Forecast', revenueContent)}
+    ${section('Financials', revenueContent)}
+    ${revisionsContent ? section('Client Revisions Pending', revisionsContent) : ''}
     ${section(`To Do — ${todoLabel}`, todoContent)}
     ${section("Today's Schedule", todayContent)}
     ${section('Coming Up This Week', upcomingContent)}

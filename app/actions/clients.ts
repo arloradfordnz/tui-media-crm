@@ -27,10 +27,12 @@ export async function createClient(prevState: { error?: string } | undefined, fo
   const status = formData.get('status') as string
   const notes = formData.get('notes') as string
   const tagsRaw = formData.get('tags') as string
+  const monthlyRetainerRaw = formData.get('monthlyRetainer') as string
 
   if (!name) return { error: 'Client / business name is required.' }
 
   const tags = tagsRaw ? JSON.stringify(tagsRaw.split(',').map((t: string) => t.trim()).filter(Boolean)) : null
+  const monthlyRetainer = monthlyRetainerRaw ? parseFloat(monthlyRetainerRaw) : null
 
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.from('clients').insert({
@@ -45,6 +47,7 @@ export async function createClient(prevState: { error?: string } | undefined, fo
     status: status || 'lead',
     notes: notes || null,
     tags,
+    monthly_retainer: monthlyRetainer,
   })
 
   if (error) return { error: error.message }
@@ -70,10 +73,12 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
   const status = formData.get('status') as string
   const notes = formData.get('notes') as string
   const tagsRaw = formData.get('tags') as string
+  const monthlyRetainerRaw = formData.get('monthlyRetainer') as string
 
   if (!name) return { error: 'Client / business name is required.' }
 
   const tags = tagsRaw ? JSON.stringify(tagsRaw.split(',').map((t: string) => t.trim()).filter(Boolean)) : null
+  const monthlyRetainer = monthlyRetainerRaw ? parseFloat(monthlyRetainerRaw) : null
 
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.from('clients').update({
@@ -88,6 +93,7 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
     status,
     notes: notes || null,
     tags,
+    monthly_retainer: monthlyRetainer,
   }).eq('id', clientId)
 
   if (error) return { error: error.message }
@@ -98,7 +104,7 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
 }
 
 export async function updateClientStatus(clientId: string, status: string) {
-  const allowed = ['active', 'lead', 'past', 'archived']
+  const allowed = ['active', 'retainer', 'marketing', 'lead', 'past', 'archived']
   if (!allowed.includes(status)) return { error: 'Invalid status.' }
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.from('clients').update({ status }).eq('id', clientId)

@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@/lib/format'
-import { Briefcase, Clock, DollarSign, Users, CalendarDays, Activity, Plus, UserPlus, Camera, TrendingUp, ArrowRight, Sparkles, ArrowUpRight } from 'lucide-react'
+import { Briefcase, Clock, DollarSign, Users, CalendarDays, Activity, Plus, UserPlus, Camera, TrendingUp, ArrowRight, Sparkles, ArrowUpRight, Repeat } from 'lucide-react'
 import TodoWidget from './TodoWidget'
 import BusinessHealth from './BusinessHealth'
 import Link from 'next/link'
@@ -40,6 +40,7 @@ export default async function DashboardPage() {
     { data: upcomingEvents },
     { data: recentActivity },
     { data: revenueHistory },
+    { data: retainerClients },
   ] = await Promise.all([
     supabase.from('jobs').select('*', { count: 'exact', head: true }).not('status', 'in', '("delivered","archived")'),
     supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('status', 'review'),
@@ -50,9 +51,11 @@ export default async function DashboardPage() {
     supabase.from('events').select('id, title, event_type, date, start_time, job_id, jobs(id, name)').gte('date', todayStart).order('date', { ascending: true }).limit(5),
     supabase.from('activities').select('id, action, details, created_at, job_id, jobs(id, name), client_id, clients(id, name)').order('created_at', { ascending: false }).limit(5),
     supabase.from('jobs').select('quote_value, created_at').eq('status', 'delivered').gte('created_at', sixMonthsAgo),
+    supabase.from('clients').select('id, name, monthly_retainer').eq('status', 'retainer'),
   ])
 
   const revenueThisMonth = (deliveredThisMonth ?? []).reduce((sum, j) => sum + (j.quote_value || 0), 0)
+  const mrr = (retainerClients ?? []).reduce((sum, c) => sum + ((c as { monthly_retainer?: number }).monthly_retainer || 0), 0)
   const pipelineValue = (pipelineJobs ?? [])
     .filter((j) => !['delivered', 'archived'].includes(j.status))
     .reduce((sum, j) => sum + ((j as { status: string; quote_value?: number }).quote_value || 0), 0)
@@ -107,11 +110,12 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Stat cards — all uniform with icon bubbles */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard icon={DollarSign} value={formatNZD(revenueThisMonth)} label="Revenue this month" />
         <StatCard icon={TrendingUp} value={formatNZD(pipelineValue)} label="Pipeline value" />
-        <StatCard icon={Briefcase} value={activeJobs ?? 0} label="Active jobs" />
+        <StatCard icon={Repeat} value={formatNZD(mrr)} label="Monthly retainers" />
+        <StatCard icon={Users} value={activeJobs ?? 0} label="Active jobs" />
         <StatCard icon={Clock} value={reviewJobs ?? 0} label="Awaiting review" />
       </div>
 
@@ -121,9 +125,7 @@ export default async function DashboardPage() {
           <SectionHeader icon={TrendingUp} title="Revenue trend" subtitle="Delivered jobs · last 6 months">
             <span className="badge badge-accent">{formatNZD(months.reduce((s, m) => s + m.value, 0))}</span>
           </SectionHeader>
-          <div className="box-inset-lg" style={{ padding: '0.5rem' }}>
-            <RevenueChart data={months} />
-          </div>
+          <RevenueChart data={months} />
         </div>
 
         <div className="grid grid-cols-1 gap-4 grid-rows-[auto_1fr]">

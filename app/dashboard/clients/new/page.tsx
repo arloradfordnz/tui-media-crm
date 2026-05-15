@@ -10,7 +10,7 @@ import DatePicker from '@/components/DatePicker'
 
 const LEAD_SOURCES = ['Referral', 'Website', 'Social Media', 'Google', 'Word of Mouth', 'Other']
 const PIPELINE_STAGES = ['enquiry', 'discovery', 'proposal', 'negotiation', 'won']
-const STATUSES = ['lead', 'active']
+const STATUSES = ['lead', 'active', 'retainer', 'marketing']
 
 export default function NewClientPage() {
   const [state, action, pending] = useActionState(createClient, undefined)
@@ -72,6 +72,10 @@ export default function NewClientPage() {
               defaultValue="lead"
               options={STATUSES.map((s) => ({ value: s, label: statusLabel(s) }))}
             />
+          </div>
+          <div>
+            <label className="field-label">Monthly Retainer</label>
+            <input name="monthlyRetainer" type="number" min="0" step="0.01" className="field-input" placeholder="e.g. 480 — leave blank if not a retainer" />
           </div>
         </div>
 

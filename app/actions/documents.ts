@@ -2,7 +2,19 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { sendAdminDocumentSignedEmail } from '@/lib/email'
+
+// Service-role client bypasses RLS. The portal/client table is anon-readable
+// but anon cannot UPDATE documents/INSERT activities — we authorise the
+// request ourselves via the portal_token match.
+function getAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return null
+  return createServiceClient(url, key)
+}
 
 export async function createDocument(prevState: { error?: string } | undefined, formData: FormData) {
   const name = formData.get('name') as string
@@ -35,17 +47,23 @@ export async function updateDocument(prevState: { error?: string } | undefined, 
 
   const supabase = await createServerSupabaseClient()
 
-  // Preserve client-side feedback (and any other fields outside template/form) from being overwritten by the editor save
+  // Preserve client-only fields (feedback array, signature) — the editor form
+  // doesn't track these, so a save would otherwise wipe them.
   let mergedContent = content || ''
   try {
     const incoming = content ? JSON.parse(content) : null
     if (incoming && typeof incoming === 'object') {
       const { data: existing } = await supabase.from('documents').select('content').eq('id', docId).single()
       if (existing?.content) {
-        const prior = JSON.parse(existing.content)
-        if (prior && typeof prior === 'object' && Array.isArray((prior as { feedback?: unknown }).feedback)) {
-          mergedContent = JSON.stringify({ ...incoming, feedback: (prior as { feedback: unknown[] }).feedback })
+        const prior = JSON.parse(existing.content) as { feedback?: unknown; form?: Record<string, unknown> }
+        const merged = { ...incoming } as { feedback?: unknown; form?: Record<string, unknown> }
+        if (Array.isArray(prior?.feedback)) merged.feedback = prior.feedback
+        const priorSig = prior?.form?.clientSignature
+        const priorSignedAt = prior?.form?.clientSignedAt
+        if (priorSig) {
+          merged.form = { ...(merged.form ?? {}), clientSignature: priorSig, clientSignedAt: priorSignedAt }
         }
+        mergedContent = JSON.stringify(merged)
       }
     }
   } catch { /* keep original content */ }
@@ -76,12 +94,14 @@ export async function signDocumentByClient(
   if (!signature) return { error: 'Please type your full name to sign.' }
 
   const supabase = await createServerSupabaseClient()
+  const admin = getAdminClient()
+  if (!admin) return { error: 'Server is missing SUPABASE_SERVICE_ROLE_KEY — signature cannot be saved.' }
 
   // Authorise: the document's client must match the client the portal token belongs to.
   // Both reads are independent; run in parallel.
   const [docRes, clientRes] = await Promise.all([
-    supabase.from('documents').select('id, content, client_id').eq('id', docId).single(),
-    supabase.from('clients').select('id, name').eq('portal_token', portalToken).single(),
+    supabase.from('documents').select('id, name, content, client_id').eq('id', docId).single(),
+    supabase.from('clients').select('id, name, email').eq('portal_token', portalToken).single(),
   ])
   const doc = docRes.data
   const client = clientRes.data
@@ -98,24 +118,42 @@ export async function signDocumentByClient(
   }
   const signedAt = new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
   const nextForm = { ...(parsed.form || {}), clientSignature: signature, clientSignedAt: signedAt }
-  const nextContent = JSON.stringify({ ...parsed, form: nextForm })
+  // Ensure a template is always present — the portal/editor parsers require
+  // both `template` and `form` keys to recognise a structured doc, and a
+  // missing template would otherwise hide the signed state.
+  const nextTemplate = typeof parsed.template === 'string' && parsed.template
+    ? parsed.template
+    : 'Contract'
+  const nextContent = JSON.stringify({ ...parsed, template: nextTemplate, form: nextForm })
+
+  // Use the service-role client so the write isn't dropped by RLS — anon has
+  // SELECT but no UPDATE policy on documents.
+  const { error: updateError } = await admin
+    .from('documents')
+    .update({ content: nextContent, doc_type: 'contract' })
+    .eq('id', docId)
+  if (updateError) return { error: 'Could not save signature. Please try again.' }
 
   await Promise.all([
-    supabase.from('documents').update({ content: nextContent, doc_type: 'contract' }).eq('id', docId),
-    supabase.from('activities').insert({
+    admin.from('activities').insert({
       action: 'document_signed',
-      details: `${client.name} signed "${signature}" on a document`,
+      details: `${client.name} signed "${signature}" on ${doc.name}`,
       client_id: client.id,
     }),
-    supabase.from('notifications').insert({
+    admin.from('notifications').insert({
       title: 'Document Signed',
-      message: `${client.name} signed a document (${signature})`,
+      message: `${client.name} signed ${doc.name} (${signature})`,
       type: 'document_signed',
       client_id: client.id,
     }),
+    sendAdminDocumentSignedEmail(client.name, doc.name, signature, signedAt, client.id).catch((e) => {
+      console.error('Admin signed-email failed:', e)
+    }),
   ])
 
-  revalidatePath('/portal/')
+  revalidatePath(`/portal/client/${portalToken}`)
+  revalidatePath(`/dashboard/documents/${docId}`)
+  revalidatePath('/dashboard/documents')
   return { success: true }
 }
 
