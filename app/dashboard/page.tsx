@@ -1,6 +1,9 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { fetchXeroTransactions } from '@/lib/xero'
+
+export const dynamic = 'force-dynamic'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@/lib/format'
-import { Plus, UserPlus, ArrowRight, ArrowUpRight } from 'lucide-react'
+import { Plus, UserPlus, ArrowRight, ArrowUpRight, Briefcase, Clock, Users, TrendingUp, RefreshCw } from 'lucide-react'
 import TodoWidget from './TodoWidget'
 import BusinessHealth from './BusinessHealth'
 import Link from 'next/link'
@@ -53,12 +56,59 @@ export default async function DashboardPage() {
     supabase.from('events').select('id, title, start_time, end_time, job_id, jobs(id, name)').eq('event_type', 'shoot').gte('date', todayStart).lt('date', todayEnd).order('start_time', { ascending: true }),
     supabase.from('events').select('id, title, event_type, date, start_time, job_id, jobs(id, name)').gte('date', todayStart).order('date', { ascending: true }).limit(5),
     supabase.from('activities').select('id, action, details, created_at, job_id, jobs(id, name), client_id, clients(id, name)').order('created_at', { ascending: false }).limit(5),
-    supabase.from('jobs').select('quote_value, updated_at').eq('status', 'delivered').gte('updated_at', sixMonthsAgo),
+    supabase.from('jobs').select('quote_value, updated_at').in('status', ['delivered', 'archived']).gte('updated_at', sixMonthsAgo),
     supabase.from('clients').select('id, name, monthly_retainer').eq('status', 'retainer'),
   ])
 
-  const revenueThisMonth = (deliveredThisMonth ?? []).reduce((sum, j) => sum + (j.quote_value || 0), 0)
-  const revenuePrevMonth = (deliveredPrevMonth ?? []).reduce((sum, j) => sum + (j.quote_value || 0), 0)
+  const crmRevenueThisMonth = (deliveredThisMonth ?? []).reduce((sum, j) => sum + (j.quote_value || 0), 0)
+  const crmRevenuePrevMonth = (deliveredPrevMonth ?? []).reduce((sum, j) => sum + (j.quote_value || 0), 0)
+
+  // Try to pull live Xero revenue from transactions (same source as Finance page).
+  // Only requires transactions — summary is not needed here.
+  let xeroRevenue: { thisMonth: number; lastMonth: number } | null = null
+  let xeroChartMonths: { label: string; value: number }[] | null = null
+  try {
+    const xt = await fetchXeroTransactions()
+    if (xt != null) {
+      const paidIn = xt.filter((t) => t.type === 'in' && t.status === 'PAID')
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
+      const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 10)
+      const thisMonthRev = paidIn.filter((t) => t.date >= monthStart).reduce((s, t) => s + t.amount, 0)
+      const lastMonthRev = paidIn.filter((t) => t.date >= prevMonthStart && t.date < monthStart).reduce((s, t) => s + t.amount, 0)
+      xeroRevenue = { thisMonth: Math.round(thisMonthRev), lastMonth: Math.round(lastMonthRev) }
+      xeroChartMonths = Array.from({ length: 6 }, (_, i) => {
+        const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1)
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        return {
+          label: d.toLocaleString('en-NZ', { month: 'short' }),
+          value: Math.round(paidIn.filter((t) => t.date.startsWith(key)).reduce((s, t) => s + t.amount, 0)),
+        }
+      })
+    }
+  } catch (err) { console.error('[Dashboard] Xero fetch error:', err) }
+
+  const months: { label: string; value: number }[] = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    months.push({ label: d.toLocaleString('en-NZ', { month: 'short' }), value: 0 })
+  }
+  for (const j of revenueHistory ?? []) {
+    const d = new Date(j.updated_at)
+    const idx = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth())
+    const slot = 5 - idx
+    if (slot >= 0 && slot < 6) months[slot].value += j.quote_value || 0
+  }
+
+  const revenueThisMonth = xeroRevenue ? xeroRevenue.thisMonth : crmRevenueThisMonth
+  const revenuePrevMonth = xeroRevenue ? xeroRevenue.lastMonth : crmRevenuePrevMonth
+  const revenueSource = xeroRevenue ? 'Live from Xero' : 'Based on delivered jobs in CRM'
+  // For the CRM fallback chart, patch in the already-computed hero values so current/prev month always show
+  const crmChartMonths = months.map((m, i) => {
+    if (i === 5) return { ...m, value: crmRevenueThisMonth }
+    if (i === 4) return { ...m, value: crmRevenuePrevMonth }
+    return m
+  })
+  const chartData = xeroChartMonths ?? crmChartMonths
   const revenueChangePct = revenuePrevMonth > 0
     ? ((revenueThisMonth - revenuePrevMonth) / revenuePrevMonth) * 100
     : revenueThisMonth > 0 ? 100 : 0
@@ -74,18 +124,6 @@ export default async function DashboardPage() {
     if (stage) stageCounts[stage.key]++
   }
   const inFlightJobs = PIPELINE_STAGES.reduce((sum, s) => sum + stageCounts[s.key], 0)
-
-  const months: { label: string; value: number }[] = []
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    months.push({ label: d.toLocaleString('en-NZ', { month: 'short' }), value: 0 })
-  }
-  for (const j of revenueHistory ?? []) {
-    const d = new Date(j.updated_at)
-    const idx = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth())
-    const slot = 5 - idx
-    if (slot >= 0 && slot < 6) months[slot].value += j.quote_value || 0
-  }
 
   const todayLabel = now.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' })
 
@@ -116,7 +154,7 @@ export default async function DashboardPage() {
 
       {/* Revenue chart hero + side stats */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="card lg:col-span-2 space-y-5">
+        <div className="card lg:col-span-2 flex flex-col">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="stat-label" style={{ margin: 0 }}>Revenue</p>
@@ -126,25 +164,67 @@ export default async function DashboardPage() {
                 </span>
                 <ChangeBadge pct={revenueChangePct} />
               </div>
-              <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)' }}>
-                from {formatNZD(revenuePrevMonth)} last month
-              </p>
+              {revenuePrevMonth > 0 && (
+                <p className="text-xs mt-2" style={{ color: 'var(--text-tertiary)' }}>
+                  {revenueThisMonth === 0
+                    ? `Last month: ${formatNZD(revenuePrevMonth)}`
+                    : `vs ${formatNZD(revenuePrevMonth)} last month`}
+                </p>
+              )}
+              <p className="text-[10px] mt-1" style={{ color: 'var(--text-tertiary)', opacity: 0.6 }}>{revenueSource}</p>
             </div>
           </div>
-          <RevenueChart data={months} />
+          <div className="mt-auto">
+            <RevenueChart data={chartData} />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4">
-          <StatCard value={formatNZD(mrr)} label="Monthly retainers" />
-          <StatCard value={formatNZD(pipelineValue)} label="Pipeline value" />
+          {/* Monthly Retainers */}
+          <div className="card flex flex-col gap-3 relative overflow-hidden">
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'var(--success)', borderRadius: '4px 4px 0 0' }} />
+            <div className="flex items-center gap-2 pt-1">
+              <RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--success)' }} />
+              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-tertiary)', letterSpacing: '0.07em' }}>Monthly Retainers</p>
+            </div>
+            <p className="text-3xl font-semibold tabular-nums" style={{ letterSpacing: '-0.03em', color: 'var(--text-primary)', lineHeight: 1 }}>{formatNZD(mrr)}</p>
+            <div className="space-y-1.5">
+              {(retainerClients ?? []).length === 0
+                ? <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>No retainer clients</p>
+                : (retainerClients ?? []).map((c) => (
+                  <div key={c.id} className="flex items-center justify-between gap-2">
+                    <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{c.name}</span>
+                    <span className="text-xs tabular-nums shrink-0" style={{ color: 'var(--text-tertiary)' }}>{formatNZD((c as { monthly_retainer?: number }).monthly_retainer ?? 0)}/mo</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+          {/* Pipeline Value */}
+          <div className="card flex flex-col gap-3 relative overflow-hidden">
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'var(--accent)', borderRadius: '4px 4px 0 0' }} />
+            <div className="flex items-center gap-2 pt-1">
+              <TrendingUp className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-tertiary)', letterSpacing: '0.07em' }}>Pipeline Value</p>
+            </div>
+            <p className="text-3xl font-semibold tabular-nums" style={{ letterSpacing: '-0.03em', color: 'var(--text-primary)', lineHeight: 1 }}>{formatNZD(pipelineValue)}</p>
+            <div className="space-y-1.5">
+              {PIPELINE_STAGES.filter((s) => stageCounts[s.key] > 0).map((s) => (
+                <div key={s.key} className="flex items-center justify-between gap-2">
+                  <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{s.label}</span>
+                  <span className="text-xs tabular-nums shrink-0 font-medium" style={{ color: 'var(--text-tertiary)' }}>{stageCounts[s.key]}</span>
+                </div>
+              ))}
+              {inFlightJobs === 0 && <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>No jobs in flight</p>}
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Secondary stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard value={activeJobs ?? 0} label="Active jobs" />
-        <StatCard value={reviewJobs ?? 0} label="Awaiting review" />
-        <StatCard value={leadsInPipeline ?? 0} label="Leads in pipeline" />
+        <IconStatCard value={activeJobs ?? 0} label="Active jobs" icon={<Briefcase className="w-4 h-4" />} />
+        <IconStatCard value={reviewJobs ?? 0} label="Awaiting review" icon={<Clock className="w-4 h-4" />} accent={reviewJobs ? 'var(--warning)' : undefined} />
+        <IconStatCard value={leadsInPipeline ?? 0} label="Leads in pipeline" icon={<Users className="w-4 h-4" />} />
         <div className="card flex flex-col">
           <div className="mb-3">
             <p className="text-xl font-semibold" style={{ letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>Shoots today</p>
@@ -282,6 +362,18 @@ function StatCard({ value, label }: { value: string | number; label: string }) {
     <div className="stat-card">
       <div className="stat-value truncate">{value}</div>
       <div className="stat-label">{label}</div>
+    </div>
+  )
+}
+
+function IconStatCard({ value, label, icon, accent }: { value: string | number; label: string; icon?: React.ReactNode; accent?: string }) {
+  return (
+    <div className="card flex flex-col gap-2">
+      {icon && (
+        <div style={{ color: accent ?? 'var(--accent)', opacity: 0.8 }}>{icon}</div>
+      )}
+      <div className="text-3xl font-semibold tabular-nums" style={{ letterSpacing: '-0.03em', color: accent ?? 'var(--text-primary)', lineHeight: 1 }}>{value}</div>
+      <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-tertiary)', letterSpacing: '0.07em' }}>{label}</div>
     </div>
   )
 }
