@@ -129,6 +129,7 @@ export async function GET(req: NextRequest) {
             connected: true,
             org_name: xeroSummary.org_name,
             revenue_this_month_nzd: xeroSummary.revenue_this_month_nzd,
+            revenue_last_month_nzd: xeroSummary.revenue_last_month_nzd,
             net_profit_this_month_nzd: xeroSummary.net_profit_this_month_nzd,
             outstanding_invoices_nzd: xeroSummary.outstanding_invoices_nzd,
             outstanding_invoice_count: xeroSummary.outstanding_invoice_count,

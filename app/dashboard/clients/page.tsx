@@ -28,7 +28,11 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
     .select('id, name, email, location, status, lifetime_value, tags, created_at, jobs(quote_value)')
     .order('name', { ascending: true })
 
-  if (statusFilter !== 'all') query = query.eq('status', statusFilter)
+  if (statusFilter === 'active') {
+    query = query.in('status', ['active', 'retainer', 'marketing'])
+  } else if (statusFilter !== 'all') {
+    query = query.eq('status', statusFilter)
+  }
   if (search) query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,location.ilike.%${search}%`)
 
   const { data: clientRows } = await query

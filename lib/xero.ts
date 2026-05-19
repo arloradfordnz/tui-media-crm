@@ -204,6 +204,7 @@ export type XeroSummary = {
   overdue_invoices_nzd: number
   overdue_invoice_count: number
   revenue_this_month_nzd: number | null
+  revenue_last_month_nzd: number | null
   net_profit_this_month_nzd: number | null
 }
 
@@ -223,7 +224,12 @@ export async function fetchXeroSummary(): Promise<XeroSummary | null> {
   const toDate = now.toISOString().slice(0, 10)
   const todayISO = toDate
 
-  const [invoicesRes, bankSummaryRes, plRes] = await Promise.allSettled([
+  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0)
+  const lastMonthStart = new Date(lastMonthEnd.getFullYear(), lastMonthEnd.getMonth(), 1)
+  const lastMonthFromDate = lastMonthStart.toISOString().slice(0, 10)
+  const lastMonthToDate = lastMonthEnd.toISOString().slice(0, 10)
+
+  const [invoicesRes, bankSummaryRes, plRes, plLastMonthRes] = await Promise.allSettled([
     xeroGet<{ Invoices?: Array<{ AmountDue: number; DueDate?: string; Status: string; Type: string }> }>(
       `/Invoices?Statuses=AUTHORISED&page=1&pageSize=200`,
       accessToken,
@@ -236,6 +242,11 @@ export async function fetchXeroSummary(): Promise<XeroSummary | null> {
     ),
     xeroGet<{ Reports?: Array<{ Rows?: Array<{ Title?: string; RowType?: string; Rows?: Array<{ Cells?: Array<{ Value?: string }>; RowType?: string }> }> }> }>(
       `/Reports/ProfitAndLoss?fromDate=${fromDate}&toDate=${toDate}`,
+      accessToken,
+      tenantId,
+    ),
+    xeroGet<{ Reports?: Array<{ Rows?: Array<{ Title?: string; RowType?: string; Rows?: Array<{ Cells?: Array<{ Value?: string }>; RowType?: string }> }> }> }>(
+      `/Reports/ProfitAndLoss?fromDate=${lastMonthFromDate}&toDate=${lastMonthToDate}`,
       accessToken,
       tenantId,
     ),
@@ -317,6 +328,36 @@ export async function fetchXeroSummary(): Promise<XeroSummary | null> {
     netProfitMonth = findRow(/^Net\s+Profit$/i)
   }
 
+  let revenueLastMonth: number | null = null
+  if (plLastMonthRes.status === 'fulfilled') {
+    const rows = plLastMonthRes.value.Reports?.[0]?.Rows ?? []
+    const findRowLast = (label: RegExp): number | null => {
+      for (const section of rows) {
+        if (section.RowType === 'Section') {
+          for (const r of section.Rows ?? []) {
+            const firstVal = r.Cells?.[0]?.Value ?? ''
+            if (label.test(firstVal)) {
+              const last = r.Cells?.[r.Cells.length - 1]?.Value
+              const n = last ? parseFloat(last.replace(/,/g, '')) : NaN
+              if (!Number.isNaN(n)) return n
+            }
+          }
+        }
+        const summaryVal = section.Rows?.find((sr) => sr.RowType === 'SummaryRow')
+        if (summaryVal) {
+          const firstVal = summaryVal.Cells?.[0]?.Value ?? ''
+          if (label.test(firstVal)) {
+            const last = summaryVal.Cells?.[summaryVal.Cells.length - 1]?.Value
+            const n = last ? parseFloat(last.replace(/,/g, '')) : NaN
+            if (!Number.isNaN(n)) return n
+          }
+        }
+      }
+      return null
+    }
+    revenueLastMonth = findRowLast(/^Total\s+Income$/i) ?? findRowLast(/^Income$/i)
+  }
+
   return {
     org_name: account.account_name,
     bank_balance_nzd: bankBalance,
@@ -325,6 +366,7 @@ export async function fetchXeroSummary(): Promise<XeroSummary | null> {
     overdue_invoices_nzd: Math.round(overdueTotal),
     overdue_invoice_count: overdueCount,
     revenue_this_month_nzd: revenueMonth == null ? null : Math.round(revenueMonth),
+    revenue_last_month_nzd: revenueLastMonth == null ? null : Math.round(revenueLastMonth),
     net_profit_this_month_nzd: netProfitMonth == null ? null : Math.round(netProfitMonth),
   }
 }

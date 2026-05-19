@@ -132,7 +132,7 @@ function Card({
         <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: 10 }}>{sub}</div>
       )}
       {children && (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: chartBottom ? 'flex-end' : 'flex-start' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
           {children}
         </div>
       )}
@@ -408,7 +408,7 @@ function Donut({ segments, centre }: {
 }) {
   const [hover, setHover] = useState<number | null>(null)
   const total = segments.reduce((s, x) => s + x.value, 0) || 1
-  const R = 36; const CX = 46; const CY = 46; const CIRC = 2 * Math.PI * R
+  const R = 42; const CX = 54; const CY = 54; const CIRC = 2 * Math.PI * R
   let offset = 0
   const arcs = segments.map((s) => {
     const dash = (s.value / total) * CIRC
@@ -418,12 +418,12 @@ function Donut({ segments, centre }: {
   })
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-      <svg width="92" height="92" viewBox="0 0 92 92" style={{ flexShrink: 0 }}>
-        <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--bg-elevated)" strokeWidth="12" />
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+      <svg width="108" height="108" viewBox="0 0 108 108">
+        <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--bg-elevated)" strokeWidth="13" />
         {arcs.map((arc, i) => arc.dash > 0 && (
           <circle key={i} cx={CX} cy={CY} r={R} fill="none"
-            stroke={arc.color} strokeWidth={hover === i ? 14 : 11}
+            stroke={arc.color} strokeWidth={hover === i ? 15 : 12}
             strokeDasharray={`${arc.dash} ${arc.gap}`}
             strokeDashoffset={arc.offset}
             style={{
@@ -435,21 +435,21 @@ function Donut({ segments, centre }: {
             onMouseLeave={() => setHover(null)}
           />
         ))}
-        <text x={CX} y={CY - 3} textAnchor="middle" fill="var(--text-primary)"
-          fontSize="13" fontWeight="700" style={{ fontFamily: 'inherit' }}>{centre}</text>
-        <text x={CX} y={CY + 11} textAnchor="middle" fill="var(--text-tertiary)"
-          fontSize="8" style={{ fontFamily: 'inherit' }}>collected</text>
+        <text x={CX} y={CY - 4} textAnchor="middle" fill="var(--text-primary)"
+          fontSize="15" fontWeight="700" style={{ fontFamily: 'inherit' }}>{centre}</text>
+        <text x={CX} y={CY + 12} textAnchor="middle" fill="var(--text-tertiary)"
+          fontSize="9" style={{ fontFamily: 'inherit' }}>collected</text>
       </svg>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {segments.map((s, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
             opacity: hover !== null && hover !== i ? 0.35 : 1, transition: 'opacity 120ms', cursor: 'default' }}
             onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, display: 'inline-block', flexShrink: 0 }} />
-              <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{s.label}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, display: 'inline-block', flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{s.label}</span>
             </div>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
               {fmtShort(s.value)}
             </span>
           </div>
@@ -487,9 +487,18 @@ function ClientBars({ clients }: { clients: { name: string; total: number }[] })
 
 // ─── Transactions table ───────────────────────────────────────────────────────
 
+function fmtTxDate(iso: string) {
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}/${y.slice(2)}`
+}
+
+const TX_PAGE = 15
+
 function TxTable({ txs }: { txs: XeroTransaction[] }) {
+  const [visible, setVisible] = useState(TX_PAGE)
   const totalIn = txs.filter((t) => t.type === 'in').reduce((s, t) => s + t.amount, 0)
   const totalOut = txs.filter((t) => t.type === 'out').reduce((s, t) => s + t.amount, 0)
+  const shown = txs.slice(0, visible)
 
   return (
     <div className="card" style={{ padding: '18px 20px 16px' }}>
@@ -508,49 +517,62 @@ function TxTable({ txs }: { txs: XeroTransaction[] }) {
       {txs.length === 0 ? (
         <p style={{ fontSize: 13, color: 'var(--text-tertiary)', padding: '12px 0' }}>No transactions in this period.</p>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                {['Date', 'Description', 'Ref', 'Status', 'Amount'].map((h) => (
-                  <th key={h} style={{
-                    padding: '5px 10px', textAlign: h === 'Amount' ? 'right' : 'left',
-                    color: 'var(--text-tertiary)', fontWeight: 500,
-                    textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.05em', whiteSpace: 'nowrap',
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {txs.map((tx, i) => (
-                <tr key={tx.id + i} style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                  <td style={{ padding: '8px 10px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap', fontSize: 12 }}>{tx.date}</td>
-                  <td style={{ padding: '8px 10px', color: 'var(--text-primary)', maxWidth: 200 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {tx.type === 'in'
-                        ? <ArrowDownLeft style={{ width: 12, height: 12, color: 'var(--success)', flexShrink: 0 }} />
-                        : <ArrowUpRight style={{ width: 12, height: 12, color: 'var(--danger)', flexShrink: 0 }} />}
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.description}</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '8px 10px', color: 'var(--text-tertiary)', fontSize: 11 }}>{tx.reference ?? '—'}</td>
-                  <td style={{ padding: '8px 10px' }}>
-                    <span style={{
-                      fontSize: 10, padding: '2px 7px', borderRadius: 999, fontWeight: 500,
-                      textTransform: 'uppercase', letterSpacing: '0.04em',
-                      background: tx.status === 'PAID' ? 'color-mix(in srgb, var(--success) 15%, transparent)' : 'color-mix(in srgb, var(--accent) 15%, transparent)',
-                      color: tx.status === 'PAID' ? 'var(--success)' : 'var(--accent)',
-                    }}>{tx.status.toLowerCase()}</span>
-                  </td>
-                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums',
-                    color: tx.type === 'in' ? 'var(--success)' : 'var(--danger)', whiteSpace: 'nowrap' }}>
-                    {tx.type === 'in' ? '+' : '−'}{fmtShort(tx.amount)}
-                  </td>
+        <>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                  {['Date', 'Description', 'Ref', 'Status', 'Amount'].map((h) => (
+                    <th key={h} style={{
+                      padding: '5px 10px', textAlign: h === 'Amount' ? 'right' : 'left',
+                      color: 'var(--text-tertiary)', fontWeight: 500,
+                      textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.05em', whiteSpace: 'nowrap',
+                    }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {shown.map((tx, i) => (
+                  <tr key={tx.id + i} style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                    <td style={{ padding: '8px 10px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap', fontSize: 12 }}>{fmtTxDate(tx.date)}</td>
+                    <td style={{ padding: '8px 10px', color: 'var(--text-primary)', maxWidth: 200 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {tx.type === 'in'
+                          ? <ArrowDownLeft style={{ width: 12, height: 12, color: 'var(--success)', flexShrink: 0 }} />
+                          : <ArrowUpRight style={{ width: 12, height: 12, color: 'var(--danger)', flexShrink: 0 }} />}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.description}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '8px 10px', color: 'var(--text-tertiary)', fontSize: 11 }}>{tx.reference ?? '—'}</td>
+                    <td style={{ padding: '8px 10px' }}>
+                      <span style={{
+                        fontSize: 10, padding: '2px 7px', borderRadius: 999, fontWeight: 500,
+                        textTransform: 'uppercase', letterSpacing: '0.04em',
+                        background: tx.status === 'PAID' ? 'color-mix(in srgb, var(--success) 15%, transparent)' : 'color-mix(in srgb, var(--accent) 15%, transparent)',
+                        color: tx.status === 'PAID' ? 'var(--success)' : 'var(--accent)',
+                      }}>{tx.status.toLowerCase()}</span>
+                    </td>
+                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums',
+                      color: tx.type === 'in' ? 'var(--success)' : 'var(--danger)', whiteSpace: 'nowrap' }}>
+                      {tx.type === 'in' ? '+' : '−'}{fmtShort(tx.amount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {visible < txs.length && (
+            <div style={{ textAlign: 'center', marginTop: 14 }}>
+              <button
+                className="btn-ghost"
+                style={{ fontSize: 12 }}
+                onClick={() => setVisible((v) => v + TX_PAGE)}
+              >
+                Load {Math.min(TX_PAGE, txs.length - visible)} more ({txs.length - visible} remaining)
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
@@ -661,7 +683,7 @@ export default function FinanceDashboard({
       </Card>
 
       {/* Row 2 — 3 cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card title="Net Profit" metric={fmtBig(Math.round(netProfit))}>
           <BarChart points={netPoints} colorBySign />
         </Card>
@@ -678,7 +700,7 @@ export default function FinanceDashboard({
       </div>
 
       {/* Row 3 — 3 cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Card title="Invoice Health">
           <Donut
             centre={collectedPct}

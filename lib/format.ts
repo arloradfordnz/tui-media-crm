@@ -8,20 +8,20 @@ export function formatNZD(amount: number): string {
 export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return '—'
   const d = typeof date === 'string' ? new Date(date) : date
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
   const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
   const yy = String(d.getFullYear()).slice(2)
-  return `${mm}/${dd}/${yy}`
+  return `${dd}/${mm}/${yy}`
 }
 
 export function formatDateTime(date: Date | string | null | undefined): string {
   if (!date) return '—'
   const d = typeof date === 'string' ? new Date(date) : date
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
   const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
   const yy = String(d.getFullYear()).slice(2)
   const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  return `${mm}/${dd}/${yy} ${time}`
+  return `${dd}/${mm}/${yy} ${time}`
 }
 
 /**

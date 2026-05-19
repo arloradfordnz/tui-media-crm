@@ -575,6 +575,40 @@ export async function sendDocumentToClientEmail({
   })
 }
 
+type LeadSummaryItem = {
+  prospectName: string
+  location: string
+  category: string
+  email: string | null
+  subject: string
+}
+
+export async function sendLeadFinderEmail(leads: LeadSummaryItem[], date: Date) {
+  const dayLabel = date.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+
+  const leadsContent = leads.length === 0
+    ? `<p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0;">No new leads found today.</p>`
+    : leads.map((l, i) => `
+        <div style="margin:0 0 20px;">
+          <p style="color:#f5f5f5;font-size:15px;font-weight:600;margin:0 0 4px;">${i + 1}. ${l.prospectName}</p>
+          <p style="color:#555;font-size:13px;margin:0 0 4px;">${l.category}${l.location ? ` &mdash; ${l.location}` : ''}</p>
+          <p style="color:#a3a3a3;font-size:13px;margin:0 0 4px;">To: <span style="color:${l.email ? '#7790ed' : '#555'};">${l.email || 'email not found'}</span></p>
+          <p style="color:#555;font-size:13px;margin:0;">Subject: ${l.subject}</p>
+        </div>
+      `).join('')
+
+  const subject = `Kōtare — ${leads.length} new lead${leads.length !== 1 ? 's' : ''} found today`
+
+  const html = wrap(`
+    <h2 style="margin:0 0 4px;font-size:22px;color:#f5f5f5;font-weight:600;">Kōtare — Daily Leads</h2>
+    <p style="color:#555;font-size:14px;margin:0;">${dayLabel}</p>
+    ${section(`${leads.length} New Lead${leads.length !== 1 ? 's' : ''} Found`, leadsContent)}
+    ${section('', `<a href="https://dashboard.tuimedia.nz/dashboard/outreach" style="color:#7790ed;font-size:14px;text-decoration:none;">Review drafts on dashboard &rarr;</a>`)}
+  `, BRIEFING_SIGNOFF)
+
+  await send({ to: 'hello@tuimedia.nz', subject, html, type: 'lead_finder' })
+}
+
 export async function sendDeliveryReminderEmail(
   to: string,
   clientName: string,

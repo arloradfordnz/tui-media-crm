@@ -77,6 +77,7 @@ export default async function BusinessHealth() {
     connected?: boolean
     org_name?: string | null
     revenue_this_month_nzd?: number | null
+    revenue_last_month_nzd?: number | null
     net_profit_this_month_nzd?: number | null
     outstanding_invoices_nzd?: number
     overdue_invoices_nzd?: number
@@ -145,6 +146,7 @@ export default async function BusinessHealth() {
         <SignalChip label="Leads" value={String((signals.leads_in_pipeline as number) ?? '—')} />
         {xero.connected && (
           <>
+            <SignalChip label="Last month" value={nzd(xero.revenue_last_month_nzd ?? null)} />
             <SignalChip label="Net profit MTD" value={nzd(xero.net_profit_this_month_nzd ?? null)} />
             <SignalChip label="Bank balance" value={nzd(xero.bank_balance_nzd ?? null)} />
             <SignalChip label="Overdue" value={nzd(xero.overdue_invoices_nzd ?? 0)} />

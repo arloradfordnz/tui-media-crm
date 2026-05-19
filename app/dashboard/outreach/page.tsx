@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
-import { formatDateTime } from '@/lib/format'
-import { Send } from 'lucide-react'
+import { formatDate } from '@/lib/format'
+import { Send, Archive } from 'lucide-react'
 import Link from 'next/link'
 import OutreachActions from './OutreachActions'
 
@@ -13,7 +13,6 @@ type Draft = {
 }
 
 export function parseDraft(details: string) {
-  // New format: SUBJECT: ...\n\nTO: ...\n\nBODY:\n...
   const subjectMatch = details.match(/^SUBJECT:\s*(.+)/m)
   const toMatch = details.match(/^TO:\s*(.+)/m)
   const bodyMatch = details.match(/BODY:\n([\s\S]+)$/)
@@ -24,7 +23,6 @@ export function parseDraft(details: string) {
       body: bodyMatch?.[1]?.trim() ?? '',
     }
   }
-  // Legacy format: "Kotare drafted pitch email. ... Subject: XYZ"
   const legacySubject = details.match(/Subject:\s*(.+)/i)
   return {
     subject: legacySubject?.[1]?.trim() ?? '',
@@ -33,13 +31,20 @@ export function parseDraft(details: string) {
   }
 }
 
-export default async function OutreachDraftsPage() {
+export default async function OutreachDraftsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>
+}) {
+  const { view } = await searchParams
+  const isArchived = view === 'archived'
+
   const supabase = await createServerSupabaseClient()
 
   const { data } = await supabase
     .from('activities')
     .select('id, created_at, details, client_id, clients(id, name, contact_person)')
-    .in('action', ['outreach_draft', 'draft_email'])
+    .in('action', isArchived ? ['outreach_archived'] : ['outreach_draft', 'draft_email'])
     .order('created_at', { ascending: false })
     .limit(100)
 
@@ -47,34 +52,50 @@ export default async function OutreachDraftsPage() {
 
   const parsed = drafts.map((d) => ({
     ...d,
-    parsed: parseDraft(d.details ?? ''),
+    parsed: { id: d.id, ...parseDraft(d.details ?? '') },
   }))
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>Outreach Drafts</h1>
+          <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>
+            {isArchived ? 'Archived Outreach' : 'Outreach Drafts'}
+          </h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-            Pitch emails drafted by Kōtare — review and send.
+            {isArchived
+              ? 'Emails you\'ve already opened in Mail.'
+              : 'Pitch emails drafted by Kōtare — review and send.'}
           </p>
         </div>
-        {parsed.length > 0 && (
-          <OutreachActions drafts={parsed.map((d) => d.parsed)} mode="all" />
-        )}
+        <div className="flex items-center gap-3 shrink-0">
+          <Link
+            href={isArchived ? '/dashboard/outreach' : '/dashboard/outreach?view=archived'}
+            className="btn-ghost text-sm inline-flex items-center gap-1.5"
+          >
+            <Archive className="w-3.5 h-3.5" />
+            {isArchived ? 'Active drafts' : 'Archived'}
+          </Link>
+          {!isArchived && parsed.length > 0 && (
+            <OutreachActions drafts={parsed.map((d) => d.parsed)} mode="all" />
+          )}
+        </div>
       </div>
 
       {parsed.length === 0 ? (
         <div className="empty-state card">
           <Send className="w-10 h-10 empty-icon" />
-          <p className="empty-title">No drafts yet</p>
-          <p className="empty-description">Kōtare will add outreach drafts here each morning.</p>
+          <p className="empty-title">{isArchived ? 'Nothing archived yet' : 'No drafts yet'}</p>
+          <p className="empty-description">
+            {isArchived
+              ? 'Archived drafts will appear here.'
+              : 'Kōtare will add outreach drafts here each morning.'}
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
           {parsed.map((draft) => (
             <div key={draft.id} className="card space-y-4">
-              {/* Header */}
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -107,21 +128,18 @@ export default async function OutreachDraftsPage() {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs whitespace-nowrap" style={{ color: 'var(--text-tertiary)' }}>
-                    {formatDateTime(draft.created_at)}
+                    {formatDate(draft.created_at)}
                   </span>
-                  <OutreachActions drafts={[draft.parsed]} mode="single" />
+                  <OutreachActions drafts={[draft.parsed]} mode="single" isArchived={isArchived} />
                 </div>
               </div>
 
-              {/* Email body */}
               <div
                 className="rounded-xl p-4 text-sm whitespace-pre-wrap leading-relaxed"
                 style={{
                   background: 'var(--bg-elevated)',
                   color: draft.parsed.body ? 'var(--text-secondary)' : 'var(--text-tertiary)',
                   fontFamily: 'inherit',
-                  borderLeft: '2px solid var(--accent)',
-                  paddingLeft: '1rem',
                   fontStyle: draft.parsed.body ? 'normal' : 'italic',
                 }}
               >

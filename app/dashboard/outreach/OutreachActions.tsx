@@ -1,38 +1,91 @@
 'use client'
 
-import { Send, MailOpen } from 'lucide-react'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Send, MailOpen, Archive, ArchiveRestore } from 'lucide-react'
 
 type ParsedDraft = {
+  id: string
   to: string
   subject: string
   body: string
 }
 
 function mailtoUrl({ to, subject, body }: ParsedDraft) {
-  return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+  return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+}
+
+async function setArchived(id: string, unarchive = false) {
+  await fetch('/api/outreach/archive', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, unarchive }),
+  })
 }
 
 export default function OutreachActions({
   drafts,
   mode,
+  isArchived = false,
 }: {
   drafts: ParsedDraft[]
   mode: 'single' | 'all'
+  isArchived?: boolean
 }) {
+  const router = useRouter()
+  const [archiving, setArchiving] = useState(false)
+
   if (mode === 'single') {
     const draft = drafts[0]
+
+    async function handleArchive() {
+      setArchiving(true)
+      await setArchived(draft.id, isArchived)
+      router.refresh()
+    }
+
+    if (isArchived) {
+      return (
+        <button
+          onClick={handleArchive}
+          disabled={archiving}
+          className="btn-ghost text-sm inline-flex items-center gap-1.5"
+        >
+          <ArchiveRestore className="w-3.5 h-3.5" />
+          {archiving ? 'Restoring…' : 'Unarchive'}
+        </button>
+      )
+    }
+
+    async function handleOpenInMail() {
+      window.location.href = mailtoUrl(draft)
+      await setArchived(draft.id)
+      router.refresh()
+    }
+
     return (
-      <a
-        href={mailtoUrl(draft)}
-        className="btn-ghost text-sm inline-flex items-center gap-1.5"
-      >
-        <Send className="w-3.5 h-3.5" />
-        Open in Mail
-      </a>
+      <div className="inline-flex items-center gap-2">
+        <button
+          onClick={handleArchive}
+          disabled={archiving}
+          className="btn-ghost text-sm inline-flex items-center gap-1.5"
+          title="Archive"
+        >
+          <Archive className="w-3.5 h-3.5" />
+          {archiving ? '…' : 'Archive'}
+        </button>
+        <button
+          onClick={handleOpenInMail}
+          className="btn-ghost text-sm inline-flex items-center gap-1.5"
+        >
+          <Send className="w-3.5 h-3.5" />
+          Open in Mail
+        </button>
+      </div>
     )
   }
 
-  function openAll() {
+  async function openAll() {
     drafts.forEach((draft, i) => {
       setTimeout(() => {
         window.location.href = mailtoUrl(draft)
