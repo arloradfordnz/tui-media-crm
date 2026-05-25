@@ -769,7 +769,7 @@ function CreateInvoiceModal({ onClose, onCreated }: { onClose: () => void; onCre
                     <p style={{ fontSize: 12, color: 'var(--danger)', marginTop: 4 }}>{contactsError}</p>
                   )}
                   {!contactsError && (loadingContacts || contacts.length > 0 || contactSearch) && (
-                    <div style={{ border: '1px solid var(--bg-border)', borderRadius: 8, marginTop: 4, background: 'var(--bg-card)', maxHeight: 180, overflowY: 'auto', position: 'absolute', width: '100%', zIndex: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.2)' }}>
+                    <div style={{ border: '1px solid var(--bg-border)', borderRadius: 8, marginTop: 4, background: 'var(--bg-elevated)', maxHeight: 180, overflowY: 'auto', position: 'absolute', width: '100%', zIndex: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.6)' }}>
                       {loadingContacts && <p style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-tertiary)' }}>Loading…</p>}
                       {!loadingContacts && contacts.length === 0 && (
                         <p style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-tertiary)' }}>No contacts found.</p>
