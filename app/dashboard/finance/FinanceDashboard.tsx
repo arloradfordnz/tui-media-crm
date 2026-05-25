@@ -956,6 +956,10 @@ export default function FinanceDashboard({
           <button className="btn-primary" style={{ fontSize: 12 }} onClick={() => setShowCreateInvoice(true)}>
             <Plus className="w-3.5 h-3.5" /> Create Invoice
           </button>
+          {/* Reconnect Xero */}
+          <a href="/api/auth/xero/start" className="btn-secondary" style={{ fontSize: 12 }}>
+            Reconnect Xero
+          </a>
           {/* Period buttons */}
           <div style={{ display: 'flex', gap: 6 }}>
             {PERIODS.map(({ key, label }) => (
