@@ -118,6 +118,17 @@ export async function updateClientStatus(clientId: string, status: string) {
   return { ok: true }
 }
 
+export async function updateClientCategory(clientId: string, category: string | null) {
+  const allowed = ['retainer', 'marketing', 'one_off', null]
+  if (!allowed.includes(category)) return { error: 'Invalid category.' }
+  const supabase = await createServerSupabaseClient()
+  const { error } = await supabase.from('clients').update({ client_category: category }).eq('id', clientId)
+  if (error) return { error: error.message }
+  revalidatePath('/dashboard/clients')
+  revalidatePath(`/dashboard/clients/${clientId}`)
+  return { ok: true }
+}
+
 export async function deleteClient(clientId: string): Promise<{ error?: string } | never> {
   const supabase = await createServerSupabaseClient()
   const admin = getAdminClient()

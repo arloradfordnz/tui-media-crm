@@ -197,23 +197,53 @@ function AreaChart({ points, color = 'var(--accent)' }: { points: { label: strin
   const linePath = smooth(xs.map((x, i) => [x, ys[i]]))
   const fillPath = `${linePath} L${xs[xs.length - 1]},${fillBottom} L${xs[0]},${fillBottom} Z`
 
+  // Precompute bezier control points for each segment (matches smooth() exactly)
+  const clampY = (y: number) => Math.max(PAD_T, Math.min(fillBottom, y))
+  const bezierSegs = xs.length >= 2 ? Array.from({ length: xs.length - 1 }, (_, i) => {
+    const p0 = [xs[Math.max(i - 1, 0)], ys[Math.max(i - 1, 0)]]
+    const p1 = [xs[i], ys[i]]
+    const p2 = [xs[i + 1], ys[i + 1]]
+    const p3 = [xs[Math.min(i + 2, xs.length - 1)], ys[Math.min(i + 2, xs.length - 1)]]
+    return {
+      x1: p1[0], y1: p1[1],
+      cx1: p1[0] + (p2[0] - p0[0]) / 6,
+      cy1: clampY(p1[1] + (p2[1] - p0[1]) / 6),
+      cx2: p2[0] - (p3[0] - p1[0]) / 6,
+      cy2: clampY(p2[1] - (p3[1] - p1[1]) / 6),
+      x2: p2[0], y2: p2[1],
+    }
+  }) : []
+
+  function evalBezier(seg: (typeof bezierSegs)[0], t: number) {
+    const mt = 1 - t
+    return {
+      x: mt*mt*mt*seg.x1 + 3*mt*mt*t*seg.cx1 + 3*mt*t*t*seg.cx2 + t*t*t*seg.x2,
+      y: mt*mt*mt*seg.y1 + 3*mt*mt*t*seg.cy1 + 3*mt*t*t*seg.cy2 + t*t*t*seg.y2,
+    }
+  }
+
   function handleMouseMove(e: React.MouseEvent) {
     if (!svgRef.current || xs.length < 2) return
     const rect = svgRef.current.getBoundingClientRect()
-    // Convert client coords to SVG viewBox coords
     const svgX = ((e.clientX - rect.left) / rect.width) * W
     const clamped = Math.max(xs[0], Math.min(xs[xs.length - 1], svgX))
 
-    // Linearly interpolate y along the line segments
+    // Find segment
     let segIdx = xs.length - 2
     for (let i = 0; i < xs.length - 1; i++) {
       if (clamped <= xs[i + 1]) { segIdx = i; break }
     }
-    const span = xs[segIdx + 1] - xs[segIdx]
-    const t = span > 0 ? (clamped - xs[segIdx]) / span : 0
-    const interpY = ys[segIdx] + t * (ys[segIdx + 1] - ys[segIdx])
 
-    // Nearest data point index for label/value snap
+    // Binary search for t where bezier x ≈ clamped (follows the actual curve)
+    const seg = bezierSegs[segIdx]
+    let lo = 0, hi = 1
+    for (let k = 0; k < 50; k++) {
+      const mid = (lo + hi) / 2
+      if (evalBezier(seg, mid).x < clamped) lo = mid
+      else hi = mid
+    }
+    const interpY = evalBezier(seg, (lo + hi) / 2).y
+
     const nearestIdx = xs.reduce((best, x, i) =>
       Math.abs(x - clamped) < Math.abs(xs[best] - clamped) ? i : best, 0)
 

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import SearchInput from '@/components/SearchInput'
 import FilterTabs from '@/components/FilterTabs'
 import QuickStatus from './QuickStatus'
+import QuickCategory from './QuickCategory'
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
@@ -117,9 +118,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
                     <td className="px-4 py-4 hidden md:table-cell text-sm" style={{ color: 'var(--text-secondary)' }}>{c.email || '—'}</td>
                     <td className="px-4 py-4 hidden lg:table-cell text-sm" style={{ color: 'var(--text-secondary)' }}>{c.location || '—'}</td>
                     <td className="px-4 py-4 hidden sm:table-cell">
-                      {c.client_category
-                        ? <span className={`badge ${statusBadgeClass(c.client_category)}`}>{statusLabel(c.client_category)}</span>
-                        : <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>—</span>}
+                      <QuickCategory clientId={c.id} category={c.client_category} />
                     </td>
                     <td className="px-4 py-4 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-secondary)' }}>{c.jobCount}</td>
                     <td className="px-4 py-4 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-primary)' }}>{formatNZD(c.lifetime_value)}</td>
