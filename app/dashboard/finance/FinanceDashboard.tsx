@@ -626,15 +626,22 @@ function CreateInvoiceModal({ onClose, onCreated }: { onClose: () => void; onCre
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [contactsError, setContactsError] = useState<string | null>(null)
 
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const loadContacts = useCallback(async (q: string) => {
     setLoadingContacts(true)
+    setContactsError(null)
     try {
       const res = await fetch(`/api/xero/contacts?q=${encodeURIComponent(q)}`)
       const data = await res.json()
-      setContacts(data.contacts ?? [])
+      if (!res.ok) {
+        setContactsError(res.status === 503 ? 'Xero not connected — reconnect from the Finance page.' : (data.error ?? 'Failed to load contacts.'))
+        setContacts([])
+      } else {
+        setContacts(data.contacts ?? [])
+      }
     } finally {
       setLoadingContacts(false)
     }
@@ -728,8 +735,15 @@ function CreateInvoiceModal({ onClose, onCreated }: { onClose: () => void; onCre
                       onChange={(e) => setContactSearch(e.target.value)}
                     />
                   </div>
-                  {contacts.length > 0 && (
+                  {contactsError && (
+                    <p style={{ fontSize: 12, color: 'var(--danger)', marginTop: 4 }}>{contactsError}</p>
+                  )}
+                  {!contactsError && (loadingContacts || contacts.length > 0 || contactSearch) && (
                     <div style={{ border: '1px solid var(--bg-border)', borderRadius: 8, marginTop: 4, background: 'var(--bg-card)', maxHeight: 180, overflowY: 'auto', position: 'absolute', width: '100%', zIndex: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.2)' }}>
+                      {loadingContacts && <p style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-tertiary)' }}>Loading…</p>}
+                      {!loadingContacts && contacts.length === 0 && (
+                        <p style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-tertiary)' }}>No contacts found.</p>
+                      )}
                       {contacts.slice(0, 10).map((c) => (
                         <button
                           key={c.ContactID}
@@ -743,7 +757,6 @@ function CreateInvoiceModal({ onClose, onCreated }: { onClose: () => void; onCre
                           {c.EmailAddress && <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 6 }}>{c.EmailAddress}</span>}
                         </button>
                       ))}
-                      {loadingContacts && <p style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-tertiary)' }}>Loading…</p>}
                     </div>
                   )}
                 </div>
