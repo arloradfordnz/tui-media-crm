@@ -22,7 +22,8 @@ import { createClient } from '@supabase/supabase-js'
 export const XERO_SCOPES = [
   'openid',
   'offline_access',
-  'accounting.invoices.read',
+  'accounting.invoices',          // full read + write for invoices
+  'accounting.contacts.read',     // read contacts to pick invoice recipients
   'accounting.reports.profitandloss.read',
   'accounting.reports.banksummary.read',
   'accounting.banktransactions.read',
@@ -192,6 +193,33 @@ async function xeroGet<T>(path: string, accessToken: string, tenantId: string): 
   if (!res.ok) {
     const text = await res.text()
     throw new Error(`Xero ${path} failed (${res.status}): ${text}`)
+  }
+  return (await res.json()) as T
+}
+
+/** Authenticated POST/PUT against the Xero accounting API. */
+async function xeroPost<T>(
+  path: string,
+  body: unknown,
+  accessToken: string,
+  tenantId: string,
+  method = 'POST',
+): Promise<T> {
+  const url = path.startsWith('http') ? path : `${XERO_API_BASE}${path}`
+  const res = await fetch(url, {
+    method,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Xero-Tenant-Id': tenantId,
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Xero ${method} ${path} failed (${res.status}): ${text}`)
   }
   return (await res.json()) as T
 }
@@ -522,4 +550,129 @@ export async function fetchXeroTransactions(): Promise<XeroTransaction[] | null>
 
   results.sort((a, b) => b.date.localeCompare(a.date))
   return results
+}
+
+// ─── Contacts ─────────────────────────────────────────────────────────────────
+
+export type XeroContact = {
+  ContactID: string
+  Name: string
+  EmailAddress?: string
+  IsCustomer: boolean
+  IsSupplier: boolean
+}
+
+export async function fetchXeroContacts(search?: string): Promise<XeroContact[] | null> {
+  const account = await getValidXeroAccount()
+  if (!account || !account.account_id) return null
+
+  const params = new URLSearchParams({ pageSize: '100', order: 'Name ASC' })
+  if (search) params.set('searchTerm', search)
+  const path = `/Contacts?${params.toString()}`
+
+  try {
+    const res = await xeroGet<{ Contacts?: XeroContact[] }>(path, account.access_token, account.account_id)
+    return res.Contacts ?? []
+  } catch {
+    return null
+  }
+}
+
+// ─── Invoice creation + management ───────────────────────────────────────────
+
+export type XeroInvoiceLineItem = {
+  Description: string
+  UnitAmount: number
+  Quantity?: number
+  AccountCode?: string  // e.g. "200" for Sales
+  TaxType?: string      // e.g. "OUTPUT2" for GST on income in NZ
+}
+
+export type XeroInvoiceCreateInput = {
+  contactId: string
+  contactName: string   // for display / fallback
+  date: string          // YYYY-MM-DD
+  dueDate: string       // YYYY-MM-DD
+  lineItems: XeroInvoiceLineItem[]
+  reference?: string
+  status?: 'DRAFT' | 'SUBMITTED' | 'AUTHORISED'
+}
+
+export type XeroCreatedInvoice = {
+  InvoiceID: string
+  InvoiceNumber: string
+  Status: string
+  Total: number
+  AmountDue: number
+  DateString?: string
+  DueDateString?: string
+}
+
+export async function createXeroInvoice(input: XeroInvoiceCreateInput): Promise<XeroCreatedInvoice | null> {
+  const account = await getValidXeroAccount()
+  if (!account || !account.account_id) return null
+
+  const payload = {
+    Type: 'ACCREC',
+    Contact: { ContactID: input.contactId },
+    Date: input.date,
+    DueDate: input.dueDate,
+    Status: input.status ?? 'DRAFT',
+    LineAmountTypes: 'EXCLUSIVE',   // line amounts are GST-exclusive
+    Reference: input.reference ?? '',
+    LineItems: input.lineItems.map((li) => ({
+      Description: li.Description,
+      UnitAmount: li.UnitAmount,
+      Quantity: li.Quantity ?? 1,
+      AccountCode: li.AccountCode ?? '200',
+      TaxType: li.TaxType ?? 'OUTPUT2',
+    })),
+  }
+
+  try {
+    const res = await xeroPost<{ Invoices?: XeroCreatedInvoice[] }>(
+      '/Invoices',
+      { Invoices: [payload] },
+      account.access_token,
+      account.account_id,
+    )
+    return res.Invoices?.[0] ?? null
+  } catch {
+    return null
+  }
+}
+
+export async function approveXeroInvoice(invoiceId: string): Promise<boolean> {
+  const account = await getValidXeroAccount()
+  if (!account || !account.account_id) return false
+
+  try {
+    await xeroPost(
+      `/Invoices/${invoiceId}`,
+      { Status: 'AUTHORISED' },
+      account.access_token,
+      account.account_id,
+      'POST',
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** List outstanding ACCREC invoices (not yet paid). */
+export async function fetchOutstandingInvoices(): Promise<XeroCreatedInvoice[]> {
+  const account = await getValidXeroAccount()
+  if (!account || !account.account_id) return []
+
+  try {
+    const res = await xeroGet<{ Invoices?: XeroCreatedInvoice[] }>(
+      '/Invoices?Statuses=DRAFT,SUBMITTED,AUTHORISED&Type=ACCREC&page=1&pageSize=50&order=Date+DESC',
+      account.access_token,
+      account.account_id,
+    )
+    return res.Invoices ?? []
+  } catch {
+    return []
+  }
 }

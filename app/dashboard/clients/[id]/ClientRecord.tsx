@@ -23,6 +23,7 @@ type ClientData = {
   firstContact: string | null
   pipelineStage: string
   status: string
+  clientCategory: string | null
   lifetimeValue: number
   monthlyRetainer: number | null
   notes: string | null
@@ -32,6 +33,13 @@ type ClientData = {
   jobs: { id: string; name: string; jobType: string | null; status: string; quoteValue: number | null; shootDate: string | null }[]
   activities: { id: string; action: string; details: string | null; createdAt: string; job: { name: string } | null }[]
 }
+
+const CLIENT_CATEGORIES = [
+  { value: '', label: 'None' },
+  { value: 'one_off', label: 'One-off' },
+  { value: 'retainer', label: 'Retainer' },
+  { value: 'marketing', label: 'Marketing' },
+]
 
 const TABS = [
   { key: 'details', label: 'Details', icon: UserCircle },
@@ -199,7 +207,15 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
               <CustomSelect
                 name="status"
                 defaultValue={client.status}
-                options={['lead', 'active', 'retainer', 'marketing', 'past', 'archived'].map((s) => ({ value: s, label: statusLabel(s) }))}
+                options={['lead', 'active', 'past', 'archived'].map((s) => ({ value: s, label: statusLabel(s) }))}
+              />
+            </div>
+            <div>
+              <label className="field-label">Client Type</label>
+              <CustomSelect
+                name="clientCategory"
+                defaultValue={client.clientCategory || ''}
+                options={CLIENT_CATEGORIES}
               />
             </div>
             <div>

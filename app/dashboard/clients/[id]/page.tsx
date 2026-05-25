@@ -8,13 +8,13 @@ export default async function ClientDetailPage({ params, searchParams }: { param
 
   const supabase = await createServerSupabaseClient()
 
-  type ClientRow = { id: string; name: string; contact_person: string | null; email: string | null; phone: string | null; location: string | null; lead_source: string | null; first_contact: string | null; pipeline_stage: string; status: string; lifetime_value: number; monthly_retainer: number | null; notes: string | null; tags: string | null; portal_token?: string | null }
+  type ClientRow = { id: string; name: string; contact_person: string | null; email: string | null; phone: string | null; location: string | null; lead_source: string | null; first_contact: string | null; pipeline_stage: string; status: string; client_category: string | null; lifetime_value: number; monthly_retainer: number | null; notes: string | null; tags: string | null; portal_token?: string | null }
 
   // Fetch all data in parallel for speed
   const [clientResult, { data: jobs }, { data: activities }, { data: documents }] = await Promise.all([
     supabase
       .from('clients')
-      .select('id, name, contact_person, email, phone, location, lead_source, first_contact, pipeline_stage, status, lifetime_value, monthly_retainer, notes, tags, portal_token')
+      .select('id, name, contact_person, email, phone, location, lead_source, first_contact, pipeline_stage, status, client_category, lifetime_value, monthly_retainer, notes, tags, portal_token')
       .eq('id', id)
       .single(),
     supabase
@@ -52,6 +52,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
     firstContact: client.first_contact,
     pipelineStage: client.pipeline_stage,
     status: client.status,
+    clientCategory: client.client_category,
     lifetimeValue: (jobs ?? []).reduce((sum, j) => sum + (j.quote_value ?? 0), 0),
     monthlyRetainer: client.monthly_retainer,
     notes: client.notes,

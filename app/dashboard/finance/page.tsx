@@ -1,6 +1,7 @@
 import { AlertCircle, Plug } from 'lucide-react'
 import { fetchXeroSummary, fetchXeroTransactions, type XeroSummary, type XeroTransaction } from '@/lib/xero'
 import FinanceDashboard from './FinanceDashboard'
+import { getAppSetting } from '@/app/actions/settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,10 +41,12 @@ export default async function FinancePage({ searchParams }: { searchParams: Sear
   let summary: XeroSummary | null = null
   let transactions: XeroTransaction[] = []
   let fetchError: string | null = null
+  let retainerInvoiceDay: number | undefined
   try {
-    const [s, t] = await Promise.all([fetchXeroSummary(), fetchXeroTransactions()])
+    const [s, t, dayStr] = await Promise.all([fetchXeroSummary(), fetchXeroTransactions(), getAppSetting('retainer_invoice_day')])
     summary = s
     transactions = t ?? []
+    retainerInvoiceDay = dayStr ? parseInt(dayStr, 10) : 1
   } catch (e) {
     fetchError = (e as Error).message
   }
@@ -51,5 +54,5 @@ export default async function FinancePage({ searchParams }: { searchParams: Sear
   if (!summary) {
     return <NotConnected error={params.xero_error ?? fetchError ?? undefined} />
   }
-  return <FinanceDashboard summary={summary} transactions={transactions} />
+  return <FinanceDashboard summary={summary} transactions={transactions} retainerInvoiceDay={retainerInvoiceDay} />
 }

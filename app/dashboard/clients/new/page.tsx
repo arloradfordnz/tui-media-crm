@@ -10,7 +10,13 @@ import DatePicker from '@/components/DatePicker'
 
 const LEAD_SOURCES = ['Referral', 'Website', 'Social Media', 'Google', 'Word of Mouth', 'Other']
 const PIPELINE_STAGES = ['enquiry', 'discovery', 'proposal', 'negotiation', 'won']
-const STATUSES = ['lead', 'active', 'retainer', 'marketing']
+const STATUSES = ['lead', 'active', 'past', 'archived']
+const CATEGORIES = [
+  { value: '', label: 'Select...' },
+  { value: 'one_off', label: 'One-off' },
+  { value: 'retainer', label: 'Retainer' },
+  { value: 'marketing', label: 'Marketing' },
+]
 
 export default function NewClientPage() {
   const [state, action, pending] = useActionState(createClient, undefined)
@@ -71,6 +77,14 @@ export default function NewClientPage() {
               name="status"
               defaultValue="lead"
               options={STATUSES.map((s) => ({ value: s, label: statusLabel(s) }))}
+            />
+          </div>
+          <div>
+            <label className="field-label">Client Type</label>
+            <CustomSelect
+              name="clientCategory"
+              defaultValue=""
+              options={CATEGORIES}
             />
           </div>
           <div>

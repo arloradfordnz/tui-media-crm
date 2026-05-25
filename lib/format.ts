@@ -61,6 +61,7 @@ export function statusLabel(status: string): string {
     past: 'Past',
     retainer: 'Retainer',
     marketing: 'Marketing',
+    one_off: 'One-off',
     available: 'Available',
     out_on_shoot: 'Out on Shoot',
     in_service: 'In Service',
@@ -100,7 +101,7 @@ export function statusLabel(status: string): string {
  * Get badge CSS class for a status
  */
 export function statusBadgeClass(status: string): string {
-  const success = ['active', 'approved', 'delivered', 'completed', 'available', 'booked', 'accepted', 'won', 'retainer', 'marketing']
+  const success = ['active', 'approved', 'delivered', 'completed', 'available', 'booked', 'accepted', 'won', 'retainer', 'marketing', 'one_off']
   const warning = ['review', 'pending', 'in_service', 'editing', 'preproduction', 'discovery', 'proposal', 'draft', 'negotiation']
   const danger = ['overdue', 'rejected', 'archived', 'retired', 'past', 'declined', 'lost']
   const accent = ['enquiry', 'lead', 'shootday', 'out_on_shoot', 'contract', 'sent']

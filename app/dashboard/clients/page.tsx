@@ -1,5 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
-import { formatNZD, getInitials } from '@/lib/format'
+import { formatNZD, getInitials, statusLabel, statusBadgeClass } from '@/lib/format'
 import { Users, Plus } from 'lucide-react'
 import Link from 'next/link'
 import SearchInput from '@/components/SearchInput'
@@ -8,30 +8,37 @@ import QuickStatus from './QuickStatus'
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
-  { value: 'retainer', label: 'Retainer' },
-  { value: 'marketing', label: 'Marketing' },
   { value: 'lead', label: 'Lead' },
   { value: 'past', label: 'Past' },
   { value: 'archived', label: 'Archived' },
   { value: 'all', label: 'All' },
 ]
 
-export default async function ClientsPage({ searchParams }: { searchParams: Promise<{ search?: string; status?: string }> }) {
+const CATEGORY_OPTIONS = [
+  { value: 'all', label: 'All types' },
+  { value: 'retainer', label: 'Retainer' },
+  { value: 'marketing', label: 'Marketing' },
+  { value: 'one_off', label: 'One-off' },
+]
+
+export default async function ClientsPage({ searchParams }: { searchParams: Promise<{ search?: string; status?: string; category?: string }> }) {
   const params = await searchParams
   const search = params.search || ''
   const statusFilter = params.status || 'active'
+  const categoryFilter = params.category || 'all'
 
   const supabase = await createServerSupabaseClient()
 
   let query = supabase
     .from('clients')
-    .select('id, name, email, location, status, lifetime_value, tags, created_at, jobs(quote_value)')
+    .select('id, name, email, location, status, client_category, lifetime_value, tags, created_at, jobs(quote_value)')
     .order('name', { ascending: true })
 
-  if (statusFilter === 'active') {
-    query = query.in('status', ['active', 'retainer', 'marketing'])
-  } else if (statusFilter !== 'all') {
+  if (statusFilter !== 'all') {
     query = query.eq('status', statusFilter)
+  }
+  if (categoryFilter !== 'all') {
+    query = query.eq('client_category', categoryFilter)
   }
   if (search) query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,location.ilike.%${search}%`)
 
@@ -42,6 +49,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
     const jobsValue = jobs.reduce((sum, j) => sum + (j.quote_value ?? 0), 0)
     return {
       ...c,
+      client_category: (c as { client_category?: string | null }).client_category ?? null,
       jobCount: jobs.length,
       lifetime_value: jobsValue,
     }
@@ -60,6 +68,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
       <div className="flex flex-col sm:flex-row gap-3">
         <SearchInput basePath="/dashboard/clients" placeholder="Search clients..." />
         <FilterTabs options={STATUS_OPTIONS} paramName="status" defaultValue="active" />
+        <FilterTabs options={CATEGORY_OPTIONS} paramName="category" defaultValue="all" />
       </div>
 
       {/* Table */}
@@ -79,6 +88,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
                 <th className="table-header text-left">Client</th>
                 <th className="table-header text-left hidden md:table-cell">Email</th>
                 <th className="table-header text-left hidden lg:table-cell">Location</th>
+                <th className="table-header text-left hidden sm:table-cell">Type</th>
                 <th className="table-header text-right hidden sm:table-cell">Jobs</th>
                 <th className="table-header text-right hidden sm:table-cell">Value</th>
                 <th className="table-header text-right">Status</th>
@@ -106,6 +116,11 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
                     </td>
                     <td className="px-4 py-4 hidden md:table-cell text-sm" style={{ color: 'var(--text-secondary)' }}>{c.email || '—'}</td>
                     <td className="px-4 py-4 hidden lg:table-cell text-sm" style={{ color: 'var(--text-secondary)' }}>{c.location || '—'}</td>
+                    <td className="px-4 py-4 hidden sm:table-cell">
+                      {c.client_category
+                        ? <span className={`badge ${statusBadgeClass(c.client_category)}`}>{statusLabel(c.client_category)}</span>
+                        : <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>—</span>}
+                    </td>
                     <td className="px-4 py-4 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-secondary)' }}>{c.jobCount}</td>
                     <td className="px-4 py-4 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-primary)' }}>{formatNZD(c.lifetime_value)}</td>
                     <td className="px-4 py-4 text-right">

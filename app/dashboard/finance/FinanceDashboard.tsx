@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useMemo, useId } from 'react'
-import { ArrowDownLeft, ArrowUpRight, Calendar } from 'lucide-react'
-import type { XeroSummary, XeroTransaction } from '@/lib/xero'
+import { useState, useMemo, useId, useRef, useEffect, useCallback } from 'react'
+import { ArrowDownLeft, ArrowUpRight, Calendar, Plus, X, Search, Check } from 'lucide-react'
+import type { XeroSummary, XeroTransaction, XeroContact } from '@/lib/xero'
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
@@ -142,8 +142,11 @@ function Card({
 
 // ─── Area / line chart ────────────────────────────────────────────────────────
 
+type AreaIndicator = { x: number; y: number; nearestIdx: number }
+
 function AreaChart({ points, color = 'var(--accent)' }: { points: { label: string; value: number }[]; color?: string }) {
-  const [hover, setHover] = useState<number | null>(null)
+  const [indicator, setIndicator] = useState<AreaIndicator | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
   const uid = useId().replace(/:/g, '')
   const gradId = `ag${uid}`
   const clipId = `cl${uid}`
@@ -152,7 +155,7 @@ function AreaChart({ points, color = 'var(--accent)' }: { points: { label: strin
 
   const W = 600
   const H = 120
-  const Y_W = 28    // left gutter for y-labels, aligned with card heading
+  const Y_W = 28
   const PAD_R = 22
   const PAD_T = 16
   const PAD_B = 14
@@ -173,7 +176,6 @@ function AreaChart({ points, color = 'var(--accent)' }: { points: { label: strin
     return PAD_T + chartH - (v / max) * chartH
   })
 
-  // Smooth curve with clamped control points — prevents overshoot above/below chart
   function smooth(pts: number[][]): string {
     if (pts.length < 2) return pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0]},${p[1]}`).join(' ')
     const clampY = (y: number) => Math.max(PAD_T, Math.min(fillBottom, y))
@@ -195,8 +197,39 @@ function AreaChart({ points, color = 'var(--accent)' }: { points: { label: strin
   const linePath = smooth(xs.map((x, i) => [x, ys[i]]))
   const fillPath = `${linePath} L${xs[xs.length - 1]},${fillBottom} L${xs[0]},${fillBottom} Z`
 
+  function handleMouseMove(e: React.MouseEvent) {
+    if (!svgRef.current || xs.length < 2) return
+    const rect = svgRef.current.getBoundingClientRect()
+    // Convert client coords to SVG viewBox coords
+    const svgX = ((e.clientX - rect.left) / rect.width) * W
+    const clamped = Math.max(xs[0], Math.min(xs[xs.length - 1], svgX))
+
+    // Linearly interpolate y along the line segments
+    let segIdx = xs.length - 2
+    for (let i = 0; i < xs.length - 1; i++) {
+      if (clamped <= xs[i + 1]) { segIdx = i; break }
+    }
+    const span = xs[segIdx + 1] - xs[segIdx]
+    const t = span > 0 ? (clamped - xs[segIdx]) / span : 0
+    const interpY = ys[segIdx] + t * (ys[segIdx + 1] - ys[segIdx])
+
+    // Nearest data point index for label/value snap
+    const nearestIdx = xs.reduce((best, x, i) =>
+      Math.abs(x - clamped) < Math.abs(xs[best] - clamped) ? i : best, 0)
+
+    setIndicator({ x: clamped, y: interpY, nearestIdx })
+  }
+
+  const tipValue = indicator != null ? points[indicator.nearestIdx]?.value ?? 0 : 0
+  const tipX = indicator ? Math.max(Y_W + 2, Math.min(indicator.x - 15, W - PAD_R - 32)) : 0
+  const tipY = indicator ? Math.max(PAD_T + 2, indicator.y - 15) : 0
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block', marginTop: 4, overflow: 'hidden' }}>
+    <svg
+      ref={svgRef}
+      viewBox={`0 0 ${W} ${H}`}
+      style={{ width: '100%', height: 'auto', display: 'block', marginTop: 4, overflow: 'hidden' }}
+    >
       <defs>
         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.25" />
@@ -207,63 +240,61 @@ function AreaChart({ points, color = 'var(--accent)' }: { points: { label: strin
         </clipPath>
       </defs>
 
-      {/* Y-labels in left gutter, lines start at Y_W */}
+      {/* Y-labels + grid lines */}
       {gridLines.map((gl, i) => (
         <g key={i}>
-          <text
-            x={0} y={gl.y + 3}
-            textAnchor="start" fill="var(--text-tertiary)" fontSize="6.5"
-            style={{ fontFamily: 'inherit' }}
-          >
+          <text x={0} y={gl.y + 3} textAnchor="start" fill="var(--text-tertiary)" fontSize="6.5" style={{ fontFamily: 'inherit' }}>
             {fmtShort(gl.val)}
           </text>
-          <line x1={Y_W} y1={gl.y} x2={W - PAD_R} y2={gl.y}
-            stroke="var(--bg-border)" strokeWidth="0.5" opacity="0.5" />
+          <line x1={Y_W} y1={gl.y} x2={W - PAD_R} y2={gl.y} stroke="var(--bg-border)" strokeWidth="0.5" opacity="0.5" />
         </g>
       ))}
 
       {/* Clipped fill + line */}
       <g clipPath={`url(#${clipId})`}>
         <path d={fillPath} fill={`url(#${gradId})`} />
-        <path d={linePath} fill="none" stroke={color} strokeWidth="1.5"
-          strokeLinejoin="round" strokeLinecap="round" />
+        <path d={linePath} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
       </g>
 
-      {/* Hover + x labels */}
+      {/* X-axis labels */}
       {xs.map((x, i) => (
-        <g key={i}
-          onMouseEnter={() => setHover(i)}
-          onMouseLeave={() => setHover(null)}
-          style={{ cursor: 'default' }}
+        <text
+          key={i} x={x} y={H - 2} textAnchor="middle"
+          fill={indicator?.nearestIdx === i ? color : 'var(--text-tertiary)'}
+          fontSize="6.5" style={{ fontFamily: 'inherit', transition: 'fill 120ms' }}
         >
-          <rect x={x - 12} y={PAD_T} width={24} height={chartH + PAD_B} fill="transparent" />
-          {hover === i && (
-            <>
-              <line x1={x} y1={PAD_T} x2={x} y2={fillBottom}
-                stroke="var(--bg-border)" strokeWidth="0.5" />
-              <circle cx={x} cy={ys[i]} r={2.5} fill={color} />
-              <rect
-                x={Math.max(Y_W + 2, Math.min(x - 15, W - PAD_R - 32))}
-                y={Math.max(PAD_T + 2, ys[i] - 15)} width={32} height={11} rx={3}
-                fill="var(--bg-elevated)" stroke="var(--bg-border)" strokeWidth="0.5"
-              />
-              <text
-                x={Math.max(Y_W + 2, Math.min(x - 15, W - PAD_R - 32)) + 16}
-                y={Math.max(PAD_T + 2, ys[i] - 15) + 7.5}
-                fill="var(--text-primary)" fontSize="7" fontWeight="600" textAnchor="middle"
-                style={{ fontFamily: 'inherit' }}
-              >
-                {fmtShort(points[i].value)}
-              </text>
-            </>
-          )}
-          <text x={x} y={H - 2}
-            textAnchor="middle" fill="var(--text-tertiary)" fontSize="6.5"
-            style={{ fontFamily: 'inherit' }}>
-            {points[i].label}
-          </text>
-        </g>
+          {points[i].label}
+        </text>
       ))}
+
+      {/* Sliding indicator — rendered above everything */}
+      {indicator && (
+        <>
+          <line
+            x1={indicator.x} y1={PAD_T} x2={indicator.x} y2={fillBottom}
+            stroke="var(--bg-border)" strokeWidth="0.8"
+          />
+          <circle cx={indicator.x} cy={indicator.y} r={3} fill={color} />
+          <rect x={tipX} y={tipY} width={32} height={11} rx={3}
+            fill="var(--bg-elevated)" stroke="var(--bg-border)" strokeWidth="0.5" />
+          <text
+            x={tipX + 16} y={tipY + 7.5}
+            fill="var(--text-primary)" fontSize="7" fontWeight="600" textAnchor="middle"
+            style={{ fontFamily: 'inherit' }}
+          >
+            {fmtShort(tipValue)}
+          </text>
+        </>
+      )}
+
+      {/* Full-width invisible overlay for continuous mouse tracking */}
+      <rect
+        x={Y_W} y={PAD_T} width={chartW} height={chartH + PAD_B}
+        fill="transparent"
+        style={{ cursor: 'crosshair' }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setIndicator(null)}
+      />
     </svg>
   )
 }
@@ -578,16 +609,215 @@ function TxTable({ txs }: { txs: XeroTransaction[] }) {
   )
 }
 
+// ─── Create Invoice Modal ─────────────────────────────────────────────────────
+
+function CreateInvoiceModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [contactSearch, setContactSearch] = useState('')
+  const [contacts, setContacts] = useState<XeroContact[]>([])
+  const [loadingContacts, setLoadingContacts] = useState(false)
+  const [selectedContact, setSelectedContact] = useState<XeroContact | null>(null)
+  const [description, setDescription] = useState('')
+  const [amount, setAmount] = useState('')
+  const [dueDate, setDueDate] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() + 14)
+    return d.toISOString().slice(0, 10)
+  })
+  const [sendNow, setSendNow] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const loadContacts = useCallback(async (q: string) => {
+    setLoadingContacts(true)
+    try {
+      const res = await fetch(`/api/xero/contacts?q=${encodeURIComponent(q)}`)
+      const data = await res.json()
+      setContacts(data.contacts ?? [])
+    } finally {
+      setLoadingContacts(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (searchDebounce.current) clearTimeout(searchDebounce.current)
+    searchDebounce.current = setTimeout(() => loadContacts(contactSearch), 350)
+    return () => { if (searchDebounce.current) clearTimeout(searchDebounce.current) }
+  }, [contactSearch, loadContacts])
+
+  // Initial load
+  useEffect(() => { loadContacts('') }, [loadContacts])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedContact) { setError('Please select a contact.'); return }
+    const unitAmount = parseFloat(amount)
+    if (!unitAmount || unitAmount <= 0) { setError('Please enter a valid amount.'); return }
+
+    setSubmitting(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/xero/invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactId: selectedContact.ContactID,
+          contactName: selectedContact.Name,
+          date: new Date().toISOString().slice(0, 10),
+          dueDate,
+          lineItems: [{ Description: description || 'Services', UnitAmount: unitAmount, Quantity: 1 }],
+          status: sendNow ? 'AUTHORISED' : 'DRAFT',
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? 'Failed to create invoice.'); return }
+      setSuccess(true)
+      setTimeout(() => { onCreated(); onClose() }, 1200)
+    } catch {
+      setError('Network error — please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 200,
+        background: 'rgba(0,0,0,0.6)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16,
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="card" style={{ width: '100%', maxWidth: 440, position: 'relative', padding: '24px 24px 20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em', margin: 0 }}>
+            Create Xero Invoice
+          </h2>
+          <button className="btn-icon" onClick={onClose}><X className="w-4 h-4" /></button>
+        </div>
+
+        {success ? (
+          <div style={{ textAlign: 'center', padding: '24px 0' }}>
+            <Check className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--success)' }} />
+            <p style={{ fontSize: 14, color: 'var(--success)', fontWeight: 600 }}>Invoice created!</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Contact */}
+            <div>
+              <label className="field-label">Bill to (Xero contact)</label>
+              {selectedContact ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, background: 'var(--bg-elevated)', border: '1px solid var(--accent)' }}>
+                  <span style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>{selectedContact.Name}</span>
+                  <button type="button" className="btn-icon" onClick={() => setSelectedContact(null)} style={{ opacity: 0.6 }}>
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div style={{ position: 'relative' }}>
+                  <div style={{ position: 'relative' }}>
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-tertiary)' }} />
+                    <input
+                      className="field-input"
+                      style={{ paddingLeft: 28 }}
+                      placeholder="Search contacts…"
+                      value={contactSearch}
+                      onChange={(e) => setContactSearch(e.target.value)}
+                    />
+                  </div>
+                  {contacts.length > 0 && (
+                    <div style={{ border: '1px solid var(--bg-border)', borderRadius: 8, marginTop: 4, background: 'var(--bg-card)', maxHeight: 180, overflowY: 'auto', position: 'absolute', width: '100%', zIndex: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.2)' }}>
+                      {contacts.slice(0, 10).map((c) => (
+                        <button
+                          key={c.ContactID}
+                          type="button"
+                          onClick={() => { setSelectedContact(c); setContactSearch('') }}
+                          style={{ width: '100%', textAlign: 'left', padding: '8px 12px', fontSize: 13, color: 'var(--text-primary)', background: 'transparent', border: 'none', cursor: 'pointer' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-elevated)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                        >
+                          {c.Name}
+                          {c.EmailAddress && <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 6 }}>{c.EmailAddress}</span>}
+                        </button>
+                      ))}
+                      {loadingContacts && <p style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-tertiary)' }}>Loading…</p>}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="field-label">Description</label>
+              <input className="field-input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Services rendered" />
+            </div>
+
+            {/* Amount */}
+            <div>
+              <label className="field-label">Amount (excl. GST)</label>
+              <input className="field-input" type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+            </div>
+
+            {/* Due date */}
+            <div>
+              <label className="field-label">Due date</label>
+              <input className="field-input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            </div>
+
+            {/* Send now toggle */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+              <div
+                onClick={() => setSendNow((v) => !v)}
+                style={{
+                  width: 36, height: 20, borderRadius: 10,
+                  background: sendNow ? 'var(--accent)' : 'var(--bg-elevated)',
+                  position: 'relative', transition: 'background 150ms', flexShrink: 0,
+                  border: '1px solid var(--bg-border)',
+                }}
+              >
+                <div style={{
+                  width: 14, height: 14, borderRadius: '50%', background: 'white',
+                  position: 'absolute', top: 2, left: sendNow ? 18 : 2, transition: 'left 150ms',
+                }} />
+              </div>
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                Approve &amp; send now <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>(leave off to save as Draft)</span>
+              </span>
+            </label>
+
+            {error && <p style={{ fontSize: 13, color: 'var(--danger)' }}>{error}</p>}
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <button type="submit" disabled={submitting} className="btn-primary" style={{ flex: 1 }}>
+                {submitting ? 'Creating…' : sendNow ? 'Create & Approve' : 'Create Draft'}
+              </button>
+              <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Main dashboard ───────────────────────────────────────────────────────────
 
 export default function FinanceDashboard({
   summary,
   transactions,
+  retainerInvoiceDay,
 }: {
   summary: XeroSummary
   transactions: XeroTransaction[]
+  retainerInvoiceDay?: number
 }) {
   const [period, setPeriod] = useState<Period>('year')
+  const [showCreateInvoice, setShowCreateInvoice] = useState(false)
+  const [invoiceRefresh, setInvoiceRefresh] = useState(0)
   const { label: rangeLabel } = periodRange(period)
 
   const filtered = useMemo(() => filterTx(transactions, period), [transactions, period])
@@ -644,8 +874,31 @@ export default function FinanceDashboard({
     { key: 'year', label: 'Year' },
   ]
 
+  // Retainer invoice day reminder
+  const todayDay = new Date().getDate()
+  const showRetainerReminder = retainerInvoiceDay != null && todayDay === retainerInvoiceDay
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+      {showCreateInvoice && (
+        <CreateInvoiceModal
+          onClose={() => setShowCreateInvoice(false)}
+          onCreated={() => setInvoiceRefresh((v) => v + 1)}
+        />
+      )}
+
+      {/* Retainer invoice reminder banner */}
+      {showRetainerReminder && (
+        <div style={{ padding: '10px 16px', borderRadius: 10, background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: '1px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <p style={{ fontSize: 13, color: 'var(--text-primary)', margin: 0 }}>
+            Today is retainer invoice day — time to send retainer invoices.
+          </p>
+          <button className="btn-primary" style={{ fontSize: 12 }} onClick={() => setShowCreateInvoice(true)}>
+            <Plus className="w-3.5 h-3.5" /> Create Invoice
+          </button>
+        </div>
+      )}
 
       {/* Header + period filter */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -656,6 +909,10 @@ export default function FinanceDashboard({
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Create invoice */}
+          <button className="btn-primary" style={{ fontSize: 12 }} onClick={() => setShowCreateInvoice(true)}>
+            <Plus className="w-3.5 h-3.5" /> Create Invoice
+          </button>
           {/* Period buttons */}
           <div style={{ display: 'flex', gap: 6 }}>
             {PERIODS.map(({ key, label }) => (

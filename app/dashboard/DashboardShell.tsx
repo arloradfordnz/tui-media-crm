@@ -43,7 +43,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
         {/* Page content */}
         <main className="p-6">
-          {children}
+          <div className="max-w-7xl mx-auto">
+            {children}
+          </div>
         </main>
       </div>
 

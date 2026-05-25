@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { fetchXeroContacts, createXeroInvoice, fetchOutstandingInvoices, approveXeroInvoice } from '@/lib/xero'
 
 // Static system prompt — rules, voice, enums. Stable across turns, so we can
 // cache it with a cache_control breakpoint and reuse it on every request.
@@ -13,7 +14,7 @@ Voice: professional, concise New Zealand English. Correct grammar and punctuatio
 
 Formatting: you may use Markdown — **bold** for emphasis on key nouns (names, statuses, dates) and *italic* sparingly for subtle emphasis. Do not use headings, lists, or code blocks unless explicitly asked.
 
-Enums — Pipeline: enquiry,discovery,proposal,negotiation,won,lost | Client status: lead,active,inactive | Job status: enquiry,booked,preproduction,shootday,editing,review,approved,delivered,archived | Events: shoot,meeting,deadline,personal | Gear: available,in-use,maintenance,retired | Docs: contract,invoice,brief,other`
+Enums — Pipeline: enquiry,discovery,proposal,negotiation,won,lost | Client status: lead,active,past,archived | Client category (type): retainer,marketing,one_off | Job status: enquiry,booked,preproduction,shootday,editing,review,approved,delivered,archived | Events: shoot,meeting,deadline,personal | Gear: available,in-use,maintenance,retired | Docs: contract,invoice,brief,other`
 
 async function getDynamicContext(supabase: ReturnType<typeof createServerSupabaseClient> extends Promise<infer T> ? T : never) {
   const now = new Date()
@@ -51,6 +52,7 @@ const MUTATING_TOOLS = new Set([
   'create_document', 'delete_document',
   'create_gear', 'update_gear', 'delete_gear',
   'create_deliverable',
+  'create_xero_invoice', 'approve_xero_invoice',
 ])
 
 const TOOLS: Anthropic.Tool[] = [
@@ -89,7 +91,8 @@ const TOOLS: Anthropic.Tool[] = [
         location: { type: 'string' },
         lead_source: { type: 'string' },
         pipeline_stage: { type: 'string', enum: ['enquiry', 'discovery', 'proposal', 'negotiation', 'won', 'lost'] },
-        status: { type: 'string', enum: ['lead', 'active', 'inactive'] },
+        status: { type: 'string', enum: ['lead', 'active', 'past', 'archived'] },
+        client_category: { type: 'string', enum: ['retainer', 'marketing', 'one_off'], description: 'Client type/category' },
         notes: { type: 'string' },
         tags: { type: 'array', items: { type: 'string' } },
       },
@@ -109,7 +112,8 @@ const TOOLS: Anthropic.Tool[] = [
         location: { type: 'string' },
         lead_source: { type: 'string' },
         pipeline_stage: { type: 'string', enum: ['enquiry', 'discovery', 'proposal', 'negotiation', 'won', 'lost'] },
-        status: { type: 'string', enum: ['lead', 'active', 'inactive'] },
+        status: { type: 'string', enum: ['lead', 'active', 'past', 'archived'] },
+        client_category: { type: 'string', enum: ['retainer', 'marketing', 'one_off'] },
         notes: { type: 'string' },
         tags: { type: 'array', items: { type: 'string' } },
       },
@@ -380,6 +384,56 @@ const TOOLS: Anthropic.Tool[] = [
       required: [],
     },
   },
+
+  // ── Xero Finance ──────────────────────────────
+  {
+    name: 'list_xero_contacts',
+    description: 'Search Xero contacts (clients/suppliers) by name. Use this to find the ContactID needed when creating invoices.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        search: { type: 'string', description: 'Name search term. Omit to list recent contacts.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'create_xero_invoice',
+    description: 'Create a sales invoice in Xero for a contact. Use list_xero_contacts first to get the ContactID. Creates as DRAFT unless send_now is true.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        contact_id: { type: 'string', description: 'Xero ContactID (from list_xero_contacts)' },
+        contact_name: { type: 'string', description: 'Contact display name (for confirmation)' },
+        description: { type: 'string', description: 'Invoice line item description' },
+        amount: { type: 'number', description: 'Amount excluding GST' },
+        due_date: { type: 'string', description: 'Due date YYYY-MM-DD. Defaults to 14 days from today.' },
+        reference: { type: 'string', description: 'Optional invoice reference/PO number' },
+        send_now: { type: 'boolean', description: 'If true, approves the invoice immediately (status AUTHORISED). Default false (DRAFT).' },
+      },
+      required: ['contact_id', 'contact_name', 'amount'],
+    },
+  },
+  {
+    name: 'list_xero_invoices',
+    description: 'List outstanding (unpaid) Xero invoices — DRAFT, SUBMITTED, and AUTHORISED.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'approve_xero_invoice',
+    description: 'Approve (authorise) a Xero invoice so it can be sent to the client. Use after create_xero_invoice if the user wants to send it.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        invoice_id: { type: 'string', description: 'Xero InvoiceID' },
+      },
+      required: ['invoice_id'],
+    },
+  },
 ]
 
 // ── Tool Executor ──────────────────────────────────────────────────────────────
@@ -416,6 +470,7 @@ async function executeTool(name: string, input: Record<string, unknown>, supabas
         lead_source: (input.lead_source as string) || null,
         pipeline_stage: (input.pipeline_stage as string) || 'enquiry',
         status: (input.status as string) || 'lead',
+        client_category: (input.client_category as string) || null,
         notes: (input.notes as string) || null,
         tags: input.tags ? JSON.stringify(input.tags) : null,
       }).select('id, name').single()
@@ -432,6 +487,7 @@ async function executeTool(name: string, input: Record<string, unknown>, supabas
       if (input.lead_source !== undefined) updates.lead_source = input.lead_source || null
       if (input.pipeline_stage !== undefined) updates.pipeline_stage = input.pipeline_stage
       if (input.status !== undefined) updates.status = input.status
+      if (input.client_category !== undefined) updates.client_category = input.client_category || null
       if (input.notes !== undefined) updates.notes = input.notes || null
       if (input.tags !== undefined) updates.tags = JSON.stringify(input.tags)
 
@@ -706,6 +762,40 @@ async function executeTool(name: string, input: Record<string, unknown>, supabas
         revenue_this_month: revenueThisMonth,
         upcoming_events: upcomingEvents ?? [],
       })
+    }
+
+    // ── Xero ────────────────────────────────
+    case 'list_xero_contacts': {
+      const contacts = await fetchXeroContacts((input.search as string) || undefined)
+      if (contacts === null) return JSON.stringify({ error: 'Xero is not connected. Ask the user to connect it from the Finance page.' })
+      return JSON.stringify({ contacts: contacts.slice(0, 20).map((c) => ({ id: c.ContactID, name: c.Name, email: c.EmailAddress })) })
+    }
+
+    case 'create_xero_invoice': {
+      const now = new Date()
+      const defaultDue = new Date(now.getTime() + 14 * 86400000).toISOString().slice(0, 10)
+      const invoice = await createXeroInvoice({
+        contactId: input.contact_id as string,
+        contactName: input.contact_name as string,
+        date: now.toISOString().slice(0, 10),
+        dueDate: (input.due_date as string) || defaultDue,
+        lineItems: [{ Description: (input.description as string) || 'Services', UnitAmount: input.amount as number, Quantity: 1 }],
+        reference: (input.reference as string) || undefined,
+        status: input.send_now ? 'AUTHORISED' : 'DRAFT',
+      })
+      if (!invoice) return JSON.stringify({ error: 'Failed to create invoice. Xero may not be connected or may require updated permissions.' })
+      return JSON.stringify({ success: true, invoice: { id: invoice.InvoiceID, number: invoice.InvoiceNumber, status: invoice.Status, total: invoice.Total } })
+    }
+
+    case 'list_xero_invoices': {
+      const invoices = await fetchOutstandingInvoices()
+      return JSON.stringify({ invoices: invoices.map((inv) => ({ id: inv.InvoiceID, number: inv.InvoiceNumber, status: inv.Status, total: inv.Total, amountDue: inv.AmountDue })) })
+    }
+
+    case 'approve_xero_invoice': {
+      const ok = await approveXeroInvoice(input.invoice_id as string)
+      if (!ok) return JSON.stringify({ error: 'Failed to approve invoice.' })
+      return JSON.stringify({ success: true })
     }
 
     default:

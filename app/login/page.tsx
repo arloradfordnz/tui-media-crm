@@ -17,9 +17,8 @@ export default function LoginPage() {
             src="/Primary_White.svg"
             alt="Tui Media"
             width={180}
-            height={38}
+            height={37}
             priority
-            style={{ height: 'auto' }}
           />
         </div>
 

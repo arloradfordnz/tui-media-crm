@@ -102,7 +102,7 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg-base)' }}>
       <header className="py-5 px-6 flex items-center justify-center">
-        <Image src="/Primary_White.svg" alt="Tui Media" width={130} height={28} style={{ height: 'auto' }} />
+        <Image src="/Primary_White.svg" alt="Tui Media" width={130} height={27} />
       </header>
 
       <div className="max-w-3xl mx-auto px-6 py-6 space-y-6 animate-fade-in">

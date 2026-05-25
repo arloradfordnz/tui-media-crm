@@ -55,6 +55,8 @@ function NavLink({ href, label, icon: Icon, onClick }: { href: string; label: st
   const pathname = usePathname()
   const isActive = href === '/dashboard'
     ? pathname === '/dashboard'
+    : href === '/dashboard/jobs'
+    ? pathname === '/dashboard/jobs' || (pathname.startsWith('/dashboard/jobs/') && !pathname.startsWith('/dashboard/jobs/templates'))
     : pathname.startsWith(href)
 
   return (
@@ -100,7 +102,7 @@ export default function Sidebar({ onLogout, mobileOpen, onClose }: { onLogout: (
 
         {/* Logo */}
         <div className="px-5 pt-5 pb-3">
-          <Image src="/Primary_White.svg" alt="Tui Media" width={120} height={26} style={{ height: 'auto' }} />
+          <Image src="/Primary_White.svg" alt="Tui Media" width={120} height={25} />
         </div>
 
         {/* Navigation */}

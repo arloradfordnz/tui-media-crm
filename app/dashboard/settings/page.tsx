@@ -1,16 +1,18 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import SettingsForm from './SettingsForm'
 import EmailTemplatesForm from './EmailTemplatesForm'
+import RetainerInvoiceSettings from './RetainerInvoiceSettings'
 import { APP_VERSION } from '@/lib/version'
+import { getAppSetting } from '@/app/actions/settings'
 
 export default async function SettingsPage() {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: templates } = await supabase
-    .from('email_templates')
-    .select('id, type, subject, body, updated_at')
-    .order('type')
+  const [templates, retainerInvoiceDay] = await Promise.all([
+    supabase.from('email_templates').select('id, type, subject, body, updated_at').order('type'),
+    getAppSetting('retainer_invoice_day'),
+  ])
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -19,7 +21,7 @@ export default async function SettingsPage() {
       {/* Profile */}
       <div className="card">
         <h2 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Profile</h2>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <p className="label">Name</p>
             <p className="text-sm mt-1" style={{ color: 'var(--text-primary)' }}>{user?.user_metadata?.name || '—'}</p>
@@ -34,8 +36,11 @@ export default async function SettingsPage() {
       {/* Change Password */}
       <SettingsForm />
 
+      {/* Retainer Invoice Day */}
+      <RetainerInvoiceSettings currentDay={retainerInvoiceDay ? parseInt(retainerInvoiceDay, 10) : 1} />
+
       {/* Email Templates */}
-      <EmailTemplatesForm templates={templates || []} />
+      <EmailTemplatesForm templates={templates.data || []} />
 
       {/* App Info */}
       <div className="card">

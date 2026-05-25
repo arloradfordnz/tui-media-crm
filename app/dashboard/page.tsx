@@ -8,6 +8,7 @@ import TodoWidget from './TodoWidget'
 import BusinessHealth from './BusinessHealth'
 import Link from 'next/link'
 import RevenueChart from './RevenueChart'
+import ClientGreeting from './ClientGreeting'
 
 const PIPELINE_STAGES = [
   { key: 'enquiry',    label: 'Enquiry',       statuses: ['enquiry'] },
@@ -18,12 +19,6 @@ const PIPELINE_STAGES = [
   { key: 'delivered',  label: 'Delivered',     statuses: ['delivered'] },
 ] as const
 
-function greeting(d: Date): string {
-  const h = d.getHours()
-  if (h < 12) return 'Good morning'
-  if (h < 18) return 'Good afternoon'
-  return 'Good evening'
-}
 
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient()
@@ -57,7 +52,7 @@ export default async function DashboardPage() {
     supabase.from('events').select('id, title, event_type, date, start_time, job_id, jobs(id, name)').gte('date', todayStart).order('date', { ascending: true }).limit(5),
     supabase.from('activities').select('id, action, details, created_at, job_id, jobs(id, name), client_id, clients(id, name)').order('created_at', { ascending: false }).limit(5),
     supabase.from('jobs').select('quote_value, updated_at').in('status', ['delivered', 'archived']).gte('updated_at', sixMonthsAgo),
-    supabase.from('clients').select('id, name, monthly_retainer').eq('status', 'retainer'),
+    supabase.from('clients').select('id, name, monthly_retainer').eq('client_category', 'retainer'),
   ])
 
   const crmRevenueThisMonth = (deliveredThisMonth ?? []).reduce((sum, j) => sum + (j.quote_value || 0), 0)
@@ -134,7 +129,7 @@ export default async function DashboardPage() {
         <div>
           <p className="text-sm mb-1" style={{ color: 'var(--text-tertiary)' }}>{todayLabel}</p>
           <h1 className="text-3xl font-semibold" style={{ letterSpacing: '-0.03em', lineHeight: 1.1 }}>
-            {greeting(now)}, Arlo.
+            <ClientGreeting />
           </h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
             {inFlightJobs > 0
@@ -348,7 +343,7 @@ function SectionHeader({ title, subtitle, children }: {
 }) {
   return (
     <div className="flex items-center justify-between gap-3 mb-4">
-      <div className="min-w-0">
+      <div className="flex-1 min-w-0">
         <h2 className="text-xl font-semibold truncate" style={{ letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>{title}</h2>
         {subtitle && <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-tertiary)' }}>{subtitle}</p>}
       </div>

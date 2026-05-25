@@ -25,6 +25,7 @@ export async function createClient(prevState: { error?: string } | undefined, fo
   const firstContact = formData.get('firstContact') as string
   const pipelineStage = formData.get('pipelineStage') as string
   const status = formData.get('status') as string
+  const clientCategory = formData.get('clientCategory') as string
   const notes = formData.get('notes') as string
   const tagsRaw = formData.get('tags') as string
   const monthlyRetainerRaw = formData.get('monthlyRetainer') as string
@@ -45,6 +46,7 @@ export async function createClient(prevState: { error?: string } | undefined, fo
     first_contact: firstContact ? new Date(firstContact).toISOString() : null,
     pipeline_stage: pipelineStage || 'enquiry',
     status: status || 'lead',
+    client_category: clientCategory || null,
     notes: notes || null,
     tags,
     monthly_retainer: monthlyRetainer,
@@ -71,6 +73,7 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
   const firstContact = formData.get('firstContact') as string
   const pipelineStage = formData.get('pipelineStage') as string
   const status = formData.get('status') as string
+  const clientCategory = formData.get('clientCategory') as string
   const notes = formData.get('notes') as string
   const tagsRaw = formData.get('tags') as string
   const monthlyRetainerRaw = formData.get('monthlyRetainer') as string
@@ -91,6 +94,7 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
     first_contact: firstContact ? new Date(firstContact).toISOString() : null,
     pipeline_stage: pipelineStage || 'enquiry',
     status,
+    client_category: clientCategory || null,
     notes: notes || null,
     tags,
     monthly_retainer: monthlyRetainer,
@@ -104,7 +108,7 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
 }
 
 export async function updateClientStatus(clientId: string, status: string) {
-  const allowed = ['active', 'retainer', 'marketing', 'lead', 'past', 'archived']
+  const allowed = ['active', 'lead', 'past', 'archived']
   if (!allowed.includes(status)) return { error: 'Invalid status.' }
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.from('clients').update({ status }).eq('id', clientId)

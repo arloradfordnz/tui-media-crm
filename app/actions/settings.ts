@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient } from '@/lib/supabase'
 
 export async function changePassword(prevState: { error?: string; success?: boolean } | undefined, formData: FormData) {
@@ -24,6 +25,33 @@ export async function changePassword(prevState: { error?: string; success?: bool
   if (error) return { error: error.message }
 
   return { success: true }
+}
+
+export async function saveAppSetting(key: string, value: string) {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated.' }
+
+  const { error } = await supabase
+    .from('app_settings')
+    .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+
+  if (error) return { error: error.message }
+  revalidatePath('/dashboard/settings')
+  return { success: true }
+}
+
+export async function getAppSetting(key: string): Promise<string | null> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase.from('app_settings').select('value').eq('key', key).maybeSingle()
+  return data?.value ?? null
+}
+
+export async function saveRetainerInvoiceDay(prevState: { error?: string; success?: boolean } | undefined, formData: FormData) {
+  const dayRaw = formData.get('retainerInvoiceDay') as string
+  const day = parseInt(dayRaw, 10)
+  if (!day || day < 1 || day > 28) return { error: 'Please enter a day between 1 and 28.' }
+  return saveAppSetting('retainer_invoice_day', String(day))
 }
 
 export async function saveEmailTemplate(prevState: { error?: string; success?: boolean } | undefined, formData: FormData) {

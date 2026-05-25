@@ -59,7 +59,7 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
     <div className="min-h-screen" style={{ background: 'var(--bg-base)' }}>
       {/* Header */}
       <header className="py-6 px-6 flex items-center justify-center" style={{ borderBottom: '1px solid var(--bg-border)' }}>
-        <Image src="/Primary_White.svg" alt="Tui Media" width={140} height={30} style={{ height: 'auto' }} />
+        <Image src="/Primary_White.svg" alt="Tui Media" width={140} height={29} />
       </header>
 
       <div className="max-w-3xl mx-auto px-6 py-10 space-y-8 animate-fade-in">
