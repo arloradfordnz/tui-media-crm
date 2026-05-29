@@ -158,22 +158,34 @@ export async function getValidXeroAccount(): Promise<StoredAccount | null> {
   const needsRefresh = !expiresAt || expiresAt.getTime() - Date.now() < 60_000
 
   if (needsRefresh && account.refresh_token) {
-    const tok = await refreshAccessToken(account.refresh_token)
-    const newExpires = new Date(Date.now() + tok.expires_in * 1000).toISOString()
-    await supabase
-      .from('connected_accounts')
-      .update({
-        access_token: tok.access_token,
-        refresh_token: tok.refresh_token,
-        expires_at: newExpires,
-        token_type: tok.token_type,
-        scope: tok.scope,
-      })
-      .eq('id', account.id)
+    try {
+      const tok = await refreshAccessToken(account.refresh_token)
+      const newExpires = new Date(Date.now() + tok.expires_in * 1000).toISOString()
+      await supabase
+        .from('connected_accounts')
+        .update({
+          access_token: tok.access_token,
+          refresh_token: tok.refresh_token,
+          expires_at: newExpires,
+          token_type: tok.token_type,
+          scope: tok.scope,
+        })
+        .eq('id', account.id)
 
-    account.access_token = tok.access_token
-    account.refresh_token = tok.refresh_token
-    account.expires_at = newExpires
+      account.access_token = tok.access_token
+      account.refresh_token = tok.refresh_token
+      account.expires_at = newExpires
+    } catch (err) {
+      // Refresh failed — if the current access token is still within its
+      // validity window, keep using it. Only surface the error if we have
+      // no usable token at all (i.e. it's already expired).
+      const stillValid = expiresAt && expiresAt.getTime() > Date.now()
+      if (!stillValid) {
+        console.error('[Xero] Token refresh failed and access token is expired:', err)
+        return null
+      }
+      console.warn('[Xero] Token refresh failed but access token still valid, proceeding:', err)
+    }
   }
 
   return account

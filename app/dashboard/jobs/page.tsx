@@ -18,6 +18,7 @@ const JOB_STATUS_OPTIONS = [
   { value: 'preproduction', label: 'Pre-production' },
   { value: 'shootday', label: 'Shoot Day' },
   { value: 'editing', label: 'Editing' },
+  { value: 'archived', label: 'Archived' },
 ]
 
 export default async function JobsPage({ searchParams }: { searchParams: Promise<{ status?: string; search?: string }> }) {
@@ -32,7 +33,9 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
     .select('id, name, job_type, status, shoot_date, quote_value, client_id, clients(id, name)')
     .order('shoot_date', { ascending: false })
 
-  if (statusFilter !== 'all') query = query.eq('status', statusFilter)
+  if (statusFilter === 'archived') query = query.eq('status', 'archived')
+  else if (statusFilter === 'all') query = query.neq('status', 'archived')
+  else query = query.eq('status', statusFilter)
   if (search) query = query.ilike('name', `%${search}%`)
 
   const { data: jobs } = await query

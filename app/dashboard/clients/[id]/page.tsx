@@ -64,7 +64,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
       docType: d.doc_type,
       updatedAt: d.updated_at,
     })),
-    jobs: (jobs ?? []).map((j) => ({
+    jobs: (jobs ?? []).filter((j) => j.status !== 'archived').map((j) => ({
       id: j.id,
       name: j.name,
       jobType: j.job_type,

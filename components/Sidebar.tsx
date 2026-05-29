@@ -37,8 +37,8 @@ const mainNav = [
 ]
 
 const businessNav = [
-  { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/dashboard/finance', label: 'Finance', icon: DollarSign },
+  { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/dashboard/gear', label: 'Gear', icon: Camera },
   { href: '/dashboard/documents', label: 'Documents', icon: FileText },
   { href: '/dashboard/jobs/templates', label: 'Templates', icon: Layers },

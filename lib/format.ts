@@ -78,6 +78,7 @@ export function statusLabel(status: string): string {
     corporate: 'Corporate',
     event: 'Event',
     realestate: 'Real Estate',
+    social_media: 'Social Media',
     custom: 'Custom',
     preshoot: 'Pre-shoot',
     postproduction: 'Post-production',

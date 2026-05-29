@@ -3,12 +3,11 @@
 import { useActionState, useState, useEffect } from 'react'
 import { createJob } from '@/app/actions/jobs'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, Check, Film, Heart, Building2, PartyPopper, Home, Palette } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Film, Heart, Building2, PartyPopper, Home, Palette, Video } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
 
 type Client = { id: string; name: string; email: string | null }
-type TemplateTask = { phase: string; title: string }
 type TemplateDeliverable = { title: string; description: string | null }
 
 const JOB_TYPES = [
@@ -17,11 +16,9 @@ const JOB_TYPES = [
   { value: 'corporate', label: 'Corporate', icon: Building2 },
   { value: 'event', label: 'Event', icon: PartyPopper },
   { value: 'realestate', label: 'Real Estate', icon: Home },
+  { value: 'social_media', label: 'Social Media', icon: Video },
   { value: 'custom', label: 'Custom', icon: Palette },
 ]
-
-const PHASES = ['preshoot', 'shootday', 'postproduction', 'delivery']
-const PHASE_LABELS: Record<string, string> = { preshoot: 'Pre-shoot', shootday: 'Shoot Day', postproduction: 'Post-production', delivery: 'Delivery' }
 
 export default function NewJobPage() {
   const [state, action, pending] = useActionState(createJob, undefined)
@@ -35,7 +32,6 @@ export default function NewJobPage() {
   const [quoteValue, setQuoteValue] = useState('')
   const [expectedAmount, setExpectedAmount] = useState('')
   const [expectedPaymentDate, setExpectedPaymentDate] = useState('')
-  const [tasks, setTasks] = useState<TemplateTask[]>([])
   const [deliverables, setDeliverables] = useState<TemplateDeliverable[]>([])
 
   useEffect(() => {
@@ -43,24 +39,12 @@ export default function NewJobPage() {
   }, [])
 
   useEffect(() => {
-    if (jobType) {
-      fetch(`/api/templates/${jobType}`)
-        .then((r) => r.json())
-        .then((data) => {
-          setTasks(data.tasks || [])
-          setDeliverables(data.deliverables || [])
-        })
-        .catch((err) => console.warn('Failed to load template:', err))
+    if (jobType === 'social_media') {
+      setDeliverables([{ title: 'Instagram Reel', description: null }])
+    } else {
+      setDeliverables([])
     }
   }, [jobType])
-
-  useEffect(() => {
-    const client = clients.find((c) => c.id === selectedClient)
-    if (client && jobType) {
-      const typeLabel = JOB_TYPES.find((t) => t.value === jobType)?.label || jobType
-      setJobName(`${client.name} — ${typeLabel}`)
-    }
-  }, [selectedClient, jobType, clients])
 
   const canNext = () => {
     if (step === 0) return selectedClient && jobName
@@ -78,7 +62,7 @@ export default function NewJobPage() {
 
       {/* Step indicator */}
       <div className="flex gap-2 mb-8">
-        {['Basics', 'Job Type', 'Tasks', 'Review'].map((label, i) => (
+        {['Basics', 'Job Type', 'Review'].map((label, i) => (
           <div key={label} className="flex-1">
             <div className="h-1.5 rounded-full mb-2" style={{ background: i <= step ? 'var(--accent)' : 'var(--bg-elevated)' }} />
             <p className="text-xs font-medium" style={{ color: i <= step ? 'var(--accent)' : 'var(--text-tertiary)' }}>{label}</p>
@@ -150,53 +134,8 @@ export default function NewJobPage() {
         </div>
       )}
 
-      {/* Step 2: Tasks & Deliverables */}
+      {/* Step 2: Review */}
       {step === 2 && (
-        <div className="space-y-6">
-          <div className="card">
-            <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Task Checklist</h3>
-            {tasks.length === 0 ? (
-              <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No template tasks. You can add tasks after creating the job.</p>
-            ) : (
-              PHASES.map((phase) => {
-                const phaseTasks = tasks.filter((t) => t.phase === phase)
-                if (phaseTasks.length === 0) return null
-                return (
-                  <div key={phase} className="mb-4">
-                    <p className="label mb-2">{PHASE_LABELS[phase]}</p>
-                    {phaseTasks.map((t, i) => (
-                      <div key={i} className="flex items-center gap-3 py-2" style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                        <div className="w-4 h-4 rounded border" style={{ borderColor: 'var(--bg-border)' }} />
-                        <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{t.title}</span>
-                        <button onClick={() => setTasks(tasks.filter((_, j) => j !== tasks.indexOf(t)))} className="ml-auto text-xs" style={{ color: 'var(--danger)' }}>Remove</button>
-                      </div>
-                    ))}
-                  </div>
-                )
-              })
-            )}
-          </div>
-          <div className="card">
-            <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Deliverables</h3>
-            {deliverables.length === 0 ? (
-              <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No template deliverables.</p>
-            ) : (
-              deliverables.map((d, i) => (
-                <div key={i} className="flex items-center gap-3 py-2" style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                  <Film className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-                  <div>
-                    <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{d.title}</span>
-                    {d.description && <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{d.description}</p>}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Step 3: Review */}
-      {step === 3 && (
         <form action={action}>
           <input type="hidden" name="name" value={jobName} />
           <input type="hidden" name="clientId" value={selectedClient} />
@@ -206,7 +145,6 @@ export default function NewJobPage() {
           <input type="hidden" name="quoteValue" value={quoteValue} />
           <input type="hidden" name="expectedAmount" value={expectedAmount} />
           <input type="hidden" name="expectedPaymentDate" value={expectedPaymentDate} />
-          <input type="hidden" name="tasks" value={JSON.stringify(tasks)} />
           <input type="hidden" name="deliverables" value={JSON.stringify(deliverables)} />
 
           <div className="card space-y-4">
@@ -219,8 +157,18 @@ export default function NewJobPage() {
               <div><p className="label">Location</p><p className="text-sm mt-1" style={{ color: 'var(--text-primary)' }}>{shootLocation || '—'}</p></div>
               <div><p className="label">Quote Value</p><p className="text-sm mt-1" style={{ color: 'var(--text-primary)' }}>{quoteValue ? `$${quoteValue}` : '—'}</p></div>
             </div>
-            <div><p className="label">Tasks</p><p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>{tasks.length} tasks</p></div>
-            <div><p className="label">Deliverables</p><p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>{deliverables.length} deliverables</p></div>
+            {deliverables.length > 0 && (
+              <div>
+                <p className="label">Deliverables</p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {deliverables.map((d, i) => (
+                    <span key={i} className="flex items-center gap-1.5 badge badge-accent">
+                      <Film className="w-3 h-3" /> {d.title}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {state?.error && (
               <div className="text-sm px-4 py-3 rounded-lg" style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--danger)' }}>{state.error}</div>
@@ -238,7 +186,7 @@ export default function NewJobPage() {
         <button onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0} className="btn-secondary" style={step === 0 ? { opacity: 0.3 } : {}}>
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
-        {step < 3 && (
+        {step < 2 && (
           <button onClick={() => setStep(step + 1)} disabled={!canNext()} className="btn-primary" style={!canNext() ? { opacity: 0.4 } : {}}>
             Next <ArrowRight className="w-4 h-4" />
           </button>
