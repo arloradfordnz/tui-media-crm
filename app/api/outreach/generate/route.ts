@@ -130,12 +130,13 @@ BODY:
         throw new Error('Unexpected Claude response format')
       }
 
-      await supabase.from('activities').insert({
+      const { error: insertError } = await supabase.from('activities').insert({
         action: 'outreach_draft',
         client_id: lead.id,
         details: text,
-        notes: `Auto-generated for ${recipientName}`,
       })
+
+      if (insertError) throw new Error(insertError.message)
 
       results.push({ clientId: lead.id, name: lead.name, ok: true })
     } catch (err) {
@@ -148,9 +149,10 @@ BODY:
   const succeeded = results.filter((r) => r.ok).length
 
   return NextResponse.json({
-    ok: true,
+    ok: succeeded > 0 || eligible.length === 0,
     count: succeeded,
     total: eligible.length,
+    failed: results.filter((r) => !r.ok),
     results,
   })
 }
