@@ -227,7 +227,7 @@ export default function JobRecord({ job }: { job: JobData }) {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6">
       <Link href="/dashboard/jobs" className="inline-flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
         <ArrowLeft className="w-4 h-4" /> Back to Jobs
       </Link>

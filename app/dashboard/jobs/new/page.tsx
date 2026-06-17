@@ -53,7 +53,7 @@ export default function NewJobPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="space-y-6">
       <Link href="/dashboard/jobs" className="inline-flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
         <ArrowLeft className="w-4 h-4" /> Back to Jobs
       </Link>

@@ -107,12 +107,12 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
 
       <div className="max-w-3xl mx-auto px-6 py-6 space-y-6 animate-fade-in">
         {/* Hero greeting */}
-        <div className="card-hero">
-          <p className="text-xs uppercase tracking-wider font-semibold opacity-80 mb-2">Client Portal</p>
-          <h1 className="text-3xl md:text-4xl font-semibold" style={{ letterSpacing: '-0.03em', lineHeight: 1.1 }}>
+        <div className="py-2">
+          <p className="text-xs uppercase tracking-wider font-semibold mb-2" style={{ color: 'var(--text-tertiary)' }}>Client Portal</p>
+          <h1 className="text-3xl md:text-4xl font-semibold" style={{ letterSpacing: '-0.03em', lineHeight: 1.1, color: 'var(--text-primary)' }}>
             Kia ora, {data.client.contactPerson || data.client.name}
           </h1>
-          <p className="text-sm md:text-base opacity-90 mt-2 max-w-md">
+          <p className="text-sm md:text-base mt-2 max-w-md" style={{ color: 'var(--text-secondary)' }}>
             View your projects, deliverables, and documents below.
           </p>
         </div>

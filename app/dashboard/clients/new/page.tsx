@@ -22,7 +22,7 @@ export default function NewClientPage() {
   const [state, action, pending] = useActionState(createClient, undefined)
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="space-y-6">
       <Link href="/dashboard/clients" className="inline-flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
         <ArrowLeft className="w-4 h-4" /> Back to Clients
       </Link>

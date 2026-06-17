@@ -10,42 +10,91 @@ Font.register({
   ],
 })
 
-// Load Patrick Hand from local /public so we don't depend on any external CDN
-// and it renders reliably in both dashboard and portal PDFs.
 Font.register({
   family: 'Patrick Hand',
   src: '/fonts/patrick-hand.ttf',
 })
 
+const C = {
+  black: '#111111',
+  grey:  '#888888',
+  lgrey: '#E0E0E0',
+  dgrey: '#444444',
+}
+
 const styles = StyleSheet.create({
-  page: { fontFamily: 'Poppins', fontSize: 12, color: '#1a1a1a', paddingTop: 48, paddingBottom: 70 },
-  header: { paddingHorizontal: 48, paddingBottom: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerTitle: { color: '#1a1a1a', fontSize: 22, fontWeight: 600 },
-  headerSub: { color: '#888888', fontSize: 11, marginTop: 6 },
-  headerMeta: { color: '#888888', fontSize: 10, marginTop: 2 },
-  body: { paddingHorizontal: 48, paddingTop: 16 },
-  section: { marginBottom: 28 },
-  label: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginBottom: 6 },
-  value: { fontSize: 12, color: '#444444', lineHeight: 1.6 },
-  meta: { fontSize: 11, color: '#666666', lineHeight: 1.6 },
-  row: { flexDirection: 'row', gap: 32, marginBottom: 28 },
-  col: { flex: 1 },
-  bodyText: { fontSize: 12, color: '#2a2a2a', lineHeight: 1.8 },
-  paragraph: { fontSize: 12, color: '#2a2a2a', lineHeight: 1.8, marginBottom: 10 },
-  h1: { fontSize: 20, fontWeight: 600, color: '#1a1a1a', marginTop: 18, marginBottom: 3 },
-  h2: { fontSize: 16, fontWeight: 600, color: '#1a1a1a', marginTop: 16, marginBottom: 3 },
-  h3: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginTop: 14, marginBottom: 2 },
-  sectionHeading: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 },
+  page: {
+    fontFamily: 'Poppins',
+    fontSize: 11,
+    color: C.black,
+    paddingTop: 48,
+    paddingBottom: 60,
+    paddingHorizontal: 52,
+  },
+
+  // ── Header ──────────────────────────────────────────────────────────────
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  headerTitle: {
+    fontFamily: 'Poppins',
+    fontWeight: 600,
+    fontSize: 22,
+    color: C.black,
+    lineHeight: 1.2,
+  },
+  headerClient: {
+    fontSize: 10,
+    color: C.grey,
+    marginTop: 6,
+    lineHeight: 1.5,
+  },
+  headerDate: {
+    fontSize: 9,
+    color: C.grey,
+    marginTop: 2,
+  },
+
+  // ── Rule ────────────────────────────────────────────────────────────────
+  rule: {
+    borderBottomWidth: 0.5,
+    borderBottomColor: C.lgrey,
+    marginTop: 14,
+    marginBottom: 0,
+  },
+
+  // ── Section label ────────────────────────────────────────────────────────
+  sectionLabel: {
+    fontFamily: 'Poppins',
+    fontWeight: 600,
+    fontSize: 8,
+    color: C.grey,
+    letterSpacing: 1.4,
+    marginTop: 16,
+    marginBottom: 6,
+  },
+
+  // ── Body text ────────────────────────────────────────────────────────────
+  paragraph: { fontSize: 11, color: C.black, lineHeight: 1.8, marginBottom: 8 },
+  h1:        { fontFamily: 'Poppins', fontWeight: 600, fontSize: 22, color: C.black, marginTop: 18, marginBottom: 4, lineHeight: 1.2 },
+  h3:        { fontFamily: 'Poppins', fontWeight: 600, fontSize: 11, color: C.black, marginTop: 12, marginBottom: 3 },
+
+  // ── Signature ────────────────────────────────────────────────────────────
   signatureBlock: { flexDirection: 'row', marginTop: 32, gap: 36 },
-  signatureCol: { flex: 1 },
-  signatureField: { position: 'relative', height: 24, marginBottom: 12 },
-  signatureFieldLine: { position: 'absolute', bottom: 0, left: 44, right: 0, height: 1, backgroundColor: '#1a1a1a' },
-  signatureFieldLabel: { position: 'absolute', bottom: 4, left: 0, fontSize: 11, fontWeight: 600, color: '#1a1a1a' },
-  signatureTyped: { position: 'absolute', bottom: 2, left: 50, fontFamily: 'Patrick Hand', fontSize: 18, color: '#1a1a1a', lineHeight: 1 },
-  signatureDateValue: { position: 'absolute', bottom: 3, left: 50, fontFamily: 'Patrick Hand', fontSize: 13, color: '#333333', lineHeight: 1 },
-  signatureName: { fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginTop: 8 },
-  signaturePrinted: { fontSize: 11, color: '#666666', marginTop: 2 },
-  footer: { position: 'absolute', bottom: 28, left: 0, right: 0, textAlign: 'center', fontSize: 10, color: '#999999' },
+  signatureCol:   { flex: 1 },
+  signatureField: { position: 'relative', height: 26, marginBottom: 12 },
+  signatureFieldLine: { position: 'absolute', bottom: 0, left: 44, right: 0, height: 0.5, backgroundColor: C.black },
+  signatureFieldLabel: { position: 'absolute', bottom: 4, left: 0, fontFamily: 'Poppins', fontWeight: 600, fontSize: 10, color: C.black },
+  signatureTyped: { position: 'absolute', bottom: 2, left: 50, fontFamily: 'Patrick Hand', fontSize: 18, color: C.black, lineHeight: 1 },
+  signatureDateValue: { position: 'absolute', bottom: 3, left: 50, fontFamily: 'Patrick Hand', fontSize: 13, color: C.dgrey, lineHeight: 1 },
+  signatureName: { fontFamily: 'Poppins', fontWeight: 600, fontSize: 11, color: C.black, marginTop: 6 },
+  signaturePrinted: { fontSize: 10, color: C.grey, marginTop: 2 },
+
+  // ── Footer ───────────────────────────────────────────────────────────────
+  footer: { position: 'absolute', bottom: 24, left: 0, right: 0, textAlign: 'center', fontSize: 9, color: C.grey },
 })
 
 type FormData = {
@@ -66,7 +115,7 @@ type FormData = {
 
 function TuiLogo() {
   return (
-    <Svg width={130} height={27} viewBox="0 0 1280 264.55">
+    <Svg width={110} height={23} viewBox="0 0 1280 264.55">
       <G>
         <Path d="M306.45,44.96v23.38h-46.52v151.37h-28.66V68.34h-46.77v-23.38h121.95Z" fill="#111" />
         <Path d="M460.83,81.16v138.54h-28.66v-16.34c-4.53,5.7-10.44,10.18-17.73,13.45-7.29,3.27-15.05,4.9-23.26,4.9-10.9,0-20.66-2.26-29.29-6.79-8.64-4.53-15.42-11.23-20.37-20.11-4.95-8.88-7.42-19.61-7.42-32.18v-81.47h28.41v77.19c0,12.41,3.1,21.92,9.3,28.54,6.2,6.62,14.67,9.93,25.4,9.93s19.23-3.31,25.52-9.93c6.29-6.62,9.43-16.13,9.43-28.54v-77.19h28.66Z" fill="#111" />
@@ -88,12 +137,10 @@ function TuiLogo() {
 function renderInline(text: string): ReactElement[] {
   const parts: ReactElement[] = []
   const re = /\*\*(.+?)\*\*/g
-  let last = 0
-  let m: RegExpExecArray | null
-  let i = 0
+  let last = 0, m: RegExpExecArray | null, i = 0
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) parts.push(<Text key={i++}>{text.slice(last, m.index)}</Text>)
-    parts.push(<Text key={i++} style={{ fontWeight: 600 }}>{m[1]}</Text>)
+    parts.push(<Text key={i++} style={{ fontFamily: 'Poppins', fontWeight: 600 }}>{m[1]}</Text>)
     last = m.index + m[0].length
   }
   if (last < text.length) parts.push(<Text key={i++}>{text.slice(last)}</Text>)
@@ -107,21 +154,25 @@ function renderBody(body: string): ReactElement[] {
   let key = 0
 
   const flush = () => {
-    if (buffer.length === 0) return
-    const para = buffer.join(' ')
-    out.push(<Text key={key++} style={styles.paragraph}>{renderInline(para)}</Text>)
+    if (!buffer.length) return
+    out.push(<Text key={key++} style={styles.paragraph}>{renderInline(buffer.join(' '))}</Text>)
     buffer = []
   }
 
   for (const raw of lines) {
     const line = raw.trim()
-    if (line === '') { flush(); continue }
-    const h3 = /^###\s+(.+)/.exec(line)
+    if (!line) { flush(); continue }
     const h2 = /^##\s+(.+)/.exec(line)
     const h1 = /^#\s+(.+)/.exec(line)
-    if (h3) { flush(); out.push(<Text key={key++} style={styles.h3}>{renderInline(h3[1])}</Text>); continue }
-    if (h2) { flush(); out.push(<Text key={key++} style={styles.h2}>{renderInline(h2[1])}</Text>); continue }
+    const h3 = /^###\s+(.+)/.exec(line)
     if (h1) { flush(); out.push(<Text key={key++} style={styles.h1}>{renderInline(h1[1])}</Text>); continue }
+    if (h2) {
+      flush()
+      // Render ## headings as section labels (small caps grey uppercase)
+      out.push(<View key={key++}><View style={styles.rule} /><Text style={styles.sectionLabel}>{h2[1].toUpperCase()}</Text></View>)
+      continue
+    }
+    if (h3) { flush(); out.push(<Text key={key++} style={styles.h3}>{renderInline(h3[1])}</Text>); continue }
     buffer.push(line)
   }
   flush()
@@ -129,101 +180,75 @@ function renderBody(body: string): ReactElement[] {
 }
 
 export default function TuiDocument({ template, form }: { template: string; form: FormData }): ReactElement<DocumentProps> {
-  const formattedDate = form.date ? new Date(form.date + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
-  const formattedShootDate = form.shootDate ? new Date(form.shootDate + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }) : ''
+  const formattedDate = form.date
+    ? new Date(form.date + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
+    : ''
   const today = new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
+
+  const clientLine = [form.clientName, form.contactPerson ? `Attn: ${form.contactPerson}` : ''].filter(Boolean).join('  ·  ')
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
+
+        {/* Header: title left, logo right, tops aligned */}
         <View style={styles.header}>
-          <TuiLogo />
-          <View style={{ alignItems: 'flex-end' }}>
+          <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>{template}</Text>
-            <Text style={styles.headerSub}>{formattedDate}</Text>
-            {form.documentNumber && <Text style={styles.headerMeta}>No. {form.documentNumber}</Text>}
+            {clientLine ? <Text style={styles.headerClient}>{clientLine}</Text> : null}
+            {formattedDate ? <Text style={styles.headerDate}>{formattedDate}</Text> : null}
+          </View>
+          <TuiLogo />
+        </View>
+
+        <View style={styles.rule} />
+
+        {/* Body */}
+        <View>
+          {form.jobDescription ? (
+            <View>
+              <Text style={styles.sectionLabel}>PROJECT</Text>
+              <Text style={styles.paragraph}>{form.jobDescription}</Text>
+              <View style={styles.rule} />
+            </View>
+          ) : null}
+
+          {form.body ? renderBody(form.body) : null}
+        </View>
+
+        {/* Signature block */}
+        <View style={styles.signatureBlock}>
+          <View style={styles.signatureCol}>
+            <View style={styles.signatureField}>
+              <View style={styles.signatureFieldLine} />
+              <Text style={styles.signatureFieldLabel}>Signed</Text>
+              <Text style={styles.signatureTyped}>Arlo Radford</Text>
+            </View>
+            <View style={styles.signatureField}>
+              <View style={styles.signatureFieldLine} />
+              <Text style={styles.signatureFieldLabel}>Date</Text>
+              <Text style={styles.signatureDateValue}>{today}</Text>
+            </View>
+            <Text style={styles.signatureName}>Arlo Radford</Text>
+            <Text style={styles.signaturePrinted}>Tui Media</Text>
+          </View>
+          <View style={styles.signatureCol}>
+            <View style={styles.signatureField}>
+              <View style={styles.signatureFieldLine} />
+              <Text style={styles.signatureFieldLabel}>Signed</Text>
+              {form.clientSignature && <Text style={styles.signatureTyped}>{form.clientSignature}</Text>}
+            </View>
+            <View style={styles.signatureField}>
+              <View style={styles.signatureFieldLine} />
+              <Text style={styles.signatureFieldLabel}>Date</Text>
+              {form.clientSignature && <Text style={styles.signatureDateValue}>{form.clientSignedAt || today}</Text>}
+            </View>
+            <Text style={styles.signatureName}>{form.contactPerson || form.clientName || 'Client'}</Text>
+            <Text style={styles.signaturePrinted}>{form.contactPerson && form.clientName ? form.clientName : 'Client'}</Text>
           </View>
         </View>
 
-        <View style={styles.body}>
-          <View style={styles.row}>
-            <View style={styles.col}>
-              <Text style={styles.label}>Client</Text>
-              <Text style={styles.value}>{form.clientName || '—'}</Text>
-              {form.contactPerson && <Text style={styles.meta}>Attn: {form.contactPerson}</Text>}
-              {form.clientEmail && <Text style={styles.meta}>{form.clientEmail}</Text>}
-              {form.clientPhone && <Text style={styles.meta}>{form.clientPhone}</Text>}
-            </View>
-            <View style={styles.col}>
-              <Text style={styles.label}>Prepared by</Text>
-              <Text style={styles.value}>{form.businessName}</Text>
-            </View>
-          </View>
-
-          {(form.jobDescription || form.shootDate || form.location) && (
-            <View style={styles.row}>
-              {form.jobDescription && (
-                <View style={styles.col}>
-                  <Text style={styles.label}>Job Description</Text>
-                  <Text style={styles.value}>{form.jobDescription}</Text>
-                </View>
-              )}
-              <View style={styles.col}>
-                {form.shootDate && (
-                  <View style={{ marginBottom: 14 }}>
-                    <Text style={styles.label}>Shoot Date</Text>
-                    <Text style={styles.value}>{formattedShootDate}</Text>
-                  </View>
-                )}
-                {form.location && (
-                  <View>
-                    <Text style={styles.label}>Location</Text>
-                    <Text style={styles.value}>{form.location}</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          )}
-
-          {form.body && (
-            <View style={styles.section}>
-              {renderBody(form.body)}
-            </View>
-          )}
-
-          <View style={styles.signatureBlock}>
-            <View style={styles.signatureCol}>
-              <View style={styles.signatureField}>
-                <View style={styles.signatureFieldLine} />
-                <Text style={styles.signatureFieldLabel}>Signed</Text>
-                <Text style={styles.signatureTyped}>Arlo Radford</Text>
-              </View>
-              <View style={styles.signatureField}>
-                <View style={styles.signatureFieldLine} />
-                <Text style={styles.signatureFieldLabel}>Date</Text>
-                <Text style={styles.signatureDateValue}>{today}</Text>
-              </View>
-              <Text style={styles.signatureName}>Arlo Radford</Text>
-              <Text style={styles.signaturePrinted}>Tui Media</Text>
-            </View>
-            <View style={styles.signatureCol}>
-              <View style={styles.signatureField}>
-                <View style={styles.signatureFieldLine} />
-                <Text style={styles.signatureFieldLabel}>Signed</Text>
-                {form.clientSignature && <Text style={styles.signatureTyped}>{form.clientSignature}</Text>}
-              </View>
-              <View style={styles.signatureField}>
-                <View style={styles.signatureFieldLine} />
-                <Text style={styles.signatureFieldLabel}>Date</Text>
-                {form.clientSignature && <Text style={styles.signatureDateValue}>{form.clientSignedAt || today}</Text>}
-              </View>
-              <Text style={styles.signatureName}>{form.contactPerson || form.clientName || 'Client'}</Text>
-              <Text style={styles.signaturePrinted}>{form.contactPerson && form.clientName ? form.clientName : 'Client'}</Text>
-            </View>
-          </View>
-        </View>
-
-        <Text style={styles.footer} fixed>www.tuimedia.nz</Text>
+        <Text style={styles.footer} fixed>hello@tuimedia.nz</Text>
       </Page>
     </Document>
   )

@@ -19,8 +19,8 @@ export const metadata: Metadata = {
   title: "Tui Media",
   description: "Client portal for Tui Media",
   icons: {
-    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
-    apple: [{ url: "/apple-icon.svg", type: "image/svg+xml" }],
+    icon: [{ url: "/Logomark_White.png", type: "image/png" }],
+    apple: [{ url: "/Logomark_White.png", type: "image/png" }],
   },
 };
 

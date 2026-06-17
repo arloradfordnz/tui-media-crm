@@ -20,11 +20,11 @@
   --sidebar-inset: 12px;     /* gap around floating sidebar */
 
   /* Radii */
-  --r-sm: 10px;
-  --r-md: 14px;
-  --r-lg: 20px;
-  --r-xl: 28px;
-  --r-pill: 999px;
+  --r-sm: 0px;
+  --r-md: 0px;
+  --r-lg: 0px;
+  --r-xl: 0px;
+  --r-pill: 0px;
 
   /* Gradients — single accent only */
   --grad-hero: linear-gradient(135deg, #5a6fc4 0%, #7790ed 60%, #8fa3f5 100%);
@@ -155,7 +155,7 @@ input, textarea, select, button { font-family: inherit; }
   background: transparent;
   color: var(--danger);
   border: 1px solid rgba(248, 113, 113, 0.3);
-  border-radius: 12px;
+  border-radius: 0px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -234,7 +234,7 @@ input, textarea, select, button { font-family: inherit; }
   background: transparent;
   color: var(--text-secondary);
   border: none;
-  border-radius: 8px;
+  border-radius: 0px;
   cursor: pointer;
   transition: all 150ms ease;
 }
@@ -308,7 +308,7 @@ input, textarea, select, button { font-family: inherit; }
   position: relative;
   will-change: background;
 }
-.nav-item:not(.active):hover { color: var(--text-primary); background: var(--bg-elevated); }
+.nav-item:not(.active):hover { color: var(--accent); background: var(--bg-elevated); }
 .nav-item.active {
   color: #fff;
   background: var(--grad-accent);
@@ -352,14 +352,14 @@ input, textarea, select, button { font-family: inherit; }
   display: inline-flex;
   align-items: center;
   padding: 3px 10px;
-  border-radius: 12px;
+  border-radius: 0px;
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
 }
-.badge-sm { padding: 2px 6px; font-size: 10px; border-radius: 8px; }
-.badge-md { padding: 3px 10px; font-size: 12px; border-radius: 12px; }
-.badge-lg { padding: 4px 12px; font-size: 13px; border-radius: 12px; }
+.badge-sm { padding: 2px 6px; font-size: 10px; border-radius: 0px; }
+.badge-md { padding: 3px 10px; font-size: 12px; border-radius: 0px; }
+.badge-lg { padding: 4px 12px; font-size: 13px; border-radius: 0px; }
 .badge-success { background: rgba(74, 222, 128, 0.1); color: var(--success); }
 .badge-warning { background: rgba(251, 191, 36, 0.1); color: var(--warning); }
 .badge-danger { background: rgba(248, 113, 113, 0.1); color: var(--danger); }
@@ -395,7 +395,7 @@ input, textarea, select, button { font-family: inherit; }
   font-size: 12px;
   font-weight: 600;
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: 0px;
 }
 .stat-change-up {
   color: #4ade80;
@@ -412,12 +412,12 @@ input, textarea, select, button { font-family: inherit; }
 .tab-pills {
   display: inline-flex;
   background: var(--bg-elevated);
-  border-radius: 999px;
+  border-radius: 0px;
   padding: 3px;
 }
 .tab-pill {
   padding: 5px 12px;
-  border-radius: 999px;
+  border-radius: 0px;
   font-size: 12px;
   font-weight: 500;
   color: var(--text-tertiary);
@@ -463,7 +463,7 @@ input, textarea, select, button { font-family: inherit; }
 .modal-content {
   background: var(--bg-surface);
   border: 1px solid var(--bg-border);
-  border-radius: 16px;
+  border-radius: 0px;
   padding: 1.5rem;
   width: 100%;
   max-width: 480px;
@@ -482,7 +482,7 @@ input, textarea, select, button { font-family: inherit; }
   width: 100%;
   padding: 24px;
   border: 2px dashed var(--bg-border);
-  border-radius: 12px;
+  border-radius: 0px;
   font-size: 14px;
   color: var(--text-secondary);
   cursor: pointer;
@@ -494,7 +494,7 @@ input, textarea, select, button { font-family: inherit; }
 .pipeline-bar {
   display: flex;
   height: 8px;
-  border-radius: 4px;
+  border-radius: 0px;
   overflow: hidden;
   background: var(--bg-elevated);
 }
@@ -587,7 +587,7 @@ input, textarea, select, button { font-family: inherit; }
   background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-border) 50%, var(--bg-elevated) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
-  border-radius: 6px;
+  border-radius: 0px;
 }
 .loading-dots {
   display: flex;
@@ -613,7 +613,7 @@ input, textarea, select, button { font-family: inherit; }
   gap: 8px;
   padding: 10px 12px 10px 14px;
   border: 1px solid var(--bg-border);
-  border-radius: 8px;
+  border-radius: 0px;
   font-size: 14px;
   color: var(--text-primary);
   background: var(--bg-elevated);
@@ -633,7 +633,7 @@ input, textarea, select, button { font-family: inherit; }
 .custom-select-menu {
   background: var(--bg-surface);
   border: 1px solid var(--bg-border);
-  border-radius: 12px;
+  border-radius: 0px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.8);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -650,7 +650,7 @@ input, textarea, select, button { font-family: inherit; }
   width: 100%;
   padding: 6px 10px;
   border: 1px solid var(--bg-border);
-  border-radius: 6px;
+  border-radius: 0px;
   background: var(--bg-elevated);
   color: var(--text-primary);
   font-size: 13px;
@@ -668,7 +668,7 @@ input, textarea, select, button { font-family: inherit; }
   background: transparent;
   color: var(--text-primary);
   font-size: 14px;
-  border-radius: 6px;
+  border-radius: 0px;
   cursor: pointer;
   font-family: inherit;
   text-align: left;
@@ -716,7 +716,7 @@ input, textarea, select, button { font-family: inherit; }
   padding: 4px 10px;
   background: var(--bg-elevated);
   border: 1px solid var(--bg-border);
-  border-radius: 6px;
+  border-radius: 0px;
   font-size: 12px;
   color: var(--text-primary);
   white-space: nowrap;
