@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
   signatureBlock: { flexDirection: 'row', marginTop: 32, gap: 36 },
   signatureCol:   { flex: 1 },
   signatureField: { position: 'relative', height: 26, marginBottom: 12 },
-  signatureFieldLine: { position: 'absolute', bottom: 0, left: 44, right: 0, height: 0.5, backgroundColor: C.black },
+  signatureFieldLine: { position: 'absolute', bottom: 0, left: 44, right: 0, borderBottomWidth: 0.5, borderBottomColor: C.lgrey },
   signatureFieldLabel: { position: 'absolute', bottom: 4, left: 0, fontFamily: 'Poppins', fontWeight: 600, fontSize: 10, color: C.black },
   signatureTyped: { position: 'absolute', bottom: 2, left: 50, fontFamily: 'Patrick Hand', fontSize: 18, color: C.black, lineHeight: 1 },
   signatureDateValue: { position: 'absolute', bottom: 3, left: 50, fontFamily: 'Patrick Hand', fontSize: 13, color: C.dgrey, lineHeight: 1 },
@@ -185,7 +185,7 @@ export default function TuiDocument({ template, form }: { template: string; form
     : ''
   const today = new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
 
-  const clientLine = [form.clientName, form.contactPerson ? `Attn: ${form.contactPerson}` : ''].filter(Boolean).join('  ·  ')
+  const businessLine = form.businessName || form.clientName || ''
 
   return (
     <Document>
@@ -195,7 +195,7 @@ export default function TuiDocument({ template, form }: { template: string; form
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>{template}</Text>
-            {clientLine ? <Text style={styles.headerClient}>{clientLine}</Text> : null}
+            {businessLine ? <Text style={styles.headerClient}>{businessLine}</Text> : null}
             {formattedDate ? <Text style={styles.headerDate}>{formattedDate}</Text> : null}
           </View>
           <TuiLogo />
@@ -209,12 +209,10 @@ export default function TuiDocument({ template, form }: { template: string; form
             <View>
               <Text style={styles.sectionLabel}>PROJECT</Text>
               <Text style={styles.paragraph}>{form.jobDescription}</Text>
-              <View style={styles.rule} />
             </View>
           ) : null}
 
-          {form.body ? renderBody(form.body) : null}
-        </View>
+          {form.body ? renderBody(form.body) : null}        </View>
 
         {/* Signature block */}
         <View style={styles.signatureBlock}>
@@ -248,7 +246,7 @@ export default function TuiDocument({ template, form }: { template: string; form
           </View>
         </View>
 
-        <Text style={styles.footer} fixed>hello@tuimedia.nz</Text>
+        <Text style={styles.footer}>hello@tuimedia.nz</Text>
       </Page>
     </Document>
   )
