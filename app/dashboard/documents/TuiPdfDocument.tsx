@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
   signatureBlock: { flexDirection: 'row', marginTop: 32, gap: 36 },
   signatureCol:   { flex: 1 },
   signatureField: { position: 'relative', height: 26, marginBottom: 12 },
-  signatureFieldLine: { position: 'absolute', bottom: 0, left: 44, right: 0, borderBottomWidth: 0.5, borderBottomColor: C.lgrey },
+  signatureFieldLine: { position: 'absolute', bottom: 0, left: 44, right: 0, height: 0, borderBottomWidth: 0.5, borderBottomColor: C.lgrey },
   signatureFieldLabel: { position: 'absolute', bottom: 4, left: 0, fontFamily: 'Poppins', fontWeight: 600, fontSize: 10, color: C.black },
   signatureTyped: { position: 'absolute', bottom: 2, left: 50, fontFamily: 'Patrick Hand', fontSize: 18, color: C.black, lineHeight: 1 },
   signatureDateValue: { position: 'absolute', bottom: 3, left: 50, fontFamily: 'Patrick Hand', fontSize: 13, color: C.dgrey, lineHeight: 1 },
@@ -185,7 +185,7 @@ export default function TuiDocument({ template, form }: { template: string; form
     : ''
   const today = new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
 
-  const businessLine = form.businessName || form.clientName || ''
+  const businessLine = form.clientName || ''
 
   return (
     <Document>
