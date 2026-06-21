@@ -59,6 +59,9 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [projectName, setProjectName] = useState('')
+  const [editingProject, setEditingProject] = useState(false)
+  const projectInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
@@ -69,8 +72,18 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
 
   async function sendMessage(text: string) {
     if (!text.trim() || loading) return
+
+    if (text.trim() === '/clear') {
+      setMessages([])
+      setInput('')
+      return
+    }
+
     const userMsg: Message = { role: 'user', content: text.trim() }
     const newMessages = [...messages, userMsg]
+    const messagesWithContext: Message[] = projectName
+      ? [{ role: 'user', content: `[Project context: ${projectName}]` }, { role: 'assistant', content: 'Understood, I\'ll keep that project in mind.' }, ...newMessages]
+      : newMessages
     setMessages([...newMessages, { role: 'assistant', content: '' }])
     setInput('')
     setLoading(true)
@@ -127,7 +140,7 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages }),
+        body: JSON.stringify({ messages: messagesWithContext }),
       })
 
       if (!res.ok) {
@@ -206,12 +219,32 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3" style={{ background: 'var(--bg-base)', borderBottom: '1px solid var(--bg-border)' }}>
-        <div className="flex items-center gap-2">
-          <Bot className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>AI Assistant</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <Bot className="w-4 h-4 shrink-0" style={{ color: 'var(--accent)' }} />
+          {editingProject ? (
+            <input
+              ref={projectInputRef}
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              onBlur={() => setEditingProject(false)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') setEditingProject(false) }}
+              placeholder="Project name…"
+              className="text-sm font-semibold bg-transparent border-0 outline-none min-w-0"
+              style={{ color: 'var(--text-primary)', width: '160px' }}
+            />
+          ) : (
+            <button
+              onClick={() => { setEditingProject(true); setTimeout(() => projectInputRef.current?.focus(), 0) }}
+              className="text-sm font-semibold truncate text-left"
+              style={{ color: projectName ? 'var(--text-primary)' : 'var(--text-tertiary)' }}
+              title="Click to set project name"
+            >
+              {projectName || 'AI Assistant'}
+            </button>
+          )}
         </div>
         {messages.length > 0 && (
-          <button onClick={handleClear} className="btn-icon" title="Clear conversation">
+          <button onClick={handleClear} className="btn-icon" title="Clear conversation (or type /clear)">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         )}
