@@ -1,5 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
-import { formatNZD, formatDate, getInitials, statusLabel } from '@/lib/format'
+import { formatNZD, formatDate, getInitials, statusLabel, stripJobPrefix } from '@/lib/format'
 
 function formatHours(seconds: number): string {
   const h = seconds / 3600
@@ -12,18 +12,17 @@ import FilterTabs from '@/components/FilterTabs'
 import QuickStatus from './QuickStatus'
 
 const JOB_STATUS_OPTIONS = [
-  { value: 'all', label: 'All' },
+  { value: 'active', label: 'Active' },
   { value: 'enquiry', label: 'Enquiry' },
   { value: 'booked', label: 'Booked' },
-  { value: 'preproduction', label: 'Pre-production' },
-  { value: 'shootday', label: 'Shoot Day' },
   { value: 'editing', label: 'Editing' },
+  { value: 'delivered', label: 'Delivered' },
   { value: 'archived', label: 'Archived' },
 ]
 
 export default async function JobsPage({ searchParams }: { searchParams: Promise<{ status?: string; search?: string }> }) {
   const params = await searchParams
-  const statusFilter = params.status || 'all'
+  const statusFilter = params.status || 'active'
   const search = params.search || ''
 
   const supabase = await createServerSupabaseClient()
@@ -34,7 +33,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
     .order('shoot_date', { ascending: false })
 
   if (statusFilter === 'archived') query = query.eq('status', 'archived')
-  else if (statusFilter === 'all') query = query.neq('status', 'archived')
+  else if (statusFilter === 'active') query = query.neq('status', 'archived')
   else query = query.eq('status', statusFilter)
   if (search) query = query.ilike('name', `%${search}%`)
 
@@ -68,7 +67,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <SearchInput basePath="/dashboard/jobs" placeholder="Search jobs..." />
-        <FilterTabs options={JOB_STATUS_OPTIONS} paramName="status" defaultValue="all" />
+        <FilterTabs options={JOB_STATUS_OPTIONS} paramName="status" defaultValue="active" />
       </div>
 
       {/* Table */}
@@ -77,7 +76,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
           <Briefcase className="w-10 h-10 empty-icon" />
           <p className="empty-title">No jobs found</p>
           <p className="empty-description">
-            {search || statusFilter !== 'all' ? 'Try adjusting your filters.' : 'Create your first job to get started.'}
+            {search || statusFilter !== 'active' ? 'Try adjusting your filters.' : 'Create your first job to get started.'}
           </p>
         </div>
       ) : (
@@ -101,7 +100,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
                   <tr key={j.id} className="table-row">
                     <td className="px-4 py-4">
                       <Link href={`/dashboard/jobs/${j.id}`} className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                        {j.name}
+                        {stripJobPrefix(j.name)}
                       </Link>
                     </td>
                     <td className="px-4 py-4 hidden md:table-cell">

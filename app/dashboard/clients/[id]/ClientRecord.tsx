@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { updateClient, deleteClient } from '@/app/actions/clients'
-import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@/lib/format'
+import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo, stripJobPrefix } from '@/lib/format'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Trash2, Briefcase, MessageSquare, StickyNote, UserCircle, Copy, Check, FileText, ExternalLink } from 'lucide-react'
@@ -282,7 +282,7 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
                 {client.jobs.map((j) => (
                   <tr key={j.id} className="table-row">
                     <td className="px-4 py-3">
-                      <Link href={`/dashboard/jobs/${j.id}`} className="text-sm font-medium" style={{ color: 'var(--accent)' }}>{j.name}</Link>
+                      <Link href={`/dashboard/jobs/${j.id}`} className="text-sm font-medium" style={{ color: 'var(--accent)' }}>{stripJobPrefix(j.name)}</Link>
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">
                       {j.jobType && <span className="badge badge-muted">{statusLabel(j.jobType)}</span>}

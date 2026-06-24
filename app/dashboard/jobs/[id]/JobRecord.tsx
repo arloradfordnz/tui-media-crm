@@ -1,16 +1,16 @@
 'use client'
 
 import { useActionState, useState, useOptimistic, useTransition, useRef } from 'react'
-import { updateJob, updateJobStatus, deleteJob, toggleTask, addRevision } from '@/app/actions/jobs'
+import { updateJob, updateJobStatus, deleteJob, toggleTask, addRevision, markRevisionDone } from '@/app/actions/jobs'
 import { createProposal } from '@/app/actions/proposals'
-import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@/lib/format'
+import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo, stripJobPrefix } from '@/lib/format'
 import Link from 'next/link'
-import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as ActivityIcon, MapPin, Calendar, FileText, Upload, Download, FileVideo, Plus, Pencil, X } from 'lucide-react'
+import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as ActivityIcon, MapPin, Calendar, FileText, Upload, Download, FileVideo, Plus, Pencil, X, CheckCheck } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
 import JobTimeTracker, { type TimeEntry } from './JobTimeTracker'
 
-const JOB_STATUSES = ['enquiry', 'booked', 'preproduction', 'shootday', 'editing', 'review', 'approved', 'delivered', 'archived']
+const JOB_STATUSES = ['enquiry', 'booked', 'editing', 'review', 'delivered', 'archived']
 const PHASES = ['preshoot', 'shootday', 'postproduction', 'delivery']
 const PHASE_LABELS: Record<string, string> = { preshoot: 'Pre-shoot', shootday: 'Shoot Day', postproduction: 'Post-production', delivery: 'Delivery' }
 
@@ -61,6 +61,9 @@ export default function JobRecord({ job }: { job: JobData }) {
   const [editingDeliverable, setEditingDeliverable] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [revisionLimit, setRevisionLimit] = useState(job.revisionLimit)
+  const [doneRevisions, setDoneRevisions] = useState<Set<string>>(
+    new Set(job.revisions.filter((r) => r.status === 'done').map((r) => r.id))
+  )
 
   // Optimistic task state — updates instantly on click
   const [optimisticTasks, setOptimisticTask] = useOptimistic(
@@ -235,7 +238,7 @@ export default function JobRecord({ job }: { job: JobData }) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>{job.name}</h1>
+          <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>{stripJobPrefix(job.name)}</h1>
           <div className="flex items-center gap-4 mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
             <Link href={`/dashboard/clients/${job.client.id}`} style={{ color: 'var(--accent)' }}>{job.client.name}</Link>
             {job.shootDate && <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {formatDate(job.shootDate)}</span>}
@@ -500,16 +503,37 @@ export default function JobRecord({ job }: { job: JobData }) {
             </span>
           </div>
         </div>
-        {job.revisions.map((r) => (
-          <div key={r.id} className="py-3 rounded-lg px-3" style={{ background: 'var(--bg-elevated)', marginBottom: '4px' }}>
-            <div className="flex items-center gap-2 mb-1">
-              <RotateCcw className="w-3.5 h-3.5" style={{ color: 'var(--warning)' }} />
-              <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Round {r.round}</span>
-              <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{formatDate(r.createdAt)}</span>
+        {job.revisions.map((r) => {
+          const done = doneRevisions.has(r.id)
+          return (
+            <div key={r.id} className="py-3 rounded-lg px-3" style={{ background: 'var(--bg-elevated)', marginBottom: '4px', opacity: done ? 0.55 : 1 }}>
+              <div className="flex items-center gap-2 mb-1">
+                {done
+                  ? <CheckCheck className="w-3.5 h-3.5" style={{ color: 'var(--success)' }} />
+                  : <RotateCcw className="w-3.5 h-3.5" style={{ color: 'var(--warning)' }} />
+                }
+                <span className="text-sm font-medium" style={{ color: 'var(--text-primary)', textDecoration: done ? 'line-through' : 'none' }}>Round {r.round}</span>
+                <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{formatDate(r.createdAt)}</span>
+                {!done && (
+                  <button
+                    type="button"
+                    className="ml-auto btn-icon"
+                    style={{ color: 'var(--success)', fontSize: '11px', gap: '4px', display: 'inline-flex', alignItems: 'center' }}
+                    title="Mark as done"
+                    onClick={() => {
+                      setDoneRevisions((prev) => new Set(prev).add(r.id))
+                      markRevisionDone(r.id, job.id)
+                    }}
+                  >
+                    <CheckCheck className="w-3.5 h-3.5" />
+                    <span className="text-xs">Accept</span>
+                  </button>
+                )}
+              </div>
+              <p className="text-sm ml-6" style={{ color: 'var(--text-secondary)', textDecoration: done ? 'line-through' : 'none' }}>{r.request}</p>
             </div>
-            <p className="text-sm ml-6" style={{ color: 'var(--text-secondary)' }}>{r.request}</p>
-          </div>
-        ))}
+          )
+        })}
         {job.revisionsUsed < revisionLimit && (
           <form action={revAction} className="mt-4 flex gap-3">
             <input type="hidden" name="jobId" value={job.id} />

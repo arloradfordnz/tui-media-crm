@@ -313,7 +313,6 @@ input, textarea, select, button { font-family: inherit; }
   color: #fff;
   background: var(--grad-accent);
   font-weight: 500;
-  box-shadow: 0 6px 18px rgba(119, 144, 237, 0.35);
   cursor: default;
 }
 

@@ -127,8 +127,8 @@ export default function Sidebar({ onLogout, mobileOpen, onClose }: { onLogout: (
         <div className="px-3 pb-3 pt-2">
           <button
             onClick={onLogout}
-            className="w-full inline-flex items-center justify-center gap-2 py-2 rounded-none text-xs font-medium transition-colors"
-            style={{ color: 'var(--text-secondary)', background: 'var(--bg-elevated)' }}
+            className="w-full inline-flex items-center justify-center gap-2 py-2 text-xs font-medium transition-colors"
+            style={{ color: 'var(--text-secondary)', background: 'var(--bg-elevated)', borderRadius: 'var(--r-pill)' }}
           >
             <LogOut className="w-3.5 h-3.5" />
             <span>Sign out</span>

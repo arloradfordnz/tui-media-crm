@@ -6,7 +6,7 @@ import { Check } from 'lucide-react'
 import { updateJobStatus } from '@/app/actions/jobs'
 import { statusLabel, statusBadgeClass } from '@/lib/format'
 
-const OPTIONS = ['enquiry', 'booked', 'preproduction', 'shootday', 'editing', 'review', 'approved', 'delivered', 'archived']
+const OPTIONS = ['enquiry', 'booked', 'editing', 'review', 'delivered', 'archived']
 
 export default function QuickStatus({ jobId, status }: { jobId: string; status: string }) {
   const [current, setCurrent] = useState(status)
@@ -23,7 +23,17 @@ export default function QuickStatus({ jobId, status }: { jobId: string; status: 
   useLayoutEffect(() => {
     if (!open || !btnRef.current) return
     const r = btnRef.current.getBoundingClientRect()
-    setPos({ top: r.bottom + 4, left: r.right - 180 })
+    const menuWidth = 180
+    const estimatedMenuHeight = OPTIONS.length * 36 + 20
+    let top = r.bottom + 4
+    let left = r.right - menuWidth
+    if (left < 8) left = 8
+    if (left + menuWidth > window.innerWidth - 8) left = window.innerWidth - menuWidth - 8
+    if (top + estimatedMenuHeight > window.innerHeight - 8) {
+      top = r.top - estimatedMenuHeight - 4
+      if (top < 8) top = 8
+    }
+    setPos({ top, left })
   }, [open])
 
   useEffect(() => {

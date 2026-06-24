@@ -85,7 +85,7 @@ export default function NewJobPage() {
           </div>
           <div>
             <label className="field-label">Job Name *</label>
-            <input value={jobName} onChange={(e) => setJobName(e.target.value)} className="field-input" placeholder="e.g. Smith Wedding — Highlight" />
+            <input value={jobName} onChange={(e) => setJobName(e.target.value)} className="field-input" placeholder="e.g. Highlight Film" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>

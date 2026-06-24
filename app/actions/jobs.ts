@@ -187,3 +187,9 @@ export async function addRevision(prevState: { error?: string } | undefined, for
   revalidatePath(`/dashboard/jobs/${jobId}`)
   return {}
 }
+
+export async function markRevisionDone(revisionId: string, jobId: string) {
+  const supabase = await createServerSupabaseClient()
+  await supabase.from('revisions').update({ status: 'done' }).eq('id', revisionId)
+  revalidatePath(`/dashboard/jobs/${jobId}`)
+}

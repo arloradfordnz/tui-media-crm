@@ -115,6 +115,17 @@ export function statusBadgeClass(status: string): string {
 }
 
 /**
+ * Strip "Client Name — " or "Client Name - " prefix from a job name for display.
+ */
+export function stripJobPrefix(name: string): string {
+  const emDash = name.indexOf(' — ')
+  if (emDash !== -1) return name.slice(emDash + 3)
+  const dash = name.indexOf(' - ')
+  if (dash !== -1) return name.slice(dash + 3)
+  return name
+}
+
+/**
  * Relative time description
  */
 export function timeAgo(date: Date | string): string {
