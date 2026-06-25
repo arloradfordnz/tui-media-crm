@@ -429,6 +429,7 @@ type RawInvoice = {
   Date?: string
   DueDateString?: string
   DateString?: string
+  FullyPaidOnDate?: string  // set by Xero when invoice status = PAID
   Contact?: { Name?: string }
   InvoiceNumber?: string
   Reference?: string
@@ -480,7 +481,11 @@ async function fetchInvoiceTransactions(
       if (amount === 0) continue
       results.push({
         id: inv.InvoiceID,
-        date: parseXeroDate(inv.DateString ?? inv.Date ?? ''),
+        date: parseXeroDate(
+          inv.Status === 'PAID' && inv.FullyPaidOnDate
+            ? inv.FullyPaidOnDate
+            : (inv.DateString ?? inv.Date ?? '')
+        ),
         type: inv.Type === 'ACCREC' ? 'in' : 'out',
         description: inv.Contact?.Name ?? inv.InvoiceNumber ?? 'Unknown',
         reference: inv.Reference ?? inv.InvoiceNumber ?? null,
