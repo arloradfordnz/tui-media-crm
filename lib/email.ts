@@ -68,7 +68,8 @@ async function send({
 }) {
   if (!resend) {
     console.log(`[email skipped] No RESEND_API_KEY — would have sent to ${to}: ${subject}`)
-    await logEmail({ to, subject, type, status: 'sent', clientId, jobId })
+    await logEmail({ to, subject, type, status: 'failed', error: 'No RESEND_API_KEY configured', clientId, jobId })
+    if (rethrow) throw new Error('Email not configured — RESEND_API_KEY is missing.')
     return
   }
   try {

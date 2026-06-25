@@ -3,9 +3,10 @@
   "configurations": [
     {
       "name": "tui-media-crm",
-      "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["/tmp/start-crm.sh"],
-      "port": 3001,
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["node_modules/next/dist/bin/next", "dev", "-p", "3003"],
+      "cwd": "/Users/arloradford/Library/Mobile Documents/com~apple~CloudDocs/Claude/tui-media-crm",
+      "port": 3003,
       "autoPort": false
     }
   ]

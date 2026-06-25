@@ -5,7 +5,7 @@ import { updateClient, deleteClient } from '@/app/actions/clients'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo, stripJobPrefix } from '@/lib/format'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Trash2, Briefcase, MessageSquare, StickyNote, UserCircle, Copy, Check, FileText, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Trash2, Briefcase, MessageSquare, StickyNote, UserCircle, Copy, Check, FileText, ExternalLink, Camera, Receipt } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
 
@@ -26,12 +26,92 @@ type ClientData = {
   clientCategory: string | null
   lifetimeValue: number
   monthlyRetainer: number | null
+  shootsPerMonth: number | null
+  invoiceDay: number | null
   notes: string | null
   tags: string | null
   portalToken: string | null
   documents: { id: string; name: string; docType: string; updatedAt: string }[]
   jobs: { id: string; name: string; jobType: string | null; status: string; quoteValue: number | null; shootDate: string | null }[]
   activities: { id: string; action: string; details: string | null; createdAt: string; job: { name: string } | null }[]
+}
+
+// Week distribution: given N shoots/month, which week numbers (1-4) to schedule
+const SHOOT_WEEKS: Record<number, number[]> = {
+  1: [2],
+  2: [1, 3],
+  3: [1, 2, 4],
+  4: [1, 2, 3, 4],
+}
+
+function RetainerSchedule({ shootsPerMonth, invoiceDay }: { shootsPerMonth: number; invoiceDay: number | null }) {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  const monthName = now.toLocaleString('en-NZ', { month: 'long' })
+
+  const clampedShoots = Math.min(Math.max(shootsPerMonth, 1), 4)
+  const weeks = SHOOT_WEEKS[clampedShoots] ?? [1]
+
+  const shootWeeks = weeks.map((w) => {
+    const startDay = (w - 1) * 7 + 1
+    const endDay = w * 7
+    return {
+      label: `Week ${w}`,
+      range: `${startDay}–${endDay} ${monthName}`,
+      past: now.getDate() > endDay,
+      current: now.getDate() >= startDay && now.getDate() <= endDay,
+    }
+  })
+
+  let invoiceDate: string | null = null
+  if (invoiceDay) {
+    const d = new Date(year, month, invoiceDay)
+    invoiceDate = d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
+  }
+
+  return (
+    <div className="card" style={{ padding: '14px 18px' }}>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+          Retainer Schedule
+        </h3>
+        <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{monthName} {year}</span>
+      </div>
+      <div className="flex flex-col gap-2">
+        {shootWeeks.map((w) => (
+          <div key={w.label} className="flex items-center gap-3">
+            <Camera
+              className="w-3.5 h-3.5 shrink-0"
+              style={{ color: w.past ? 'var(--text-tertiary)' : w.current ? 'var(--accent)' : 'var(--text-secondary)' }}
+            />
+            <span
+              className="text-sm font-medium w-16 shrink-0"
+              style={{ color: w.past ? 'var(--text-tertiary)' : 'var(--text-primary)', textDecoration: w.past ? 'line-through' : 'none' }}
+            >
+              {w.label}
+            </span>
+            <span className="text-sm" style={{ color: w.past ? 'var(--text-tertiary)' : 'var(--text-secondary)' }}>{w.range}</span>
+            {w.current && (
+              <span className="badge badge-accent" style={{ fontSize: 10 }}>This week</span>
+            )}
+          </div>
+        ))}
+        <div className="flex items-center gap-3 mt-1 pt-2" style={{ borderTop: '1px solid var(--bg-border)' }}>
+          <Receipt className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-secondary)' }} />
+          <span className="text-sm font-medium w-16 shrink-0" style={{ color: 'var(--text-primary)' }}>Invoice</span>
+          {invoiceDate ? (
+            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{invoiceDate}</span>
+          ) : (
+            <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
+              No invoice day set —{' '}
+              <Link href="/dashboard/settings" style={{ color: 'var(--accent)' }}>configure in Settings</Link>
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 const CLIENT_CATEGORIES = [
@@ -145,6 +225,11 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
         </div>
       </div>
 
+      {/* Retainer schedule — only for retainer clients with shoots_per_month set */}
+      {client.clientCategory === 'retainer' && client.shootsPerMonth && (
+        <RetainerSchedule shootsPerMonth={client.shootsPerMonth} invoiceDay={client.invoiceDay} />
+      )}
+
       {/* Tabs */}
       <div className="flex gap-0" style={{ borderBottom: '1px solid var(--bg-border)' }}>
         {TABS.map((t) => (
@@ -229,6 +314,19 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
                 className="field-input"
                 placeholder="e.g. 480 — leave blank if not a retainer"
               />
+            </div>
+            <div>
+              <label className="field-label">Shoots per Month</label>
+              <input
+                name="shootsPerMonth"
+                type="number"
+                min="1"
+                max="4"
+                defaultValue={client.shootsPerMonth ?? ''}
+                className="field-input"
+                placeholder="1–4 — retainer clients only"
+              />
+              <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>Used to calculate your shoot schedule</p>
             </div>
           </div>
 

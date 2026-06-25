@@ -29,11 +29,13 @@ export async function createClient(prevState: { error?: string } | undefined, fo
   const notes = formData.get('notes') as string
   const tagsRaw = formData.get('tags') as string
   const monthlyRetainerRaw = formData.get('monthlyRetainer') as string
+  const shootsPerMonthRaw = formData.get('shootsPerMonth') as string
 
   if (!name) return { error: 'Client / business name is required.' }
 
   const tags = tagsRaw ? JSON.stringify(tagsRaw.split(',').map((t: string) => t.trim()).filter(Boolean)) : null
   const monthlyRetainer = monthlyRetainerRaw ? parseFloat(monthlyRetainerRaw) : null
+  const shootsPerMonth = shootsPerMonthRaw ? parseInt(shootsPerMonthRaw, 10) : null
 
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.from('clients').insert({
@@ -50,6 +52,7 @@ export async function createClient(prevState: { error?: string } | undefined, fo
     notes: notes || null,
     tags,
     monthly_retainer: monthlyRetainer,
+    shoots_per_month: shootsPerMonth,
   })
 
   if (error) return { error: error.message }
@@ -77,11 +80,13 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
   const notes = formData.get('notes') as string
   const tagsRaw = formData.get('tags') as string
   const monthlyRetainerRaw = formData.get('monthlyRetainer') as string
+  const shootsPerMonthRaw = formData.get('shootsPerMonth') as string
 
   if (!name) return { error: 'Client / business name is required.' }
 
   const tags = tagsRaw ? JSON.stringify(tagsRaw.split(',').map((t: string) => t.trim()).filter(Boolean)) : null
   const monthlyRetainer = monthlyRetainerRaw ? parseFloat(monthlyRetainerRaw) : null
+  const shootsPerMonth = shootsPerMonthRaw ? parseInt(shootsPerMonthRaw, 10) : null
 
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.from('clients').update({
@@ -98,6 +103,7 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
     notes: notes || null,
     tags,
     monthly_retainer: monthlyRetainer,
+    shoots_per_month: shootsPerMonth,
   }).eq('id', clientId)
 
   if (error) return { error: error.message }

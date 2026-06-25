@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getAppSetting } from '@/app/actions/settings'
 import { notFound } from 'next/navigation'
 import ClientRecord from './ClientRecord'
 
@@ -8,13 +9,13 @@ export default async function ClientDetailPage({ params, searchParams }: { param
 
   const supabase = await createServerSupabaseClient()
 
-  type ClientRow = { id: string; name: string; contact_person: string | null; email: string | null; phone: string | null; location: string | null; lead_source: string | null; first_contact: string | null; pipeline_stage: string; status: string; client_category: string | null; lifetime_value: number; monthly_retainer: number | null; notes: string | null; tags: string | null; portal_token?: string | null }
+  type ClientRow = { id: string; name: string; contact_person: string | null; email: string | null; phone: string | null; location: string | null; lead_source: string | null; first_contact: string | null; pipeline_stage: string; status: string; client_category: string | null; lifetime_value: number; monthly_retainer: number | null; shoots_per_month: number | null; notes: string | null; tags: string | null; portal_token?: string | null }
 
   // Fetch all data in parallel for speed
-  const [clientResult, { data: jobs }, { data: activities }, { data: documents }] = await Promise.all([
+  const [clientResult, { data: jobs }, { data: activities }, { data: documents }, invoiceDayRaw] = await Promise.all([
     supabase
       .from('clients')
-      .select('id, name, contact_person, email, phone, location, lead_source, first_contact, pipeline_stage, status, client_category, lifetime_value, monthly_retainer, notes, tags, portal_token')
+      .select('id, name, contact_person, email, phone, location, lead_source, first_contact, pipeline_stage, status, client_category, lifetime_value, monthly_retainer, shoots_per_month, notes, tags, portal_token')
       .eq('id', id)
       .single(),
     supabase
@@ -33,6 +34,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
       .select('id, name, doc_type, updated_at')
       .eq('client_id', id)
       .order('updated_at', { ascending: false }),
+    getAppSetting('retainer_invoice_day'),
   ])
 
   const client = clientResult.data as ClientRow | null
@@ -55,6 +57,8 @@ export default async function ClientDetailPage({ params, searchParams }: { param
     clientCategory: client.client_category,
     lifetimeValue: (jobs ?? []).reduce((sum, j) => sum + (j.quote_value ?? 0), 0),
     monthlyRetainer: client.monthly_retainer,
+    shootsPerMonth: client.shoots_per_month,
+    invoiceDay: invoiceDayRaw ? parseInt(invoiceDayRaw, 10) : null,
     notes: client.notes,
     tags: client.tags,
     portalToken: client.portal_token ?? null,
