@@ -3,7 +3,7 @@ import { fetchXeroTransactions } from '@/lib/xero'
 
 export const dynamic = 'force-dynamic'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo } from '@/lib/format'
-import { Plus, UserPlus, ArrowRight, ArrowUpRight, Briefcase, Clock, Users, TrendingUp, RefreshCw } from 'lucide-react'
+import { Plus, UserPlus, ArrowRight, ArrowUpRight, Briefcase, Clock, TrendingUp, RefreshCw } from 'lucide-react'
 import TodoWidget from './TodoWidget'
 import BusinessHealth from './BusinessHealth'
 import Link from 'next/link'
@@ -32,7 +32,6 @@ export default async function DashboardPage() {
   const [
     { count: activeJobs },
     { count: reviewJobs },
-    { count: leadsInPipeline },
     { data: deliveredThisMonth },
     { data: deliveredPrevMonth },
     { data: pipelineJobs },
@@ -44,7 +43,6 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     supabase.from('jobs').select('*', { count: 'exact', head: true }).not('status', 'in', '("delivered","archived")'),
     supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('status', 'review'),
-    supabase.from('clients').select('*', { count: 'exact', head: true }).eq('status', 'lead'),
     supabase.from('jobs').select('quote_value').eq('status', 'delivered').gte('updated_at', startOfMonth),
     supabase.from('jobs').select('quote_value').eq('status', 'delivered').gte('updated_at', startOfPrevMonth).lt('updated_at', startOfMonth),
     supabase.from('jobs').select('status, quote_value'),
@@ -216,10 +214,9 @@ export default async function DashboardPage() {
       </div>
 
       {/* Secondary stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <IconStatCard value={activeJobs ?? 0} label="Active jobs" icon={<Briefcase className="w-4 h-4" />} />
         <IconStatCard value={reviewJobs ?? 0} label="Awaiting review" icon={<Clock className="w-4 h-4" />} accent={reviewJobs ? 'var(--warning)' : undefined} />
-        <IconStatCard value={leadsInPipeline ?? 0} label="Leads in pipeline" icon={<Users className="w-4 h-4" />} />
         <div className="card flex flex-col">
           <div className="mb-3">
             <p className="text-xl font-semibold" style={{ letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>Shoots today</p>
@@ -268,11 +265,7 @@ export default async function DashboardPage() {
         </div>
 
         <div className="card">
-          <SectionHeader title="Recent activity">
-            <Link href="/dashboard/activity" className="btn-ghost btn-ghost-accent">
-              View all <ArrowUpRight className="w-3.5 h-3.5" />
-            </Link>
-          </SectionHeader>
+          <SectionHeader title="Recent activity" />
           {(recentActivity ?? []).length === 0 ? (
             <div className="box-inset text-sm" style={{ color: 'var(--text-tertiary)' }}>No activity yet.</div>
           ) : (

@@ -14,15 +14,10 @@ import {
   Settings,
   LogOut,
   X,
-  Bot,
   Building2,
-  Mail,
   CheckSquare,
-  Activity,
   Layers,
-  BarChart3,
   NotebookPen,
-  Send,
 } from 'lucide-react'
 
 const mainNav = [
@@ -32,18 +27,13 @@ const mainNav = [
   { href: '/dashboard/todos', label: 'To Do', icon: CheckSquare },
   { href: '/dashboard/notes', label: 'Notes', icon: NotebookPen },
   { href: '/dashboard/calendar', label: 'Calendar', icon: Calendar },
-  { href: '/dashboard/ai', label: 'AI Assistant', icon: Bot },
-  { href: '/dashboard/outreach', label: 'Outreach Drafts', icon: Send },
 ]
 
 const businessNav = [
   { href: '/dashboard/finance', label: 'Finance', icon: DollarSign },
-  { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/dashboard/gear', label: 'Gear', icon: Camera },
   { href: '/dashboard/documents', label: 'Documents', icon: FileText },
   { href: '/dashboard/jobs/templates', label: 'Templates', icon: Layers },
-  { href: '/dashboard/activity', label: 'Activity', icon: Activity },
-  { href: '/dashboard/emails', label: 'Email Log', icon: Mail },
 ]
 
 const accountNav = [
