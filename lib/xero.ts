@@ -24,6 +24,7 @@ export const XERO_SCOPES = [
   'offline_access',
   'accounting.invoices',          // full read + write for invoices
   'accounting.contacts.read',     // read contacts to pick invoice recipients
+  'accounting.settings',          // read + write for items/products
   'accounting.reports.profitandloss.read',
   'accounting.reports.banksummary.read',
   'accounting.banktransactions.read',
