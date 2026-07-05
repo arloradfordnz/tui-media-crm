@@ -261,9 +261,11 @@ export async function fetchXeroSummary(): Promise<XeroSummary | null> {
   const tenantId = account.account_id
 
   const now = new Date()
-  const fromDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
-  const toDate = now.toISOString().slice(0, 10)
-  const todayISO = toDate
+  const nzDate = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })
+  const todayISO = nzDate(now)
+  const [nzYear, nzMonth] = todayISO.split('-').map(Number)
+  const fromDate = new Date(nzYear, nzMonth - 1, 1).toISOString().slice(0, 10)
+  const toDate = todayISO
 
   const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0)
   const lastMonthStart = new Date(lastMonthEnd.getFullYear(), lastMonthEnd.getMonth(), 1)
@@ -271,7 +273,7 @@ export async function fetchXeroSummary(): Promise<XeroSummary | null> {
   const lastMonthToDate = lastMonthEnd.toISOString().slice(0, 10)
 
   const [invoicesRes, bankSummaryRes, plRes, plLastMonthRes] = await Promise.allSettled([
-    xeroGet<{ Invoices?: Array<{ AmountDue: number; DueDate?: string; Status: string; Type: string }> }>(
+    xeroGet<{ Invoices?: Array<{ AmountDue: number; DueDate?: string; DueDateString?: string; Status: string; Type: string }> }>(
       `/Invoices?Statuses=AUTHORISED&page=1&pageSize=200`,
       accessToken,
       tenantId,
@@ -306,7 +308,9 @@ export async function fetchXeroSummary(): Promise<XeroSummary | null> {
       if (due <= 0) continue
       outstandingTotal += due
       outstandingCount += 1
-      if (inv.DueDate && inv.DueDate.slice(0, 10) < todayISO) {
+      // Xero JSON returns DueDate as /Date(ms)/ — DueDateString is always YYYY-MM-DD
+      const dueDateStr = inv.DueDateString ?? (inv.DueDate ? parseXeroDate(inv.DueDate) : null)
+      if (dueDateStr && dueDateStr < todayISO) {
         overdueTotal += due
         overdueCount += 1
       }

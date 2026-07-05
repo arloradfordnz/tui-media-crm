@@ -39,11 +39,15 @@ export async function GET(req: NextRequest) {
 
   const supabase = getServiceClient()
   const now = new Date()
-  const todayISO = now.toISOString().split('T')[0]
-  const weekAgoISO = new Date(now.getTime() - 7 * 86400000).toISOString().split('T')[0]
-  const weekAheadISO = new Date(now.getTime() + 7 * 86400000).toISOString().split('T')[0]
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
+  // en-CA locale returns YYYY-MM-DD — use Pacific/Auckland so the date matches NZ wall-clock
+  // rather than UTC (at 7am NZST, toISOString() still shows the previous UTC day).
+  const nzDate = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })
+  const todayISO = nzDate(now)
+  const weekAgoISO = nzDate(new Date(now.getTime() - 7 * 86400000))
+  const weekAheadISO = nzDate(new Date(now.getTime() + 7 * 86400000))
+  const [nzYear, nzMonth] = todayISO.split('-').map(Number)
+  const monthStart = new Date(nzYear, nzMonth - 1, 1).toISOString().split('T')[0]
+  const monthEnd = new Date(nzYear, nzMonth, 0).toISOString().split('T')[0]
 
   const [
     weatherRes,
