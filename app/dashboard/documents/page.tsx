@@ -32,9 +32,13 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>Documents & PDF Generator</h1>
-        <NewDocButton clients={clientOptions.map((c) => ({ id: c.id, name: c.name }))} defaultClientId={params.clientId} />
+      <div className="page-header" style={{ marginBottom: 0 }}>
+        <div className="page-header-left">
+          <h1 className="page-title">Documents</h1>
+        </div>
+        <div className="page-header-actions">
+          <NewDocButton clients={clientOptions.map((c) => ({ id: c.id, name: c.name }))} defaultClientId={params.clientId} />
+        </div>
       </div>
 
       {/* PDF Generator */}

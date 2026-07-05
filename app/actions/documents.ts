@@ -58,10 +58,14 @@ export async function updateDocument(prevState: { error?: string } | undefined, 
         const prior = JSON.parse(existing.content) as { feedback?: unknown; form?: Record<string, unknown> }
         const merged = { ...incoming } as { feedback?: unknown; form?: Record<string, unknown> }
         if (Array.isArray(prior?.feedback)) merged.feedback = prior.feedback
-        const priorSig = prior?.form?.clientSignature
-        const priorSignedAt = prior?.form?.clientSignedAt
-        if (priorSig) {
-          merged.form = { ...(merged.form ?? {}), clientSignature: priorSig, clientSignedAt: priorSignedAt }
+        const priorForm = prior?.form as Record<string, unknown> | undefined
+        if (priorForm?.clientSignature) {
+          merged.form = {
+            ...(merged.form ?? {}),
+            clientSignature: priorForm.clientSignature,
+            clientSignedAt: priorForm.clientSignedAt,
+            clientSignedAtISO: priorForm.clientSignedAtISO,
+          }
         }
         mergedContent = JSON.stringify(merged)
       }
@@ -93,15 +97,14 @@ export async function signDocumentByClient(
   if (!docId || !portalToken) return { error: 'Missing document or portal token.' }
   if (!signature) return { error: 'Please type your full name to sign.' }
 
-  const supabase = await createServerSupabaseClient()
   const admin = getAdminClient()
   if (!admin) return { error: 'Server is missing SUPABASE_SERVICE_ROLE_KEY — signature cannot be saved.' }
 
   // Authorise: the document's client must match the client the portal token belongs to.
-  // Both reads are independent; run in parallel.
+  // Public page (no login) so read with the service role; both reads are independent.
   const [docRes, clientRes] = await Promise.all([
-    supabase.from('documents').select('id, name, content, client_id').eq('id', docId).single(),
-    supabase.from('clients').select('id, name, email').eq('portal_token', portalToken).single(),
+    admin.from('documents').select('id, name, content, client_id').eq('id', docId).single(),
+    admin.from('clients').select('id, name, email').eq('portal_token', portalToken).single(),
   ])
   const doc = docRes.data
   const client = clientRes.data
@@ -117,7 +120,14 @@ export async function signDocumentByClient(
     parsed = {}
   }
   const signedAt = new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
-  const nextForm = { ...(parsed.form || {}), clientSignature: signature, clientSignedAt: signedAt }
+  // Keep a machine-readable audit timestamp alongside the display date — the
+  // pretty string has no time or timezone, which is weak for a signed contract.
+  const nextForm = {
+    ...(parsed.form || {}),
+    clientSignature: signature,
+    clientSignedAt: signedAt,
+    clientSignedAtISO: new Date().toISOString(),
+  }
   // Ensure a template is always present — the portal/editor parsers require
   // both `template` and `form` keys to recognise a structured doc, and a
   // missing template would otherwise hide the signed state.
@@ -126,11 +136,12 @@ export async function signDocumentByClient(
     : 'Contract'
   const nextContent = JSON.stringify({ ...parsed, template: nextTemplate, form: nextForm })
 
-  // Use the service-role client so the write isn't dropped by RLS — anon has
-  // SELECT but no UPDATE policy on documents.
+  // Use the service-role client so the write isn't dropped by RLS.
+  // Preserve the document's own type — only contracts reach the sign flow, but
+  // forcing 'contract' here would silently retype anything else.
   const { error: updateError } = await admin
     .from('documents')
-    .update({ content: nextContent, doc_type: 'contract' })
+    .update({ content: nextContent })
     .eq('id', docId)
   if (updateError) return { error: 'Could not save signature. Please try again.' }
 
@@ -168,11 +179,15 @@ export async function submitDocumentFeedback(
   if (!docId || !portalToken) return { error: 'Missing document or portal token.' }
   if (!message) return { error: 'Please type your feedback before sending.' }
 
-  const supabase = await createServerSupabaseClient()
+  // Service role: the public portal has no login and anon has no UPDATE policy
+  // on documents. Previously this ran as anon, so the write was silently
+  // dropped by RLS and the client's feedback was lost.
+  const admin = getAdminClient()
+  if (!admin) return { error: 'Server misconfigured — feedback cannot be saved.' }
 
   const [docRes, clientRes] = await Promise.all([
-    supabase.from('documents').select('id, name, content, client_id').eq('id', docId).single(),
-    supabase.from('clients').select('id, name').eq('portal_token', portalToken).single(),
+    admin.from('documents').select('id, name, content, client_id').eq('id', docId).single(),
+    admin.from('clients').select('id, name').eq('portal_token', portalToken).single(),
   ])
   const doc = docRes.data
   const client = clientRes.data
@@ -196,14 +211,16 @@ export async function submitDocumentFeedback(
   const nextFeedback = [...(parsed.feedback ?? []), newEntry]
   const nextContent = JSON.stringify({ ...parsed, feedback: nextFeedback })
 
+  const { error: updateError } = await admin.from('documents').update({ content: nextContent }).eq('id', docId)
+  if (updateError) return { error: 'Could not save your feedback. Please try again.' }
+
   await Promise.all([
-    supabase.from('documents').update({ content: nextContent }).eq('id', docId),
-    supabase.from('activities').insert({
+    admin.from('activities').insert({
       action: 'document_feedback',
       details: `${client.name} left feedback on "${doc.name}"`,
       client_id: client.id,
     }),
-    supabase.from('notifications').insert({
+    admin.from('notifications').insert({
       title: 'Document Feedback',
       message: `${client.name} left feedback on "${doc.name}"`,
       type: 'document_feedback',

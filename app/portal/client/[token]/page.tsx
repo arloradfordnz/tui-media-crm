@@ -1,10 +1,21 @@
-import { createServerSupabaseClient } from '@/lib/supabase'
+import { createAdminClient } from '@/lib/supabase-admin'
 import { signedDownloadUrl, signedDownloadUrlAttachment } from '@/lib/r2'
 import ClientPortalView from './ClientPortalView'
 
 export default async function ClientPortalPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
-  const supabase = await createServerSupabaseClient()
+  // Public page — the unguessable token in the URL IS the auth. RLS grants anon
+  // nothing, so read with the service role, scoped strictly to this token's client.
+  const supabase = createAdminClient()
+
+  if (!supabase) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center" style={{ background: 'var(--bg-base)' }}>
+        <p className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Portal unavailable</p>
+        <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>Please try again later.</p>
+      </div>
+    )
+  }
 
   const { data: client } = await supabase
     .from('clients')

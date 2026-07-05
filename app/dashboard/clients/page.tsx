@@ -41,7 +41,12 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   if (categoryFilter !== 'all') {
     query = query.eq('client_category', categoryFilter)
   }
-  if (search) query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,location.ilike.%${search}%`)
+  if (search) {
+    // Strip PostgREST filter metacharacters — commas, parens and asterisks
+    // would otherwise break the .or() expression (or worse, alter the filter).
+    const safe = search.replace(/[(),*]/g, ' ').trim()
+    if (safe) query = query.or(`name.ilike.%${safe}%,email.ilike.%${safe}%,location.ilike.%${safe}%`)
+  }
 
   const { data: clientRows } = await query
 
@@ -57,19 +62,26 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   })
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>Clients</h1>
-        <Link href="/dashboard/clients/new" className="btn-primary w-fit">
-          <Plus className="w-4 h-4" /> New Client
-        </Link>
+    <div>
+      {/* Page header */}
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1 className="page-title">Clients</h1>
+        </div>
+        <div className="page-header-actions">
+          <SearchInput basePath="/dashboard/clients" placeholder="Search clients..." />
+          <Link href="/dashboard/clients/new" className="btn-primary">
+            <Plus className="w-4 h-4" /> New Client
+          </Link>
+        </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <SearchInput basePath="/dashboard/clients" placeholder="Search clients..." />
+      {/* Status + category tabs */}
+      <div className="flex items-center justify-between mb-6">
         <FilterTabs options={STATUS_OPTIONS} paramName="status" defaultValue="active" />
-        <FilterTabs options={CATEGORY_OPTIONS} paramName="category" defaultValue="all" />
+        <div className="hidden sm:block">
+          <FilterTabs options={CATEGORY_OPTIONS} paramName="category" defaultValue="all" />
+        </div>
       </div>
 
       {/* Table */}
@@ -97,7 +109,8 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
             </thead>
             <tbody>
               {clients.map((c) => {
-                const tags: string[] = c.tags ? JSON.parse(c.tags) : []
+                let tags: string[] = []
+                try { if (c.tags) tags = JSON.parse(c.tags) } catch { tags = [] }
                 return (
                   <tr key={c.id} className="table-row">
                     <td className="px-4 py-4">

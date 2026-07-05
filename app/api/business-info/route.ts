@@ -1,13 +1,16 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getAuthUser, unauthorizedResponse } from '@/lib/supabase-admin'
 import { NextRequest } from 'next/server'
 
 export async function GET() {
+  if (!(await getAuthUser())) return unauthorizedResponse()
   const supabase = await createServerSupabaseClient()
   const { data } = await supabase.from('business_info').select('section, content').order('section')
   return Response.json({ sections: data ?? [] })
 }
 
 export async function PUT(request: NextRequest) {
+  if (!(await getAuthUser())) return unauthorizedResponse()
   const supabase = await createServerSupabaseClient()
   const { section, content } = await request.json()
 

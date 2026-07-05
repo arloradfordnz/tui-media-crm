@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
+import { getAuthUser, unauthorizedResponse } from '@/lib/supabase-admin'
 
 /**
  * Kicks off the Instagram Login OAuth flow (the 2026 path that replaces
@@ -13,6 +14,8 @@ import crypto from 'crypto'
  *   - INSTAGRAM_OAUTH_REDIRECT_URI (e.g. https://dashboard.tuimedia.nz/api/auth/instagram/callback)
  */
 export async function GET() {
+  if (!(await getAuthUser())) return unauthorizedResponse()
+
   const appId = process.env.INSTAGRAM_APP_ID
   const redirectUri = process.env.INSTAGRAM_OAUTH_REDIRECT_URI
   if (!appId || !redirectUri) {

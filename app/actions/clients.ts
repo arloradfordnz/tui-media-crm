@@ -98,7 +98,7 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
     lead_source: leadSource || null,
     first_contact: firstContact ? new Date(firstContact).toISOString() : null,
     pipeline_stage: pipelineStage || 'enquiry',
-    status,
+    status: status || 'lead',
     client_category: clientCategory || null,
     notes: notes || null,
     tags,
@@ -155,14 +155,25 @@ export async function deleteClient(clientId: string): Promise<{ error?: string }
     return { error: 'Missing SUPABASE_SERVICE_ROLE_KEY — set it in Vercel env vars so the server can clean up email_logs before deleting the client.' }
   }
 
-  await supabase.from('documents').delete().eq('client_id', clientId)
-  await supabase.from('notifications').delete().eq('client_id', clientId)
+  // Collect the client's document ids BEFORE deleting the client — the FK is
+  // ON DELETE SET NULL, so after the delete they'd be unfindable by client_id.
+  // The destructive cleanup itself runs AFTER the client delete succeeds, so a
+  // failed delete no longer leaves the client stripped of their documents.
+  const { data: docRows } = await supabase.from('documents').select('id').eq('client_id', clientId)
+  const docIds = (docRows ?? []).map((d) => d.id)
 
   const { error } = await supabase.from('clients').delete().eq('id', clientId)
   if (error) {
     console.error('[deleteClient] failed:', error)
     return { error: error.message }
   }
+
+  // Cleanup: orphaned documents + notification noise (notifications keep their
+  // client_id — the column has no FK).
+  if (docIds.length > 0) {
+    await supabase.from('documents').delete().in('id', docIds)
+  }
+  await supabase.from('notifications').delete().eq('client_id', clientId)
 
   revalidatePath('/dashboard/clients')
   redirect('/dashboard/clients')

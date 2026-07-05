@@ -1,54 +1,76 @@
 'use client'
 
-import { useState } from 'react'
-import Sidebar from '@/components/Sidebar'
+import { useState, createContext, useContext, ReactNode } from 'react'
 import BottomNav from '@/components/BottomNav'
-import NotificationBell from '@/components/NotificationBell'
 import AiChatWidget from '@/components/AiChatWidget'
-import { logout } from '@/app/actions/auth'
-import { Menu } from 'lucide-react'
 
-export default function DashboardShell({ children }: { children: React.ReactNode }) {
-  const [mobileOpen, setMobileOpen] = useState(false)
+// ── Panel context (Monthly Report push panel) ─────────────────
+type PanelCtx = {
+  panelOpen: boolean
+  panelContent: ReactNode | null
+  openPanel: (content: ReactNode) => void
+  closePanel: () => void
+}
+export const PanelContext = createContext<PanelCtx | null>(null)
+export function usePanelContext() {
+  const ctx = useContext(PanelContext)
+  if (!ctx) throw new Error('usePanelContext must be inside DashboardShell')
+  return ctx
+}
+
+const PANEL_W = 404 // 380px panel + 12px left margin + 12px right margin
+const EASE = 'cubic-bezier(0.4, 0, 0.2, 1)'
+
+export default function DashboardShell({ children }: { children: ReactNode }) {
+  const [panelOpen, setPanelOpen] = useState(false)
+  const [panelContent, setPanelContent] = useState<ReactNode | null>(null)
+
+  function openPanel(content: ReactNode) {
+    setPanelContent(content)
+    setPanelOpen(true)
+  }
+  function closePanel() {
+    setPanelOpen(false)
+    setPanelContent(null)
+  }
 
   return (
-    <div className="min-h-screen flex" style={{ background: 'var(--bg-base)' }}>
-      <Sidebar onLogout={() => logout()} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
+    <PanelContext.Provider value={{ panelOpen, panelContent, openPanel, closePanel }}>
+      <div style={{ minHeight: '100vh', background: 'var(--bg-base)' }}>
 
-      {/* Main content area */}
-      <div className="flex-1 desktop-margin" style={{ marginLeft: 'var(--sidebar-width)' }}>
-        {/* Top bar */}
-        <header
-          className="sticky top-0 z-30 flex items-center justify-between px-6 py-4 top-bar-mobile"
+        {/* Fixed report panel — slides in from the right */}
+        <div
+          className="report-panel"
           style={{
-            background: 'color-mix(in srgb, var(--bg-base) 80%, transparent)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
+            transform: panelOpen ? 'translateX(0)' : `translateX(calc(100% + 24px))`,
           }}
         >
-          {/* Mobile hamburger */}
-          <button
-            className="mobile-nav-toggle btn-icon"
-            onClick={() => setMobileOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
+          {panelContent}
+        </div>
 
-          {/* Spacer for desktop (hamburger hidden) */}
-          <div className="flex-1" />
+        {/* Main area — marginRight pushes away from the report panel */}
+        <div
+          style={{
+            marginRight: panelOpen ? PANEL_W : 0,
+            transition: `margin-right 240ms ${EASE}`,
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100vh',
+            overflow: 'hidden',
+            minWidth: 0,
+          }}
+        >
+          {/* Scrollable page content — scrollbar hidden, scroll still works */}
+          <div className="scroll-invisible" style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
+            <div className="page-shell-inner">
+              {children}
+            </div>
+          </div>
+        </div>
 
-          <NotificationBell />
-        </header>
-
-        {/* Page content */}
-        <main className="p-6">
-          {children}
-        </main>
+        <BottomNav />
+        <AiChatWidget />
       </div>
-
-      <BottomNav />
-      <AiChatWidget />
-    </div>
+    </PanelContext.Provider>
   )
 }

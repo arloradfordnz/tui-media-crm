@@ -1,9 +1,19 @@
-import { createServerSupabaseClient } from '@/lib/supabase'
+import { createAdminClient } from '@/lib/supabase-admin'
 import ProposalView from './ProposalView'
 
 export default async function PublicProposalPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
-  const supabase = await createServerSupabaseClient()
+  // Public page authed by the token in the URL; read with the service role.
+  const supabase = createAdminClient()
+
+  if (!supabase) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center" style={{ background: 'var(--bg-base)' }}>
+        <p className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Proposal unavailable</p>
+        <p className="text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>Please try again later.</p>
+      </div>
+    )
+  }
 
   const { data: proposal } = await supabase
     .from('proposals')

@@ -1,4 +1,5 @@
-import { createServerSupabaseClient } from '@/lib/supabase'
+import { createAdminClient } from '@/lib/supabase-admin'
+import type { NextRequest } from 'next/server'
 
 function escapeIcs(str: string) {
   return str.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n')
@@ -17,8 +18,21 @@ function formatIcsDate(dateStr: string, time?: string | null) {
   return `${year}${month}${day}`
 }
 
-export async function GET() {
-  const supabase = await createServerSupabaseClient()
+export async function GET(request: NextRequest) {
+  // Calendar apps (Google/Apple) fetch this URL with no cookies, so we can't
+  // rely on a login session. Gate on a secret token in the query string and
+  // read with the service role. Subscribe URL:
+  //   /api/calendar/feed.ics?token=CALENDAR_FEED_SECRET
+  const secret = process.env.CALENDAR_FEED_SECRET
+  const token = request.nextUrl.searchParams.get('token')
+  if (!secret || token !== secret) {
+    return new Response('Not found', { status: 404 })
+  }
+
+  const supabase = createAdminClient()
+  if (!supabase) {
+    return new Response('Calendar feed unavailable — server missing SUPABASE_SERVICE_ROLE_KEY.', { status: 500 })
+  }
 
   const [{ data: events }, { data: jobs }] = await Promise.all([
     supabase.from('events').select('id, title, event_type, date, start_time, end_time, notes').order('date', { ascending: true }),

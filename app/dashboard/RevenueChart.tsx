@@ -6,21 +6,36 @@ type Point = { label: string; value: number }
 
 const fmt = (n: number) => n >= 1000 ? `$${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : `$${Math.round(n)}`
 
-export default function RevenueChart({ data }: { data: Point[] }) {
+export default function RevenueChart({
+  data,
+  comparisonData,
+  width,
+}: {
+  data: Point[]
+  comparisonData?: Point[]
+  /** Measured container width in px. When set, the chart renders 1:1
+   *  (no scaling) so narrowing the container never shrinks it — the
+   *  parent cuts months instead. */
+  width?: number
+}) {
   const [indicator, setIndicator] = useState<{ x: number; y: number; nearestIdx: number } | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const uid = useId().replace(/:/g, '')
   const gradId = `rg${uid}`
   const clipId = `rc${uid}`
 
-  const max = Math.max(...data.map((p) => Math.max(0, p.value)), 1)
+  const allValues = [
+    ...data.map((p) => p.value),
+    ...(comparisonData ?? []).map((p) => p.value),
+  ]
+  const max = Math.max(...allValues.map((v) => Math.max(0, v)), 1)
 
-  const W = 600
-  const H = 120
-  const Y_W = 28
-  const PAD_R = 22
-  const PAD_T = 16
-  const PAD_B = 14
+  const W = Math.max(300, Math.round(width ?? 720))
+  const H = 220
+  const Y_W = 38
+  const PAD_R = 12
+  const PAD_T = 14
+  const PAD_B = 20
   const chartW = W - Y_W - PAD_R
   const chartH = H - PAD_T - PAD_B
   const fillBottom = PAD_T + chartH
@@ -35,6 +50,17 @@ export default function RevenueChart({ data }: { data: Point[] }) {
     const v = Math.max(0, p.value)
     return PAD_T + chartH - (v / max) * chartH
   })
+
+  // Comparison line — aligned to same x positions as main data
+  const cxs = comparisonData
+    ? comparisonData.map((_, i) => Y_W + (i / Math.max(comparisonData.length - 1, 1)) * chartW)
+    : []
+  const cys = comparisonData
+    ? comparisonData.map((p) => {
+        const v = Math.max(0, p.value)
+        return PAD_T + chartH - (v / max) * chartH
+      })
+    : []
 
   const clampY = (y: number) => Math.max(PAD_T, Math.min(fillBottom, y))
 
@@ -57,6 +83,7 @@ export default function RevenueChart({ data }: { data: Point[] }) {
 
   const linePath = smooth(xs.map((x, i) => [x, ys[i]]))
   const fillPath = `${linePath} L${xs[xs.length - 1]},${fillBottom} L${xs[0]},${fillBottom} Z`
+  const compPath = cxs.length > 1 ? smooth(cxs.map((x, i) => [x, cys[i]])) : null
 
   const bezierSegs = xs.length >= 2 ? Array.from({ length: xs.length - 1 }, (_, i) => {
     const p0 = [xs[Math.max(i - 1, 0)], ys[Math.max(i - 1, 0)]]
@@ -100,7 +127,6 @@ export default function RevenueChart({ data }: { data: Point[] }) {
       else hi = mid
     }
     const interpY = evalBezier(seg, (lo + hi) / 2).y
-
     const nearestIdx = xs.reduce((best, x, i) =>
       Math.abs(x - clamped) < Math.abs(xs[best] - clamped) ? i : best, 0)
 
@@ -108,8 +134,8 @@ export default function RevenueChart({ data }: { data: Point[] }) {
   }
 
   const tipValue = indicator != null ? data[indicator.nearestIdx]?.value ?? 0 : 0
-  const tipX = indicator ? Math.max(Y_W + 2, Math.min(indicator.x - 15, W - PAD_R - 32)) : 0
-  const tipY = indicator ? Math.max(PAD_T + 2, indicator.y - 15) : 0
+  const tipX = indicator ? Math.max(Y_W + 2, Math.min(indicator.x - 27, W - PAD_R - 56)) : 0
+  const tipY = indicator ? Math.max(PAD_T + 2, indicator.y - 27) : 0
 
   return (
     <div style={{ position: 'relative' }}>
@@ -120,7 +146,7 @@ export default function RevenueChart({ data }: { data: Point[] }) {
       >
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.25" />
+            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.10" />
             <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
           </linearGradient>
           <clipPath id={clipId}>
@@ -128,42 +154,67 @@ export default function RevenueChart({ data }: { data: Point[] }) {
           </clipPath>
         </defs>
 
+        {/* Grid lines */}
         {gridLines.map((gl, i) => (
           <g key={i}>
-            <text x={0} y={gl.y + 3} textAnchor="start" fill="var(--text-tertiary)" fontSize="6.5" style={{ fontFamily: 'inherit' }}>
+            <text x={0} y={gl.y + 3} textAnchor="start" fill="var(--text-tertiary)" fontSize="10.5" style={{ fontFamily: 'inherit' }}>
               {fmt(gl.val)}
             </text>
-            <line x1={Y_W} y1={gl.y} x2={W - PAD_R} y2={gl.y} stroke="var(--bg-border)" strokeWidth="0.5" opacity="0.5" />
+            <line x1={Y_W} y1={gl.y} x2={W - PAD_R} y2={gl.y} stroke="var(--bg-border)" strokeWidth="0.5" opacity="0.6" />
           </g>
         ))}
 
         <g clipPath={`url(#${clipId})`}>
+          {/* Comparison line (previous period) — opacified */}
+          {compPath && (
+            <path
+              d={compPath}
+              fill="none"
+              stroke="var(--text-tertiary)"
+              strokeWidth="1.25"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              opacity="0.35"
+              strokeDasharray="4 3"
+            />
+          )}
+
+          {/* Current period fill + line */}
           <path d={fillPath} fill={`url(#${gradId})`} />
           <path d={linePath} fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
         </g>
 
+        {/* X-axis labels */}
         {xs.map((x, i) => (
           <text
-            key={i} x={x} y={H - 2} textAnchor="middle"
-            fill={indicator?.nearestIdx === i ? 'var(--accent)' : 'var(--text-tertiary)'}
-            fontSize="6.5" style={{ fontFamily: 'inherit', transition: 'fill 120ms' }}
+            key={i} x={x} y={H - 4} textAnchor="middle"
+            fill={indicator?.nearestIdx === i ? 'var(--text-primary)' : 'var(--text-tertiary)'}
+            fontSize="10.5" style={{ fontFamily: 'inherit', transition: 'fill 120ms' }}
           >
             {data[i].label}
           </text>
         ))}
 
+        {/* Persistent dot at current (latest) point */}
+        {!indicator && xs.length > 0 && (
+          <circle
+            cx={xs[xs.length - 1]} cy={ys[ys.length - 1]} r={4}
+            fill="var(--accent)" stroke="var(--bg-surface)" strokeWidth="2"
+          />
+        )}
+
+        {/* Hover indicator */}
         {indicator && (
           <>
             <line
               x1={indicator.x} y1={PAD_T} x2={indicator.x} y2={fillBottom}
-              stroke="var(--bg-border)" strokeWidth="0.8"
+              stroke="var(--text-tertiary)" strokeWidth="0.8" strokeDasharray="3 3"
             />
-            <circle cx={indicator.x} cy={indicator.y} r={3} fill="var(--accent)" />
-            <rect x={tipX} y={tipY} width={32} height={11} rx={3}
-              fill="var(--bg-elevated)" stroke="var(--bg-border)" strokeWidth="0.5" />
+            <circle cx={indicator.x} cy={indicator.y} r={4.5} fill="var(--bg-surface)" stroke="var(--accent)" strokeWidth="2" />
+            <rect x={tipX} y={tipY} width={54} height={19} rx={6} fill="var(--accent)" />
             <text
-              x={tipX + 16} y={tipY + 7.5}
-              fill="var(--text-primary)" fontSize="7" fontWeight="600" textAnchor="middle"
+              x={tipX + 27} y={tipY + 13}
+              fill="var(--on-accent)" fontSize="10.5" fontWeight="600" textAnchor="middle"
               style={{ fontFamily: 'inherit' }}
             >
               {fmt(tipValue)}
@@ -171,6 +222,7 @@ export default function RevenueChart({ data }: { data: Point[] }) {
           </>
         )}
 
+        {/* Hit area */}
         <rect
           x={Y_W} y={PAD_T} width={chartW} height={chartH + PAD_B}
           fill="transparent"

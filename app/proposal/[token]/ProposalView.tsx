@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { acceptProposal, declineProposal } from '@/app/actions/proposals'
 import { formatNZD, formatDate, statusLabel } from '@/lib/format'
 import Image from 'next/image'
@@ -29,6 +30,7 @@ type ProposalData = {
 }
 
 export default function ProposalView({ proposal }: { proposal: ProposalData }) {
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [responded, setResponded] = useState(proposal.status === 'accepted' || proposal.status === 'declined')
 
@@ -42,7 +44,7 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
     startTransition(async () => {
       await acceptProposal(proposal.token)
       setResponded(true)
-      window.location.reload()
+      router.refresh()
     })
   }
 
@@ -51,7 +53,7 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
     startTransition(async () => {
       await declineProposal(proposal.token)
       setResponded(true)
-      window.location.reload()
+      router.refresh()
     })
   }
 
@@ -59,7 +61,7 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
     <div className="min-h-screen" style={{ background: 'var(--bg-base)' }}>
       {/* Header */}
       <header className="py-6 px-6 flex items-center justify-center" style={{ borderBottom: '1px solid var(--bg-border)' }}>
-        <Image src="/Primary_White.svg" alt="Tui Media" width={140} height={29} />
+        <Image src="/Primary_Black.svg" alt="Tui Media" width={140} height={29} />
       </header>
 
       <div className="max-w-3xl mx-auto px-6 py-10 space-y-8 animate-fade-in">

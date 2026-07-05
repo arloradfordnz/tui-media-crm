@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getAuthUser, unauthorizedResponse } from '@/lib/supabase-admin'
 
 type Row = { id: string; title: string; message: string; type: string; read: boolean; created_at: string; link_url: string | null }
 
 export async function GET() {
+  if (!(await getAuthUser())) return unauthorizedResponse()
   const supabase = await createServerSupabaseClient()
   const { data } = await supabase
     .from('notifications')

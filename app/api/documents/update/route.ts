@@ -1,7 +1,9 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getAuthUser, unauthorizedResponse } from '@/lib/supabase-admin'
 import { NextRequest } from 'next/server'
 
 export async function POST(request: NextRequest) {
+  if (!(await getAuthUser())) return unauthorizedResponse()
   const fd = await request.formData()
   const docId = fd.get('docId') as string
   const name = fd.get('name') as string
@@ -36,13 +38,13 @@ export async function POST(request: NextRequest) {
           form?: Record<string, unknown>
         }
         if (Array.isArray(prior?.feedback)) merged.feedback = prior.feedback
-        const priorSig = prior?.form?.clientSignature
-        const priorSignedAt = prior?.form?.clientSignedAt
-        if (priorSig) {
+        const priorForm = prior?.form as Record<string, unknown> | undefined
+        if (priorForm?.clientSignature) {
           merged.form = {
             ...(merged.form ?? {}),
-            clientSignature: priorSig,
-            clientSignedAt: priorSignedAt,
+            clientSignature: priorForm.clientSignature,
+            clientSignedAt: priorForm.clientSignedAt,
+            clientSignedAtISO: priorForm.clientSignedAtISO,
           }
         }
         mergedContent = JSON.stringify(merged)

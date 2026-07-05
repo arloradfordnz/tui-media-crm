@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { createAdminClient } from '@/lib/supabase-admin'
 import { sendProposalEmail, sendProposalAcceptedEmail } from '@/lib/email'
 
 export async function createProposal(jobId: string) {
@@ -31,7 +32,7 @@ export async function createProposal(jobId: string) {
     cover_note: `Dear ${client.name},\n\nThank you for choosing Tui Media. We're excited to work with you on this project. Please find our proposal below.`,
     services,
     total_value: job.quote_value || 0,
-    inclusions: 'Full coverage as outlined\nProfessional editing &amp; colour grading\nLicensed music where applicable\nTwo rounds of revisions\nFinal delivery via secure client portal',
+    inclusions: 'Full coverage as outlined\nProfessional editing & colour grading\nLicensed music where applicable\nTwo rounds of revisions\nFinal delivery via secure client portal',
   }).select('id').single()
 
   if (error || !proposal) return { error: error?.message || 'Failed to create proposal.' }
@@ -95,7 +96,9 @@ export async function sendProposal(proposalId: string) {
 }
 
 export async function acceptProposal(token: string) {
-  const supabase = await createServerSupabaseClient()
+  // Public proposal page — no login. Auth is the token; write with service role.
+  const supabase = createAdminClient()
+  if (!supabase) return { error: 'Server misconfigured.' }
 
   const { data: proposal } = await supabase
     .from('proposals')
@@ -120,7 +123,8 @@ export async function acceptProposal(token: string) {
 }
 
 export async function declineProposal(token: string) {
-  const supabase = await createServerSupabaseClient()
+  const supabase = createAdminClient()
+  if (!supabase) return { error: 'Server misconfigured.' }
 
   const { data: proposal } = await supabase
     .from('proposals')

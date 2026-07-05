@@ -65,8 +65,8 @@ export async function GET(req: NextRequest) {
     { data: igPostsRecent },
     { data: igPostsPrior },
   ] = await Promise.all([
-    supabase.from('jobs').select('quote_value, updated_at').eq('status', 'delivered').gte('updated_at', startOfMonth),
-    supabase.from('jobs').select('quote_value, updated_at').eq('status', 'delivered').gte('updated_at', ninetyDaysAgo).lt('updated_at', startOfMonth),
+    supabase.from('jobs').select('quote_value, delivered_at').eq('status', 'delivered').gte('delivered_at', startOfMonth),
+    supabase.from('jobs').select('quote_value, delivered_at').eq('status', 'delivered').gte('delivered_at', ninetyDaysAgo).lt('delivered_at', startOfMonth),
     supabase.from('jobs').select('status, quote_value'),
     supabase.from('clients').select('*', { count: 'exact', head: true }).in('pipeline_stage', ['enquiry', 'discovery']),
     supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('status', 'review'),

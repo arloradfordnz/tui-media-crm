@@ -1,7 +1,9 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getAuthUser, unauthorizedResponse } from '@/lib/supabase-admin'
 import { NextRequest } from 'next/server'
 
 export async function POST(request: NextRequest) {
+  if (!(await getAuthUser())) return unauthorizedResponse()
   const supabase = await createServerSupabaseClient()
   const { jobId, title } = await request.json()
 
@@ -20,6 +22,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  if (!(await getAuthUser())) return unauthorizedResponse()
   const supabase = await createServerSupabaseClient()
   const { id, title } = await request.json()
 
@@ -33,6 +36,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  if (!(await getAuthUser())) return unauthorizedResponse()
   const supabase = await createServerSupabaseClient()
   const { id } = await request.json()
 

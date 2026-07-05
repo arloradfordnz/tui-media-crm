@@ -323,14 +323,12 @@ export default function TodosView({ todos, jobs, clients, filter }: {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <CheckSquare className="w-5 h-5" style={{ color: 'var(--accent)' }} />
-          <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>To Do</h1>
-        </div>
-        <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-          <span>{todoCount} remaining</span>
-          {doneCount > 0 && <span>· {doneCount} done</span>}
+      <div className="page-header" style={{ marginBottom: 0 }}>
+        <div className="page-header-left">
+          <h1 className="page-title">To Do</h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+            {todoCount} remaining{doneCount > 0 ? ` · ${doneCount} done` : ''}
+          </p>
         </div>
       </div>
 

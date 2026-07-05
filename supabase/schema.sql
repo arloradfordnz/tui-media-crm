@@ -269,22 +269,12 @@ CREATE POLICY "auth_all" ON notifications     FOR ALL TO authenticated USING (tr
 CREATE POLICY "auth_all" ON activities        FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "auth_all" ON business_info    FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
--- Anon users can read jobs/deliverables/delivery_files/proposals/revisions/clients
--- (needed for the public portal and proposal pages which use the anon key)
-CREATE POLICY "anon_read" ON jobs            FOR SELECT TO anon USING (true);
-CREATE POLICY "anon_read" ON deliverables    FOR SELECT TO anon USING (true);
-CREATE POLICY "anon_read" ON delivery_files  FOR SELECT TO anon USING (true);
-CREATE POLICY "anon_read" ON proposals       FOR SELECT TO anon USING (true);
-CREATE POLICY "anon_read" ON revisions       FOR SELECT TO anon USING (true);
-CREATE POLICY "anon_read" ON clients         FOR SELECT TO anon USING (true);
-CREATE POLICY "anon_read" ON documents       FOR SELECT TO anon USING (true);
-
--- Anon can update delivery_files and jobs (for approve/request changes from portal)
-CREATE POLICY "anon_update_delivery" ON delivery_files FOR UPDATE TO anon USING (true) WITH CHECK (true);
-CREATE POLICY "anon_update_jobs"     ON jobs           FOR UPDATE TO anon USING (true) WITH CHECK (true);
-CREATE POLICY "anon_insert"          ON revisions      FOR INSERT TO anon WITH CHECK (true);
-CREATE POLICY "anon_insert"          ON activities     FOR INSERT TO anon WITH CHECK (true);
-CREATE POLICY "anon_insert"          ON notifications  FOR INSERT TO anon WITH CHECK (true);
+-- NO anon (public) policies. The anon key is shipped in the browser bundle, so
+-- any anon policy is effectively public on the internet. The public portal and
+-- proposal pages authenticate via the unguessable token in the URL and run
+-- server-side with the service-role key (which bypasses RLS) — see
+-- lib/supabase-admin.ts. Do NOT add "TO anon" policies here.
+-- (Historical anon policies are dropped by migration_lockdown_anon.sql.)
 
 -- ── Todos ─────────────────────────────────────────────────────────────────────
 CREATE TABLE todos (

@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getAuthUser, unauthorizedResponse } from '@/lib/supabase-admin'
 
 export async function GET(_req: Request, { params }: { params: Promise<{ jobType: string }> }) {
+  if (!(await getAuthUser())) return unauthorizedResponse()
   const { jobType } = await params
   const supabase = await createServerSupabaseClient()
 

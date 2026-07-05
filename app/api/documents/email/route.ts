@@ -1,7 +1,9 @@
 import { NextRequest } from 'next/server'
 import { sendDocumentToClientEmail } from '@/lib/email'
+import { getAuthUser, unauthorizedResponse } from '@/lib/supabase-admin'
 
 export async function POST(request: NextRequest) {
+  if (!(await getAuthUser())) return unauthorizedResponse()
   const { to, clientName, docName, template, clientId, portalToken } = await request.json()
   if (!to) return Response.json({ error: 'Missing recipient.' }, { status: 400 })
   if (!portalToken) return Response.json({ error: 'Client has no portal link yet — open the client record and generate one.' }, { status: 400 })

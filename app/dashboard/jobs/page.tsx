@@ -56,17 +56,21 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>Jobs</h1>
-        <Link href="/dashboard/jobs/new" className="btn-primary w-fit">
-          <Plus className="w-4 h-4" /> New Job
-        </Link>
+    <div>
+      {/* Page header */}
+      <div className="page-header">
+        <div className="page-header-left">
+          <h1 className="page-title">Jobs</h1>
+        </div>
+        <div className="page-header-actions">
+          <SearchInput basePath="/dashboard/jobs" placeholder="Search jobs..." />
+          <Link href="/dashboard/jobs/new" className="btn-primary">
+            <Plus className="w-4 h-4" /> New Job
+          </Link>
+        </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <SearchInput basePath="/dashboard/jobs" placeholder="Search jobs..." />
+      <div className="mb-6">
         <FilterTabs options={JOB_STATUS_OPTIONS} paramName="status" defaultValue="active" />
       </div>
 

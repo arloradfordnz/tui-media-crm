@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getAuthUser, unauthorizedResponse } from '@/lib/supabase-admin'
 import { signedUploadUrl, deleteObject } from '@/lib/r2'
 import { sendPortalDeliveryEmail } from '@/lib/email'
 import { NextRequest } from 'next/server'
@@ -7,6 +8,7 @@ import { NextRequest } from 'next/server'
 // Step 2: client PUTs the file directly to R2 (bypasses this server — no size limit).
 // Step 3: client calls PATCH to flip the row from 'uploading' to 'not_sent'.
 export async function POST(request: NextRequest) {
+  if (!(await getAuthUser())) return unauthorizedResponse()
   const supabase = await createServerSupabaseClient()
   const body = await request.json()
   const { deliverableId, fileName, fileSize, mimeType, versionLabel, notes } = body
@@ -47,6 +49,7 @@ export async function POST(request: NextRequest) {
 
 // Called by the browser after the R2 PUT succeeds.
 export async function PATCH(request: NextRequest) {
+  if (!(await getAuthUser())) return unauthorizedResponse()
   const supabase = await createServerSupabaseClient()
   const { fileId } = await request.json()
 
@@ -114,6 +117,7 @@ export async function PATCH(request: NextRequest) {
 
 // Called if the R2 PUT fails — removes the orphaned pending row and object.
 export async function DELETE(request: NextRequest) {
+  if (!(await getAuthUser())) return unauthorizedResponse()
   const supabase = await createServerSupabaseClient()
   const { fileId } = await request.json()
 

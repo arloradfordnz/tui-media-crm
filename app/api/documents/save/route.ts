@@ -1,7 +1,9 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getAuthUser, unauthorizedResponse } from '@/lib/supabase-admin'
 import { NextRequest } from 'next/server'
 
 export async function POST(request: NextRequest) {
+  if (!(await getAuthUser())) return unauthorizedResponse()
   const supabase = await createServerSupabaseClient()
   const { name, docType, content, clientId } = await request.json()
 

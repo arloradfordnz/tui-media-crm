@@ -1,8 +1,10 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getAuthUser, unauthorizedResponse } from '@/lib/supabase-admin'
 import { sendPortalDeliveryEmail } from '@/lib/email'
 import { NextRequest } from 'next/server'
 
 export async function PATCH(request: NextRequest) {
+  if (!(await getAuthUser())) return unauthorizedResponse()
   const supabase = await createServerSupabaseClient()
   const { fileId, status } = await request.json()
 

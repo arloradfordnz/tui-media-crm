@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { approveDelivery, markViewed, requestDeliverableRevision } from '@/app/actions/portal'
 import { signDocumentByClient, submitDocumentFeedback } from '@/app/actions/documents'
 import { renderDocBody } from '@/lib/markdown'
@@ -78,6 +79,7 @@ function fileKind(mime: string | null, name: string): 'video' | 'image' | 'audio
 }
 
 export default function ClientPortalView({ data }: { data: PortalData }) {
+  const router = useRouter()
   const [expandedJob, setExpandedJob] = useState<string | null>(data.jobs[0]?.id || null)
 
   // Mark any 'sent' files as viewed once the client opens the portal.
@@ -86,7 +88,7 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
       for (const d of job.deliverables) {
         for (const f of d.deliveryFiles) {
           if (f.deliveryStatus === 'sent') {
-            markViewed(f.id, job.id).catch(() => {})
+            markViewed(f.id, job.id, data.portalToken).catch(() => {})
           }
         }
       }
@@ -95,14 +97,15 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
 
   async function handleApprove(fileId: string, jobId: string) {
     if (!confirm('Approve this file? This confirms you are happy with the delivery.')) return
-    await approveDelivery(fileId, jobId)
-    window.location.reload()
+    await approveDelivery(fileId, jobId, data.portalToken)
+    // Re-fetch the server component data in place — no full page flash.
+    router.refresh()
   }
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg-base)' }}>
       <header className="py-5 px-6 flex items-center justify-center">
-        <Image src="/Primary_White.svg" alt="Tui Media" width={130} height={27} />
+        <Image src="/Primary_Black.svg" alt="Tui Media" width={130} height={27} />
       </header>
 
       <div className="max-w-3xl mx-auto px-6 py-6 space-y-6 animate-fade-in">
@@ -189,7 +192,7 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
                               )}
 
                               {d.deliveryFiles.length > 0 && (
-                                <RevisionPanel deliverable={d} />
+                                <RevisionPanel deliverable={d} portalToken={data.portalToken} />
                               )}
                             </div>
                           ))
@@ -233,27 +236,20 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
 function FileCard({ file, jobId, onApprove }: { file: DeliveryFile; jobId: string; onApprove: (fileId: string, jobId: string) => void }) {
   const kind = file.fileUrl && file.fileUrl.includes('vimeo') ? 'vimeo' : fileKind(file.mimeType, file.originalName)
   const canApprove = file.deliveryStatus === 'sent' || file.deliveryStatus === 'viewed'
-  const [downloading, setDownloading] = useState(false)
 
-  async function handleDownload() {
+  function handleDownload() {
+    // downloadUrl is a presigned R2 URL with Content-Disposition: attachment, so
+    // the browser saves the file natively. Navigating to it streams straight to
+    // disk — no fetch()/blob(), which used to buffer multi-GB videos in memory
+    // and stall phones.
     const url = file.downloadUrl || file.fileUrl
     if (!url) return
-    setDownloading(true)
-    try {
-      const res = await fetch(url)
-      const blob = await res.blob()
-      const objectUrl = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = objectUrl
-      a.download = file.originalName
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(objectUrl)
-    } catch (err) {
-      console.error('Download error:', err)
-    }
-    setDownloading(false)
+    const a = document.createElement('a')
+    a.href = url
+    a.rel = 'noreferrer'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
   }
 
   return (
@@ -314,8 +310,8 @@ function FileCard({ file, jobId, onApprove }: { file: DeliveryFile; jobId: strin
 
       <div className="flex gap-2 flex-wrap">
         {(file.downloadUrl || file.fileUrl) && (
-          <button onClick={handleDownload} disabled={downloading} className="btn-secondary text-sm">
-            <Download className="w-3.5 h-3.5" /> {downloading ? 'Downloading...' : 'Download'}
+          <button onClick={handleDownload} className="btn-secondary text-sm">
+            <Download className="w-3.5 h-3.5" /> Download
           </button>
         )}
         {canApprove && (
@@ -328,7 +324,7 @@ function FileCard({ file, jobId, onApprove }: { file: DeliveryFile; jobId: strin
   )
 }
 
-function RevisionPanel({ deliverable }: { deliverable: Deliverable }) {
+function RevisionPanel({ deliverable, portalToken }: { deliverable: Deliverable; portalToken: string }) {
   const [open, setOpen] = useState(false)
   const [state, action, pending] = useActionState(requestDeliverableRevision, undefined)
   const used = deliverable.revisionsUsed
@@ -369,6 +365,7 @@ function RevisionPanel({ deliverable }: { deliverable: Deliverable }) {
       ) : (
         <form action={action} className="space-y-3">
           <input type="hidden" name="deliverableId" value={deliverable.id} />
+          <input type="hidden" name="portalToken" value={portalToken} />
           <div>
             <label className="label mb-2 block">Round {used + 1} feedback</label>
             <textarea
@@ -393,6 +390,7 @@ function RevisionPanel({ deliverable }: { deliverable: Deliverable }) {
 }
 
 function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string }) {
+  const router = useRouter()
   const [expanded, setExpanded] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [signing, setSigning] = useState(false)
@@ -406,9 +404,9 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
     if (fbState?.success) {
       setFeedbackInput('')
       setFeedbackOpen(false)
-      window.location.reload()
+      router.refresh()
     }
-  }, [fbState])
+  }, [fbState, router])
 
   const parsed = (() => {
     if (!doc.content) return null
@@ -460,9 +458,9 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
       setSigning(false)
       setSignatureInput('')
       // Refresh to show the signed state and pick up updated content
-      window.location.reload()
+      router.refresh()
     }
-  }, [signState])
+  }, [signState, router])
 
   async function handleDownload() {
     if (!parsed) return

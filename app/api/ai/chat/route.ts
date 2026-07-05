@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getAuthUser, unauthorizedResponse } from '@/lib/supabase-admin'
 import { fetchXeroContacts, createXeroInvoice, fetchOutstandingInvoices, approveXeroInvoice } from '@/lib/xero'
 
 // Static system prompt — rules, voice, enums. Stable across turns, so we can
@@ -570,6 +571,8 @@ async function executeTool(name: string, input: Record<string, unknown>, supabas
       if (input.quote_value !== undefined) updates.quote_value = input.quote_value != null ? Number(input.quote_value) : null
       if (input.notes !== undefined) updates.notes = input.notes || null
       if (input.status !== undefined) updates.status = input.status
+      // Revenue is bucketed by delivered_at — stamp it on the delivery transition.
+      if (input.status === 'delivered') updates.delivered_at = new Date().toISOString()
 
       const { data, error } = await supabase.from('jobs').update(updates).eq('id', input.job_id as string).select('id, name').single()
       if (error) return JSON.stringify({ error: error.message })
@@ -586,10 +589,13 @@ async function executeTool(name: string, input: Record<string, unknown>, supabas
     }
 
     case 'update_job_status': {
-      const { data: job } = await supabase.from('jobs').select('client_id, name').eq('id', input.job_id as string).single()
+      const { data: job } = await supabase.from('jobs').select('client_id, name, status').eq('id', input.job_id as string).single()
       if (!job) return JSON.stringify({ error: 'Job not found' })
 
-      await supabase.from('jobs').update({ status: input.status as string }).eq('id', input.job_id as string)
+      await supabase.from('jobs').update({
+        status: input.status as string,
+        ...(input.status === 'delivered' && job.status !== 'delivered' ? { delivered_at: new Date().toISOString() } : {}),
+      }).eq('id', input.job_id as string)
       await supabase.from('activities').insert({ action: 'status_changed', details: `Status changed to ${input.status}`, job_id: input.job_id as string, client_id: job.client_id })
       await supabase.from('notifications').insert({ title: 'Job Status Updated', message: `"${job.name}" is now ${input.status}`, type: 'status_change', job_id: input.job_id as string, client_id: job.client_id })
 
@@ -806,6 +812,8 @@ async function executeTool(name: string, input: Record<string, unknown>, supabas
 // ── POST Handler ───────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+  if (!(await getAuthUser())) return unauthorizedResponse()
+
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     return Response.json({ error: 'ANTHROPIC_API_KEY is not configured.' }, { status: 500 })

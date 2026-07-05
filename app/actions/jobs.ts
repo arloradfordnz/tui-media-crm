@@ -18,6 +18,17 @@ export async function createJob(prevState: { error?: string } | undefined, formD
 
   if (!name || !clientId) return { error: 'Job name and client are required.' }
 
+  // Parse the JSON payloads up front so malformed input returns a form error
+  // instead of throwing mid-flight after the job row has been created.
+  let parsedTasks: { phase: string; title: string }[] | null = null
+  let parsedDeliverables: { title: string; description?: string }[] | null = null
+  try {
+    if (tasksJson) parsedTasks = JSON.parse(tasksJson)
+    if (deliverablesJson) parsedDeliverables = JSON.parse(deliverablesJson)
+  } catch {
+    return { error: 'Invalid tasks or deliverables data — please retry.' }
+  }
+
   const supabase = await createServerSupabaseClient()
 
   const { data: job, error } = await supabase.from('jobs').insert({
@@ -33,11 +44,10 @@ export async function createJob(prevState: { error?: string } | undefined, formD
 
   if (error || !job) return { error: error?.message || 'Failed to create job.' }
 
-  if (tasksJson) {
-    const tasks = JSON.parse(tasksJson) as { phase: string; title: string }[]
-    if (tasks.length > 0) {
+  if (parsedTasks) {
+    if (parsedTasks.length > 0) {
       await supabase.from('job_tasks').insert(
-        tasks.map((t, i) => ({ job_id: job.id, phase: t.phase, title: t.title, sort_order: i }))
+        parsedTasks.map((t, i) => ({ job_id: job.id, phase: t.phase, title: t.title, sort_order: i }))
       )
     }
   } else if (jobType) {
@@ -65,13 +75,10 @@ export async function createJob(prevState: { error?: string } | undefined, formD
     }
   }
 
-  if (deliverablesJson) {
-    const deliverables = JSON.parse(deliverablesJson) as { title: string; description?: string }[]
-    if (deliverables.length > 0) {
-      await supabase.from('deliverables').insert(
-        deliverables.map((d) => ({ job_id: job.id, title: d.title, description: d.description || null }))
-      )
-    }
+  if (parsedDeliverables && parsedDeliverables.length > 0) {
+    await supabase.from('deliverables').insert(
+      parsedDeliverables.map((d) => ({ job_id: job.id, title: d.title, description: d.description || null }))
+    )
   }
 
   await supabase.from('activities').insert({
@@ -116,6 +123,9 @@ export async function updateJob(prevState: { error?: string } | undefined, formD
     estimated_hours: estimatedHours ? parseFloat(estimatedHours) : 0,
     notes: notes || null,
     ...(status ? { status } : {}),
+    // Stamp delivery once, on the transition — revenue is bucketed by this,
+    // so it must not drift when the job is edited later.
+    ...(statusChanged && status === 'delivered' ? { delivered_at: new Date().toISOString() } : {}),
   }).eq('id', jobId)
 
   if (statusChanged) {
@@ -137,10 +147,13 @@ async function logStatusChange(jobId: string, clientId: string | null, jobName: 
 
 export async function updateJobStatus(jobId: string, newStatus: string) {
   const supabase = await createServerSupabaseClient()
-  const { data: job } = await supabase.from('jobs').select('client_id, name').eq('id', jobId).single()
+  const { data: job } = await supabase.from('jobs').select('client_id, name, status').eq('id', jobId).single()
   if (!job) return
 
-  await supabase.from('jobs').update({ status: newStatus }).eq('id', jobId)
+  await supabase.from('jobs').update({
+    status: newStatus,
+    ...(newStatus === 'delivered' && job.status !== 'delivered' ? { delivered_at: new Date().toISOString() } : {}),
+  }).eq('id', jobId)
   await logStatusChange(jobId, job.client_id, job.name, newStatus)
 
   revalidatePath('/dashboard/jobs')

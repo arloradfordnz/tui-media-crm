@@ -49,8 +49,8 @@ export default function FilterTabs({
           options={options}
         />
       </div>
-      {/* Desktop: button row */}
-      <div className="hidden sm:flex gap-2">
+      {/* Desktop: underline tabs */}
+      <div className="hidden sm:flex page-tabs" style={{ marginBottom: 0 }}>
         {options.map((o) => {
           const active = o.value === optimistic
           return (
@@ -58,8 +58,7 @@ export default function FilterTabs({
               key={o.value}
               type="button"
               onClick={() => onSelect(o.value)}
-              className="btn-secondary text-sm"
-              style={active ? { background: 'var(--accent-muted)', color: 'var(--accent)', borderColor: 'var(--accent)' } : {}}
+              className={`page-tab ${active ? 'active' : ''}`}
             >
               {o.label}
             </button>

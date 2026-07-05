@@ -41,6 +41,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       jobs={jobs ?? []}
       month={month}
       year={year}
+      feedToken={process.env.CALENDAR_FEED_SECRET ?? null}
     />
   )
 }

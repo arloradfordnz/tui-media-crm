@@ -31,11 +31,15 @@ export default function GearView({ gear, category, status }: { gear: GearItem[];
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>Gear & Equipment</h1>
-        <button onClick={() => { setEditItem(null); setShowModal(true) }} className="btn-primary w-fit">
-          <Plus className="w-4 h-4" /> Add Gear
-        </button>
+      <div className="page-header" style={{ marginBottom: 0 }}>
+        <div className="page-header-left">
+          <h1 className="page-title">Gear & Equipment</h1>
+        </div>
+        <div className="page-header-actions">
+          <button onClick={() => { setEditItem(null); setShowModal(true) }} className="btn-primary">
+            <Plus className="w-4 h-4" /> Add Gear
+          </button>
+        </div>
       </div>
 
       {/* Filters */}

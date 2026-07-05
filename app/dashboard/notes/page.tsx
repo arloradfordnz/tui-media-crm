@@ -44,21 +44,21 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold truncate" style={{ letterSpacing: '-0.02em' }}>Notes</h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+      <div className="page-header" style={{ marginBottom: 0 }}>
+        <div className="page-header-left">
+          <h1 className="page-title">Notes</h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
             {all.length} note{all.length === 1 ? '' : 's'} · {meetingCount} meeting · {generalCount} general
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="page-header-actions">
           <form action={newMeeting}>
-            <button type="submit" className="btn-secondary text-sm">
+            <button type="submit" className="btn-secondary">
               <Users className="w-3.5 h-3.5" /> New meeting
             </button>
           </form>
           <form action={newGeneral}>
-            <button type="submit" className="btn-primary text-sm">
+            <button type="submit" className="btn-primary">
               <Plus className="w-3.5 h-3.5" /> New note
             </button>
           </form>

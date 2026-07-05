@@ -17,17 +17,24 @@ const patrickHand = Patrick_Hand({
 
 export const metadata: Metadata = {
   title: "Tui Media",
-  description: "Client portal for Tui Media",
-  icons: {
-    icon: [{ url: "/Logomark_White.png", type: "image/png" }],
-    apple: [{ url: "/Logomark_White.png", type: "image/png" }],
-  },
+  description: "Tui Media — studio dashboard and client portal",
+  // Favicon comes from app/icon.svg (Next.js convention) — the old
+  // Logomark_White.png override was invisible on light browser tabs.
 };
+
+// Apply the saved theme before first paint so the theme never flashes.
+// Default to LIGHT: it's the app's design default, and client-facing pages
+// (login, portal, proposal) use the black logo which is invisible on a black
+// dark-mode canvas for a first-time visitor who has nothing saved.
+const themeInit = `(function(){try{var t=localStorage.getItem('tui-theme');document.documentElement.classList.add(t==='dark'?'dark':'light');}catch(e){document.documentElement.classList.add('light');}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${poppins.className} ${patrickHand.variable}`}>
-      <body>{children}</body>
+    <html lang="en" className={`${poppins.className} ${patrickHand.variable}`} suppressHydrationWarning>
+      <body>
+        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+        {children}
+      </body>
     </html>
   );
 }

@@ -29,7 +29,7 @@ type EventData = {
   job: { id: string; name: string } | null
 }
 
-export default function CalendarView({ events, jobs, month, year }: { events: EventData[]; jobs: { id: string; name: string }[]; month: number; year: number }) {
+export default function CalendarView({ events, jobs, month, year, feedToken }: { events: EventData[]; jobs: { id: string; name: string }[]; month: number; year: number; feedToken: string | null }) {
   const router = useRouter()
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const [showModal, setShowModal] = useState(false)
@@ -65,16 +65,22 @@ export default function CalendarView({ events, jobs, month, year }: { events: Ev
   const selectedEvents = selectedDay ? eventsForDay(selectedDay) : []
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
-  const webcalUrl = `webcal://${appUrl.replace(/^https?:\/\//, '')}/api/calendar/feed.ics`
+  const webcalUrl = feedToken
+    ? `webcal://${appUrl.replace(/^https?:\/\//, '')}/api/calendar/feed.ics?token=${encodeURIComponent(feedToken)}`
+    : null
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>Calendar</h1>
-        <div className="flex items-center gap-3">
-          <a href={webcalUrl} className="btn-secondary text-sm hidden! sm:inline-flex!">
-            <Calendar className="w-3.5 h-3.5" /> Subscribe in Apple Calendar
-          </a>
+      <div className="page-header" style={{ marginBottom: 0 }}>
+        <div className="page-header-left">
+          <h1 className="page-title">Calendar</h1>
+        </div>
+        <div className="page-header-actions">
+          {webcalUrl && (
+            <a href={webcalUrl} className="btn-secondary hidden! sm:inline-flex!">
+              <Calendar className="w-3.5 h-3.5" /> Subscribe
+            </a>
+          )}
           <button onClick={() => setShowModal(true)} className="btn-primary">
             <Plus className="w-4 h-4" /> Add Event
           </button>

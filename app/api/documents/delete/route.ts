@@ -1,7 +1,9 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getAuthUser, unauthorizedResponse } from '@/lib/supabase-admin'
 import { NextRequest } from 'next/server'
 
 export async function POST(request: NextRequest) {
+  if (!(await getAuthUser())) return unauthorizedResponse()
   const fd = await request.formData()
   const docId = fd.get('docId') as string
   if (!docId) return Response.json({ error: 'Missing docId.' }, { status: 400 })

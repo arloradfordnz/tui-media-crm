@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest } from 'next/server'
+import { getAuthUser, unauthorizedResponse } from '@/lib/supabase-admin'
 
 const DRAFT_START = '===DRAFT START==='
 const DRAFT_END = '===DRAFT END==='
@@ -29,6 +30,8 @@ Do not write anything after the closing marker. Before the markers, you may writ
 }
 
 export async function POST(request: NextRequest) {
+  if (!(await getAuthUser())) return unauthorizedResponse()
+
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     return Response.json({ error: 'ANTHROPIC_API_KEY is not configured.' }, { status: 500 })
