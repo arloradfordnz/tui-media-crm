@@ -920,6 +920,11 @@ input, textarea, select, button { font-family: inherit; }
   transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Sidebar wordmark — swaps black/white with the theme, no JS needed */
+.sidebar-logo-dark { display: none; }
+.dark .sidebar-logo-light { display: none; }
+.dark .sidebar-logo-dark { display: block; }
+
 /* Reopen button — shown only once the sidebar has slid off-screen */
 .sidebar-reopen {
   position: fixed;

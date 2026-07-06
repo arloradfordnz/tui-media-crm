@@ -1,4 +1,9 @@
+import type { Metadata } from 'next'
 import DashboardShell from './DashboardShell'
+
+export const metadata: Metadata = {
+  title: 'Tui Media — Dashboard',
+}
 
 // Auth is enforced by middleware (proxy.ts) — no need to repeat the
 // getUser() round trip here; doing so doubled latency on every nav.

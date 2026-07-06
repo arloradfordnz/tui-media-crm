@@ -9,35 +9,25 @@ import {
   Briefcase,
   Calendar,
   DollarSign,
-  Camera,
   FileText,
   Settings,
   LogOut,
   X,
-  Building2,
-  CheckSquare,
-  Layers,
-  NotebookPen,
 } from 'lucide-react'
 
 const mainNav = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/clients', label: 'Clients', icon: Users },
   { href: '/dashboard/jobs', label: 'Jobs', icon: Briefcase },
-  { href: '/dashboard/todos', label: 'To Do', icon: CheckSquare },
-  { href: '/dashboard/notes', label: 'Notes', icon: NotebookPen },
   { href: '/dashboard/calendar', label: 'Calendar', icon: Calendar },
 ]
 
 const businessNav = [
   { href: '/dashboard/finance', label: 'Finance', icon: DollarSign },
-  { href: '/dashboard/gear', label: 'Gear', icon: Camera },
   { href: '/dashboard/documents', label: 'Documents', icon: FileText },
-  { href: '/dashboard/jobs/templates', label: 'Templates', icon: Layers },
 ]
 
 const accountNav = [
-  { href: '/dashboard/business', label: 'Business Info', icon: Building2 },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ]
 
@@ -53,13 +43,7 @@ function NavLink({
   onClick?: () => void
 }) {
   const pathname = usePathname()
-  const isActive =
-    href === '/dashboard'
-      ? pathname === '/dashboard'
-      : href === '/dashboard/jobs'
-      ? pathname === '/dashboard/jobs' ||
-        (pathname.startsWith('/dashboard/jobs/') && !pathname.startsWith('/dashboard/jobs/templates'))
-      : pathname.startsWith(href)
+  const isActive = href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
 
   return (
     <Link href={href} className={`nav-item ${isActive ? 'active' : ''}`} onClick={onClick}>
@@ -91,7 +75,10 @@ export default function Sidebar({
         style={{ transform: open ? 'translateX(0)' : 'translateX(calc(-100% - 24px))' }}
       >
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
-          <Image src="/Primary_Black.svg" alt="Tui Media" width={120} height={25} />
+          <span className="sidebar-logo">
+            <Image className="sidebar-logo-light" src="/Primary_Black.svg" alt="Tui Media" width={120} height={25} />
+            <Image className="sidebar-logo-dark" src="/Primary_White.svg" alt="Tui Media" width={120} height={25} />
+          </span>
           <button className="btn-icon" onClick={onClose} aria-label="Close menu">
             <X className="w-4 h-4" />
           </button>

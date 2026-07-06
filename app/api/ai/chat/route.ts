@@ -8,14 +8,14 @@ import { fetchXeroContacts, createXeroInvoice, fetchOutstandingInvoices, approve
 // cache it with a cache_control breakpoint and reuse it on every request.
 const STATIC_SYSTEM = `You are the AI assistant for Tui Media CRM (Arlo Radford, videography, photography and marketing, Nelson NZ).
 
-You can search, create, and update clients, jobs, events, documents, gear, and deliverables. You can view stats and manage tasks.
+You can search, create, and update clients, jobs, events, documents, and deliverables. You can view stats and manage tasks.
 IMPORTANT: You CANNOT delete clients. Client deletion is not permitted via AI — tell the user to do it from the client profile page.
 
 Voice: professional, concise New Zealand English. Correct grammar and punctuation always. Never use emojis. Keep replies to one or two sentences unless the user asks for detail. Act immediately with tools rather than narrating what you are about to do. Use sensible defaults (status "lead", pipeline "enquiry"). Confirm completed actions in a single sentence.
 
 Formatting: you may use Markdown — **bold** for emphasis on key nouns (names, statuses, dates) and *italic* sparingly for subtle emphasis. Do not use headings, lists, or code blocks unless explicitly asked.
 
-Enums — Pipeline: enquiry,discovery,proposal,negotiation,won,lost | Client status: lead,active,past,archived | Client category (type): retainer,marketing,one_off | Job status: enquiry,booked,preproduction,shootday,editing,review,approved,delivered,archived | Events: shoot,meeting,deadline,personal | Gear: available,in-use,maintenance,retired | Docs: contract,invoice,brief,other`
+Enums — Pipeline: enquiry,discovery,proposal,negotiation,won,lost | Client status: lead,active,past,archived | Client category (type): retainer,marketing,one_off | Job status: enquiry,booked,preproduction,shootday,editing,review,approved,delivered,archived | Events: shoot,meeting,deadline,personal | Docs: contract,invoice,brief,other`
 
 async function getDynamicContext(supabase: ReturnType<typeof createServerSupabaseClient> extends Promise<infer T> ? T : never) {
   const now = new Date()
@@ -51,7 +51,6 @@ const MUTATING_TOOLS = new Set([
   'create_job', 'update_job', 'update_job_status', 'delete_job', 'toggle_task',
   'create_event', 'delete_event',
   'create_document', 'delete_document',
-  'create_gear', 'update_gear', 'delete_gear',
   'create_deliverable',
   'create_xero_invoice', 'approve_xero_invoice',
 ])
@@ -290,62 +289,6 @@ const TOOLS: Anthropic.Tool[] = [
         doc_id: { type: 'string' },
       },
       required: ['doc_id'],
-    },
-  },
-
-  // ── Gear ──────────────────────────────────────
-  {
-    name: 'list_gear',
-    description: 'List all gear/equipment items.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {},
-      required: [],
-    },
-  },
-  {
-    name: 'create_gear',
-    description: 'Add a new piece of gear/equipment.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        name: { type: 'string' },
-        category: { type: 'string', description: 'e.g. Camera, Lens, Audio, Lighting, Stabiliser, Drone, Accessory' },
-        purchase_value: { type: 'number' },
-        insurance_value: { type: 'number' },
-        serial_number: { type: 'string' },
-        notes: { type: 'string' },
-      },
-      required: ['name'],
-    },
-  },
-  {
-    name: 'update_gear',
-    description: 'Update gear details.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        gear_id: { type: 'string' },
-        name: { type: 'string' },
-        category: { type: 'string' },
-        status: { type: 'string', enum: ['available', 'in-use', 'maintenance', 'retired'] },
-        purchase_value: { type: 'number' },
-        insurance_value: { type: 'number' },
-        serial_number: { type: 'string' },
-        notes: { type: 'string' },
-      },
-      required: ['gear_id'],
-    },
-  },
-  {
-    name: 'delete_gear',
-    description: 'Delete a gear item by ID.',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        gear_id: { type: 'string' },
-      },
-      required: ['gear_id'],
     },
   },
 
@@ -673,47 +616,6 @@ async function executeTool(name: string, input: Record<string, unknown>, supabas
       return JSON.stringify({ success: true })
     }
 
-    // ── Gear ────────────────────────────────
-    case 'list_gear': {
-      const { data, error } = await supabase.from('gear').select('*').order('name')
-      if (error) return JSON.stringify({ error: error.message })
-      return JSON.stringify({ gear: data })
-    }
-
-    case 'create_gear': {
-      const { data, error } = await supabase.from('gear').insert({
-        name: input.name as string,
-        category: (input.category as string) || null,
-        purchase_value: input.purchase_value != null ? Number(input.purchase_value) : null,
-        insurance_value: input.insurance_value != null ? Number(input.insurance_value) : null,
-        serial_number: (input.serial_number as string) || null,
-        notes: (input.notes as string) || null,
-      }).select('id, name').single()
-      if (error) return JSON.stringify({ error: error.message })
-      return JSON.stringify({ success: true, gear: data })
-    }
-
-    case 'update_gear': {
-      const updates: Record<string, unknown> = {}
-      if (input.name !== undefined) updates.name = input.name
-      if (input.category !== undefined) updates.category = input.category || null
-      if (input.status !== undefined) updates.status = input.status
-      if (input.purchase_value !== undefined) updates.purchase_value = input.purchase_value != null ? Number(input.purchase_value) : null
-      if (input.insurance_value !== undefined) updates.insurance_value = input.insurance_value != null ? Number(input.insurance_value) : null
-      if (input.serial_number !== undefined) updates.serial_number = input.serial_number || null
-      if (input.notes !== undefined) updates.notes = input.notes || null
-
-      const { data, error } = await supabase.from('gear').update(updates).eq('id', input.gear_id as string).select('id, name').single()
-      if (error) return JSON.stringify({ error: error.message })
-      return JSON.stringify({ success: true, gear: data })
-    }
-
-    case 'delete_gear': {
-      const { error } = await supabase.from('gear').delete().eq('id', input.gear_id as string)
-      if (error) return JSON.stringify({ error: error.message })
-      return JSON.stringify({ success: true })
-    }
-
     // ── Deliverables ────────────────────────
     case 'create_deliverable': {
       const { data, error } = await supabase.from('deliverables').insert({
@@ -921,7 +823,6 @@ export async function POST(request: NextRequest) {
                 if (parsed.job?.id) createdLinks.push({ path: `/dashboard/jobs/${parsed.job.id}`, label: `View ${parsed.job.name || 'Job'}` })
                 if (parsed.document?.id) createdLinks.push({ path: `/dashboard/documents/${parsed.document.id}`, label: `View ${parsed.document.name || 'Document'}` })
                 if (parsed.event?.id) createdLinks.push({ path: `/dashboard/calendar`, label: 'View Calendar' })
-                if (parsed.gear?.id) createdLinks.push({ path: `/dashboard/gear`, label: `View ${parsed.gear.name || 'Gear'}` })
               }
             } catch { /* not JSON or no link needed */ }
           }

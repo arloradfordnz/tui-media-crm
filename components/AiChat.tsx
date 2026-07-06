@@ -295,7 +295,7 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
                   className="rounded-lg px-3 py-2 text-sm"
                   style={{
                     background: m.role === 'user' ? 'var(--accent)' : 'var(--bg-elevated)',
-                    color: m.role === 'user' ? '#fff' : currentlyWorking ? 'var(--text-tertiary)' : 'var(--text-primary)',
+                    color: m.role === 'user' ? 'var(--on-accent)' : currentlyWorking ? 'var(--text-tertiary)' : 'var(--text-primary)',
                     whiteSpace: 'pre-wrap',
                   }}
                 >
@@ -320,7 +320,7 @@ export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors"
                         style={{
                           background: 'var(--accent)',
-                          color: '#fff',
+                          color: 'var(--on-accent)',
                         }}
                       >
                         <ExternalLink className="w-3 h-3" />
