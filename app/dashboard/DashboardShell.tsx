@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, createContext, useContext, ReactNode } from 'react'
-import BottomNav from '@/components/BottomNav'
+import { Menu } from 'lucide-react'
+import Sidebar from '@/components/Sidebar'
 import AiChatWidget from '@/components/AiChatWidget'
+import { logout } from '@/app/actions/auth'
 
 // ── Panel context (Monthly Report push panel) ─────────────────
 type PanelCtx = {
@@ -19,11 +21,13 @@ export function usePanelContext() {
 }
 
 const PANEL_W = 404 // 380px panel + 12px left margin + 12px right margin
+const SIDEBAR_W = 272 // 248px sidebar + 12px left margin + 12px right margin
 const EASE = 'cubic-bezier(0.4, 0, 0.2, 1)'
 
 export default function DashboardShell({ children }: { children: ReactNode }) {
   const [panelOpen, setPanelOpen] = useState(false)
   const [panelContent, setPanelContent] = useState<ReactNode | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
   function openPanel(content: ReactNode) {
     setPanelContent(content)
@@ -38,6 +42,24 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
     <PanelContext.Provider value={{ panelOpen, panelContent, openPanel, closePanel }}>
       <div style={{ minHeight: '100vh', background: 'var(--bg-base)' }}>
 
+        <Sidebar
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          onLogout={() => logout()}
+        />
+
+        {/* Reopen button — only shown once the sidebar has slid away, same
+            trigger/close pairing the report panel uses. */}
+        {!sidebarOpen && (
+          <button
+            className="sidebar-reopen"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
+          >
+            <Menu className="w-4 h-4" />
+          </button>
+        )}
+
         {/* Fixed report panel — slides in from the right */}
         <div
           className="report-panel"
@@ -48,11 +70,12 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
           {panelContent}
         </div>
 
-        {/* Main area — marginRight pushes away from the report panel */}
+        {/* Main area — margins push away from the sidebar and report panel */}
         <div
           style={{
+            marginLeft: sidebarOpen ? SIDEBAR_W : 0,
             marginRight: panelOpen ? PANEL_W : 0,
-            transition: `margin-right 240ms ${EASE}`,
+            transition: `margin-left 240ms ${EASE}, margin-right 240ms ${EASE}`,
             display: 'flex',
             flexDirection: 'column',
             height: '100vh',
@@ -68,7 +91,6 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        <BottomNav />
         <AiChatWidget />
       </div>
     </PanelContext.Provider>

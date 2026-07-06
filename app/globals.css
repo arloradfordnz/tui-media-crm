@@ -416,7 +416,7 @@ input, textarea, select, button { font-family: inherit; }
 
 .page-shell-inner {
   flex: 1;
-  padding: clamp(28px, 4vh, 44px) clamp(28px, 4.5vw, 64px) 128px;
+  padding: clamp(28px, 4vh, 44px) clamp(28px, 4.5vw, 64px);
   overflow-y: auto;
 }
 
@@ -903,50 +903,57 @@ input, textarea, select, button { font-family: inherit; }
   }
 }
 
-/* ── Bottom pill nav (real liquid-glass-react component) ──── */
-/* The single navigation for the whole app on every breakpoint —
-   a floating refractive glass pill. The glass surface comes from
-   the LiquidGlass component; this is just the icon row inside it. */
-.glass-nav-row {
+/* ── Left sidebar (floating island, slides like the report panel) ── */
+.sidebar-panel {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 248px;
+  margin: 12px;
+  border-radius: var(--r-xl);
   display: flex;
-  align-items: center;
-  gap: 3px;
+  flex-direction: column;
+  background: var(--bg-surface);
+  overflow: hidden;
+  z-index: 60;
+  transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
 }
-/* The pill is dark tinted glass in BOTH themes (like the iOS/Instagram
-   reference), so its icons are always light-on-dark. */
-.glass-nav-item {
-  width: 46px;
-  height: 46px;
+
+/* Reopen button — shown only once the sidebar has slid off-screen */
+.sidebar-reopen {
+  position: fixed;
+  top: 22px;
+  left: 22px;
+  z-index: 50;
+  width: 38px;
+  height: 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--r-pill);
-  color: rgba(255, 255, 255, 0.72);
-  background: transparent;
-  border: none;
+  background: var(--glass-card-bg);
+  border: 1px solid var(--glass-card-border);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  box-shadow: var(--glass-card-highlight), var(--shadow-soft);
+  color: var(--text-secondary);
   cursor: pointer;
-  text-decoration: none;
-  transition: color 200ms ease, background 200ms ease;
 }
-.glass-nav-item svg { width: 20px; height: 20px; stroke-width: 1.75px; }
-.glass-nav-item:hover:not(.active) {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.08);
+.sidebar-reopen:hover { color: var(--text-primary); }
+
+/* Scrim behind the sidebar on narrow viewports, closes it on outside click */
+.sidebar-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 55;
 }
-.glass-nav-item.active {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.18);
+@media (min-width: 769px) {
+  .sidebar-scrim { display: none; }
 }
-.glass-nav-item:disabled { opacity: 0.5; cursor: default; }
-.glass-nav-sep {
-  width: 1px;
-  height: 22px;
-  background: rgba(255, 255, 255, 0.16);
-  margin: 0 4px;
-}
-/* Dark tint inside the LiquidGlass surface (component renders .glass) */
-.bottomnav-glass .glass {
-  background: rgba(16, 16, 20, 0.55);
+@media (max-width: 768px) {
+  .sidebar-panel { z-index: 65; }
 }
 
 /* ── KPI cards (flat stat cards, reference style) ─────────── */
@@ -1153,8 +1160,7 @@ input, textarea, select, button { font-family: inherit; }
 .btn-secondary svg,
 .btn-ghost svg,
 .pill-select svg,
-.tab-pill svg,
-.glass-nav-item svg { stroke-width: 1.75px; }
+.tab-pill svg { stroke-width: 1.75px; }
 
 /* ── Drawer section dividers + closing summary ────────────── */
 .drawer-body { display: flex; flex-direction: column; }
@@ -1214,7 +1220,8 @@ input, textarea, select, button { font-family: inherit; }
 .modal-content,
 .custom-select-menu,
 .drawer-panel,
-.report-panel {
+.report-panel,
+.sidebar-panel {
   background: var(--glass-card-bg);
   border: 1px solid var(--glass-card-border);
   backdrop-filter: blur(20px) saturate(160%);

@@ -18,8 +18,7 @@ const patrickHand = Patrick_Hand({
 export const metadata: Metadata = {
   title: "Tui Media",
   description: "Tui Media — studio dashboard and client portal",
-  // Favicon comes from app/icon.svg (Next.js convention) — the old
-  // Logomark_White.png override was invisible on light browser tabs.
+  // Favicon comes from app/icon.svg (Next.js convention) — same mark as tuimedia.nz.
 };
 
 // Apply the saved theme before first paint so the theme never flashes.
