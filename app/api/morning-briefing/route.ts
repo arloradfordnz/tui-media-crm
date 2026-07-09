@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
     weatherRes,
     todosRes,
     todayEventsRes,
-    upcomingRes,
+    retainerRes,
     reviewRes,
     weekJobsRes,
     leadsRes,
@@ -64,7 +64,9 @@ export async function GET(req: NextRequest) {
     fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LNG}&current=temperature_2m,weather_code,wind_speed_10m&timezone=Pacific%2FAuckland`),
     supabase.from('todos').select('title, due_date, jobs:linked_job_id(name)').eq('completed', false).order('due_date', { ascending: true, nullsFirst: false }).limit(20),
     supabase.from('events').select('title, start_time, jobs(name)').gte('date', todayISO).lt('date', new Date(now.getTime() + 86400000).toISOString().split('T')[0]).order('start_time'),
-    supabase.from('events').select('title, date, jobs(name)').gte('date', todayISO).lte('date', twoWeeksAheadISO).order('date').limit(15),
+    // Active retainer clients — the calendar shows when each is due to be filmed,
+    // derived from shoots_per_month (not one-off booked events).
+    supabase.from('clients').select('id, name, shoots_per_month').eq('client_category', 'retainer').neq('status', 'archived'),
     supabase.from('jobs').select('name, clients(name)').eq('status', 'review'),
     supabase.from('jobs').select('id').gte('updated_at', weekAgoISO).not('status', 'in', '("delivered","archived")'),
     supabase.from('clients').select('id').eq('status', 'lead'),
@@ -102,12 +104,36 @@ export async function GET(req: NextRequest) {
   }
   const pendingRevisions = ((pendingRevisionsRes.data ?? []) as unknown) as PendingRevision[]
 
-  // ── Upcoming shoots (next fortnight) — powers the calendar strip and the hook. ─
-  const upcomingShoots = (upcomingRes.data ?? []).map((e) => ({
-    title: e.title as string,
-    date: e.date as string,
-    jobName: (e.jobs as unknown as { name: string } | null)?.name ?? null,
-  }))
+  // ── Retainer filming schedule (next fortnight) — powers the calendar + hook. ──
+  // Each retainer client shoots on a monthly cadence set by shoots_per_month.
+  // SHOOT_WEEKS maps that to which weeks of the month get a shoot (week 1 = 1st,
+  // 2 = 8th, 3 = 15th, 4 = 22nd) — the same rule the dashboard schedule uses.
+  const SHOOT_WEEKS: Record<number, number[]> = { 1: [2], 2: [1, 3], 3: [1, 2, 4], 4: [1, 2, 3, 4] }
+  const cadenceLabel = (spm: number) =>
+    spm >= 4 ? 'Weekly' : spm === 3 ? '3× / month' : spm === 2 ? 'Fortnightly' : 'Monthly'
+  const pad2 = (n: number) => String(n).padStart(2, '0')
+  const [nzY, nzM] = todayISO.split('-').map(Number)
+  const retainerClients = (retainerRes.data ?? []) as unknown as { id: string; name: string; shoots_per_month: number | null }[]
+  const upcomingShoots = retainerClients
+    .flatMap((c) => {
+      const spm = Math.min(Math.max(c.shoots_per_month ?? 1, 1), 4)
+      const weeks = SHOOT_WEEKS[spm] ?? [2]
+      const out: { title: string; date: string; jobName: string | null }[] = []
+      // current + next month covers any 14-day window that straddles a month end
+      for (let mo = 0; mo <= 1; mo++) {
+        const tm = (nzM - 1) + mo
+        const yy = nzY + Math.floor(tm / 12)
+        const mm = (tm % 12) + 1
+        for (const w of weeks) {
+          const iso = `${yy}-${pad2(mm)}-${pad2((w - 1) * 7 + 1)}`
+          if (iso >= todayISO && iso <= twoWeeksAheadISO) {
+            out.push({ title: c.name, date: iso, jobName: cadenceLabel(spm) })
+          }
+        }
+      }
+      return out
+    })
+    .sort((a, b) => a.date.localeCompare(b.date))
 
   // ── AI summary (best-effort; never fail the cron) ─────────────────────────
   let aiSummary: string | null = null
@@ -211,7 +237,7 @@ export async function GET(req: NextRequest) {
     counts: {
       todos: (todosRes.data ?? []).length,
       todayEvents: (todayEventsRes.data ?? []).length,
-      upcomingEvents: (upcomingRes.data ?? []).length,
+      retainerShoots: upcomingShoots.length,
       reviewJobs: (reviewRes.data ?? []).length,
       pendingRevisions: pendingRevisions.length,
       xeroConnected: !!xeroSummary,

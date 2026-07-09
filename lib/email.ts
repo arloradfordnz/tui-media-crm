@@ -532,11 +532,11 @@ export async function sendMorningBriefingEmail(data: MorningBriefingData) {
     <tr>${weekRows[1].join('')}</tr>
   </table>`
   const shootList = shoots.length
-    ? shoots.slice(0, 3).map((s) =>
+    ? shoots.slice(0, 4).map((s) =>
         `<p style="color:#a3a3a3;font-size:14px;line-height:1.5;margin:14px 0 0;"><span style="color:#f5f5f5;font-weight:600;">${fmtShortDate(s.date)}</span> &middot; ${esc(s.title)}${s.jobName ? ` <span style="color:#666;">${esc(s.jobName)}</span>` : ''}</p>`
       ).join('')
-    : `<p style="color:#a3a3a3;font-size:14px;line-height:1.6;margin:16px 0 0;">No shoots booked in the next fortnight. A good window to line some up.</p>`
-  const calendarCard = card('Next two weeks', `${calGrid}${shootList}`)
+    : `<p style="color:#a3a3a3;font-size:14px;line-height:1.6;margin:16px 0 0;">No retainer shoots due in the next fortnight.</p>`
+  const calendarCard = card('Retainer filming · next two weeks', `${calGrid}${shootList}`)
 
   // ── One news story — the day's most relevant thing in AI / creative tech. ─────
   const newsCard = news
@@ -569,9 +569,13 @@ export async function sendMorningBriefingEmail(data: MorningBriefingData) {
     ${calendarCard}
     ${newsCard}
     ${revisionsCard}
-    <div style="margin:28px 0 0;">
-      <a href="https://dashboard.tuimedia.nz" style="display:inline-block;background:#ffffff;color:#0a0a0a;padding:13px 30px;border-radius:999px;text-decoration:none;font-weight:600;font-size:14px;">Open the dashboard</a>
-    </div>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 0;">
+      <tr>
+        <td align="center" bgcolor="#ffffff" style="background:#ffffff;border-radius:999px;">
+          <a href="https://dashboard.tuimedia.nz" style="display:inline-block;background:#ffffff;color:#000000;padding:14px 32px;border-radius:999px;text-decoration:none;font-weight:700;font-size:14px;">Open the dashboard</a>
+        </td>
+      </tr>
+    </table>
   `, BRIEFING_SIGNOFF, preheader)
 
   await send({ to: 'hello@tuimedia.nz', subject, html, type: 'morning_briefing' })
