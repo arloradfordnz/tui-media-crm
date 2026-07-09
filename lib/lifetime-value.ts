@@ -3,7 +3,7 @@ import { fetchPaidInvoiceTotals, fetchXeroContacts } from './xero'
 
 export type LifetimeSyncResult = {
   connected: boolean
-  matched: number   // clients matched to a Xero contact with paid invoices
+  matched: number   // clients matched to at least one Xero contact with paid invoices
   updated: number   // clients whose lifetime_value actually changed
   unmatched: string[]  // Xero contacts with paid revenue that matched no client
 }
@@ -13,12 +13,14 @@ const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim()
 /**
  * Sync each client's lifetime_value from paid Xero invoices.
  *
- * Matching is tiered so it survives renames on either side:
- *   1. clients.xero_contact_id, if already linked — exact and permanent.
+ * A client's total is the sum of every Xero contact linked to it, found by:
+ *   1. clients.xero_contact_ids, already pinned — exact and permanent. A
+ *      client can hold more than one ID (e.g. it also invoices under a
+ *      second trading name in Xero).
  *   2. Contact email (via the Xero contacts list) matched against client email.
  *   3. Client/contact name, case/whitespace-insensitive.
- * Whenever (2) or (3) resolves a match, we backfill xero_contact_id onto the
- * client so future syncs skip straight to the stable ID.
+ * Any ID resolved via (2) or (3) that isn't already pinned gets appended to
+ * xero_contact_ids, so future syncs skip straight to the stable ID set.
  *
  * Pass an authed or service-role Supabase client — callers are the dashboard
  * sync action and the daily briefing cron.
@@ -48,26 +50,20 @@ export async function syncClientLifetimeValues(supabase: SupabaseClient): Promis
   }
 
   // '*' keeps this working whether or not migration_xero_contact_id.sql
-  // (the xero_contact_id column) has been run yet.
+  // (the xero_contact_ids column) has been run yet.
   const { data: clients } = await supabase.from('clients').select('*')
   if (!clients) return { connected: true, matched: 0, updated: 0, unmatched: totals.map((t) => t.name) }
-  const hasContactIdColumn = clients.length > 0 && Object.prototype.hasOwnProperty.call(clients[0], 'xero_contact_id')
+  const hasContactIdsColumn = clients.length > 0 && Object.prototype.hasOwnProperty.call(clients[0], 'xero_contact_ids')
 
   const claimed = new Set<string>()
   let matched = 0
   let updated = 0
   for (const client of clients) {
-    let contactIds: string[] = []
+    const pinned: string[] = (client as { xero_contact_ids?: string[] | null }).xero_contact_ids ?? []
+    const emailHits = client.email ? (emailIndex.get(norm(client.email)) ?? []) : []
+    const nameHits = nameIndex.get(norm(client.name)) ?? []
 
-    const linked = (client as { xero_contact_id?: string | null }).xero_contact_id
-    if (linked && totalsByContactId.has(linked)) {
-      contactIds = [linked]
-    } else {
-      const emailHits = client.email ? emailIndex.get(norm(client.email)) : undefined
-      const nameHits = nameIndex.get(norm(client.name))
-      contactIds = [...new Set([...(emailHits ?? []), ...(nameHits ?? [])])]
-    }
-
+    const contactIds = [...new Set([...pinned, ...emailHits, ...nameHits])].filter((id) => totalsByContactId.has(id))
     if (contactIds.length === 0) continue
     contactIds.forEach((id) => claimed.add(id))
     matched++
@@ -77,8 +73,10 @@ export async function syncClientLifetimeValues(supabase: SupabaseClient): Promis
 
     const patch: Record<string, unknown> = {}
     if (Number(client.lifetime_value ?? 0) !== rounded) patch.lifetime_value = rounded
-    // First time this client resolves via email/name — pin it to the ID.
-    if (hasContactIdColumn && !linked && contactIds.length === 1) patch.xero_contact_id = contactIds[0]
+    const newlyDiscovered = contactIds.filter((id) => !pinned.includes(id))
+    if (hasContactIdsColumn && newlyDiscovered.length > 0) {
+      patch.xero_contact_ids = [...new Set([...pinned, ...newlyDiscovered])]
+    }
 
     if (Object.keys(patch).length > 0) {
       const { error } = await supabase.from('clients').update(patch).eq('id', client.id)
