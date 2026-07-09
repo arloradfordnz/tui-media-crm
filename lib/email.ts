@@ -96,11 +96,14 @@ const BRIEFING_SIGNOFF = `
 
 const NO_REPLY = `
   <div style="border-top:1px solid #222;margin-top:32px;padding-top:20px;">
-    <p style="color:#555;font-size:13px;line-height:1.5;margin:0;">This is an automated message — please do not reply to this email. If you need to get in touch, email us at <a href="mailto:hello@tuimedia.nz" style="color:#7790ed;text-decoration:none;">hello@tuimedia.nz</a></p>
+    <p style="color:#555;font-size:13px;line-height:1.5;margin:0;">This is an automated message — please do not reply to this email. If you need to get in touch, email us at <a href="mailto:hello@tuimedia.nz" style="color:#f5f5f5;text-decoration:underline;">hello@tuimedia.nz</a></p>
   </div>
 `
 
-function wrap(body: string, signoff = SIGNOFF) {
+function wrap(body: string, signoff = SIGNOFF, preheader?: string) {
+  const preheaderHtml = preheader
+    ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#0a0a0a;font-size:1px;line-height:1px;">${preheader}${'&#847;&zwnj;&nbsp;'.repeat(30)}</div>`
+    : ''
   return `<!DOCTYPE html>
 <html lang="en" style="background:#0a0a0a;margin:0;padding:0;">
   <head>
@@ -119,6 +122,7 @@ function wrap(body: string, signoff = SIGNOFF) {
     </style>
   </head>
   <body bgcolor="#0a0a0a" style="background:#0a0a0a;margin:0;padding:0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#f5f5f5;">
+    ${preheaderHtml}
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0a0a0a" class="email-bg" style="background:#0a0a0a;width:100%;margin:0;padding:0;">
       <tr>
         <td align="center" bgcolor="#0a0a0a" style="background:#0a0a0a;padding:48px 0;">
@@ -174,6 +178,18 @@ const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }> = {
   approval: {
     subject: 'Delivery approved — {{jobName}}',
     body: "Thank you for approving the delivery for {{jobName}}. We're glad you're happy with the result.\n\nYour final files will be prepared and delivered shortly.",
+  },
+  revision_accepted: {
+    subject: 'Your revisions are underway — {{jobName}}',
+    body: "Good news — your revision request (round {{round}}) for {{jobName}} has been accepted and we're onto it now.\n\nWe'll send through the updated version as soon as it's ready.",
+  },
+  revision_declined: {
+    subject: 'About your revision request — {{jobName}}',
+    body: "We've had a look at your revision request (round {{round}}) for {{jobName}} and unfortunately we won't be able to make these changes as part of this round.\n\nIf you'd like to talk it through, just get in touch and we'll sort something out.",
+  },
+  revision_reply: {
+    subject: 'A note about your revisions — {{jobName}}',
+    body: "We've left a note on your revision request (round {{round}}) for {{jobName}} — see below.",
   },
 }
 
@@ -235,9 +251,9 @@ export async function sendPortalDeliveryEmail(to: string, clientName: string, jo
       ${buildGreeting(clientName)}
       ${bodyToHtml(bodyText)}
       <div style="text-align:left;margin:28px 0;">
-        <a href="${portalUrl}" style="display:inline-block;background:#7790ed;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:400;font-size:13px;">View Your Project</a>
+        <a href="${portalUrl}" style="display:inline-block;background:#ffffff;color:#0a0a0a;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:500;font-size:13px;">View Your Project</a>
       </div>
-      <p style="color:#555;font-size:13px;margin:0;">If the button doesn't work, copy this link: <a href="${portalUrl}" style="color:#7790ed;text-decoration:none;">${portalUrl}</a></p>
+      <p style="color:#555;font-size:13px;margin:0;">If the button doesn't work, copy this link: <a href="${portalUrl}" style="color:#f5f5f5;text-decoration:underline;">${portalUrl}</a></p>
     `),
   })
 }
@@ -280,6 +296,43 @@ export async function sendRevisionRequestEmail(to: string, clientName: string, j
   })
 }
 
+export async function sendRevisionResponseEmail(
+  to: string,
+  clientName: string,
+  jobName: string,
+  round: number,
+  response: 'accepted' | 'declined' | 'reply',
+  reply?: string | null,
+  clientId?: string,
+  jobId?: string,
+) {
+  const type = response === 'reply' ? 'revision_reply' : `revision_${response}`
+  const tpl = await getTemplate(type)
+  const vars = { clientName, jobName, round: String(round) }
+  const subject = replacePlaceholders(tpl.subject, vars)
+  const bodyText = replacePlaceholders(tpl.body, vars)
+
+  const replyBlock = reply?.trim()
+    ? `<div style="background:#111;border-radius:8px;padding:16px;margin:16px 0;">
+        <p style="color:#a3a3a3;font-size:12px;margin:0 0 6px;text-transform:uppercase;letter-spacing:0.04em;">Note from Tui Media</p>
+        <p style="color:#d4d4d4;font-size:14px;line-height:1.6;margin:0;white-space:pre-wrap;">${reply.trim().replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+      </div>`
+    : ''
+
+  await send({
+    to,
+    subject,
+    type,
+    clientId,
+    jobId,
+    html: wrap(`
+      ${buildGreeting(clientName)}
+      ${bodyToHtml(bodyText)}
+      ${replyBlock}
+    `),
+  })
+}
+
 export async function sendProposalEmail(to: string, clientName: string, jobName: string, proposalUrl: string, clientId?: string, jobId?: string) {
   const tpl = await getTemplate('proposal')
   const vars = { clientName, jobName, proposalUrl }
@@ -296,9 +349,9 @@ export async function sendProposalEmail(to: string, clientName: string, jobName:
       ${buildGreeting(clientName)}
       ${bodyToHtml(bodyText)}
       <div style="text-align:left;margin:28px 0;">
-        <a href="${proposalUrl}" style="display:inline-block;background:#7790ed;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:400;font-size:13px;">View Proposal</a>
+        <a href="${proposalUrl}" style="display:inline-block;background:#ffffff;color:#0a0a0a;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:500;font-size:13px;">View Proposal</a>
       </div>
-      <p style="color:#555;font-size:13px;margin:0;">If the button doesn't work, copy this link: <a href="${proposalUrl}" style="color:#7790ed;text-decoration:none;">${proposalUrl}</a></p>
+      <p style="color:#555;font-size:13px;margin:0;">If the button doesn't work, copy this link: <a href="${proposalUrl}" style="color:#f5f5f5;text-decoration:underline;">${proposalUrl}</a></p>
     `),
   })
 }
@@ -356,8 +409,10 @@ function fmtNZD(n: number) {
   return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 }).format(n)
 }
 
+const NZ_TZ = 'Pacific/Auckland'
+
 function fmtShortDate(d: string) {
-  return new Date(d).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })
+  return new Date(d).toLocaleDateString('en-NZ', { timeZone: NZ_TZ, weekday: 'short', day: 'numeric', month: 'short' })
 }
 
 function section(label: string, content: string) {
@@ -372,14 +427,77 @@ function section(label: string, content: string) {
 export async function sendMorningBriefingEmail(data: MorningBriefingData) {
   const { date, weather, todos, overdueCount, todayEvents, upcomingEvents, reviewJobs, weekJobCount, xero, pendingRevisions, aiSummary } = data
 
-  const dayLabel = date.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-  const shortDay = date.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })
+  // Format in NZ time — the cron server runs on UTC, so at ~7am NZST an un-zoned
+  // formatter renders the previous UTC day and the header reads a day behind.
+  const dayLabel = date.toLocaleDateString('en-NZ', { timeZone: NZ_TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const shortDay = date.toLocaleDateString('en-NZ', { timeZone: NZ_TZ, weekday: 'short', day: 'numeric', month: 'short' })
 
-  // Weather
-  const weatherContent = weather
-    ? `<p style="color:#f5f5f5;font-size:26px;font-weight:700;margin:0 0 4px;">${weather.temp}&deg;C</p>
-       <p style="color:#a3a3a3;font-size:14px;line-height:1.6;margin:0;">${weather.description} &middot; Wind ${weather.windKph} km/h &middot; Nelson, NZ</p>`
-    : `<p style="color:#a3a3a3;font-size:15px;margin:0;">Weather unavailable.</p>`
+  const revisionCount = pendingRevisions?.length ?? 0
+  const overdueInvoices = xero && xero.overdue_invoice_count > 0
+  const revenue = xero?.revenue_this_month_nzd ?? null
+  const plural = (n: number) => (n !== 1 ? 's' : '')
+
+  // Header weather line — a small chip beside the date rather than a big block up top.
+  const weatherLine = weather
+    ? ` &middot; ${weather.temp}&deg;C, ${weather.description.toLowerCase()} in Nelson`
+    : ''
+
+  // ── The hook: what earns the open. Subject + inbox preview + hero all lead with
+  //    the single most pressing thing, in priority order. ────────────────────────
+  let subjectHook: string
+  let focusFallback: string
+  if (overdueInvoices) {
+    subjectHook = `${xero!.overdue_invoice_count} invoice${plural(xero!.overdue_invoice_count)} overdue, ${fmtNZD(xero!.overdue_invoices_nzd)} to chase`
+    focusFallback = `Chase the overdue invoices first. ${fmtNZD(xero!.overdue_invoices_nzd)} is still sitting out there waiting to be collected.`
+  } else if (revisionCount > 0) {
+    subjectHook = `${revisionCount} client revision${plural(revisionCount)} waiting on you`
+    focusFallback = `${revisionCount} client${plural(revisionCount)} waiting on revisions. Knock those out early and you will have happy clients by lunch.`
+  } else if (todayEvents.length > 0) {
+    subjectHook = `${todayEvents.length} on today: ${todayEvents[0].title}`
+    focusFallback = `You have ${todayEvents.length} on today. Prep the first one, then keep the run tidy and you are sorted.`
+  } else if (overdueCount > 0) {
+    subjectHook = `${overdueCount} to-do${plural(overdueCount)} slipped past due`
+    focusFallback = `A couple of to-dos have slipped past due. Clear the oldest one first and the rest of the list feels lighter.`
+  } else if (revenue != null && revenue > 0) {
+    subjectHook = `${fmtNZD(revenue)} in this month, and you are clear`
+    focusFallback = `Nothing on fire today. Good chance to get ahead on outreach or push through a few edits.`
+  } else {
+    subjectHook = `A clear run today`
+    focusFallback = `Nothing on fire today. Good chance to get ahead on outreach or push through a few edits.`
+  }
+
+  const focusText = (aiSummary && aiSummary.trim()) || focusFallback
+  const focusHtml = focusText.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>')
+
+  // Hidden inbox preview text — teases the focus so the subject earns a second look.
+  const preheader = focusText.replace(/\s+/g, ' ').trim().slice(0, 140)
+
+  // ── Hero: the reason to open, right at the top. Flat, accent rule on the left. ─
+  const heroBlock = `
+    <div style="margin:26px 0 0;padding:2px 0 2px 18px;border-left:2px solid #f5f5f5;">
+      <p style="color:#a3a3a3;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px;">Focus for today</p>
+      <p style="color:#f5f5f5;font-size:18px;line-height:1.55;font-weight:500;margin:0;">${focusHtml}</p>
+    </div>
+  `
+
+  // ── At a glance: three flat stats, no fills. ──────────────────────────────────
+  const statCell = (value: string, label: string, accent?: string) => `
+    <td width="33%" align="left" valign="top" style="padding:0 10px 0 0;">
+      <p style="color:${accent || '#f5f5f5'};font-size:24px;font-weight:700;line-height:1;margin:0 0 6px;">${value}</p>
+      <p style="color:#555;font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;margin:0;">${label}</p>
+    </td>`
+  const glancePrimary = revenue != null
+    ? statCell(fmtNZD(revenue), 'Revenue this month')
+    : statCell(String(weekJobCount), `Active job${plural(weekJobCount)} this week`)
+  const glanceBlock = `
+    <div style="margin:26px 0 0;border-top:1px solid #222;border-bottom:1px solid #222;padding:20px 0;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+        ${glancePrimary}
+        ${statCell(String(todos.length), `To-do${plural(todos.length)}${overdueCount > 0 ? `, ${overdueCount} overdue` : ''}`, overdueCount > 0 ? '#f87171' : undefined)}
+        ${statCell(String(todayEvents.length), 'On today')}
+      </tr></table>
+    </div>
+  `
 
   // Todos
   const todoContent = todos.length === 0
@@ -388,7 +506,7 @@ export async function sendMorningBriefingEmail(data: MorningBriefingData) {
         const duePart = t.dueDate
           ? ` &mdash; <span style="color:${t.isOverdue ? '#f87171' : '#555'};font-size:13px;">${t.isOverdue ? 'Overdue &middot; ' : ''}${fmtShortDate(t.dueDate)}</span>`
           : ''
-        const jobPart = t.jobName ? ` <span style="color:#7790ed;font-size:13px;">${t.jobName}</span>` : ''
+        const jobPart = t.jobName ? ` <span style="color:#f5f5f5;font-size:13px;">${t.jobName}</span>` : ''
         return `<p style="color:#a3a3a3;font-size:15px;line-height:1.6;margin:0 0 10px;">${t.title}${duePart}${jobPart}</p>`
       }).join('')
 
@@ -397,7 +515,7 @@ export async function sendMorningBriefingEmail(data: MorningBriefingData) {
     ? `<p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0;">Nothing scheduled today.</p>`
     : todayEvents.map((e) => {
         const timePart = e.startTime ? ` <span style="color:#555;font-size:13px;">&middot; ${e.startTime}</span>` : ''
-        const jobPart = e.jobName ? ` <span style="color:#7790ed;font-size:13px;">${e.jobName}</span>` : ''
+        const jobPart = e.jobName ? ` <span style="color:#f5f5f5;font-size:13px;">${e.jobName}</span>` : ''
         return `<p style="color:#a3a3a3;font-size:15px;line-height:1.6;margin:0 0 10px;">${e.title}${timePart}${jobPart}</p>`
       }).join('')
 
@@ -405,7 +523,7 @@ export async function sendMorningBriefingEmail(data: MorningBriefingData) {
   const upcomingContent = upcomingEvents.length === 0
     ? `<p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0;">Nothing coming up this week.</p>`
     : upcomingEvents.map((e) => {
-        const jobPart = e.jobName ? ` <span style="color:#7790ed;font-size:13px;">${e.jobName}</span>` : ''
+        const jobPart = e.jobName ? ` <span style="color:#f5f5f5;font-size:13px;">${e.jobName}</span>` : ''
         return `<p style="color:#a3a3a3;font-size:15px;line-height:1.6;margin:0 0 10px;"><span style="color:#555;font-size:13px;">${fmtShortDate(e.date)} &mdash;</span> ${e.title}${jobPart}</p>`
       }).join('')
 
@@ -435,7 +553,7 @@ export async function sendMorningBriefingEmail(data: MorningBriefingData) {
   // Pending client revisions
   const revisionsContent = pendingRevisions && pendingRevisions.length > 0
     ? pendingRevisions.map((r) => {
-        const who = r.clientName ? `<span style="color:#7790ed;font-size:13px;">${r.clientName}</span>` : ''
+        const who = r.clientName ? `<span style="color:#d4d4d4;font-size:13px;">${r.clientName}</span>` : ''
         const job = r.jobName ? `<span style="color:#f5f5f5;font-size:14px;">${r.jobName}</span>` : ''
         const preview = r.request.length > 120 ? r.request.slice(0, 120) + '…' : r.request
         return `<div style="margin:0 0 14px;">
@@ -444,10 +562,6 @@ export async function sendMorningBriefingEmail(data: MorningBriefingData) {
         </div>`
       }).join('')
     : null
-
-  const aiSummaryContent = aiSummary
-    ? `<p style="color:#d4d4d4;font-size:15px;line-height:1.7;margin:0;">${aiSummary.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>')}</p>`
-    : ''
 
   // Review jobs
   const reviewContent = reviewJobs.length === 0
@@ -461,21 +575,23 @@ export async function sendMorningBriefingEmail(data: MorningBriefingData) {
 
   const todoLabel = `${todos.length} to-do${todos.length !== 1 ? 's' : ''}${overdueCount > 0 ? ` (${overdueCount} overdue)` : ''}`
 
-  const subject = `Morning briefing — ${dayLabel}`
+  const subject = `${subjectHook} · ${shortDay}`
 
   const html = wrap(`
     <h2 style="margin:0 0 4px;font-size:22px;color:#f5f5f5;font-weight:600;">Good morning Arlo,</h2>
-    <p style="color:#555;font-size:14px;margin:0;">${dayLabel}</p>
-    ${section('Weather', weatherContent)}
-    ${aiSummaryContent ? section('Focus For Today', aiSummaryContent) : ''}
-    ${section('Financials', revenueContent)}
+    <p style="color:#555;font-size:14px;margin:0;">${dayLabel}${weatherLine}</p>
+    ${heroBlock}
+    ${glanceBlock}
+    ${section('Money', revenueContent)}
     ${revisionsContent ? section('Client Revisions Pending', revisionsContent) : ''}
     ${section(`To Do — ${todoLabel}`, todoContent)}
     ${section("Today's Schedule", todayContent)}
     ${section('Coming Up This Week', upcomingContent)}
     ${reviewContent}
-    ${section('', `<a href="https://dashboard.tuimedia.nz" style="color:#7790ed;font-size:14px;text-decoration:none;">Open dashboard</a>`)}
-  `, BRIEFING_SIGNOFF)
+    <div style="margin:32px 0 0;">
+      <a href="https://dashboard.tuimedia.nz" style="display:inline-block;background:#ffffff;color:#0a0a0a;padding:12px 26px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Open the dashboard</a>
+    </div>
+  `, BRIEFING_SIGNOFF, preheader)
 
   await send({ to: 'hello@tuimedia.nz', subject, html, type: 'morning_briefing' })
 }
@@ -486,9 +602,9 @@ export async function sendAdminDeliveryViewedEmail(clientName: string, jobName: 
   const subject = `Client viewed delivery — ${jobName}`
   const html = wrap(`
     <h2 style="margin:0 0 20px;font-size:22px;color:#f5f5f5;font-weight:600;">Kia ora Arlo,</h2>
-    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;"><span style="color:#f5f5f5;font-weight:600;">${clientName}</span> just opened the portal and viewed <span style="color:#f5f5f5;">${fileName}</span> for <span style="color:#7790ed;">${jobName}</span>.</p>
+    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;"><span style="color:#f5f5f5;font-weight:600;">${clientName}</span> just opened the portal and viewed <span style="color:#f5f5f5;">${fileName}</span> for <span style="color:#f5f5f5;">${jobName}</span>.</p>
     <div style="text-align:left;margin:24px 0;">
-      <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#7790ed;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:400;font-size:13px;">Open dashboard</a>
+      <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#ffffff;color:#0a0a0a;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:500;font-size:13px;">Open dashboard</a>
     </div>
   `)
   await send({ to: ADMIN_INBOX, subject, html, type: 'admin_delivery_viewed', clientId, jobId })
@@ -498,9 +614,9 @@ export async function sendAdminDeliveryApprovedEmail(clientName: string, jobName
   const subject = `Delivery approved — ${jobName}`
   const html = wrap(`
     <h2 style="margin:0 0 20px;font-size:22px;color:#f5f5f5;font-weight:600;">Kia ora Arlo,</h2>
-    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;"><span style="color:#f5f5f5;font-weight:600;">${clientName}</span> has approved <span style="color:#f5f5f5;">${fileName}</span> for <span style="color:#7790ed;">${jobName}</span>.</p>
+    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;"><span style="color:#f5f5f5;font-weight:600;">${clientName}</span> has approved <span style="color:#f5f5f5;">${fileName}</span> for <span style="color:#f5f5f5;">${jobName}</span>.</p>
     <div style="text-align:left;margin:24px 0;">
-      <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#7790ed;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:400;font-size:13px;">Open dashboard</a>
+      <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#ffffff;color:#0a0a0a;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:500;font-size:13px;">Open dashboard</a>
     </div>
   `)
   await send({ to: ADMIN_INBOX, subject, html, type: 'admin_delivery_approved', clientId, jobId })
@@ -510,12 +626,12 @@ export async function sendAdminRevisionRequestedEmail(clientName: string, jobNam
   const subject = `Revision requested — ${jobName} (round ${round})`
   const html = wrap(`
     <h2 style="margin:0 0 20px;font-size:22px;color:#f5f5f5;font-weight:600;">Kia ora Arlo,</h2>
-    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;"><span style="color:#f5f5f5;font-weight:600;">${clientName}</span> has requested changes on <span style="color:#7790ed;">${jobName}</span> (round ${round}).</p>
+    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;"><span style="color:#f5f5f5;font-weight:600;">${clientName}</span> has requested changes on <span style="color:#f5f5f5;">${jobName}</span> (round ${round}).</p>
     <div style="background:#111;border-radius:8px;padding:16px;margin:16px 0;">
       <p style="color:#d4d4d4;font-size:14px;line-height:1.6;margin:0;white-space:pre-wrap;">${request.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
     </div>
     <div style="text-align:left;margin:24px 0;">
-      <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#7790ed;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:400;font-size:13px;">Open dashboard</a>
+      <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#ffffff;color:#0a0a0a;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:500;font-size:13px;">Open dashboard</a>
     </div>
   `)
   await send({ to: ADMIN_INBOX, subject, html, type: 'admin_revision_requested', clientId, jobId })
@@ -526,13 +642,13 @@ export async function sendAdminDocumentSignedEmail(clientName: string, docName: 
   const safeSignature = signature.replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const html = wrap(`
     <h2 style="margin:0 0 20px;font-size:22px;color:#f5f5f5;font-weight:600;">Kia ora Arlo,</h2>
-    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;"><span style="color:#f5f5f5;font-weight:600;">${clientName}</span> just signed <span style="color:#7790ed;">${docName}</span> on ${signedAt}.</p>
+    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;"><span style="color:#f5f5f5;font-weight:600;">${clientName}</span> just signed <span style="color:#f5f5f5;">${docName}</span> on ${signedAt}.</p>
     <div style="background:#111;border-radius:8px;padding:16px;margin:16px 0;">
       <p style="color:#a3a3a3;font-size:12px;margin:0 0 6px;text-transform:uppercase;letter-spacing:0.04em;">Signature</p>
       <p style="color:#f5f5f5;font-size:20px;line-height:1.3;margin:0;font-family:'Patrick Hand',cursive;">${safeSignature}</p>
     </div>
     <div style="text-align:left;margin:24px 0;">
-      <a href="https://dashboard.tuimedia.nz/dashboard/documents" style="display:inline-block;background:#7790ed;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:400;font-size:13px;">Open dashboard</a>
+      <a href="https://dashboard.tuimedia.nz/dashboard/documents" style="display:inline-block;background:#ffffff;color:#0a0a0a;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:500;font-size:13px;">Open dashboard</a>
     </div>
   `)
   await send({ to: ADMIN_INBOX, subject, html, type: 'admin_document_signed', clientId })
@@ -558,7 +674,7 @@ export async function sendDocumentToClientEmail({
   const portalUrl = portalToken ? `https://dashboard.tuimedia.nz/portal/client/${portalToken}` : null
   const buttonSection = portalUrl
     ? `<div style="text-align:left;margin:28px 0 0;">
-        <a href="${portalUrl}" target="_blank" style="display:inline-block;background:#7790ed;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:400;font-size:13px;">View & Sign Document</a>
+        <a href="${portalUrl}" target="_blank" style="display:inline-block;background:#ffffff;color:#0a0a0a;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:500;font-size:13px;">View & Sign Document</a>
       </div>`
     : ''
   const html = wrap(`
@@ -593,7 +709,7 @@ export async function sendLeadFinderEmail(leads: LeadSummaryItem[], date: Date) 
         <div style="margin:0 0 20px;">
           <p style="color:#f5f5f5;font-size:15px;font-weight:600;margin:0 0 4px;">${i + 1}. ${l.prospectName}</p>
           <p style="color:#555;font-size:13px;margin:0 0 4px;">${l.category}${l.location ? ` &mdash; ${l.location}` : ''}</p>
-          <p style="color:#a3a3a3;font-size:13px;margin:0 0 4px;">To: <span style="color:${l.email ? '#7790ed' : '#555'};">${l.email || 'email not found'}</span></p>
+          <p style="color:#a3a3a3;font-size:13px;margin:0 0 4px;">To: <span style="color:${l.email ? '#f5f5f5' : '#555'};">${l.email || 'email not found'}</span></p>
           <p style="color:#555;font-size:13px;margin:0;">Subject: ${l.subject}</p>
         </div>
       `).join('')
@@ -604,7 +720,7 @@ export async function sendLeadFinderEmail(leads: LeadSummaryItem[], date: Date) 
     <h2 style="margin:0 0 4px;font-size:22px;color:#f5f5f5;font-weight:600;">Kōtare — Daily Leads</h2>
     <p style="color:#555;font-size:14px;margin:0;">${dayLabel}</p>
     ${section(`${leads.length} New Lead${leads.length !== 1 ? 's' : ''} Found`, leadsContent)}
-    ${section('', `<a href="https://dashboard.tuimedia.nz/dashboard/outreach" style="color:#7790ed;font-size:14px;text-decoration:none;">Review drafts on dashboard &rarr;</a>`)}
+    ${section('', `<a href="https://dashboard.tuimedia.nz/dashboard/outreach" style="color:#f5f5f5;font-size:14px;text-decoration:underline;">Review drafts on dashboard &rarr;</a>`)}
   `, BRIEFING_SIGNOFF)
 
   await send({ to: 'hello@tuimedia.nz', subject, html, type: 'lead_finder' })
@@ -625,9 +741,9 @@ export async function sendDeliveryReminderEmail(
     <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;">Just a friendly nudge — I noticed you took a look at your project for <span style="color:#f5f5f5;">${jobName}</span> ${daysSinceViewed === 1 ? 'a day' : `${daysSinceViewed} days`} ago but haven't had a chance to come back to it yet.</p>
     <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;">No rush at all — whenever you're ready, you can approve it or send through any feedback right from the portal.</p>
     <div style="text-align:left;margin:28px 0;">
-      <a href="${portalUrl}" style="display:inline-block;background:#7790ed;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:400;font-size:13px;">Open Your Portal</a>
+      <a href="${portalUrl}" style="display:inline-block;background:#ffffff;color:#0a0a0a;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:500;font-size:13px;">Open Your Portal</a>
     </div>
-    <p style="color:#555;font-size:13px;margin:0;">If anything's unclear or you'd rather chat it through, just reply to <a href="mailto:hello@tuimedia.nz" style="color:#7790ed;text-decoration:none;">hello@tuimedia.nz</a>.</p>
+    <p style="color:#555;font-size:13px;margin:0;">If anything's unclear or you'd rather chat it through, just reply to <a href="mailto:hello@tuimedia.nz" style="color:#f5f5f5;text-decoration:underline;">hello@tuimedia.nz</a>.</p>
   `)
   await send({ to, subject, html, type: 'delivery_reminder', clientId, jobId })
 }
