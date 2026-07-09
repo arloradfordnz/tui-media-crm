@@ -435,7 +435,7 @@ type RawInvoice = {
   DueDateString?: string
   DateString?: string
   FullyPaidOnDate?: string  // set by Xero when invoice status = PAID
-  Contact?: { Name?: string }
+  Contact?: { ContactID?: string; Name?: string }
   InvoiceNumber?: string
   Reference?: string
   Total?: number
@@ -572,6 +572,52 @@ export async function fetchXeroTransactions(): Promise<XeroTransaction[] | null>
 
   results.sort((a, b) => b.date.localeCompare(a.date))
   return results
+}
+
+// ─── Paid invoice totals (lifetime value) ────────────────────────────────────
+
+export type PaidContactTotal = {
+  contactId: string | null
+  name: string
+  total: number          // sum of AmountPaid across PAID ACCREC invoices
+}
+
+/**
+ * Sum every PAID sales invoice per Xero contact. Used to sync each CRM
+ * client's lifetime value from money actually received, not quotes.
+ */
+export async function fetchPaidInvoiceTotals(): Promise<PaidContactTotal[] | null> {
+  const account = await getValidXeroAccount()
+  if (!account || !account.account_id) return null
+
+  const byKey = new Map<string, PaidContactTotal>()
+  for (let page = 1; page <= 10; page++) {
+    let pageData: RawInvoice[]
+    try {
+      const res = await xeroGet<{ Invoices?: RawInvoice[] }>(
+        `/Invoices?Statuses=PAID&page=${page}&pageSize=200&order=Date+DESC`,
+        account.access_token,
+        account.account_id,
+      )
+      pageData = res.Invoices ?? []
+    } catch {
+      break
+    }
+    if (pageData.length === 0) break
+    for (const inv of pageData) {
+      if (inv.Type !== 'ACCREC') continue
+      const name = inv.Contact?.Name?.trim()
+      if (!name) continue
+      const paid = inv.AmountPaid ?? inv.Total ?? 0
+      if (paid <= 0) continue
+      const key = inv.Contact?.ContactID || name.toLowerCase().replace(/\s+/g, ' ')
+      const existing = byKey.get(key)
+      if (existing) existing.total += paid
+      else byKey.set(key, { contactId: inv.Contact?.ContactID ?? null, name, total: paid })
+    }
+    if (pageData.length < 200) break
+  }
+  return [...byKey.values()]
 }
 
 // ─── Contacts ─────────────────────────────────────────────────────────────────

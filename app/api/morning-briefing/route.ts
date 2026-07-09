@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
 import { sendMorningBriefingEmail } from '@/lib/email'
 import { fetchXeroSummary } from '@/lib/xero'
+import { syncClientLifetimeValues } from '@/lib/lifetime-value'
 
 const LAT = -41.2706
 const LNG = 173.2840
@@ -80,6 +81,12 @@ export async function GET(req: NextRequest) {
       return null
     }),
   ])
+
+  // Daily lifetime-value sync — attribute paid Xero invoices to clients.
+  // Best-effort: never fail the briefing over it.
+  await syncClientLifetimeValues(supabase).catch((err) => {
+    console.error('[morning brief] lifetime value sync failed:', err)
+  })
 
   const raw = weatherRes.ok ? await weatherRes.json() : null
   const weather = raw?.current ? {

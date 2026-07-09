@@ -1,11 +1,11 @@
 'use client'
 
 import { useActionState, useState, useOptimistic, useTransition, useRef } from 'react'
-import { updateJob, updateJobStatus, deleteJob, toggleTask, addRevision, markRevisionDone } from '@/app/actions/jobs'
+import { updateJob, updateJobStatus, deleteJob, toggleTask, addRevision, respondToRevision } from '@/app/actions/jobs'
 import { createProposal } from '@/app/actions/proposals'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo, stripJobPrefix } from '@/lib/format'
 import Link from 'next/link'
-import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as ActivityIcon, MapPin, Calendar, FileText, Upload, Download, FileVideo, Plus, Pencil, X, CheckCheck } from 'lucide-react'
+import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as ActivityIcon, MapPin, Calendar, FileText, Upload, Download, FileVideo, Plus, Pencil, X, CheckCheck, MessageSquare } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
 import JobTimeTracker, { type TimeEntry } from './JobTimeTracker'
@@ -34,7 +34,7 @@ type JobData = {
   client: { id: string; name: string }
   tasks: Task[]
   deliverables: { id: string; title: string; description: string | null; completed: boolean; deliveryFiles: { id: string; originalName: string; versionLabel: string; deliveryStatus: string; createdAt: string; fileUrl: string; personalNote: string | null }[] }[]
-  revisions: { id: string; round: number; request: string; status: string; createdAt: string }[]
+  revisions: { id: string; round: number; request: string; status: string; reply: string | null; createdAt: string }[]
   proposals: { id: string; status: string; token: string; totalValue: number; sentAt: string | null; respondedAt: string | null; createdAt: string }[]
   activities: { id: string; action: string; details: string | null; createdAt: string }[]
   timeEntries: TimeEntry[]
@@ -61,9 +61,6 @@ export default function JobRecord({ job }: { job: JobData }) {
   const [editingDeliverable, setEditingDeliverable] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [revisionLimit, setRevisionLimit] = useState(job.revisionLimit)
-  const [doneRevisions, setDoneRevisions] = useState<Set<string>>(
-    new Set(job.revisions.filter((r) => r.status === 'done').map((r) => r.id))
-  )
 
   // Optimistic task state — updates instantly on click
   const [optimisticTasks, setOptimisticTask] = useOptimistic(
@@ -503,37 +500,9 @@ export default function JobRecord({ job }: { job: JobData }) {
             </span>
           </div>
         </div>
-        {job.revisions.map((r) => {
-          const done = doneRevisions.has(r.id)
-          return (
-            <div key={r.id} className="py-3 rounded-lg px-3" style={{ background: 'var(--bg-elevated)', marginBottom: '4px', opacity: done ? 0.55 : 1 }}>
-              <div className="flex items-center gap-2 mb-1">
-                {done
-                  ? <CheckCheck className="w-3.5 h-3.5" style={{ color: 'var(--success)' }} />
-                  : <RotateCcw className="w-3.5 h-3.5" style={{ color: 'var(--warning)' }} />
-                }
-                <span className="text-sm font-medium" style={{ color: 'var(--text-primary)', textDecoration: done ? 'line-through' : 'none' }}>Round {r.round}</span>
-                <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{formatDate(r.createdAt)}</span>
-                {!done && (
-                  <button
-                    type="button"
-                    className="ml-auto btn-icon"
-                    style={{ color: 'var(--success)', fontSize: '11px', gap: '4px', display: 'inline-flex', alignItems: 'center' }}
-                    title="Mark as done"
-                    onClick={() => {
-                      setDoneRevisions((prev) => new Set(prev).add(r.id))
-                      markRevisionDone(r.id, job.id)
-                    }}
-                  >
-                    <CheckCheck className="w-3.5 h-3.5" />
-                    <span className="text-xs">Accept</span>
-                  </button>
-                )}
-              </div>
-              <p className="text-sm ml-6" style={{ color: 'var(--text-secondary)', textDecoration: done ? 'line-through' : 'none' }}>{r.request}</p>
-            </div>
-          )
-        })}
+        {job.revisions.map((r) => (
+          <RevisionItem key={r.id} revision={r} jobId={job.id} />
+        ))}
         {job.revisionsUsed < revisionLimit && (
           <form action={revAction} className="mt-4 flex gap-3">
             <input type="hidden" name="jobId" value={job.id} />
@@ -570,6 +539,97 @@ export default function JobRecord({ job }: { job: JobData }) {
           <Trash2 className="w-4 h-4" /> {deleting ? 'Deleting...' : 'Delete Job'}
         </button>
       </div>
+    </div>
+  )
+}
+
+type RevisionData = { id: string; round: number; request: string; status: string; reply: string | null; createdAt: string }
+
+function RevisionItem({ revision, jobId }: { revision: RevisionData; jobId: string }) {
+  const [status, setStatus] = useState(revision.status)
+  const [reply, setReply] = useState(revision.reply)
+  const [replyOpen, setReplyOpen] = useState(false)
+  const [replyText, setReplyText] = useState('')
+  const [busy, setBusy] = useState<'accepted' | 'declined' | 'reply' | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const resolved = status === 'accepted' || status === 'declined' || status === 'done'
+
+  async function respond(response: 'accepted' | 'declined' | 'reply') {
+    setBusy(response)
+    setError(null)
+    const res = await respondToRevision(revision.id, jobId, response, replyText)
+    setBusy(null)
+    if (res?.error) {
+      setError(res.error)
+      return
+    }
+    if (response !== 'reply') setStatus(response)
+    if (replyText.trim()) setReply(replyText.trim())
+    setReplyText('')
+    setReplyOpen(false)
+    setNotice(res?.emailed ? 'Client notified by email' : 'Saved — no client email on file')
+  }
+
+  return (
+    <div className="py-3 rounded-lg px-3" style={{ background: 'var(--bg-elevated)', marginBottom: '4px', opacity: status === 'done' ? 0.55 : 1 }}>
+      <div className="flex items-center gap-2 mb-1 flex-wrap">
+        {status === 'accepted' || status === 'done'
+          ? <CheckCheck className="w-3.5 h-3.5" style={{ color: 'var(--success)' }} />
+          : status === 'declined'
+            ? <X className="w-3.5 h-3.5" style={{ color: 'var(--danger)' }} />
+            : <RotateCcw className="w-3.5 h-3.5" style={{ color: 'var(--warning)' }} />
+        }
+        <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Round {revision.round}</span>
+        <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{formatDate(revision.createdAt)}</span>
+        <span className={`badge badge-sm ${statusBadgeClass(status)}`}>{statusLabel(status)}</span>
+        {notice && <span className="text-xs ml-auto" style={{ color: 'var(--text-tertiary)' }}>{notice}</span>}
+      </div>
+      <p className="text-sm ml-6" style={{ color: 'var(--text-secondary)' }}>{revision.request}</p>
+
+      {reply && (
+        <div className="ml-6 mt-2 p-2.5 rounded-md" style={{ background: 'var(--bg-surface)' }}>
+          <p className="label mb-1">Your reply</p>
+          <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{reply}</p>
+        </div>
+      )}
+
+      {!resolved && (
+        <div className="ml-6 mt-3 space-y-2">
+          {replyOpen && (
+            <textarea
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              rows={3}
+              className="field-input text-sm"
+              placeholder="Write a note to the client... (sent with your response)"
+              autoFocus
+            />
+          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button type="button" disabled={busy !== null} onClick={() => respond('accepted')} className="btn-primary text-xs" style={{ padding: '6px 14px' }}>
+              <CheckCheck className="w-3.5 h-3.5" /> {busy === 'accepted' ? 'Accepting...' : 'Accept'}
+            </button>
+            <button type="button" disabled={busy !== null} onClick={() => respond('declined')} className="btn-secondary text-xs" style={{ padding: '6px 14px', color: 'var(--danger)' }}>
+              <X className="w-3.5 h-3.5" /> {busy === 'declined' ? 'Declining...' : 'Decline'}
+            </button>
+            {!replyOpen ? (
+              <button type="button" disabled={busy !== null} onClick={() => setReplyOpen(true)} className="btn-secondary text-xs" style={{ padding: '6px 14px' }}>
+                <MessageSquare className="w-3.5 h-3.5" /> Reply
+              </button>
+            ) : (
+              <>
+                <button type="button" disabled={busy !== null || !replyText.trim()} onClick={() => respond('reply')} className="btn-secondary text-xs" style={{ padding: '6px 14px' }}>
+                  <MessageSquare className="w-3.5 h-3.5" /> {busy === 'reply' ? 'Sending...' : 'Send reply only'}
+                </button>
+                <button type="button" disabled={busy !== null} onClick={() => { setReplyOpen(false); setReplyText('') }} className="btn-icon"><X className="w-3.5 h-3.5" /></button>
+              </>
+            )}
+          </div>
+          {error && <p className="text-xs" style={{ color: 'var(--danger)' }}>{error}</p>}
+        </div>
+      )}
     </div>
   )
 }

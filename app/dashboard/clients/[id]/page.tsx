@@ -55,7 +55,8 @@ export default async function ClientDetailPage({ params, searchParams }: { param
     pipelineStage: client.pipeline_stage,
     status: client.status,
     clientCategory: client.client_category,
-    lifetimeValue: (jobs ?? []).reduce((sum, j) => sum + (j.quote_value ?? 0), 0),
+    // Paid revenue synced from Xero (Sync Value on the Clients page / daily cron).
+    lifetimeValue: Number(client.lifetime_value ?? 0),
     monthlyRetainer: client.monthly_retainer,
     shootsPerMonth: client.shoots_per_month,
     invoiceDay: invoiceDayRaw ? parseInt(invoiceDayRaw, 10) : null,

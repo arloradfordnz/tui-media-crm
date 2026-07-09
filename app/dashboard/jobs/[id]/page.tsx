@@ -23,7 +23,9 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
       .single(),
     supabase.from('job_tasks').select('id, phase, title, completed').eq('job_id', id).order('sort_order', { ascending: true }),
     supabase.from('deliverables').select('id, title, description, completed, delivery_files(id, original_name, version_label, delivery_status, created_at, file_url, personal_note)').eq('job_id', id),
-    supabase.from('revisions').select('id, round, request, status, created_at').eq('job_id', id).order('round', { ascending: true }),
+    // '*' keeps this working whether or not migration_revision_responses.sql
+    // (reply / responded_at columns) has been run yet.
+    supabase.from('revisions').select('*').eq('job_id', id).order('round', { ascending: true }),
     supabase.from('proposals').select('id, status, token, total_value, sent_at, responded_at, created_at').eq('job_id', id).order('created_at', { ascending: false }),
     supabase.from('activities').select('id, action, details, created_at').eq('job_id', id).order('created_at', { ascending: false }).limit(20),
     supabase.from('time_entries').select('id, description, category, started_at, ended_at, duration_seconds, billable, hourly_rate').eq('job_id', id).order('started_at', { ascending: false }),
@@ -87,6 +89,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
       round: r.round,
       request: r.request,
       status: r.status,
+      reply: (r.reply as string | null) ?? null,
       createdAt: r.created_at,
     })),
     proposals: (proposals ?? []).map((p) => ({

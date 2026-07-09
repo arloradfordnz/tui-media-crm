@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { sendRevisionResponseEmail } from '@/lib/email'
 
 export async function createJob(prevState: { error?: string } | undefined, formData: FormData) {
   const name = formData.get('name') as string
@@ -205,4 +206,63 @@ export async function markRevisionDone(revisionId: string, jobId: string) {
   const supabase = await createServerSupabaseClient()
   await supabase.from('revisions').update({ status: 'done' }).eq('id', revisionId)
   revalidatePath(`/dashboard/jobs/${jobId}`)
+}
+
+// Accept, decline, or reply to a client revision request. Accept/decline set the
+// revision status; a plain reply keeps it pending. The client is emailed either way.
+export async function respondToRevision(
+  revisionId: string,
+  jobId: string,
+  response: 'accepted' | 'declined' | 'reply',
+  reply?: string,
+) {
+  const trimmedReply = (reply ?? '').trim()
+  if (response === 'reply' && !trimmedReply) return { error: 'Please write a reply first.' }
+
+  const supabase = await createServerSupabaseClient()
+  const { data: revision } = await supabase
+    .from('revisions')
+    .select('id, round, status, job_id')
+    .eq('id', revisionId)
+    .single()
+  if (!revision || revision.job_id !== jobId) return { error: 'Revision not found.' }
+
+  const { data: job } = await supabase
+    .from('jobs')
+    .select('id, name, client_id, clients(name, email)')
+    .eq('id', jobId)
+    .single()
+  if (!job) return { error: 'Job not found.' }
+
+  const update: Record<string, unknown> = { responded_at: new Date().toISOString() }
+  if (response !== 'reply') update.status = response
+  if (trimmedReply) update.reply = trimmedReply
+
+  const { error: updateError } = await supabase.from('revisions').update(update).eq('id', revisionId)
+  if (updateError) return { error: updateError.message }
+
+  const verb = response === 'reply' ? 'replied to' : response
+  await supabase.from('activities').insert({
+    action: response === 'reply' ? 'revision_replied' : `revision_${response}`,
+    details: `Revision round ${revision.round} ${verb}`,
+    job_id: jobId,
+    client_id: job.client_id,
+  })
+
+  const clientRel = job.clients as unknown as { name: string; email: string | null } | null
+  if (clientRel?.email) {
+    await sendRevisionResponseEmail(
+      clientRel.email,
+      clientRel.name,
+      job.name,
+      revision.round,
+      response,
+      trimmedReply || null,
+      job.client_id ?? undefined,
+      jobId,
+    )
+  }
+
+  revalidatePath(`/dashboard/jobs/${jobId}`)
+  return { success: true, emailed: !!clientRel?.email }
 }

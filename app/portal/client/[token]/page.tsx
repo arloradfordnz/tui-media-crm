@@ -41,7 +41,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
         deliverables(
           id, title, description, completed, revision_limit, revisions_used,
           delivery_files(id, file_name, original_name, file_url, mime_type, version_label, delivery_status, download_enabled, personal_note, created_at),
-          revisions(id, round, request, status, created_at)
+          revisions(*)
         )
       `)
       .eq('client_id', client.id)
@@ -55,7 +55,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
   ])
 
   type RawDeliveryFile = { id: string; file_name: string; original_name: string; file_url: string | null; mime_type: string | null; version_label: string; delivery_status: string; download_enabled: boolean; personal_note: string | null; created_at: string }
-  type RawRevision = { id: string; round: number; request: string; status: string; created_at: string }
+  type RawRevision = { id: string; round: number; request: string; status: string; reply: string | null; created_at: string }
   type RawDeliverable = { id: string; title: string; description: string | null; completed: boolean; revision_limit: number | null; revisions_used: number | null; delivery_files: RawDeliveryFile[]; revisions: RawRevision[] | null }
   type RawJob = { id: string; name: string; status: string; job_type: string | null; shoot_date: string | null; deliverables: RawDeliverable[] }
 
@@ -94,6 +94,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
           round: r.round,
           request: r.request,
           status: r.status,
+          reply: r.reply ?? null,
           createdAt: r.created_at,
         })),
         deliveryFiles: await Promise.all((d.delivery_files ?? [])

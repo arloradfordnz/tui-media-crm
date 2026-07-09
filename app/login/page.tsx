@@ -14,7 +14,16 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="flex justify-center mb-12">
           <Image
+            className="logo-light"
             src="/Primary_Black.svg"
+            alt="Tui Media"
+            width={180}
+            height={37}
+            priority
+          />
+          <Image
+            className="logo-dark"
+            src="/Primary_White.svg"
             alt="Tui Media"
             width={180}
             height={37}

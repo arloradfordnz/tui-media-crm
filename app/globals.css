@@ -925,6 +925,11 @@ input, textarea, select, button { font-family: inherit; }
 .dark .sidebar-logo-light { display: none; }
 .dark .sidebar-logo-dark { display: block; }
 
+/* Generic theme-aware logo swap (login, portal, proposal pages) */
+.logo-dark { display: none; }
+.dark .logo-light { display: none; }
+.dark .logo-dark { display: block; }
+
 /* Reopen button — shown only once the sidebar has slid off-screen */
 .sidebar-reopen {
   position: fixed;

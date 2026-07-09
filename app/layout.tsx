@@ -21,11 +21,12 @@ export const metadata: Metadata = {
   // Favicon comes from app/icon.svg (Next.js convention) — same mark as tuimedia.nz.
 };
 
-// Apply the saved theme before first paint so the theme never flashes.
-// Default to LIGHT: it's the app's design default, and client-facing pages
-// (login, portal, proposal) use the black logo which is invisible on a black
-// dark-mode canvas for a first-time visitor who has nothing saved.
-const themeInit = `(function(){try{var t=localStorage.getItem('tui-theme');document.documentElement.classList.add(t==='dark'?'dark':'light');}catch(e){document.documentElement.classList.add('light');}})();`;
+// Apply the theme before first paint so it never flashes.
+// Explicit 'light'/'dark' choices (Settings → Appearance) win; anything else
+// follows the device's prefers-color-scheme, live — the media-query listener
+// re-checks localStorage so an explicit choice made later still sticks.
+// Client-facing pages swap logos via .logo-light/.logo-dark in globals.css.
+const themeInit = `(function(){var d=document.documentElement;function set(dark){d.classList.toggle('dark',dark);d.classList.toggle('light',!dark);}try{var t=localStorage.getItem('tui-theme');var mq=window.matchMedia('(prefers-color-scheme: dark)');set(t==='dark'||(t!=='light'&&mq.matches));mq.addEventListener('change',function(e){var s=localStorage.getItem('tui-theme');if(s==='dark'||s==='light')return;set(e.matches);});}catch(e){set(false);}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

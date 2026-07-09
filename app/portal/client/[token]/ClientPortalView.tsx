@@ -27,6 +27,7 @@ type Revision = {
   round: number
   request: string
   status: string
+  reply: string | null
   createdAt: string
 }
 
@@ -105,7 +106,8 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg-base)' }}>
       <header className="py-5 px-6 flex items-center justify-center">
-        <Image src="/Primary_Black.svg" alt="Tui Media" width={130} height={27} />
+        <Image className="logo-light" src="/Primary_Black.svg" alt="Tui Media" width={130} height={27} />
+        <Image className="logo-dark" src="/Primary_White.svg" alt="Tui Media" width={130} height={27} />
       </header>
 
       <div className="max-w-3xl mx-auto px-6 py-6 space-y-6 animate-fade-in">
@@ -349,6 +351,12 @@ function RevisionPanel({ deliverable, portalToken }: { deliverable: Deliverable;
                 <span className="text-xs ml-auto" style={{ color: 'var(--text-tertiary)' }}>{formatDate(r.createdAt)}</span>
               </div>
               <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{r.request}</p>
+              {r.reply && (
+                <div className="mt-2 p-2.5 rounded-md" style={{ background: 'var(--bg-elevated)' }}>
+                  <p className="label mb-1">Reply from Tui Media</p>
+                  <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{r.reply}</p>
+                </div>
+              )}
             </div>
           ))}
         </div>

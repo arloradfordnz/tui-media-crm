@@ -191,3 +191,23 @@ export async function deleteAllDocuments(): Promise<{ ok: true; count: number } 
   revalidatePath('/dashboard/documents')
   return { ok: true, count }
 }
+
+// Pull paid-invoice totals from Xero and write them onto each matched
+// client's lifetime_value. Triggered from the Clients page; the morning
+// briefing cron also runs the same sync daily.
+export async function syncLifetimeValues() {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authorised.' }
+
+  const { syncClientLifetimeValues } = await import('@/lib/lifetime-value')
+  try {
+    const result = await syncClientLifetimeValues(supabase)
+    if (!result.connected) return { error: 'Xero is not connected — connect it in Settings first.' }
+    revalidatePath('/dashboard/clients')
+    return result
+  } catch (err) {
+    console.error('[syncLifetimeValues] failed:', err)
+    return { error: 'Sync failed — check the Xero connection and try again.' }
+  }
+}

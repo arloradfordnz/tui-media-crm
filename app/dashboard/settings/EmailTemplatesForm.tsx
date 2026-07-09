@@ -19,6 +19,9 @@ const TYPE_LABELS: Record<string, string> = {
   proposal_accepted: 'Proposal Accepted',
   delivery: 'Delivery',
   revision: 'Revision Request',
+  revision_accepted: 'Revision Accepted',
+  revision_declined: 'Revision Declined',
+  revision_reply: 'Revision Reply',
   approval: 'Approval Confirmation',
 }
 

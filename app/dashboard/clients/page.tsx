@@ -6,6 +6,7 @@ import SearchInput from '@/components/SearchInput'
 import FilterTabs from '@/components/FilterTabs'
 import QuickStatus from './QuickStatus'
 import QuickCategory from './QuickCategory'
+import SyncLifetimeButton from './SyncLifetimeButton'
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
@@ -52,12 +53,12 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
 
   const clients = (clientRows ?? []).map((c) => {
     const jobs = (c.jobs as unknown as { quote_value: number | null }[]) ?? []
-    const jobsValue = jobs.reduce((sum, j) => sum + (j.quote_value ?? 0), 0)
     return {
       ...c,
       client_category: (c as { client_category?: string | null }).client_category ?? null,
       jobCount: jobs.length,
-      lifetime_value: jobsValue,
+      // Paid revenue synced from Xero (Sync Value button / daily cron) — not quoted totals.
+      lifetime_value: Number(c.lifetime_value ?? 0),
     }
   })
 
@@ -70,6 +71,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
         </div>
         <div className="page-header-actions">
           <SearchInput basePath="/dashboard/clients" placeholder="Search clients..." />
+          <SyncLifetimeButton />
           <Link href="/dashboard/clients/new" className="btn-primary">
             <Plus className="w-4 h-4" /> New Client
           </Link>
