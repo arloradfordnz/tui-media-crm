@@ -374,11 +374,9 @@ export async function sendWelcomeEmail(to: string, clientName: string, clientId?
   })
 }
 
-type BriefingTodo = { title: string; dueDate: string | null; isOverdue: boolean; jobName: string | null }
-type BriefingEvent = { title: string; startTime: string | null; jobName: string | null }
-type BriefingUpcoming = { title: string; date: string; jobName: string | null }
-type BriefingJob = { name: string; clientName: string | null }
 type BriefingRevision = { round: number; request: string; jobName: string | null; clientName: string | null }
+type BriefingShoot = { title: string; date: string; jobName: string | null }
+type BriefingNews = { headline: string; summary: string }
 
 type XeroSummaryData = {
   org_name: string | null
@@ -394,14 +392,10 @@ type XeroSummaryData = {
 export type MorningBriefingData = {
   date: Date
   weather: { temp: number; description: string; windKph: number } | null
-  todos: BriefingTodo[]
-  overdueCount: number
-  todayEvents: BriefingEvent[]
-  upcomingEvents: BriefingUpcoming[]
-  reviewJobs: BriefingJob[]
-  weekJobCount: number
   xero?: XeroSummaryData | null
   pendingRevisions?: BriefingRevision[]
+  upcomingShoots?: BriefingShoot[]
+  news?: BriefingNews | null
   aiSummary?: string | null
 }
 
@@ -424,172 +418,159 @@ function section(label: string, content: string) {
   `
 }
 
+// Bento card — a single subtle border, separated from its neighbours by margin so
+// no two dividers ever stack. This is the visual unit the briefing is built from.
+function card(label: string, content: string, pad = '22px 24px') {
+  return `
+    <div style="background:#101010;border:1px solid #1e1e1e;border-radius:16px;padding:${pad};margin:14px 0 0;">
+      ${label ? `<p style="color:#666;font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;margin:0 0 16px;">${label}</p>` : ''}
+      ${content}
+    </div>
+  `
+}
+
 export async function sendMorningBriefingEmail(data: MorningBriefingData) {
-  const { date, weather, todos, overdueCount, todayEvents, upcomingEvents, reviewJobs, weekJobCount, xero, pendingRevisions, aiSummary } = data
+  const { date, weather, xero, pendingRevisions, upcomingShoots, news, aiSummary } = data
+
+  const esc = (s: string) => s.replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
   // Format in NZ time — the cron server runs on UTC, so at ~7am NZST an un-zoned
   // formatter renders the previous UTC day and the header reads a day behind.
   const dayLabel = date.toLocaleDateString('en-NZ', { timeZone: NZ_TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
   const shortDay = date.toLocaleDateString('en-NZ', { timeZone: NZ_TZ, weekday: 'short', day: 'numeric', month: 'short' })
 
-  const revisionCount = pendingRevisions?.length ?? 0
+  const revisions = pendingRevisions ?? []
+  const shoots = (upcomingShoots ?? []).slice().sort((a, b) => a.date.localeCompare(b.date))
+  const nextShoot = shoots[0]
   const overdueInvoices = xero && xero.overdue_invoice_count > 0
   const revenue = xero?.revenue_this_month_nzd ?? null
   const plural = (n: number) => (n !== 1 ? 's' : '')
 
-  // Header weather line — a small chip beside the date rather than a big block up top.
   const weatherLine = weather
     ? ` &middot; ${weather.temp}&deg;C, ${weather.description.toLowerCase()} in Nelson`
     : ''
 
-  // ── The hook: what earns the open. Subject + inbox preview + hero all lead with
-  //    the single most pressing thing, in priority order. ────────────────────────
+  // ── The hook: subject + hidden preview lead with the single most pressing thing.
   let subjectHook: string
   let focusFallback: string
   if (overdueInvoices) {
     subjectHook = `${xero!.overdue_invoice_count} invoice${plural(xero!.overdue_invoice_count)} overdue, ${fmtNZD(xero!.overdue_invoices_nzd)} to chase`
-    focusFallback = `Chase the overdue invoices first. ${fmtNZD(xero!.overdue_invoices_nzd)} is still sitting out there waiting to be collected.`
-  } else if (revisionCount > 0) {
-    subjectHook = `${revisionCount} client revision${plural(revisionCount)} waiting on you`
-    focusFallback = `${revisionCount} client${plural(revisionCount)} waiting on revisions. Knock those out early and you will have happy clients by lunch.`
-  } else if (todayEvents.length > 0) {
-    subjectHook = `${todayEvents.length} on today: ${todayEvents[0].title}`
-    focusFallback = `You have ${todayEvents.length} on today. Prep the first one, then keep the run tidy and you are sorted.`
-  } else if (overdueCount > 0) {
-    subjectHook = `${overdueCount} to-do${plural(overdueCount)} slipped past due`
-    focusFallback = `A couple of to-dos have slipped past due. Clear the oldest one first and the rest of the list feels lighter.`
+    focusFallback = `Chase the overdue invoices first. ${fmtNZD(xero!.overdue_invoices_nzd)} is still out there waiting to be collected.`
+  } else if (revisions.length > 0) {
+    subjectHook = `${revisions.length} client revision${plural(revisions.length)} waiting on you`
+    focusFallback = `${revisions.length} client${plural(revisions.length)} waiting on revisions. Turn those around early and you will have happy clients by lunch.`
+  } else if (nextShoot) {
+    subjectHook = `Next shoot ${fmtShortDate(nextShoot.date)}: ${nextShoot.title}`
+    focusFallback = `Your next shoot is ${nextShoot.title} on ${fmtShortDate(nextShoot.date)}. Sort the gear list and you are set.`
   } else if (revenue != null && revenue > 0) {
     subjectHook = `${fmtNZD(revenue)} in this month, and you are clear`
-    focusFallback = `Nothing on fire today. Good chance to get ahead on outreach or push through a few edits.`
+    focusFallback = `Nothing on fire today. Good chance to line up some shoots or push through a few edits.`
   } else {
     subjectHook = `A clear run today`
-    focusFallback = `Nothing on fire today. Good chance to get ahead on outreach or push through a few edits.`
+    focusFallback = `Nothing on fire today. Good chance to line up some shoots or push through a few edits.`
   }
 
   const focusText = (aiSummary && aiSummary.trim()) || focusFallback
-  const focusHtml = focusText.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>')
-
-  // Hidden inbox preview text — teases the focus so the subject earns a second look.
+  const focusHtml = esc(focusText).replace(/\n/g, '<br/>')
   const preheader = focusText.replace(/\s+/g, ' ').trim().slice(0, 140)
 
-  // ── Hero: the reason to open, right at the top. Flat, accent rule on the left. ─
-  const heroBlock = `
-    <div style="margin:26px 0 0;padding:2px 0 2px 18px;border-left:2px solid #f5f5f5;">
-      <p style="color:#a3a3a3;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px;">Focus for today</p>
-      <p style="color:#f5f5f5;font-size:18px;line-height:1.55;font-weight:500;margin:0;">${focusHtml}</p>
-    </div>
-  `
+  // ── Focus — quiet and readable, not shouting. ─────────────────────────────────
+  const focusCard = card('Focus for today',
+    `<p style="color:#c8c8c8;font-size:15px;line-height:1.65;font-weight:400;margin:0;">${focusHtml}</p>`)
 
-  // ── At a glance: three flat stats, no fills. ──────────────────────────────────
-  const statCell = (value: string, label: string, accent?: string) => `
-    <td width="33%" align="left" valign="top" style="padding:0 10px 0 0;">
-      <p style="color:${accent || '#f5f5f5'};font-size:24px;font-weight:700;line-height:1;margin:0 0 6px;">${value}</p>
-      <p style="color:#555;font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;margin:0;">${label}</p>
-    </td>`
-  const glancePrimary = revenue != null
-    ? statCell(fmtNZD(revenue), 'Revenue this month')
-    : statCell(String(weekJobCount), `Active job${plural(weekJobCount)} this week`)
-  const glanceBlock = `
-    <div style="margin:26px 0 0;border-top:1px solid #222;border-bottom:1px solid #222;padding:20px 0;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-        ${glancePrimary}
-        ${statCell(String(todos.length), `To-do${plural(todos.length)}${overdueCount > 0 ? `, ${overdueCount} overdue` : ''}`, overdueCount > 0 ? '#f87171' : undefined)}
-        ${statCell(String(todayEvents.length), 'On today')}
-      </tr></table>
-    </div>
-  `
+  // ── Money — one consolidated card: hero number + a clean 2-up grid of the rest. ─
+  let moneyCard: string
+  if (xero) {
+    const metric = (label: string, value: string, accent?: string) => `
+      <td width="50%" valign="top" style="padding:0 8px 4px 0;">
+        <p style="color:#666;font-size:11px;margin:0 0 3px;">${label}</p>
+        <p style="color:${accent || '#f5f5f5'};font-size:16px;font-weight:600;margin:0;">${value}</p>
+      </td>`
+    const cells: string[] = []
+    if (xero.net_profit_this_month_nzd != null) cells.push(metric('Net profit', fmtNZD(xero.net_profit_this_month_nzd)))
+    if (xero.bank_balance_nzd != null) cells.push(metric('Bank', fmtNZD(xero.bank_balance_nzd)))
+    if (xero.outstanding_invoice_count > 0) cells.push(metric('Outstanding', `${fmtNZD(xero.outstanding_invoices_nzd)} · ${xero.outstanding_invoice_count}`))
+    if (xero.overdue_invoice_count > 0) cells.push(metric('Overdue', `${fmtNZD(xero.overdue_invoices_nzd)} · ${xero.overdue_invoice_count}`, '#f87171'))
+    const rows: string[] = []
+    for (let i = 0; i < cells.length; i += 2) rows.push(`<tr>${cells[i]}${cells[i + 1] ?? '<td width="50%"></td>'}</tr>`)
+    const big = revenue != null
+      ? `<p style="color:#f5f5f5;font-size:30px;font-weight:700;line-height:1;margin:0 0 4px;">${fmtNZD(revenue)}</p>
+         <p style="color:#666;font-size:12px;margin:0 0 ${rows.length ? '20px' : '0'};">Revenue this month</p>`
+      : ''
+    const grid = rows.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows.join('')}</table>` : ''
+    moneyCard = card('Money', `${big}${grid}`)
+  } else {
+    moneyCard = card('Money', `<p style="color:#a3a3a3;font-size:15px;line-height:1.6;margin:0;">Connect Xero in settings to see live financials here.</p>`)
+  }
 
-  // Todos
-  const todoContent = todos.length === 0
-    ? `<p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0;">All caught up — no outstanding to-dos.</p>`
-    : todos.map((t) => {
-        const duePart = t.dueDate
-          ? ` &mdash; <span style="color:${t.isOverdue ? '#f87171' : '#555'};font-size:13px;">${t.isOverdue ? 'Overdue &middot; ' : ''}${fmtShortDate(t.dueDate)}</span>`
-          : ''
-        const jobPart = t.jobName ? ` <span style="color:#f5f5f5;font-size:13px;">${t.jobName}</span>` : ''
-        return `<p style="color:#a3a3a3;font-size:15px;line-height:1.6;margin:0 0 10px;">${t.title}${duePart}${jobPart}</p>`
-      }).join('')
+  // ── Shoot calendar — a 14-day strip, booked days filled, today ringed. ────────
+  const nzTodayStr = date.toLocaleDateString('en-CA', { timeZone: NZ_TZ }) // YYYY-MM-DD
+  const [cy, cm, cd] = nzTodayStr.split('-').map(Number)
+  const shootDates = new Set(shoots.map((s) => s.date))
+  const weekRows: string[][] = [[], []]
+  for (let i = 0; i < 14; i++) {
+    const dt = new Date(Date.UTC(cy, cm - 1, cd + i))
+    const iso = dt.toISOString().slice(0, 10)
+    const wd = dt.toLocaleDateString('en-NZ', { timeZone: 'UTC', weekday: 'short' })
+    const num = dt.getUTCDate()
+    const booked = shootDates.has(iso)
+    const isToday = i === 0
+    const bg = booked ? '#ffffff' : '#161616'
+    const border = booked ? '#ffffff' : (isToday ? '#f5f5f5' : '#1e1e1e')
+    const wdColor = booked ? '#0a0a0a' : '#666'
+    const numColor = booked ? '#0a0a0a' : '#d4d4d4'
+    weekRows[Math.floor(i / 7)].push(`
+      <td width="14.28%" align="center" valign="top" style="padding:3px;">
+        <div style="background:${bg};border:1px solid ${border};border-radius:12px;padding:9px 0;">
+          <div style="color:${wdColor};font-size:9px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;line-height:1;margin:0 0 5px;">${wd}</div>
+          <div style="color:${numColor};font-size:15px;font-weight:700;line-height:1;">${num}</div>
+        </div>
+      </td>`)
+  }
+  const calGrid = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>${weekRows[0].join('')}</tr>
+    <tr>${weekRows[1].join('')}</tr>
+  </table>`
+  const shootList = shoots.length
+    ? shoots.slice(0, 3).map((s) =>
+        `<p style="color:#a3a3a3;font-size:14px;line-height:1.5;margin:14px 0 0;"><span style="color:#f5f5f5;font-weight:600;">${fmtShortDate(s.date)}</span> &middot; ${esc(s.title)}${s.jobName ? ` <span style="color:#666;">${esc(s.jobName)}</span>` : ''}</p>`
+      ).join('')
+    : `<p style="color:#a3a3a3;font-size:14px;line-height:1.6;margin:16px 0 0;">No shoots booked in the next fortnight. A good window to line some up.</p>`
+  const calendarCard = card('Next two weeks', `${calGrid}${shootList}`)
 
-  // Today
-  const todayContent = todayEvents.length === 0
-    ? `<p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0;">Nothing scheduled today.</p>`
-    : todayEvents.map((e) => {
-        const timePart = e.startTime ? ` <span style="color:#555;font-size:13px;">&middot; ${e.startTime}</span>` : ''
-        const jobPart = e.jobName ? ` <span style="color:#f5f5f5;font-size:13px;">${e.jobName}</span>` : ''
-        return `<p style="color:#a3a3a3;font-size:15px;line-height:1.6;margin:0 0 10px;">${e.title}${timePart}${jobPart}</p>`
-      }).join('')
+  // ── One news story — the day's most relevant thing in AI / creative tech. ─────
+  const newsCard = news
+    ? card('One to know', `
+        <p style="color:#f5f5f5;font-size:16px;font-weight:600;line-height:1.4;margin:0 0 8px;">${esc(news.headline)}</p>
+        <p style="color:#a3a3a3;font-size:14px;line-height:1.6;margin:0;">${esc(news.summary)}</p>
+      `)
+    : ''
 
-  // Upcoming
-  const upcomingContent = upcomingEvents.length === 0
-    ? `<p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0;">Nothing coming up this week.</p>`
-    : upcomingEvents.map((e) => {
-        const jobPart = e.jobName ? ` <span style="color:#f5f5f5;font-size:13px;">${e.jobName}</span>` : ''
-        return `<p style="color:#a3a3a3;font-size:15px;line-height:1.6;margin:0 0 10px;"><span style="color:#555;font-size:13px;">${fmtShortDate(e.date)} &mdash;</span> ${e.title}${jobPart}</p>`
-      }).join('')
-
-  // Financials — from Xero
-  const revenueContent = xero
-    ? `
-        ${xero.revenue_this_month_nzd != null
-          ? `<p style="color:#f5f5f5;font-size:22px;font-weight:700;margin:0 0 4px;">${fmtNZD(xero.revenue_this_month_nzd)} <span style="color:#555;font-size:13px;font-weight:400;">revenue this month</span></p>`
-          : ''}
-        ${xero.net_profit_this_month_nzd != null
-          ? `<p style="color:#a3a3a3;font-size:14px;margin:0 0 12px;">Net profit: <span style="color:#f5f5f5;">${fmtNZD(xero.net_profit_this_month_nzd)}</span></p>`
-          : ''}
-        ${xero.bank_balance_nzd != null
-          ? `<p style="color:#a3a3a3;font-size:14px;margin:0 0 12px;">Bank: <span style="color:#f5f5f5;">${fmtNZD(xero.bank_balance_nzd)}</span></p>`
-          : ''}
-        ${xero.outstanding_invoice_count > 0
-          ? `<p style="color:#a3a3a3;font-size:14px;margin:0 0 6px;">Outstanding invoices: <span style="color:#f5f5f5;">${fmtNZD(xero.outstanding_invoices_nzd)}</span> &middot; ${xero.outstanding_invoice_count} invoice${xero.outstanding_invoice_count !== 1 ? 's' : ''}</p>`
-          : ''}
-        ${xero.overdue_invoice_count > 0
-          ? `<p style="color:#f87171;font-size:14px;margin:0 0 6px;">Overdue: ${fmtNZD(xero.overdue_invoices_nzd)} &middot; ${xero.overdue_invoice_count} invoice${xero.overdue_invoice_count !== 1 ? 's' : ''}</p>`
-          : ''}
-        <p style="color:#555;font-size:13px;margin:8px 0 0;">Active jobs this week: <span style="color:#f5f5f5;">${weekJobCount}</span></p>
-      `
-    : `<p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 8px;">Connect Xero in settings to see live financials here.</p>
-       <p style="color:#555;font-size:13px;margin:0;">Active jobs this week: <span style="color:#f5f5f5;">${weekJobCount}</span></p>`
-
-  // Pending client revisions
-  const revisionsContent = pendingRevisions && pendingRevisions.length > 0
-    ? pendingRevisions.map((r) => {
-        const who = r.clientName ? `<span style="color:#d4d4d4;font-size:13px;">${r.clientName}</span>` : ''
-        const job = r.jobName ? `<span style="color:#f5f5f5;font-size:14px;">${r.jobName}</span>` : ''
+  // ── Client revisions — actionable, kept as a tidy card. ───────────────────────
+  const revisionsCard = revisions.length
+    ? card('Client revisions pending', revisions.map((r) => {
+        const who = r.clientName ? `<span style="color:#a3a3a3;font-size:13px;">${esc(r.clientName)}</span>` : ''
+        const job = r.jobName ? `<span style="color:#f5f5f5;font-size:14px;font-weight:600;">${esc(r.jobName)}</span>` : ''
         const preview = r.request.length > 120 ? r.request.slice(0, 120) + '…' : r.request
         return `<div style="margin:0 0 14px;">
-          <p style="color:#a3a3a3;font-size:14px;margin:0 0 4px;">${job}${who ? ' &mdash; ' : ''}${who} <span style="color:#555;font-size:12px;">Round ${r.round}</span></p>
-          <p style="color:#555;font-size:13px;line-height:1.5;margin:0;">${preview.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+          <p style="margin:0 0 4px;">${job}${who ? ' &middot; ' : ''}${who} <span style="color:#666;font-size:12px;">Round ${r.round}</span></p>
+          <p style="color:#777;font-size:13px;line-height:1.5;margin:0;">${esc(preview)}</p>
         </div>`
-      }).join('')
-    : null
-
-  // Review jobs
-  const reviewContent = reviewJobs.length === 0
-    ? ''
-    : section('Awaiting Your Review',
-        reviewJobs.map((j) => {
-          const clientPart = j.clientName ? ` <span style="color:#555;font-size:13px;">&mdash; ${j.clientName}</span>` : ''
-          return `<p style="color:#a3a3a3;font-size:15px;line-height:1.6;margin:0 0 10px;">${j.name}${clientPart}</p>`
-        }).join('')
-      )
-
-  const todoLabel = `${todos.length} to-do${todos.length !== 1 ? 's' : ''}${overdueCount > 0 ? ` (${overdueCount} overdue)` : ''}`
+      }).join(''))
+    : ''
 
   const subject = `${subjectHook} · ${shortDay}`
 
   const html = wrap(`
     <h2 style="margin:0 0 4px;font-size:22px;color:#f5f5f5;font-weight:600;">Good morning Arlo,</h2>
-    <p style="color:#555;font-size:14px;margin:0;">${dayLabel}${weatherLine}</p>
-    ${heroBlock}
-    ${glanceBlock}
-    ${section('Money', revenueContent)}
-    ${revisionsContent ? section('Client Revisions Pending', revisionsContent) : ''}
-    ${section(`To Do — ${todoLabel}`, todoContent)}
-    ${section("Today's Schedule", todayContent)}
-    ${section('Coming Up This Week', upcomingContent)}
-    ${reviewContent}
-    <div style="margin:32px 0 0;">
-      <a href="https://dashboard.tuimedia.nz" style="display:inline-block;background:#ffffff;color:#0a0a0a;padding:12px 26px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Open the dashboard</a>
+    <p style="color:#666;font-size:14px;margin:0;">${dayLabel}${weatherLine}</p>
+    ${focusCard}
+    ${moneyCard}
+    ${calendarCard}
+    ${newsCard}
+    ${revisionsCard}
+    <div style="margin:28px 0 0;">
+      <a href="https://dashboard.tuimedia.nz" style="display:inline-block;background:#ffffff;color:#0a0a0a;padding:13px 30px;border-radius:999px;text-decoration:none;font-weight:600;font-size:14px;">Open the dashboard</a>
     </div>
   `, BRIEFING_SIGNOFF, preheader)
 

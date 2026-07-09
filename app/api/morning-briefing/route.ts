@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
   const nzDate = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })
   const todayISO = nzDate(now)
   const weekAgoISO = nzDate(new Date(now.getTime() - 7 * 86400000))
-  const weekAheadISO = nzDate(new Date(now.getTime() + 7 * 86400000))
+  const twoWeeksAheadISO = nzDate(new Date(now.getTime() + 14 * 86400000))
   const [nzYear, nzMonth] = todayISO.split('-').map(Number)
   const monthStart = new Date(nzYear, nzMonth - 1, 1).toISOString().split('T')[0]
   const monthEnd = new Date(nzYear, nzMonth, 0).toISOString().split('T')[0]
@@ -56,7 +56,6 @@ export async function GET(req: NextRequest) {
     todayEventsRes,
     upcomingRes,
     reviewRes,
-    overdueRes,
     weekJobsRes,
     leadsRes,
     pendingRevisionsRes,
@@ -65,9 +64,8 @@ export async function GET(req: NextRequest) {
     fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LNG}&current=temperature_2m,weather_code,wind_speed_10m&timezone=Pacific%2FAuckland`),
     supabase.from('todos').select('title, due_date, jobs:linked_job_id(name)').eq('completed', false).order('due_date', { ascending: true, nullsFirst: false }).limit(20),
     supabase.from('events').select('title, start_time, jobs(name)').gte('date', todayISO).lt('date', new Date(now.getTime() + 86400000).toISOString().split('T')[0]).order('start_time'),
-    supabase.from('events').select('title, date, jobs(name)').gt('date', todayISO).lte('date', weekAheadISO).order('date').limit(8),
+    supabase.from('events').select('title, date, jobs(name)').gte('date', todayISO).lte('date', twoWeeksAheadISO).order('date').limit(15),
     supabase.from('jobs').select('name, clients(name)').eq('status', 'review'),
-    supabase.from('todos').select('id').eq('completed', false).not('due_date', 'is', null).lt('due_date', todayISO),
     supabase.from('jobs').select('id').gte('updated_at', weekAgoISO).not('status', 'in', '("delivered","archived")'),
     supabase.from('clients').select('id').eq('status', 'lead'),
     // Pending revisions — revisions on jobs still in 'editing' status
@@ -104,6 +102,13 @@ export async function GET(req: NextRequest) {
   }
   const pendingRevisions = ((pendingRevisionsRes.data ?? []) as unknown) as PendingRevision[]
 
+  // ── Upcoming shoots (next fortnight) — powers the calendar strip and the hook. ─
+  const upcomingShoots = (upcomingRes.data ?? []).map((e) => ({
+    title: e.title as string,
+    date: e.date as string,
+    jobName: (e.jobs as unknown as { name: string } | null)?.name ?? null,
+  }))
+
   // ── AI summary (best-effort; never fail the cron) ─────────────────────────
   let aiSummary: string | null = null
   if (process.env.ANTHROPIC_API_KEY) {
@@ -111,9 +116,9 @@ export async function GET(req: NextRequest) {
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
       const snapshot = {
         date: todayISO,
-        open_todos: (todosRes.data ?? []).length,
-        overdue_todos: (overdueRes.data ?? []).length,
         events_today: (todayEventsRes.data ?? []).length,
+        upcoming_shoots: upcomingShoots.length,
+        next_shoot: upcomingShoots[0] ? { title: upcomingShoots[0].title, date: upcomingShoots[0].date } : null,
         jobs_active_this_week: (weekJobsRes.data ?? []).length,
         jobs_in_review: (reviewRes.data ?? []).length,
         pending_revisions: pendingRevisions.length,
@@ -130,7 +135,7 @@ export async function GET(req: NextRequest) {
       const message = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 120,
-        system: `You are Arlo's morning advisor for Tui Media (videography/photography/marketing, sole operator, Nelson NZ). Give 1-2 punchy sentences on what to focus on today. Prioritise: overdue items, pending client revisions, overdue invoices. NZ tone, no fluff, no markdown, no greeting.`,
+        system: `You are Arlo's morning advisor for Tui Media (videography/photography/marketing, sole operator, Nelson NZ). Give 1-2 punchy sentences on what to focus on today. Prioritise pending client revisions, overdue invoices, and prepping upcoming shoots. NZ tone, no fluff, no markdown, no greeting, no em dashes.`,
         messages: [
           { role: 'user', content: JSON.stringify(snapshot) },
         ],
@@ -145,32 +150,52 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── One news story — top AI / creative-tech item from Hacker News, summarised. ─
+  // Best-effort: a null result simply hides the section.
+  let news: { headline: string; summary: string } | null = null
+  if (process.env.ANTHROPIC_API_KEY) {
+    try {
+      const topRes = await fetch('https://hacker-news.firebaseio.com/v0/topstories.json')
+      const ids: number[] = topRes.ok ? ((await topRes.json()) as number[]).slice(0, 20) : []
+      const items = await Promise.all(
+        ids.map((id) =>
+          fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then((r) => r.json()).catch(() => null)),
+      )
+      const stories = items
+        .filter((s): s is { type: string; title: string } => !!s && s.type === 'story' && !!s.title)
+        .map((s) => ({ title: s.title }))
+      if (stories.length) {
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+        const msg = await anthropic.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 200,
+          system: `Arlo is a 16-year-old founder in Nelson NZ running a video/photo/marketing company and building AI products. From these Hacker News headlines, pick the SINGLE most relevant story for someone at the intersection of AI and creative media. Reply as strict JSON only, no code fences: {"headline":"<max 9 words>","summary":"<one punchy sentence on what it is and why it matters to him>"}. NZ tone, no fluff, no markdown, no em dashes.`,
+          messages: [{ role: 'user', content: JSON.stringify(stories) }],
+        })
+        const text = msg.content
+          .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+          .map((b) => b.text)
+          .join('')
+          .trim()
+        const match = text.match(/\{[\s\S]*\}/)
+        if (match) {
+          const parsed = JSON.parse(match[0])
+          if (parsed.headline && parsed.summary) {
+            news = { headline: String(parsed.headline), summary: String(parsed.summary) }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[morning brief news failed]', err)
+    }
+  }
+
   await sendMorningBriefingEmail({
     date: now,
     weather,
-    todos: (todosRes.data ?? []).map((t) => ({
-      title: t.title,
-      dueDate: t.due_date,
-      isOverdue: !!t.due_date && new Date(t.due_date) < now,
-      jobName: (t.jobs as unknown as { name: string } | null)?.name ?? null,
-    })),
-    overdueCount: (overdueRes.data ?? []).length,
-    todayEvents: (todayEventsRes.data ?? []).map((e) => ({
-      title: e.title,
-      startTime: e.start_time,
-      jobName: (e.jobs as unknown as { name: string } | null)?.name ?? null,
-    })),
-    upcomingEvents: (upcomingRes.data ?? []).map((e) => ({
-      title: e.title,
-      date: e.date,
-      jobName: (e.jobs as unknown as { name: string } | null)?.name ?? null,
-    })),
-    reviewJobs: (reviewRes.data ?? []).map((j) => ({
-      name: j.name,
-      clientName: (j.clients as unknown as { name: string } | null)?.name ?? null,
-    })),
-    weekJobCount: (weekJobsRes.data ?? []).length,
     xero: xeroSummary,
+    upcomingShoots,
+    news,
     pendingRevisions: pendingRevisions.map((r) => ({
       round: r.round,
       request: r.request,
