@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { sendApprovalConfirmationEmail, sendRevisionRequestEmail, sendAdminDeliveryViewedEmail, sendAdminDeliveryApprovedEmail, sendAdminRevisionRequestedEmail } from '@/lib/email'
+import { sendApprovalConfirmationEmail, sendRevisionRequestEmail, sendAdminDeliveryViewedEmail, sendAdminDeliveryApprovedEmail, sendAdminRevisionRequestedEmail, sendAdminFileDownloadedEmail } from '@/lib/email'
 import { isAdminViewing } from '@/lib/admin-ip'
 import { createAdminClient } from '@/lib/supabase-admin'
 
@@ -204,5 +204,35 @@ export async function markViewed(deliveryFileId: string, jobId: string, portalTo
     admin.from('delivery_files').update({ delivery_status: 'viewed', viewed_at: new Date().toISOString() }).eq('id', deliveryFileId),
     admin.from('notifications').insert({ title: 'Portal Viewed', message: `Client viewed delivery for "${job.name}"`, type: 'portal_viewed', job_id: jobId, client_id: job.client_id }),
     sendAdminDeliveryViewedEmail(clientRel?.name || 'Your client', job.name, file.original_name || 'a delivery file', jobId, job.client_id),
+  ])
+}
+
+export async function markDownloaded(deliveryFileId: string, jobId: string, portalToken: string) {
+  const admin = createAdminClient()
+  if (!admin) return
+
+  const client = await resolveClient(admin, portalToken)
+  if (!client) return
+  const job = await authorizeJob(admin, jobId, client.id)
+  if (!job) return
+
+  const { data: file } = await admin
+    .from('delivery_files')
+    .select('original_name, deliverables(job_id)')
+    .eq('id', deliveryFileId)
+    .single()
+  const fileJobId = (file?.deliverables as unknown as { job_id: string } | null)?.job_id
+  if (!file || fileJobId !== jobId) return
+
+  const adminViewing = await isAdminViewing()
+  // Don't notify when the studio owner is the one downloading.
+  if (adminViewing) return
+
+  const fileName = file.original_name || 'a delivery file'
+  const clientRel = job.clients as unknown as { name: string } | null
+  await Promise.all([
+    admin.from('activities').insert({ action: 'delivery_downloaded', details: `Client downloaded "${fileName}"`, job_id: jobId, client_id: job.client_id }),
+    admin.from('notifications').insert({ title: 'File Downloaded', message: `Client downloaded "${fileName}" for "${job.name}"`, type: 'delivery_downloaded', job_id: jobId, client_id: job.client_id }),
+    sendAdminFileDownloadedEmail(clientRel?.name || 'Your client', job.name, fileName, jobId, job.client_id),
   ])
 }

@@ -4,26 +4,25 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard,
+  House,
   Users,
-  Briefcase,
-  Calendar,
-  DollarSign,
+  Clapperboard,
+  CalendarDays,
+  Wallet,
   FileText,
   Settings,
   LogOut,
-  X,
 } from 'lucide-react'
 
 const mainNav = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard', label: 'Dashboard', icon: House },
   { href: '/dashboard/clients', label: 'Clients', icon: Users },
-  { href: '/dashboard/jobs', label: 'Jobs', icon: Briefcase },
-  { href: '/dashboard/calendar', label: 'Calendar', icon: Calendar },
+  { href: '/dashboard/jobs', label: 'Jobs', icon: Clapperboard },
+  { href: '/dashboard/calendar', label: 'Calendar', icon: CalendarDays },
 ]
 
 const businessNav = [
-  { href: '/dashboard/finance', label: 'Finance', icon: DollarSign },
+  { href: '/dashboard/finance', label: 'Finance', icon: Wallet },
   { href: '/dashboard/documents', label: 'Documents', icon: FileText },
 ]
 
@@ -47,7 +46,7 @@ function NavLink({
 
   return (
     <Link href={href} className={`nav-item ${isActive ? 'active' : ''}`} onClick={onClick}>
-      <Icon className="w-[18px] h-[18px] shrink-0" />
+      <Icon className="nav-item-icon" />
       <span>{label}</span>
     </Link>
   )
@@ -64,40 +63,34 @@ export default function Sidebar({
 }) {
   return (
     <>
-      {/* Scrim — closes the sidebar on outside click when it's covering content (mobile) */}
+      {/* Scrim — closes the sidebar on outside click on mobile (hidden on desktop via CSS) */}
       {open && (
         <div className="sidebar-scrim" onClick={onClose} aria-hidden="true" />
       )}
 
-      {/* Sidebar — floating island, slides in/out exactly like the report panel */}
-      <aside
-        className="sidebar-panel"
-        style={{ transform: open ? 'translateX(0)' : 'translateX(calc(-100% - 24px))' }}
-      >
-        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+      {/* Sidebar — pinned open on desktop; slides in/out on mobile */}
+      <aside className={`sidebar-panel ${open ? 'sidebar-panel-open' : ''}`}>
+        <div className="flex items-center px-5 pt-5 pb-3">
           <span className="sidebar-logo">
             <Image className="sidebar-logo-light" src="/Primary_Black.svg" alt="Tui Media" width={120} height={25} />
             <Image className="sidebar-logo-dark" src="/Primary_White.svg" alt="Tui Media" width={120} height={25} />
           </span>
-          <button className="btn-icon" onClick={onClose} aria-label="Close menu">
-            <X className="w-4 h-4" />
-          </button>
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 pb-1 scroll-invisible">
           <div className="nav-section-label">Main</div>
           {mainNav.map((item) => (
-            <NavLink key={item.href} {...item} />
+            <NavLink key={item.href} {...item} onClick={onClose} />
           ))}
 
           <div className="nav-section-label">Business</div>
           {businessNav.map((item) => (
-            <NavLink key={item.href} {...item} />
+            <NavLink key={item.href} {...item} onClick={onClose} />
           ))}
 
           <div className="nav-section-label">Account</div>
           {accountNav.map((item) => (
-            <NavLink key={item.href} {...item} />
+            <NavLink key={item.href} {...item} onClick={onClose} />
           ))}
         </nav>
 

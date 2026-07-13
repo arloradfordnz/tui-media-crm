@@ -141,8 +141,31 @@ type StoredAccount = {
   meta: Record<string, unknown> | null
 }
 
+// Module-level account cache — getValidXeroAccount is called by every Xero
+// helper, so a summary+transactions page load was doing two Supabase reads
+// and could race two token refreshes. Reuse the account while its access
+// token still has >2 minutes of life. A null result (not connected) is never
+// cached so reconnecting takes effect immediately.
+let accountCache: { account: StoredAccount; validUntil: number } | null = null
+let accountInflight: Promise<StoredAccount | null> | null = null
+
 /** Returns the first connected Xero org, refreshing tokens if needed. */
 export async function getValidXeroAccount(): Promise<StoredAccount | null> {
+  if (accountCache && Date.now() < accountCache.validUntil) return accountCache.account
+  // Collapse concurrent callers into one lookup/refresh
+  if (accountInflight) return accountInflight
+  accountInflight = fetchValidXeroAccount()
+    .then((account) => {
+      if (account?.expires_at) {
+        accountCache = { account, validUntil: new Date(account.expires_at).getTime() - 2 * 60_000 }
+      }
+      return account
+    })
+    .finally(() => { accountInflight = null })
+  return accountInflight
+}
+
+async function fetchValidXeroAccount(): Promise<StoredAccount | null> {
   const supabase = serviceClient()
   const { data } = await supabase
     .from('connected_accounts')
@@ -235,6 +258,46 @@ async function xeroPost<T>(
     throw new Error(`Xero ${method} ${path} failed (${res.status}): ${text}`)
   }
   return (await res.json()) as T
+}
+
+// ─── Stale-while-revalidate cache for dashboard-facing fetches ───────────────
+// Xero round trips take seconds; pages should never block on them twice.
+// Fresh (< TTL): serve cached. Stale: serve cached instantly, refresh in the
+// background. Empty: block once. Errors never evict a previous good result.
+
+const SWR_TTL = 2 * 60 * 1000
+
+type SwrEntry<T> = { at: number; data: T }
+const swrStore = new Map<string, SwrEntry<unknown>>()
+const swrInflight = new Map<string, Promise<unknown>>()
+
+async function swrCached<T>(key: string, fn: () => Promise<T | null>): Promise<T | null> {
+  const entry = swrStore.get(key) as SwrEntry<T> | undefined
+  const age = entry ? Date.now() - entry.at : Infinity
+  if (entry && age < SWR_TTL) return entry.data
+
+  const refresh = () => {
+    if (!swrInflight.has(key)) {
+      const p = fn()
+        .then((data) => {
+          if (data != null) swrStore.set(key, { at: Date.now(), data })
+          return data
+        })
+        .catch((err) => {
+          console.error(`[Xero] ${key} refresh failed:`, err)
+          return null
+        })
+        .finally(() => { swrInflight.delete(key) })
+      swrInflight.set(key, p)
+    }
+    return swrInflight.get(key) as Promise<T | null>
+  }
+
+  if (entry) {
+    void refresh() // serve stale, revalidate in background
+    return entry.data
+  }
+  return refresh() // cold: block once
 }
 
 export type XeroSummary = {
@@ -416,6 +479,11 @@ export async function fetchXeroSummary(): Promise<XeroSummary | null> {
   }
 }
 
+/** Cached fetchXeroSummary — serves within 2 min instantly, stale-while-revalidate after. */
+export function fetchXeroSummaryCached(): Promise<XeroSummary | null> {
+  return swrCached('summary', fetchXeroSummary)
+}
+
 export type XeroTransaction = {
   id: string
   date: string          // ISO date YYYY-MM-DD
@@ -572,6 +640,11 @@ export async function fetchXeroTransactions(): Promise<XeroTransaction[] | null>
 
   results.sort((a, b) => b.date.localeCompare(a.date))
   return results
+}
+
+/** Cached fetchXeroTransactions — serves within 2 min instantly, stale-while-revalidate after. */
+export function fetchXeroTransactionsCached(): Promise<XeroTransaction[] | null> {
+  return swrCached('transactions', fetchXeroTransactions)
 }
 
 // ─── Paid invoice totals (lifetime value) ────────────────────────────────────

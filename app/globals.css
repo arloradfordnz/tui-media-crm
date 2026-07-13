@@ -358,13 +358,26 @@ input, textarea, select, button { font-family: inherit; }
 }
 .nav-item:not(.active):hover {
   color: var(--text-primary);
-  background: var(--bg-surface);
+  background: var(--bg-hover);
 }
 .nav-item.active {
   color: var(--text-primary);
   background: var(--bg-surface);
   font-weight: 500;
   box-shadow: var(--shadow-soft);
+}
+
+/* Nav icons — quieter than the label at rest, matching it on hover/active */
+.nav-item-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  transition: color 120ms ease;
+}
+.nav-item:hover .nav-item-icon,
+.nav-item.active .nav-item-icon {
+  color: var(--text-primary);
 }
 
 .nav-section-label {
@@ -903,7 +916,7 @@ input, textarea, select, button { font-family: inherit; }
   }
 }
 
-/* ── Left sidebar (floating island, slides like the report panel) ── */
+/* ── Left sidebar (floating island — pinned on desktop, overlay on mobile) ── */
 .sidebar-panel {
   position: fixed;
   left: 0;
@@ -920,6 +933,14 @@ input, textarea, select, button { font-family: inherit; }
   transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Main content sits beside the pinned sidebar on desktop */
+.main-area {
+  margin-left: 272px; /* 248px sidebar + 12px margin each side */
+}
+@media (max-width: 768px) {
+  .main-area { margin-left: 0; }
+}
+
 /* Sidebar wordmark — swaps black/white with the theme, no JS needed */
 .sidebar-logo-dark { display: none; }
 .dark .sidebar-logo-light { display: none; }
@@ -930,7 +951,7 @@ input, textarea, select, button { font-family: inherit; }
 .dark .logo-light { display: none; }
 .dark .logo-dark { display: block; }
 
-/* Reopen button — shown only once the sidebar has slid off-screen */
+/* Menu button — mobile only; the sidebar is pinned open on desktop */
 .sidebar-reopen {
   position: fixed;
   top: 22px;
@@ -951,6 +972,9 @@ input, textarea, select, button { font-family: inherit; }
   cursor: pointer;
 }
 .sidebar-reopen:hover { color: var(--text-primary); }
+@media (min-width: 769px) {
+  .sidebar-reopen { display: none; }
+}
 
 /* Scrim behind the sidebar on narrow viewports, closes it on outside click */
 .sidebar-scrim {
@@ -963,7 +987,11 @@ input, textarea, select, button { font-family: inherit; }
   .sidebar-scrim { display: none; }
 }
 @media (max-width: 768px) {
-  .sidebar-panel { z-index: 65; }
+  .sidebar-panel {
+    z-index: 65;
+    transform: translateX(calc(-100% - 24px));
+  }
+  .sidebar-panel.sidebar-panel-open { transform: translateX(0); }
 }
 
 /* ── KPI cards (flat stat cards, reference style) ─────────── */

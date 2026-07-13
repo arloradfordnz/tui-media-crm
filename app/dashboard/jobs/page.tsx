@@ -37,22 +37,21 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   else query = query.eq('status', statusFilter)
   if (search) query = query.ilike('name', `%${search}%`)
 
-  const { data: jobs } = await query
-
-  // Time totals per job — gracefully skip if table doesn't exist yet
-  const jobIds = (jobs ?? []).map((j) => j.id)
-  let timeByJob: Record<string, number> = {}
-  if (jobIds.length > 0) {
-    const { data: timeTotals } = await supabase
+  // Fetch jobs and time totals in parallel — filtering time entries to the
+  // visible jobs happens in JS, which saves a dependent second round trip.
+  const [{ data: jobs }, { data: timeTotals }] = await Promise.all([
+    query,
+    supabase
       .from('time_entries')
       .select('job_id, duration_seconds')
-      .in('job_id', jobIds)
-      .not('ended_at', 'is', null)
-    if (timeTotals) {
-      for (const t of timeTotals) {
-        timeByJob[t.job_id] = (timeByJob[t.job_id] || 0) + (t.duration_seconds || 0)
-      }
-    }
+      .not('ended_at', 'is', null),
+  ])
+
+  const jobIds = new Set((jobs ?? []).map((j) => j.id))
+  const timeByJob: Record<string, number> = {}
+  for (const t of timeTotals ?? []) {
+    if (!jobIds.has(t.job_id)) continue
+    timeByJob[t.job_id] = (timeByJob[t.job_id] || 0) + (t.duration_seconds || 0)
   }
 
   return (

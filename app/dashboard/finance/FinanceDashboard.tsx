@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useMemo, useId, useRef, useEffect, useCallback } from 'react'
-import { ArrowDownLeft, ArrowUpRight, Calendar, Plus, X, Search, Check } from 'lucide-react'
-import type { XeroSummary, XeroTransaction, XeroContact } from '@/lib/xero'
+import { useState, useMemo, useId, useRef } from 'react'
+import { ArrowDownLeft, ArrowUpRight, Calendar } from 'lucide-react'
+import type { XeroSummary, XeroTransaction } from '@/lib/xero'
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
@@ -639,214 +639,6 @@ function TxTable({ txs }: { txs: XeroTransaction[] }) {
   )
 }
 
-// ─── Create Invoice Modal ─────────────────────────────────────────────────────
-
-function CreateInvoiceModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [contactSearch, setContactSearch] = useState('')
-  const [contacts, setContacts] = useState<XeroContact[]>([])
-  const [loadingContacts, setLoadingContacts] = useState(false)
-  const [selectedContact, setSelectedContact] = useState<XeroContact | null>(null)
-  const [description, setDescription] = useState('')
-  const [amount, setAmount] = useState('')
-  const [dueDate, setDueDate] = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() + 14)
-    return d.toISOString().slice(0, 10)
-  })
-  const [sendNow, setSendNow] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
-  const [contactsError, setContactsError] = useState<string | null>(null)
-
-  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const loadContacts = useCallback(async (q: string) => {
-    setLoadingContacts(true)
-    setContactsError(null)
-    try {
-      const res = await fetch(`/api/xero/contacts?q=${encodeURIComponent(q)}`)
-      const data = await res.json()
-      if (!res.ok) {
-        setContactsError(res.status === 503 ? 'Xero not connected — reconnect from the Finance page.' : (data.error ?? 'Failed to load contacts.'))
-        setContacts([])
-      } else {
-        setContacts(data.contacts ?? [])
-      }
-    } finally {
-      setLoadingContacts(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (searchDebounce.current) clearTimeout(searchDebounce.current)
-    searchDebounce.current = setTimeout(() => loadContacts(contactSearch), 350)
-    return () => { if (searchDebounce.current) clearTimeout(searchDebounce.current) }
-  }, [contactSearch, loadContacts])
-
-  // Initial load
-  useEffect(() => { loadContacts('') }, [loadContacts])
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!selectedContact) { setError('Please select a contact.'); return }
-    const unitAmount = parseFloat(amount)
-    if (!unitAmount || unitAmount <= 0) { setError('Please enter a valid amount.'); return }
-
-    setSubmitting(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/xero/invoices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contactId: selectedContact.ContactID,
-          contactName: selectedContact.Name,
-          date: new Date().toISOString().slice(0, 10),
-          dueDate,
-          lineItems: [{ Description: description || 'Services', UnitAmount: unitAmount, Quantity: 1 }],
-          status: sendNow ? 'AUTHORISED' : 'DRAFT',
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Failed to create invoice.'); return }
-      setSuccess(true)
-      setTimeout(() => { onCreated(); onClose() }, 1200)
-    } catch {
-      setError('Network error — please try again.')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 200,
-        background: 'rgba(0,0,0,0.6)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 16,
-      }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div className="card" style={{ width: '100%', maxWidth: 440, position: 'relative', padding: '24px 24px 20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em', margin: 0 }}>
-            Create Xero Invoice
-          </h2>
-          <button className="btn-icon" onClick={onClose}><X className="w-4 h-4" /></button>
-        </div>
-
-        {success ? (
-          <div style={{ textAlign: 'center', padding: '24px 0' }}>
-            <Check className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--success)' }} />
-            <p style={{ fontSize: 14, color: 'var(--success)', fontWeight: 600 }}>Invoice created!</p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {/* Contact */}
-            <div>
-              <label className="field-label">Bill to (Xero contact)</label>
-              {selectedContact ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, background: 'var(--bg-elevated)', border: '1px solid var(--accent)' }}>
-                  <span style={{ flex: 1, fontSize: 13, color: 'var(--text-primary)' }}>{selectedContact.Name}</span>
-                  <button type="button" className="btn-icon" onClick={() => setSelectedContact(null)} style={{ opacity: 0.6 }}>
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <div style={{ position: 'relative' }}>
-                  <div style={{ position: 'relative' }}>
-                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-tertiary)' }} />
-                    <input
-                      className="field-input"
-                      style={{ paddingLeft: 28 }}
-                      placeholder="Search contacts…"
-                      value={contactSearch}
-                      onChange={(e) => setContactSearch(e.target.value)}
-                    />
-                  </div>
-                  {contactsError && (
-                    <p style={{ fontSize: 12, color: 'var(--danger)', marginTop: 4 }}>{contactsError}</p>
-                  )}
-                  {!contactsError && (loadingContacts || contacts.length > 0 || contactSearch) && (
-                    <div style={{ border: '1px solid var(--bg-border)', borderRadius: 8, marginTop: 4, background: 'var(--bg-elevated)', maxHeight: 180, overflowY: 'auto', position: 'absolute', width: '100%', zIndex: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.6)' }}>
-                      {loadingContacts && <p style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-tertiary)' }}>Loading…</p>}
-                      {!loadingContacts && contacts.length === 0 && (
-                        <p style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-tertiary)' }}>No contacts found.</p>
-                      )}
-                      {contacts.slice(0, 10).map((c) => (
-                        <button
-                          key={c.ContactID}
-                          type="button"
-                          onClick={() => { setSelectedContact(c); setContactSearch('') }}
-                          style={{ width: '100%', textAlign: 'left', padding: '8px 12px', fontSize: 13, color: 'var(--text-primary)', background: 'transparent', border: 'none', cursor: 'pointer' }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-elevated)')}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                        >
-                          {c.Name}
-                          {c.EmailAddress && <span style={{ fontSize: 11, color: 'var(--text-tertiary)', marginLeft: 6 }}>{c.EmailAddress}</span>}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="field-label">Description</label>
-              <input className="field-input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Services rendered" />
-            </div>
-
-            {/* Amount */}
-            <div>
-              <label className="field-label">Amount (excl. GST)</label>
-              <input className="field-input" type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
-            </div>
-
-            {/* Due date */}
-            <div>
-              <label className="field-label">Due date</label>
-              <input className="field-input" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-            </div>
-
-            {/* Send now toggle */}
-            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-              <div
-                onClick={() => setSendNow((v) => !v)}
-                style={{
-                  width: 36, height: 20, borderRadius: 10,
-                  background: sendNow ? 'var(--accent)' : 'var(--bg-elevated)',
-                  position: 'relative', transition: 'background 150ms', flexShrink: 0,
-                  border: '1px solid var(--bg-border)',
-                }}
-              >
-                <div style={{
-                  width: 14, height: 14, borderRadius: '50%', background: 'white',
-                  position: 'absolute', top: 2, left: sendNow ? 18 : 2, transition: 'left 150ms',
-                }} />
-              </div>
-              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                Approve &amp; send now <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>(leave off to save as Draft)</span>
-              </span>
-            </label>
-
-            {error && <p style={{ fontSize: 13, color: 'var(--danger)' }}>{error}</p>}
-
-            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-              <button type="submit" disabled={submitting} className="btn-primary" style={{ flex: 1 }}>
-                {submitting ? 'Creating…' : sendNow ? 'Create & Approve' : 'Create Draft'}
-              </button>
-              <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ─── Main dashboard ───────────────────────────────────────────────────────────
 
 export default function FinanceDashboard({
@@ -859,8 +651,6 @@ export default function FinanceDashboard({
   retainerInvoiceDay?: number
 }) {
   const [period, setPeriod] = useState<Period>('year')
-  const [showCreateInvoice, setShowCreateInvoice] = useState(false)
-  const [invoiceRefresh, setInvoiceRefresh] = useState(0)
   const { label: rangeLabel } = periodRange(period)
 
   const filtered = useMemo(() => filterTx(transactions, period), [transactions, period])
@@ -924,22 +714,12 @@ export default function FinanceDashboard({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-      {showCreateInvoice && (
-        <CreateInvoiceModal
-          onClose={() => setShowCreateInvoice(false)}
-          onCreated={() => setInvoiceRefresh((v) => v + 1)}
-        />
-      )}
-
       {/* Retainer invoice reminder banner */}
       {showRetainerReminder && (
-        <div style={{ padding: '10px 16px', borderRadius: 10, background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: '1px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ padding: '10px 16px', borderRadius: 10, background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: '1px solid var(--accent)' }}>
           <p style={{ fontSize: 13, color: 'var(--text-primary)', margin: 0 }}>
-            Today is retainer invoice day — time to send retainer invoices.
+            Today is retainer invoice day — time to send retainer invoices from Xero.
           </p>
-          <button className="btn-primary" style={{ fontSize: 12 }} onClick={() => setShowCreateInvoice(true)}>
-            <Plus className="w-3.5 h-3.5" /> Create Invoice
-          </button>
         </div>
       )}
 
@@ -952,10 +732,6 @@ export default function FinanceDashboard({
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Create invoice */}
-          <button className="btn-primary" style={{ fontSize: 12 }} onClick={() => setShowCreateInvoice(true)}>
-            <Plus className="w-3.5 h-3.5" /> Create Invoice
-          </button>
           {/* Period buttons */}
           <div style={{ display: 'flex', gap: 6 }}>
             {PERIODS.map(({ key, label }) => (

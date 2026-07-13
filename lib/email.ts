@@ -595,6 +595,18 @@ export async function sendAdminDeliveryViewedEmail(clientName: string, jobName: 
   await send({ to: ADMIN_INBOX, subject, html, type: 'admin_delivery_viewed', clientId, jobId })
 }
 
+export async function sendAdminFileDownloadedEmail(clientName: string, jobName: string, fileName: string, jobId?: string, clientId?: string) {
+  const subject = `Client downloaded a file — ${jobName}`
+  const html = wrap(`
+    <h2 style="margin:0 0 20px;font-size:22px;color:#f5f5f5;font-weight:600;">Kia ora Arlo,</h2>
+    <p style="color:#a3a3a3;font-size:15px;line-height:1.7;margin:0 0 16px;"><span style="color:#f5f5f5;font-weight:600;">${clientName}</span> just downloaded <span style="color:#f5f5f5;">${fileName}</span> for <span style="color:#f5f5f5;">${jobName}</span>.</p>
+    <div style="text-align:left;margin:24px 0;">
+      <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#ffffff;color:#0a0a0a;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:500;font-size:13px;">Open dashboard</a>
+    </div>
+  `)
+  await send({ to: ADMIN_INBOX, subject, html, type: 'admin_file_downloaded', clientId, jobId })
+}
+
 export async function sendAdminDeliveryApprovedEmail(clientName: string, jobName: string, fileName: string, jobId?: string, clientId?: string) {
   const subject = `Delivery approved — ${jobName}`
   const html = wrap(`

@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { approveDelivery, markViewed, requestDeliverableRevision } from '@/app/actions/portal'
+import { approveDelivery, markViewed, markDownloaded, requestDeliverableRevision } from '@/app/actions/portal'
 import { signDocumentByClient, submitDocumentFeedback } from '@/app/actions/documents'
 import { renderDocBody } from '@/lib/markdown'
 import { statusLabel, statusBadgeClass, formatDate } from '@/lib/format'
@@ -186,7 +186,7 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
                               {d.description && <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{d.description}</p>}
 
                               {d.deliveryFiles.map((f) => (
-                                <FileCard key={f.id} file={f} jobId={job.id} onApprove={handleApprove} />
+                                <FileCard key={f.id} file={f} jobId={job.id} portalToken={data.portalToken} onApprove={handleApprove} />
                               ))}
 
                               {d.deliveryFiles.length === 0 && (
@@ -235,7 +235,7 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
   )
 }
 
-function FileCard({ file, jobId, onApprove }: { file: DeliveryFile; jobId: string; onApprove: (fileId: string, jobId: string) => void }) {
+function FileCard({ file, jobId, portalToken, onApprove }: { file: DeliveryFile; jobId: string; portalToken: string; onApprove: (fileId: string, jobId: string) => void }) {
   const kind = file.fileUrl && file.fileUrl.includes('vimeo') ? 'vimeo' : fileKind(file.mimeType, file.originalName)
   const canApprove = file.deliveryStatus === 'sent' || file.deliveryStatus === 'viewed'
 
@@ -252,6 +252,7 @@ function FileCard({ file, jobId, onApprove }: { file: DeliveryFile; jobId: strin
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
+    markDownloaded(file.id, jobId, portalToken).catch(() => {})
   }
 
   return (

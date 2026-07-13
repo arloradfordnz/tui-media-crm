@@ -21,13 +21,13 @@ export function usePanelContext() {
 }
 
 const PANEL_W = 404 // 380px panel + 12px left margin + 12px right margin
-const SIDEBAR_W = 272 // 248px sidebar + 12px left margin + 12px right margin
 const EASE = 'cubic-bezier(0.4, 0, 0.2, 1)'
 
 export default function DashboardShell({ children }: { children: ReactNode }) {
   const [panelOpen, setPanelOpen] = useState(false)
   const [panelContent, setPanelContent] = useState<ReactNode | null>(null)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  // Only meaningful on mobile — on desktop the sidebar is pinned open via CSS.
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   function openPanel(content: ReactNode) {
     setPanelContent(content)
@@ -48,8 +48,7 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
           onLogout={() => logout()}
         />
 
-        {/* Reopen button — only shown once the sidebar has slid away, same
-            trigger/close pairing the report panel uses. */}
+        {/* Mobile menu button — hidden on desktop where the sidebar is pinned */}
         {!sidebarOpen && (
           <button
             className="sidebar-reopen"
@@ -70,12 +69,13 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
           {panelContent}
         </div>
 
-        {/* Main area — margins push away from the sidebar and report panel */}
+        {/* Main area — sidebar margin is handled by .main-area (pinned sidebar on
+            desktop, overlay on mobile); the report panel margin stays dynamic */}
         <div
+          className="main-area"
           style={{
-            marginLeft: sidebarOpen ? SIDEBAR_W : 0,
             marginRight: panelOpen ? PANEL_W : 0,
-            transition: `margin-left 240ms ${EASE}, margin-right 240ms ${EASE}`,
+            transition: `margin-right 240ms ${EASE}`,
             display: 'flex',
             flexDirection: 'column',
             height: '100vh',

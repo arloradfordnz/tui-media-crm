@@ -1,5 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
-import { fetchXeroTransactions } from '@/lib/xero'
+import { fetchXeroTransactionsCached } from '@/lib/xero'
 
 export const dynamic = 'force-dynamic'
 import { formatNZD, formatDate, getInitials, statusLabel, statusBadgeClass } from '@/lib/format'
@@ -7,33 +7,6 @@ import { Plus, UserPlus, ArrowUpRight } from 'lucide-react'
 import Link from 'next/link'
 import RevenueSection from './RevenueSection'
 import Greeting from './Greeting'
-
-// Module-level Xero cache — the live fetch hits several Xero endpoints and
-// takes seconds, which made every Overview visit crawl. Serve the cached
-// result for 2 minutes and refresh in the background after that.
-type XeroTx = Awaited<ReturnType<typeof fetchXeroTransactions>>
-let xeroCache: { at: number; data: XeroTx } | null = null
-let xeroRefreshing: Promise<void> | null = null
-const XERO_TTL = 2 * 60 * 1000
-
-async function getXeroTransactionsCached(): Promise<XeroTx> {
-  const age = xeroCache ? Date.now() - xeroCache.at : Infinity
-  if (xeroCache && age < XERO_TTL) return xeroCache.data
-  if (xeroCache) {
-    // Stale: return instantly, refresh without blocking this render
-    if (!xeroRefreshing) {
-      xeroRefreshing = fetchXeroTransactions()
-        .then((data) => { if (data != null) xeroCache = { at: Date.now(), data } })
-        .catch((err) => console.error('[Dashboard] Xero refresh error:', err))
-        .finally(() => { xeroRefreshing = null })
-    }
-    return xeroCache.data
-  }
-  // Cold start: no choice but to wait once
-  const data = await fetchXeroTransactions()
-  if (data != null) xeroCache = { at: Date.now(), data }
-  return data
-}
 
 const PIPELINE_STAGES = [
   { key: 'enquiry',    label: 'Enquiry',       statuses: ['enquiry'] },
@@ -90,7 +63,7 @@ export default async function DashboardPage() {
   let xeroRevenue: { thisMonth: number; lastMonth: number } | null = null
   let xeroChartMonths: { label: string; value: number }[] | null = null
   try {
-    const xt = await getXeroTransactionsCached()
+    const xt = await fetchXeroTransactionsCached()
     if (xt != null) {
       const paidIn = xt.filter((t) => t.type === 'in' && t.status === 'PAID')
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)

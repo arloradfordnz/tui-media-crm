@@ -1,5 +1,5 @@
 import { AlertCircle, Plug } from 'lucide-react'
-import { fetchXeroSummary, fetchXeroTransactions, type XeroSummary, type XeroTransaction } from '@/lib/xero'
+import { fetchXeroSummaryCached, fetchXeroTransactionsCached, type XeroSummary, type XeroTransaction } from '@/lib/xero'
 import FinanceDashboard from './FinanceDashboard'
 import { getAppSetting } from '@/app/actions/settings'
 
@@ -43,16 +43,23 @@ export default async function FinancePage({ searchParams }: { searchParams: Sear
   let fetchError: string | null = null
   let retainerInvoiceDay: number | undefined
   try {
-    const [s, t, dayStr] = await Promise.all([fetchXeroSummary(), fetchXeroTransactions(), getAppSetting('retainer_invoice_day')])
+    const [s, t, dayStr] = await Promise.all([fetchXeroSummaryCached(), fetchXeroTransactionsCached(), getAppSetting('retainer_invoice_day')])
     summary = s
     transactions = t ?? []
     retainerInvoiceDay = dayStr ? parseInt(dayStr, 10) : 1
   } catch (e) {
     fetchError = (e as Error).message
+    console.error('[Finance] Xero fetch failed:', e)
   }
 
   if (!summary) {
-    return <NotConnected error={params.xero_error ?? fetchError ?? undefined} />
+    // A null summary with no thrown error means no connected_accounts row OR a
+    // failed token refresh (Xero refresh tokens lapse after 60 days unused) —
+    // both land on the reconnect screen, so say which one it likely is.
+    const reason = params.xero_error
+      ?? fetchError
+      ?? 'No active Xero connection found — if you connected before, the login may have expired. Reconnect below.'
+    return <NotConnected error={reason} />
   }
   return <FinanceDashboard summary={summary} transactions={transactions} retainerInvoiceDay={retainerInvoiceDay} />
 }
