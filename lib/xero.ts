@@ -847,6 +847,53 @@ export async function deleteXeroInvoice(invoiceId: string): Promise<boolean> {
   }
 }
 
+export type XeroInvoicePayment = {
+  PaymentID: string
+  Date: string
+  Amount: number
+  Reference?: string
+}
+
+/** Full invoice detail including its Payments array — needed to void/delete an invoice that has partial payments allocated. */
+export async function getXeroInvoice(invoiceId: string): Promise<(XeroCreatedInvoice & { Payments?: XeroInvoicePayment[] }) | null> {
+  const account = await getValidXeroAccount()
+  if (!account || !account.account_id) return null
+
+  try {
+    const res = await xeroGet<{ Invoices?: (XeroCreatedInvoice & { Payments?: XeroInvoicePayment[] })[] }>(
+      `/Invoices/${invoiceId}`,
+      account.access_token,
+      account.account_id,
+    )
+    return res.Invoices?.[0] ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Removes a payment so its invoice becomes voidable/deletable again. PERMANENT
+ * — this also un-reconciles the underlying bank transaction if it was matched,
+ * so the money doesn't disappear, it just needs re-matching in Xero afterward.
+ */
+export async function deleteXeroPayment(paymentId: string): Promise<boolean> {
+  const account = await getValidXeroAccount()
+  if (!account || !account.account_id) return false
+
+  try {
+    await xeroPost(
+      `/Payments/${paymentId}`,
+      { Status: 'DELETED' },
+      account.access_token,
+      account.account_id,
+      'POST',
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** Updates line items/date/reference on an invoice that's still DRAFT (not yet sent). */
 export async function updateXeroInvoice(invoiceId: string, updates: {
   description?: string

@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { fetchXeroContacts, createXeroInvoice, fetchOutstandingInvoices, approveXeroInvoice, voidXeroInvoice, deleteXeroInvoice, updateXeroInvoice } from '@/lib/xero'
+import { fetchXeroContacts, createXeroInvoice, fetchOutstandingInvoices, approveXeroInvoice, voidXeroInvoice, deleteXeroInvoice, updateXeroInvoice, getXeroInvoice, deleteXeroPayment } from '@/lib/xero'
 import { fetchRecentEmails, fetchUnreadEmails } from '@/lib/mail'
 
 // Shared tool definitions + executor for every AI surface (dashboard chat,
@@ -15,7 +15,7 @@ export const MUTATING_TOOLS = new Set([
   'create_event', 'delete_event',
   'create_document', 'delete_document',
   'create_deliverable',
-  'create_xero_invoice', 'approve_xero_invoice', 'void_xero_invoice', 'delete_xero_invoice', 'update_xero_invoice',
+  'create_xero_invoice', 'approve_xero_invoice', 'void_xero_invoice', 'delete_xero_invoice', 'update_xero_invoice', 'remove_xero_payment',
 ])
 
 export const TOOLS: Anthropic.Tool[] = [
@@ -361,6 +361,28 @@ export const TOOLS: Anthropic.Tool[] = [
         invoice_id: { type: 'string', description: 'Xero InvoiceID' },
       },
       required: ['invoice_id'],
+    },
+  },
+  {
+    name: 'get_xero_invoice_detail',
+    description: 'Get full detail for one Xero invoice by ID, including any Payments allocated to it (PaymentID, amount, date). Use this before voiding/deleting an invoice that might have partial payments — Xero blocks the void/delete until those payments are removed first.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        invoice_id: { type: 'string', description: 'Xero InvoiceID' },
+      },
+      required: ['invoice_id'],
+    },
+  },
+  {
+    name: 'remove_xero_payment',
+    description: 'Delete a payment allocated to a Xero invoice, freeing the invoice to be voided or deleted. PERMANENT — also un-reconciles the underlying bank transaction if it was matched (the money isn\'t lost, it just needs re-matching in Xero afterward). Get the payment_id from get_xero_invoice_detail first. Only use when explicitly asked to remove/unallocate a payment.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        payment_id: { type: 'string', description: 'Xero PaymentID' },
+      },
+      required: ['payment_id'],
     },
   },
   {
@@ -729,6 +751,27 @@ export async function executeTool(name: string, input: Record<string, unknown>, 
     case 'delete_xero_invoice': {
       const ok = await deleteXeroInvoice(input.invoice_id as string)
       if (!ok) return JSON.stringify({ error: 'Failed to delete invoice — it may already be AUTHORISED (use void_xero_invoice instead) or not exist.' })
+      return JSON.stringify({ success: true })
+    }
+
+    case 'get_xero_invoice_detail': {
+      const invoice = await getXeroInvoice(input.invoice_id as string)
+      if (!invoice) return JSON.stringify({ error: 'Invoice not found.' })
+      return JSON.stringify({
+        invoice: {
+          id: invoice.InvoiceID,
+          number: invoice.InvoiceNumber,
+          status: invoice.Status,
+          total: invoice.Total,
+          amount_due: invoice.AmountDue,
+          payments: (invoice.Payments ?? []).map((p) => ({ payment_id: p.PaymentID, date: p.Date, amount: p.Amount, reference: p.Reference })),
+        },
+      })
+    }
+
+    case 'remove_xero_payment': {
+      const ok = await deleteXeroPayment(input.payment_id as string)
+      if (!ok) return JSON.stringify({ error: 'Failed to remove payment — it may already be deleted, or reconciled in a way Xero won\'t allow removing via API.' })
       return JSON.stringify({ success: true })
     }
 
