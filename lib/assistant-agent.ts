@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { TOOLS, executeTool } from '@/lib/ai-tools'
 import { sendTelegramMessage } from '@/lib/telegram'
+import { fetchOutstandingInvoices } from '@/lib/xero'
 
 // The Telegram "brain" — same tool-using agent as the dashboard chat, reused
 // for two triggers: a scheduled proactive check-in (brain-tick cron) and a
@@ -23,7 +24,7 @@ VOICE — this is the part that matters most. Tui Media's whole thing is underst
 - No markdown, no emojis, no em dashes, no bullet points in a text message.
 - If he asks who you are, you're Tui. Don't over-explain what that means every time.
 
-WHEN TO SPEAK — only when something genuinely needs Arlo's attention right now: a slipping deadline, a stalled edit, something blocking progress, a client waiting on a reply. Stay quiet otherwise — never message just to say everything's fine. Never repeat something you already flagged recently (check recent_brain_ticks and recent_messages_last_10 in the snapshot) unless it's gotten worse or he's sat on it a while.
+WHEN TO SPEAK — only when something genuinely needs Arlo's attention right now: a slipping deadline, a stalled edit, something blocking progress, a client waiting on a reply, or an overdue invoice sitting unpaid (check overdue_xero_invoices in the snapshot). Stay quiet otherwise — never message just to say everything's fine. Never repeat something you already flagged recently (check recent_brain_ticks and recent_messages_last_10 in the snapshot) unless it's gotten worse or he's sat on it a while.
 
 If Arlo just replied, treat it as a real conversation: understand what he means even if it's casual or shorthand ("push smith to friday", "done", "who's that"), use tools to actually act on it (update job/task status, reschedule, look things up), then reply. Always reply — never leave him on read. Important: only text sent via the send_message tool actually reaches him — thinking through an answer without calling the tool means he sees nothing. So when he's messaged you, your last action before finishing must be calling send_message.
 
@@ -47,7 +48,7 @@ async function buildSnapshot(supabase: any): Promise<string> {
   const todayISO = now.toISOString().split('T')[0]
   const staleThreshold = new Date(now.getTime() - 7 * 86400000).toISOString()
 
-  const [overdueTasks, stalledJobs, overdueDeadlines, recentTicks, recentMessages] = await Promise.all([
+  const [overdueTasks, stalledJobs, overdueDeadlines, recentTicks, recentMessages, outstandingInvoices] = await Promise.all([
     supabase.from('job_tasks')
       .select('id, title, due_date, jobs(id, name, status, clients(name))')
       .eq('completed', false)
@@ -75,13 +76,22 @@ async function buildSnapshot(supabase: any): Promise<string> {
       .select('direction, body, created_at')
       .order('created_at', { ascending: false })
       .limit(10),
+    // Best-effort — Xero may not be connected, and a failure here shouldn't
+    // break the whole snapshot.
+    fetchOutstandingInvoices().catch(() => []),
   ])
+
+  const todayForCompare = todayISO
+  const overdueInvoices = outstandingInvoices
+    .filter((inv) => inv.Status === 'AUTHORISED' && inv.AmountDue > 0 && !!inv.DueDateString && inv.DueDateString.slice(0, 10) < todayForCompare)
+    .map((inv) => ({ number: inv.InvoiceNumber, amount_due: inv.AmountDue, due_date: inv.DueDateString?.slice(0, 10) }))
 
   return JSON.stringify({
     today: todayISO,
     overdue_tasks: overdueTasks.data ?? [],
     jobs_stalled_in_editing_or_review_7d_plus: stalledJobs.data ?? [],
     overdue_deadline_events: overdueDeadlines.data ?? [],
+    overdue_xero_invoices: overdueInvoices,
     recent_brain_ticks: recentTicks.data ?? [],
     recent_messages_last_10_oldest_first: (recentMessages.data ?? []).slice().reverse(),
   })
