@@ -76,3 +76,9 @@ export async function fetchUnreadEmails(limit = 15): Promise<EmailSummary[]> {
   const all = await fetchRecentEmails(Math.max(limit, 30))
   return all.filter((e) => e.unread).slice(0, limit)
 }
+
+/** True only if login actually succeeds — used by the daily heartbeat to report real connectivity, not just "no results". */
+export async function checkMailConnection(): Promise<boolean> {
+  const result = await withClient(async () => true)
+  return result === true
+}

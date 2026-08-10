@@ -1,8 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { TOOLS, executeTool } from '@/lib/ai-tools'
 import { sendTelegramMessage } from '@/lib/telegram'
-import { fetchOutstandingInvoices } from '@/lib/xero'
-import { fetchUnreadEmails } from '@/lib/mail'
+import { fetchOutstandingInvoices, getValidXeroAccount } from '@/lib/xero'
+import { fetchUnreadEmails, checkMailConnection } from '@/lib/mail'
 
 // The Telegram "brain" — same tool-using agent as the dashboard chat, reused
 // for two triggers: a scheduled proactive check-in (brain-tick cron) and a
@@ -28,6 +28,8 @@ VOICE — this is the part that matters most. Tui Media's whole thing is underst
 - If he asks who you are, you're Tui. Don't over-explain what that means every time.
 
 WHEN TO SPEAK — only when something genuinely needs Arlo's attention right now: a slipping deadline, a stalled edit, something blocking progress, a client waiting on a reply, an overdue invoice sitting unpaid (check overdue_xero_invoices), or an unread email that looks time-sensitive (check unread_emails — use judgement on subject/sender, most unread mail is not urgent). Stay quiet otherwise — never message just to say everything's fine. Never repeat something you already flagged recently (check recent_brain_ticks and recent_messages_last_10 in the snapshot) unless it's gotten worse or he's sat on it a while.
+
+Exception: on a daily heartbeat check-in, always send something, even a one-liner like "all quiet, X active jobs tracked" — that daily message is Arlo's only signal that you're actually still running, so silence there would look identical to a broken integration. Keep it just as short as everything else, and fold in anything from system_health worth knowing (Xero or email disconnected, for instance).
 
 If Arlo just replied, treat it as a real conversation: understand what he means even if it's casual or shorthand ("push smith to friday", "done", "who's that"), use tools to actually act on it (update job/task status, reschedule, look things up), then reply. Always reply — never leave him on read. Important: only text sent via the send_message tool actually reaches him — thinking through an answer without calling the tool means he sees nothing. So when he's messaged you, your last action before finishing must be calling send_message.
 
@@ -86,6 +88,14 @@ async function buildSnapshot(supabase: any): Promise<string> {
     fetchUnreadEmails(15).catch(() => []),
   ])
 
+  // Explicit connectivity checks — fetchOutstandingInvoices/fetchUnreadEmails
+  // return [] both when "nothing to report" and "integration is broken",
+  // which is exactly the ambiguity the heartbeat exists to resolve.
+  const [xeroAccount, mailConnected] = await Promise.all([
+    getValidXeroAccount().catch(() => null),
+    checkMailConnection().catch(() => false),
+  ])
+
   const todayForCompare = todayISO
   const overdueInvoices = outstandingInvoices
     .filter((inv) => inv.Status === 'AUTHORISED' && inv.AmountDue > 0 && !!inv.DueDateString && inv.DueDateString.slice(0, 10) < todayForCompare)
@@ -98,6 +108,10 @@ async function buildSnapshot(supabase: any): Promise<string> {
     overdue_deadline_events: overdueDeadlines.data ?? [],
     overdue_xero_invoices: overdueInvoices,
     unread_emails: unreadEmails,
+    system_health: {
+      xero_connected: !!xeroAccount,
+      email_connected: mailConnected,
+    },
     recent_brain_ticks: recentTicks.data ?? [],
     recent_messages_last_10_oldest_first: (recentMessages.data ?? []).slice().reverse(),
   })
@@ -106,7 +120,7 @@ async function buildSnapshot(supabase: any): Promise<string> {
 export async function runAssistantTurn(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
-  opts: { trigger: 'tick' | 'inbound'; inboundBody?: string }
+  opts: { trigger: 'tick' | 'inbound' | 'heartbeat'; inboundBody?: string }
 ): Promise<{ messageSent: boolean; messageBody?: string; reasoning: string }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   const chatId = process.env.OWNER_TELEGRAM_CHAT_ID
@@ -122,6 +136,8 @@ export async function runAssistantTurn(
 
   const userTurn = opts.trigger === 'inbound'
     ? `Arlo just messaged: "${opts.inboundBody}"\n\nCurrent CRM snapshot:\n${snapshot}`
+    : opts.trigger === 'heartbeat'
+    ? `Daily heartbeat — this is the one check-in per day you must always respond to, so Arlo knows you're actually running. Give a short status line (active jobs, anything worth flagging, system_health if anything's disconnected), then call send_message.\n\n${snapshot}`
     : `Scheduled check-in — review the CRM snapshot below and decide if anything needs a message right now.\n\n${snapshot}`
 
   const messages: Anthropic.MessageParam[] = [{ role: 'user', content: userTurn }]
@@ -168,13 +184,15 @@ export async function runAssistantTurn(
 
   // Safety net: the model sometimes reasons through an answer as plain text
   // without actually calling send_message. That's fine for a proactive tick
-  // (silence is the intended outcome), but for an inbound reply it means
-  // Arlo asked something and got left on read. Force the reply through.
-  if (opts.trigger === 'inbound' && !messageSent && reasoning) {
-    const messageId = await sendTelegramMessage(reasoning)
+  // (silence is the intended outcome), but for an inbound reply or the daily
+  // heartbeat it means Arlo was owed a message and didn't get one. Force it.
+  const mustRespond = opts.trigger === 'inbound' || opts.trigger === 'heartbeat'
+  if (mustRespond && !messageSent) {
+    const fallbackBody = reasoning || 'Daily check-in: couldn\'t put together a summary this time, but I\'m still running — worth a look if this keeps happening.'
+    const messageId = await sendTelegramMessage(fallbackBody)
     messageSent = messageId != null
-    messageBody = reasoning
-    await supabase.from('sms_messages').insert({ direction: 'outbound', body: reasoning, twilio_sid: messageId ? String(messageId) : null })
+    messageBody = fallbackBody
+    await supabase.from('sms_messages').insert({ direction: 'outbound', body: fallbackBody, twilio_sid: messageId ? String(messageId) : null })
   }
 
   await supabase.from('agent_ticks').insert({
