@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { fetchXeroContacts, createXeroInvoice, fetchOutstandingInvoices, approveXeroInvoice } from '@/lib/xero'
+import { fetchRecentEmails, fetchUnreadEmails } from '@/lib/mail'
 
 // Shared tool definitions + executor for every AI surface (dashboard chat,
 // SMS assistant). One tool set, one set of side effects — a job marked
@@ -340,6 +341,20 @@ export const TOOLS: Anthropic.Tool[] = [
       required: ['invoice_id'],
     },
   },
+
+  // ── Email (hello@tuimedia.nz, read-only) ───────
+  {
+    name: 'list_recent_emails',
+    description: 'List recent inbox emails for hello@tuimedia.nz — subject, sender, date, read/flagged status. Read-only: never marks anything as read. Use unread_only to see only what hasn\'t been opened yet.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        limit: { type: 'number', description: 'Max emails to return. Default 15.' },
+        unread_only: { type: 'boolean', description: 'If true, only return unread emails. Default false.' },
+      },
+      required: [],
+    },
+  },
 ]
 
 // ── Tool Executor ──────────────────────────────────────────────────────────────
@@ -666,6 +681,13 @@ export async function executeTool(name: string, input: Record<string, unknown>, 
       const ok = await approveXeroInvoice(input.invoice_id as string)
       if (!ok) return JSON.stringify({ error: 'Failed to approve invoice.' })
       return JSON.stringify({ success: true })
+    }
+
+    // ── Email ───────────────────────────────
+    case 'list_recent_emails': {
+      const limit = input.limit != null ? Number(input.limit) : 15
+      const emails = input.unread_only ? await fetchUnreadEmails(limit) : await fetchRecentEmails(limit)
+      return JSON.stringify({ emails })
     }
 
     default:

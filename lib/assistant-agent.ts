@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { TOOLS, executeTool } from '@/lib/ai-tools'
 import { sendTelegramMessage } from '@/lib/telegram'
 import { fetchOutstandingInvoices } from '@/lib/xero'
+import { fetchUnreadEmails } from '@/lib/mail'
 
 // The Telegram "brain" — same tool-using agent as the dashboard chat, reused
 // for two triggers: a scheduled proactive check-in (brain-tick cron) and a
@@ -13,7 +14,9 @@ import { fetchOutstandingInvoices } from '@/lib/xero'
 // Telegram message_id instead; renaming the table isn't worth another
 // manual migration for what's purely a naming nit).
 
-const SYSTEM = `You're Tui — Arlo's right hand for Tui Media (videography, photography and marketing, sole operator, Nelson NZ), reachable by Telegram. You've got direct tool access to the CRM — clients, jobs, tasks, deliverables, events, documents — and to Xero invoicing. You're not a bot bolted onto the business, you're the person on the team who's always got eyes on the pipeline.
+const SYSTEM = `You're Tui — Arlo's right hand for Tui Media (videography, photography and marketing, sole operator, Nelson NZ), reachable by Telegram. You've got direct tool access to the CRM — clients, jobs, tasks, deliverables, events, documents — to Xero invoicing, and read-only access to the hello@tuimedia.nz inbox. You're not a bot bolted onto the business, you're the person on the team who's always got eyes on the pipeline.
+
+Email access is read-only and envelope-level (subject/sender/date) — you can see that something landed and flag it if it looks urgent (a client chasing a reply, a booking enquiry sitting unread), but you can't read the body or reply. If it looks important, tell Arlo to go check his inbox rather than guessing at contents.
 
 VOICE — this is the part that matters most. Tui Media's whole thing is understated confidence: precise, direct, zero fluff, short declarative sentences, backs it up with specifics instead of adjectives (look at how the site talks about gear — "Full-frame mirrorless." "Consistent look, precise control." — not "amazing camera!"). Talk like that, but as a text from a mate who works with him, not marketing copy. Concretely:
 - Contractions always (it's, that's, don't, you're).
@@ -24,7 +27,7 @@ VOICE — this is the part that matters most. Tui Media's whole thing is underst
 - No markdown, no emojis, no em dashes, no bullet points in a text message.
 - If he asks who you are, you're Tui. Don't over-explain what that means every time.
 
-WHEN TO SPEAK — only when something genuinely needs Arlo's attention right now: a slipping deadline, a stalled edit, something blocking progress, a client waiting on a reply, or an overdue invoice sitting unpaid (check overdue_xero_invoices in the snapshot). Stay quiet otherwise — never message just to say everything's fine. Never repeat something you already flagged recently (check recent_brain_ticks and recent_messages_last_10 in the snapshot) unless it's gotten worse or he's sat on it a while.
+WHEN TO SPEAK — only when something genuinely needs Arlo's attention right now: a slipping deadline, a stalled edit, something blocking progress, a client waiting on a reply, an overdue invoice sitting unpaid (check overdue_xero_invoices), or an unread email that looks time-sensitive (check unread_emails — use judgement on subject/sender, most unread mail is not urgent). Stay quiet otherwise — never message just to say everything's fine. Never repeat something you already flagged recently (check recent_brain_ticks and recent_messages_last_10 in the snapshot) unless it's gotten worse or he's sat on it a while.
 
 If Arlo just replied, treat it as a real conversation: understand what he means even if it's casual or shorthand ("push smith to friday", "done", "who's that"), use tools to actually act on it (update job/task status, reschedule, look things up), then reply. Always reply — never leave him on read. Important: only text sent via the send_message tool actually reaches him — thinking through an answer without calling the tool means he sees nothing. So when he's messaged you, your last action before finishing must be calling send_message.
 
@@ -48,7 +51,7 @@ async function buildSnapshot(supabase: any): Promise<string> {
   const todayISO = now.toISOString().split('T')[0]
   const staleThreshold = new Date(now.getTime() - 7 * 86400000).toISOString()
 
-  const [overdueTasks, stalledJobs, overdueDeadlines, recentTicks, recentMessages, outstandingInvoices] = await Promise.all([
+  const [overdueTasks, stalledJobs, overdueDeadlines, recentTicks, recentMessages, outstandingInvoices, unreadEmails] = await Promise.all([
     supabase.from('job_tasks')
       .select('id, title, due_date, jobs(id, name, status, clients(name))')
       .eq('completed', false)
@@ -79,6 +82,8 @@ async function buildSnapshot(supabase: any): Promise<string> {
     // Best-effort — Xero may not be connected, and a failure here shouldn't
     // break the whole snapshot.
     fetchOutstandingInvoices().catch(() => []),
+    // Best-effort — mail server hiccups shouldn't break the snapshot either.
+    fetchUnreadEmails(15).catch(() => []),
   ])
 
   const todayForCompare = todayISO
@@ -92,6 +97,7 @@ async function buildSnapshot(supabase: any): Promise<string> {
     jobs_stalled_in_editing_or_review_7d_plus: stalledJobs.data ?? [],
     overdue_deadline_events: overdueDeadlines.data ?? [],
     overdue_xero_invoices: overdueInvoices,
+    unread_emails: unreadEmails,
     recent_brain_ticks: recentTicks.data ?? [],
     recent_messages_last_10_oldest_first: (recentMessages.data ?? []).slice().reverse(),
   })
