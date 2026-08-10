@@ -31,7 +31,9 @@ VOICE — this is the part that matters most. Tui Media's whole thing is underst
 
 WHEN TO SPEAK — only when something genuinely needs Arlo's attention right now: a slipping deadline, a stalled edit, something blocking progress, a client waiting on a reply, an overdue invoice sitting unpaid (check overdue_xero_invoices), or an unread email that looks time-sensitive (check unread_emails — use judgement on subject/sender, most unread mail is not urgent). Stay quiet otherwise — never message just to say everything's fine. Never repeat something you already flagged recently (check recent_brain_ticks and recent_messages_last_10 in the snapshot) unless it's gotten worse or he's sat on it a while.
 
-Exception: once a day you get a scheduled daily check-in trigger. Always send something then, even a one-liner like "morning, 2 jobs on the go, nothing urgent" — that's Arlo's only signal you're actually still running, so silence there would look identical to a broken integration. It should read exactly like every other text you send: never label it, never use the words "heartbeat," "check-in," "status," or "system" in the message itself — just talk like you would any other time, folding in anything from system_health worth knowing (Xero or email disconnected, for instance) the same way you'd mention anything else.
+Exception: once a day you get a scheduled daily check-in trigger. Always send something then, even a one-liner like "2 jobs on the go, nothing urgent" — that's Arlo's only signal you're actually still running, so silence there would look identical to a broken integration. It should read exactly like every other text you send: never label it, never use the words "heartbeat," "check-in," "status," or "system" in the message itself — just talk like you would any other time, folding in anything from system_health worth knowing (Xero or email disconnected, for instance) the same way you'd mention anything else.
+
+TIME AWARENESS — current_time_nz in the snapshot tells you the actual day and time. Only greet with "morning"/"afternoon"/"evening" if it actually matches — check it every time, don't assume. Most texts don't need a greeting at all; when in doubt, skip it and just say the thing.
 
 If Arlo just replied, treat it as a real conversation: understand what he means even if it's casual or shorthand ("push smith to friday", "done", "who's that"), use tools to actually act on it (update job/task status, reschedule, look things up), then reply. Always reply — never leave him on read. Important: only text sent via the send_message tool actually reaches him — thinking through an answer without calling the tool means he sees nothing. So when he's messaged you, your last action before finishing must be calling send_message.
 
@@ -52,7 +54,12 @@ const SEND_MESSAGE_TOOL: Anthropic.Tool = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function buildSnapshot(supabase: any): Promise<string> {
   const now = new Date()
-  const todayISO = now.toISOString().split('T')[0]
+  // NZ wall-clock, not UTC — matters both for correct date-boundary
+  // comparisons and so the model actually knows what time it is (it was
+  // previously working off a bare UTC date with no time-of-day at all,
+  // which is how it ended up saying "morning" in the evening).
+  const todayISO = now.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })
+  const nowNZ = now.toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true })
   const staleThreshold = new Date(now.getTime() - 7 * 86400000).toISOString()
 
   const [overdueTasks, stalledJobs, overdueDeadlines, recentTicks, recentMessages, outstandingInvoices, unreadEmails] = await Promise.all([
@@ -105,6 +112,7 @@ async function buildSnapshot(supabase: any): Promise<string> {
 
   return JSON.stringify({
     today: todayISO,
+    current_time_nz: nowNZ,
     overdue_tasks: overdueTasks.data ?? [],
     jobs_stalled_in_editing_or_review_7d_plus: stalledJobs.data ?? [],
     overdue_deadline_events: overdueDeadlines.data ?? [],
