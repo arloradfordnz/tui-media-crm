@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { fetchXeroContacts, createXeroInvoice, fetchOutstandingInvoices, approveXeroInvoice } from '@/lib/xero'
+import { fetchXeroContacts, createXeroInvoice, fetchOutstandingInvoices, approveXeroInvoice, voidXeroInvoice, deleteXeroInvoice, updateXeroInvoice } from '@/lib/xero'
 import { fetchRecentEmails, fetchUnreadEmails } from '@/lib/mail'
 
 // Shared tool definitions + executor for every AI surface (dashboard chat,
@@ -15,7 +15,7 @@ export const MUTATING_TOOLS = new Set([
   'create_event', 'delete_event',
   'create_document', 'delete_document',
   'create_deliverable',
-  'create_xero_invoice', 'approve_xero_invoice',
+  'create_xero_invoice', 'approve_xero_invoice', 'void_xero_invoice', 'delete_xero_invoice', 'update_xero_invoice',
 ])
 
 export const TOOLS: Anthropic.Tool[] = [
@@ -337,6 +337,43 @@ export const TOOLS: Anthropic.Tool[] = [
       type: 'object' as const,
       properties: {
         invoice_id: { type: 'string', description: 'Xero InvoiceID' },
+      },
+      required: ['invoice_id'],
+    },
+  },
+  {
+    name: 'void_xero_invoice',
+    description: 'Void an AUTHORISED (sent) Xero invoice. PERMANENT — Xero has no un-void. Fails if the invoice has payments allocated (those must be removed in Xero first). Only use when explicitly asked to void/cancel a specific invoice.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        invoice_id: { type: 'string', description: 'Xero InvoiceID' },
+      },
+      required: ['invoice_id'],
+    },
+  },
+  {
+    name: 'delete_xero_invoice',
+    description: 'Delete a DRAFT or SUBMITTED (not yet approved) Xero invoice. PERMANENT. For an AUTHORISED invoice, use void_xero_invoice instead — Xero does not allow hard-deleting sent invoices. Only use when explicitly asked to delete a specific invoice.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        invoice_id: { type: 'string', description: 'Xero InvoiceID' },
+      },
+      required: ['invoice_id'],
+    },
+  },
+  {
+    name: 'update_xero_invoice',
+    description: 'Edit a DRAFT Xero invoice — amount, description, due date, or reference. Only works before the invoice is approved/sent.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        invoice_id: { type: 'string', description: 'Xero InvoiceID' },
+        description: { type: 'string', description: 'New line item description' },
+        amount: { type: 'number', description: 'New amount excluding GST' },
+        due_date: { type: 'string', description: 'New due date YYYY-MM-DD' },
+        reference: { type: 'string', description: 'New invoice reference/PO number' },
       },
       required: ['invoice_id'],
     },
@@ -681,6 +718,29 @@ export async function executeTool(name: string, input: Record<string, unknown>, 
       const ok = await approveXeroInvoice(input.invoice_id as string)
       if (!ok) return JSON.stringify({ error: 'Failed to approve invoice.' })
       return JSON.stringify({ success: true })
+    }
+
+    case 'void_xero_invoice': {
+      const ok = await voidXeroInvoice(input.invoice_id as string)
+      if (!ok) return JSON.stringify({ error: 'Failed to void invoice — it may have payments allocated, or may not be in AUTHORISED status.' })
+      return JSON.stringify({ success: true })
+    }
+
+    case 'delete_xero_invoice': {
+      const ok = await deleteXeroInvoice(input.invoice_id as string)
+      if (!ok) return JSON.stringify({ error: 'Failed to delete invoice — it may already be AUTHORISED (use void_xero_invoice instead) or not exist.' })
+      return JSON.stringify({ success: true })
+    }
+
+    case 'update_xero_invoice': {
+      const invoice = await updateXeroInvoice(input.invoice_id as string, {
+        description: input.description as string | undefined,
+        amount: input.amount != null ? Number(input.amount) : undefined,
+        dueDate: input.due_date as string | undefined,
+        reference: input.reference as string | undefined,
+      })
+      if (!invoice) return JSON.stringify({ error: 'Failed to update invoice — it may no longer be in DRAFT status.' })
+      return JSON.stringify({ success: true, invoice: { id: invoice.InvoiceID, number: invoice.InvoiceNumber, status: invoice.Status, total: invoice.Total } })
     }
 
     // ── Email ───────────────────────────────

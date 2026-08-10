@@ -801,6 +801,89 @@ export async function approveXeroInvoice(invoiceId: string): Promise<boolean> {
   }
 }
 
+/**
+ * Voids an AUTHORISED invoice. Xero does not support un-voiding — this is
+ * permanent. Fails (returns false) if the invoice has payments/credit notes
+ * allocated to it; those must be removed in Xero first.
+ */
+export async function voidXeroInvoice(invoiceId: string): Promise<boolean> {
+  const account = await getValidXeroAccount()
+  if (!account || !account.account_id) return false
+
+  try {
+    await xeroPost(
+      `/Invoices/${invoiceId}`,
+      { Status: 'VOIDED' },
+      account.access_token,
+      account.account_id,
+      'POST',
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Deletes a DRAFT or SUBMITTED invoice (Xero's actual "delete" — it only
+ * applies to unapproved invoices; anything AUTHORISED must be voided
+ * instead, never hard-deleted, for accounting-trail integrity).
+ */
+export async function deleteXeroInvoice(invoiceId: string): Promise<boolean> {
+  const account = await getValidXeroAccount()
+  if (!account || !account.account_id) return false
+
+  try {
+    await xeroPost(
+      `/Invoices/${invoiceId}`,
+      { Status: 'DELETED' },
+      account.access_token,
+      account.account_id,
+      'POST',
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Updates line items/date/reference on an invoice that's still DRAFT (not yet sent). */
+export async function updateXeroInvoice(invoiceId: string, updates: {
+  description?: string
+  amount?: number
+  dueDate?: string
+  reference?: string
+}): Promise<XeroCreatedInvoice | null> {
+  const account = await getValidXeroAccount()
+  if (!account || !account.account_id) return null
+
+  const payload: Record<string, unknown> = {}
+  if (updates.dueDate) payload.DueDate = updates.dueDate
+  if (updates.reference !== undefined) payload.Reference = updates.reference
+  if (updates.description !== undefined || updates.amount !== undefined) {
+    payload.LineItems = [{
+      Description: updates.description ?? 'Services',
+      UnitAmount: updates.amount,
+      Quantity: 1,
+      AccountCode: '200',
+      TaxType: 'OUTPUT2',
+    }]
+  }
+
+  try {
+    const res = await xeroPost<{ Invoices?: XeroCreatedInvoice[] }>(
+      `/Invoices/${invoiceId}`,
+      payload,
+      account.access_token,
+      account.account_id,
+      'POST',
+    )
+    return res.Invoices?.[0] ?? null
+  } catch {
+    return null
+  }
+}
+
 /** List outstanding ACCREC invoices (not yet paid). */
 export async function fetchOutstandingInvoices(): Promise<XeroCreatedInvoice[]> {
   const account = await getValidXeroAccount()

@@ -14,7 +14,9 @@ import { fetchUnreadEmails, checkMailConnection } from '@/lib/mail'
 // Telegram message_id instead; renaming the table isn't worth another
 // manual migration for what's purely a naming nit).
 
-const SYSTEM = `You're Tui — Arlo's right hand for Tui Media (videography, photography and marketing, sole operator, Nelson NZ), reachable by Telegram. You've got direct tool access to the CRM — clients, jobs, tasks, deliverables, events, documents — to Xero invoicing, and read-only access to the hello@tuimedia.nz inbox. You're not a bot bolted onto the business, you're the person on the team who's always got eyes on the pipeline.
+const SYSTEM = `You're Tui — Arlo's right hand for Tui Media (videography, photography and marketing, sole operator, Nelson NZ), reachable by Telegram. You've got direct tool access to the CRM — clients, jobs, tasks, deliverables, events, documents — full control of Xero invoicing (create, edit, approve, void, delete), and read-only access to the hello@tuimedia.nz inbox. You're not a bot bolted onto the business, you're the person on the team who's always got eyes on the pipeline.
+
+Xero actions — void_xero_invoice and delete_xero_invoice are permanent, no undo. Only ever use them when Arlo explicitly names the invoice and says to void/delete/cancel it in that message. Never void, delete, or otherwise change an invoice on your own initiative during a proactive check-in or heartbeat — flagging it to him is the right move there, acting on it isn't.
 
 Email access is read-only and envelope-level (subject/sender/date) — you can see that something landed and flag it if it looks urgent (a client chasing a reply, a booking enquiry sitting unread), but you can't read the body or reply. If it looks important, tell Arlo to go check his inbox rather than guessing at contents.
 
@@ -29,7 +31,7 @@ VOICE — this is the part that matters most. Tui Media's whole thing is underst
 
 WHEN TO SPEAK — only when something genuinely needs Arlo's attention right now: a slipping deadline, a stalled edit, something blocking progress, a client waiting on a reply, an overdue invoice sitting unpaid (check overdue_xero_invoices), or an unread email that looks time-sensitive (check unread_emails — use judgement on subject/sender, most unread mail is not urgent). Stay quiet otherwise — never message just to say everything's fine. Never repeat something you already flagged recently (check recent_brain_ticks and recent_messages_last_10 in the snapshot) unless it's gotten worse or he's sat on it a while.
 
-Exception: on a daily heartbeat check-in, always send something, even a one-liner like "all quiet, X active jobs tracked" — that daily message is Arlo's only signal that you're actually still running, so silence there would look identical to a broken integration. Keep it just as short as everything else, and fold in anything from system_health worth knowing (Xero or email disconnected, for instance).
+Exception: once a day you get a scheduled daily check-in trigger. Always send something then, even a one-liner like "morning, 2 jobs on the go, nothing urgent" — that's Arlo's only signal you're actually still running, so silence there would look identical to a broken integration. It should read exactly like every other text you send: never label it, never use the words "heartbeat," "check-in," "status," or "system" in the message itself — just talk like you would any other time, folding in anything from system_health worth knowing (Xero or email disconnected, for instance) the same way you'd mention anything else.
 
 If Arlo just replied, treat it as a real conversation: understand what he means even if it's casual or shorthand ("push smith to friday", "done", "who's that"), use tools to actually act on it (update job/task status, reschedule, look things up), then reply. Always reply — never leave him on read. Important: only text sent via the send_message tool actually reaches him — thinking through an answer without calling the tool means he sees nothing. So when he's messaged you, your last action before finishing must be calling send_message.
 
@@ -137,7 +139,7 @@ export async function runAssistantTurn(
   const userTurn = opts.trigger === 'inbound'
     ? `Arlo just messaged: "${opts.inboundBody}"\n\nCurrent CRM snapshot:\n${snapshot}`
     : opts.trigger === 'heartbeat'
-    ? `Daily heartbeat — this is the one check-in per day you must always respond to, so Arlo knows you're actually running. Give a short status line (active jobs, anything worth flagging, system_health if anything's disconnected), then call send_message.\n\n${snapshot}`
+    ? `[Internal note, not for Arlo: this is the once-daily trigger you must always reply to.] Send Arlo a short, ordinary-sounding text — just what's going on today (active jobs, anything worth flagging, system_health if anything's disconnected) — like you'd send any other time. Don't mention that this is a scheduled or automatic message.\n\n${snapshot}`
     : `Scheduled check-in — review the CRM snapshot below and decide if anything needs a message right now.\n\n${snapshot}`
 
   const messages: Anthropic.MessageParam[] = [{ role: 'user', content: userTurn }]
@@ -188,7 +190,7 @@ export async function runAssistantTurn(
   // heartbeat it means Arlo was owed a message and didn't get one. Force it.
   const mustRespond = opts.trigger === 'inbound' || opts.trigger === 'heartbeat'
   if (mustRespond && !messageSent) {
-    const fallbackBody = reasoning || 'Daily check-in: couldn\'t put together a summary this time, but I\'m still running — worth a look if this keeps happening.'
+    const fallbackBody = reasoning || 'Hey, couldn\'t pull a proper summary together just now but I\'m still up — flag it if this keeps happening.'
     const messageId = await sendTelegramMessage(fallbackBody)
     messageSent = messageId != null
     messageBody = fallbackBody
