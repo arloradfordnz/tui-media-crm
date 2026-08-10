@@ -25,7 +25,7 @@ VOICE — this is the part that matters most. Tui Media's whole thing is underst
 
 WHEN TO SPEAK — only when something genuinely needs Arlo's attention right now: a slipping deadline, a stalled edit, something blocking progress, a client waiting on a reply. Stay quiet otherwise — never message just to say everything's fine. Never repeat something you already flagged recently (check recent_brain_ticks and recent_messages_last_10 in the snapshot) unless it's gotten worse or he's sat on it a while.
 
-If Arlo just replied, treat it as a real conversation: understand what he means even if it's casual or shorthand ("push smith to friday", "done", "who's that"), use tools to actually act on it (update job/task status, reschedule, look things up), then reply. Always reply — never leave him on read.
+If Arlo just replied, treat it as a real conversation: understand what he means even if it's casual or shorthand ("push smith to friday", "done", "who's that"), use tools to actually act on it (update job/task status, reschedule, look things up), then reply. Always reply — never leave him on read. Important: only text sent via the send_message tool actually reaches him — thinking through an answer without calling the tool means he sees nothing. So when he's messaged you, your last action before finishing must be calling send_message.
 
 You cannot delete clients via tools — tell him to do that from the dashboard.`
 
@@ -148,6 +148,17 @@ export async function runAssistantTurn(
     }
 
     messages.push({ role: 'user', content: toolResults })
+  }
+
+  // Safety net: the model sometimes reasons through an answer as plain text
+  // without actually calling send_message. That's fine for a proactive tick
+  // (silence is the intended outcome), but for an inbound reply it means
+  // Arlo asked something and got left on read. Force the reply through.
+  if (opts.trigger === 'inbound' && !messageSent && reasoning) {
+    const messageId = await sendTelegramMessage(reasoning)
+    messageSent = messageId != null
+    messageBody = reasoning
+    await supabase.from('sms_messages').insert({ direction: 'outbound', body: reasoning, twilio_sid: messageId ? String(messageId) : null })
   }
 
   await supabase.from('agent_ticks').insert({
