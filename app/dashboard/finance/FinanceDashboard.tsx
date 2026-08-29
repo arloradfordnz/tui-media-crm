@@ -427,7 +427,7 @@ function CashPosition({
 
   const segments = [
     { label: 'Cash in bank', value: cash, color: 'var(--accent)' },
-    { label: 'Due (not overdue)', value: nonOverdue, color: '#f59e0b' },
+    { label: 'Due (not overdue)', value: nonOverdue, color: 'var(--warning)' },
     { label: 'Overdue', value: overdue, color: 'var(--danger)' },
   ]
 
@@ -797,7 +797,7 @@ export default function FinanceDashboard({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 8px', marginTop: 4 }}>
             {[
               { label: 'Avg Invoice', value: fmtShort(avgInvoice), color: undefined },
-              { label: 'Runway', value: runwayMonths != null ? `${runwayMonths}mo` : '—', color: runwayMonths != null && runwayMonths < 3 ? 'var(--danger)' : runwayMonths != null && runwayMonths < 6 ? '#f59e0b' : undefined },
+              { label: 'Runway', value: runwayMonths != null ? `${runwayMonths}mo` : '—', color: runwayMonths != null && runwayMonths < 3 ? 'var(--danger)' : runwayMonths != null && runwayMonths < 6 ? 'var(--warning)' : undefined },
               { label: 'Outstanding', value: fmtShort(outstandingTotal), color: undefined },
               { label: 'Overdue', value: fmtShort(overdueTotal), color: overdueTotal > 0 ? 'var(--danger)' : undefined },
             ].map(({ label, value, color }) => (

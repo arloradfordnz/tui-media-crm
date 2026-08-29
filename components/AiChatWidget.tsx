@@ -32,7 +32,7 @@ export default function AiChatWidget() {
       className="fixed bottom-6 right-6 z-50"
       style={{ zIndex: 60, display: open ? 'block' : 'none' }}
     >
-      <div style={{ filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.5))' }}>
+      <div style={{ filter: 'drop-shadow(0 10px 34px rgba(6, 13, 26, 0.55))' }}>
         <Suspense
           fallback={
             <div

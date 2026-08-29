@@ -215,8 +215,8 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
         </div>
 
         {/* Save / Status */}
-        {state?.error && <div className="text-sm px-4 py-3 rounded-lg" style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--danger)' }}>{state.error}</div>}
-        {state?.success && <div className="text-sm px-4 py-3 rounded-lg" style={{ background: 'rgba(74,222,128,0.1)', color: 'var(--success)' }}>Proposal saved.</div>}
+        {state?.error && <div className="alert alert-danger">{state.error}</div>}
+        {state?.success && <div className="alert alert-success">Proposal saved.</div>}
 
         {isDraft && (
           <div className="flex gap-3">

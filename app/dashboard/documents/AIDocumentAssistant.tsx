@@ -143,7 +143,7 @@ export default function AIDocumentAssistant({
         style={{
           background: 'var(--bg-surface)',
           border: '1px solid var(--bg-border)',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+          boxShadow: '0 18px 40px rgba(6, 13, 26, 0.20)',
         }}
         role="complementary"
         aria-label="AI draft assistant"
@@ -204,7 +204,7 @@ export default function AIDocumentAssistant({
                       background: m.role === 'user' ? 'var(--accent)' : 'var(--bg-elevated)',
                       color:
                         m.role === 'user'
-                          ? '#fff'
+                          ? 'var(--on-accent)'
                           : isEmpty
                           ? 'var(--text-tertiary)'
                           : 'var(--text-primary)',

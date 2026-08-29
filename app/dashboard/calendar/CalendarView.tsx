@@ -12,8 +12,8 @@ const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const EVENT_COLORS: Record<string, string> = {
   shoot: 'var(--accent)',
-  meeting: '#a78bfa',
-  call: '#a78bfa',
+  meeting: 'var(--accent-soft)',
+  call: 'var(--accent-soft)',
   deadline: 'var(--warning)',
   personal: 'var(--text-tertiary)',
 }
@@ -123,7 +123,7 @@ export default function CalendarView({ events, jobs, month, year, feedToken }: {
                     <span className="text-sm font-medium" style={{ color: isToday ? 'var(--accent)' : 'var(--text-secondary)' }}>{day}</span>
                     <div className="mt-1 space-y-1">
                       {dayEvents.slice(0, 3).map((e) => (
-                        <div key={e.id} className="text-[10px] px-1.5 py-0.5 rounded truncate" style={{ background: EVENT_COLORS[e.eventType] || 'var(--bg-elevated)', color: '#fff' }}>
+                        <div key={e.id} className="text-[10px] px-1.5 py-0.5 rounded truncate" style={{ background: EVENT_COLORS[e.eventType] || 'var(--bg-elevated)', color: 'var(--on-accent)' }}>
                           {e.title}
                         </div>
                       ))}

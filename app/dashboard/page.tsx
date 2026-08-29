@@ -127,8 +127,9 @@ export default async function DashboardPage() {
   }
   const inFlightJobs = PIPELINE_STAGES.reduce((sum, s) => sum + stageCounts[s.key], 0)
 
-  // Monochrome ramp (dark → light) — keeps the breakdown restrained, no rainbow accents
-  const STAGE_COLORS = ['#1a1a1f', '#3f3f46', '#52525b', '#71717a', '#a1a1aa', '#cbcbd1']
+  // A single-hue ramp off the brand blue (deep → pale) — keeps the breakdown
+  // restrained, no rainbow accents, and stays inside the palette.
+  const STAGE_COLORS = ['#2F5FD0', '#4A7AE4', '#6E9BF7', '#93B5F9', '#B4CCFB', '#D3E0FD']
   const reportBreakdown = PIPELINE_STAGES
     .map((s, i) => ({ label: s.label, value: stageValues[s.key], color: STAGE_COLORS[i % STAGE_COLORS.length] }))
     .filter((b) => b.value > 0)

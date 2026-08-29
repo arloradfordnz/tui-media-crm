@@ -104,7 +104,7 @@ export default function NewClientPage() {
         </div>
 
         {state?.error && (
-          <div className="text-sm px-4 py-3 rounded-lg" style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--danger)' }}>
+          <div className="alert alert-danger">
             {state.error}
           </div>
         )}

@@ -349,7 +349,7 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
           <input type="hidden" name="notes" value={client.notes || ''} />
 
           {state?.error && (
-            <div className="text-sm px-4 py-3 rounded-lg" style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--danger)' }}>{state.error}</div>
+            <div className="alert alert-danger">{state.error}</div>
           )}
           <div className="flex gap-3">
             <button type="submit" disabled={pending} className="btn-primary">{pending ? 'Saving...' : 'Save Changes'}</button>

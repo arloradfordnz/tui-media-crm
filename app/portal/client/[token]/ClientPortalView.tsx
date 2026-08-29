@@ -267,7 +267,7 @@ function FileCard({ file, jobId, portalToken, onApprove }: { file: DeliveryFile;
 
       {/* Preview */}
       {file.fileUrl && kind === 'vimeo' && (
-        <div className="relative w-full mb-3" style={{ paddingBottom: '56.25%', background: '#000', borderRadius: '8px', overflow: 'hidden' }}>
+        <div className="relative w-full mb-3" style={{ paddingBottom: '56.25%', background: '#060D1A', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
           <iframe
             src={file.fileUrl.replace('vimeo.com/', 'player.vimeo.com/video/')}
             className="absolute inset-0 w-full h-full"
@@ -277,17 +277,17 @@ function FileCard({ file, jobId, portalToken, onApprove }: { file: DeliveryFile;
         </div>
       )}
       {file.fileUrl && kind === 'video' && (
-        <video controls className="w-full rounded-lg mb-3" style={{ maxHeight: '480px', background: '#000' }}>
+        <video controls className="w-full rounded-lg mb-3" style={{ maxHeight: '480px', background: '#060D1A' }}>
           <source src={file.fileUrl} type={file.mimeType || undefined} />
         </video>
       )}
       {file.fileUrl && kind === 'image' && (
         <a href={file.fileUrl} target="_blank" rel="noreferrer">
-          <img src={file.fileUrl} alt={file.originalName} className="w-full rounded-lg mb-3" style={{ maxHeight: '480px', objectFit: 'contain', background: '#000' }} />
+          <img src={file.fileUrl} alt={file.originalName} className="w-full rounded-lg mb-3" style={{ maxHeight: '480px', objectFit: 'contain', background: '#060D1A' }} />
         </a>
       )}
       {file.fileUrl && kind === 'pdf' && (
-        <iframe src={file.fileUrl} className="w-full rounded-lg mb-3" style={{ height: '480px', background: '#000', border: 0 }} />
+        <iframe src={file.fileUrl} className="w-full rounded-lg mb-3" style={{ height: '480px', background: '#060D1A', border: 0 }} />
       )}
       {file.fileUrl && kind === 'audio' && (
         <audio controls className="w-full mb-3">
@@ -624,7 +624,7 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
                     </div>
                   )}
                   {signState?.error && (
-                    <p className="text-xs" style={{ color: '#f87171' }}>{signState.error}</p>
+                    <p className="text-xs" style={{ color: 'var(--danger)' }}>{signState.error}</p>
                   )}
                   <div className="flex gap-2">
                     <button type="submit" disabled={signPending || !signatureInput.trim()} className="btn-primary text-sm">

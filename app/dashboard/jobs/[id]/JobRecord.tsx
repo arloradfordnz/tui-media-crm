@@ -330,7 +330,7 @@ export default function JobRecord({ job }: { job: JobData }) {
           <label className="field-label">Notes</label>
           <textarea name="notes" rows={3} defaultValue={job.notes || ''} className="field-input" />
         </div>
-        {state?.error && <div className="text-sm px-4 py-3 rounded-lg" style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--danger)' }}>{state.error}</div>}
+        {state?.error && <div className="alert alert-danger">{state.error}</div>}
         <button type="submit" disabled={pending} className="btn-primary">{pending ? 'Saving...' : 'Save Changes'}</button>
       </form>
 

@@ -86,12 +86,12 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
 
         {/* Status Banner */}
         {proposal.status === 'accepted' && (
-          <div className="rounded-lg p-4 text-center" style={{ background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.3)' }}>
+          <div className="alert alert-success" style={{ display: 'block', textAlign: 'center' }}>
             <p className="text-sm font-medium" style={{ color: 'var(--success)' }}>This proposal has been accepted. Thank you!</p>
           </div>
         )}
         {proposal.status === 'declined' && (
-          <div className="rounded-lg p-4 text-center" style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)' }}>
+          <div className="alert alert-danger" style={{ display: 'block', textAlign: 'center' }}>
             <p className="text-sm font-medium" style={{ color: 'var(--danger)' }}>This proposal has been declined.</p>
           </div>
         )}

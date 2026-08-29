@@ -1,93 +1,157 @@
 @import "tailwindcss";
 
+/* ── Tailwind theme ───────────────────────────────────────── */
+/* The utility radius scale is remapped onto the brand's geometry so a
+   `rounded-lg` inset panel matches a `.card` instead of sitting 14px sharper
+   than everything around it. Tailwind's defaults (4/6/8/12/16px) are far
+   tighter than the site's, which runs 22px on controls and 32px on panels.
+   Remapping here means no markup has to change. */
+@theme {
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+  --radius-2xl: 28px;
+  --radius-3xl: 32px;
+
+  --font-sans: 'Bricolage Grotesque', 'Helvetica Neue', Arial, sans-serif;
+}
+
+
+/* ── Brand typeface ───────────────────────────────────────── */
+/* Bricolage Grotesque, self-hosted from the same variable woff2 files
+   tuimedia.nz ships. Two subsets, each with its own unicode-range: latin
+   covers the whole interface and is preloaded in layout.tsx; latin-ext is
+   only fetched when a character in its range appears (macrons in te reo
+   place and client names, mostly). */
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 200 800;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url(/fonts/bricolage-grotesque-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 200 800;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url(/fonts/bricolage-grotesque-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
 /* ── Design Tokens ────────────────────────────────────────── */
-/* Default = clean light theme (flat, minimal, monochrome) */
+/* The palette is tuimedia.nz's, token for token (see the site's PALETTES.md).
+   The site is navy-only; the CRM keeps its light/dark switch, so the same
+   brand is expressed twice:
+
+     dark  — the site's own values, unchanged. Navy paper, blue accent.
+     light — the same hues inverted onto paper: a cool off-white ground with
+             navy ink, and the accent deepened just enough to hold contrast
+             on a light surface (#6E9BF7 is a dark-ground blue and fails as
+             text or a fill colour on white).
+
+   Token NAMES are the CRM's existing ones so no component has to change. */
+
+/* Default = light */
 :root {
-  --bg-base: #ffffff;        /* app canvas — white */
-  --bg-surface: #f4f3f1;     /* cards / panels — warm light grey */
-  --bg-elevated: #eeede9;    /* inset boxes, hover, active fills */
-  --bg-hover: #e8e7e3;       /* row / control hover */
-  --bg-border: #eaeae7;      /* hairline borders */
-  --text-primary: #1a1a1f;
-  --text-secondary: #6b6b76;
-  --text-tertiary: #a3a3ad;
-  --accent: #1a1a1f;         /* monochrome — near black */
-  --accent-hover: #000000;
-  --accent-muted: #f0efec;   /* neutral fill behind accent content */
-  --accent-soft: #33333a;    /* lighter near-black for hovers */
-  --on-accent: #ffffff;      /* text/icon sitting on an accent fill */
-  --success: #16a34a;
-  --warning: #d97706;
-  --danger: #dc2626;
+  --bg-base: #F4F6FA;        /* app canvas — cool paper, the navy inverted */
+  --bg-surface: #FFFFFF;     /* cards / panels */
+  --bg-elevated: #EDF0F7;    /* inset boxes, hover, active fills */
+  --bg-hover: #E4E9F3;       /* row / control hover */
+  --bg-border: #DBE1EC;      /* hairline borders */
+  --text-primary: #0A1428;   /* --accent-ink from the site: near-black navy */
+  --text-secondary: #5A6884;
+  --text-tertiary: #8996B2;  /* --muted, which reads as tertiary on paper */
+  --accent: #2F5FD0;         /* --accent deepened for a light ground (4.9:1) */
+  --accent-hover: #244CAE;
+  --accent-muted: rgba(47, 95, 208, 0.10);
+  --accent-soft: #4A7AE4;
+  --on-accent: #FFFFFF;
+  --success: #1B8F4F;
+  --warning: #B4690E;
+  --danger: #C4443F;
   --sidebar-width: 248px;
   --sidebar-inset: 12px;     /* gap around floating sidebar */
 
-  /* Liquid glass (Apple-style translucent chrome) — light */
+  /* Liquid glass (translucent chrome) — light.
+     The site's nav pill is a translucent panel carried by blur and a drop
+     shadow with no border; these keep a hairline because CRM panels sit on
+     a busier ground than a marketing page. */
   --glass-bg: rgba(255, 255, 255, 0.62);
-  --glass-border: rgba(20, 20, 30, 0.08);
-  --glass-hover: rgba(20, 20, 30, 0.05);
-  --glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 10px 34px rgba(20, 20, 30, 0.14);
+  --glass-border: rgba(10, 20, 40, 0.10);
+  --glass-hover: rgba(10, 20, 40, 0.05);
+  --glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 10px 34px rgba(10, 20, 40, 0.14);
 
   /* Card glass — subtler than chrome glass so content stays legible */
-  --glass-card-bg: rgba(255, 255, 255, 0.55);
-  --glass-card-border: rgba(20, 20, 30, 0.07);
+  --glass-card-bg: rgba(255, 255, 255, 0.72);
+  --glass-card-border: rgba(10, 20, 40, 0.08);
   --glass-card-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.85);
 
-  /* Radii */
-  --r-sm: 10px;
-  --r-md: 12px;
-  --r-lg: 18px;
-  --r-xl: 24px;
+  /* Radii — the site's scale. 32px panels, 22px controls, pill for anything
+     interactive and small. */
+  --r-sm: 14px;
+  --r-md: 18px;
+  --r-lg: 22px;
+  --r-xl: 32px;
   --r-pill: 999px;
 
-  /* "Gradients" — kept as tokens; solid in light theme */
-  --grad-hero: #18181b;      /* solid dark feature card */
-  --grad-accent: #1a1a1f;    /* solid black for primary / active */
+  /* Feature surfaces — the site's own navy, both themes, so a hero card
+     reads as a piece of the brand rather than "the dark one". */
+  --grad-hero: #0F1930;      /* --surface */
+  --grad-accent: #2F5FD0;
 
-  /* Shadows — very soft */
-  --shadow-soft: 0 1px 3px rgba(20, 20, 30, 0.06), 0 1px 2px rgba(20, 20, 30, 0.04);
-  --shadow-glow-accent: 0 8px 24px rgba(20, 20, 30, 0.10);
-  --shadow-glow-warm: 0 8px 24px rgba(20, 20, 30, 0.10);
+  /* Shadows — soft and navy-tinted rather than neutral grey */
+  --shadow-soft: 0 1px 3px rgba(10, 20, 40, 0.06), 0 1px 2px rgba(10, 20, 40, 0.04);
+  --shadow-glow-accent: 0 8px 24px rgba(47, 95, 208, 0.16);
+  --shadow-glow-warm: 0 8px 24px rgba(10, 20, 40, 0.10);
+
+  /* Motion — the site's single easing curve */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-/* ── Dark theme (opt-in via Settings → <html class="dark">) ──── */
-/* Monochrome: Tui black canvas, white ink. No brand accent —
-   white is the highlight; status colours kept for badges only. */
+/* ── Dark theme (Settings → Appearance, or the device default) ──
+   These are tuimedia.nz's values verbatim. */
 .dark {
-  --bg-base: #000000;        /* Tui black */
-  --bg-surface: #0d0d0f;     /* cards / panels */
-  --bg-elevated: #17171a;    /* inset boxes, hover, active fills */
-  --bg-hover: #1f1f23;       /* row / control hover */
-  --bg-border: #262629;      /* hairline borders */
-  --text-primary: #ffffff;
-  --text-secondary: #a1a1aa;
-  --text-tertiary: #6b6b73;
-  --accent: #ffffff;         /* monochrome — white is the accent */
-  --accent-hover: #e6e6e6;
-  --accent-muted: rgba(255, 255, 255, 0.10);
-  --accent-soft: #d4d4d8;
-  --on-accent: #000000;      /* dark ink on a white fill */
-  --success: #4ade80;
-  --warning: #fbbf24;
-  --danger: #f87171;
+  --bg-base: #060D1A;        /* --paper */
+  --bg-surface: #0F1930;     /* --surface */
+  --bg-elevated: #16223E;    /* insets sit a step ABOVE the card, not below */
+  --bg-hover: #1C2B4C;       /* row / control hover, one step further up */
+  --bg-border: rgba(239, 242, 248, 0.13);   /* --rule */
+  --text-primary: #EFF2F8;   /* --ink */
+  --text-secondary: #8996B2; /* --muted */
+  --text-tertiary: #6B7899;
+  --accent: #6E9BF7;
+  --accent-hover: #8FB2F9;
+  --accent-muted: rgba(110, 155, 247, 0.16); /* --accent-soft */
+  --accent-soft: #A8C3FB;
+  --on-accent: #0A1428;      /* --accent-ink */
+  --success: #45C97A;        /* --ok, the one green in the palette */
+  --warning: #F5C06B;
+  --danger: #FF8A8A;         /* --error */
 
-  --grad-hero: #17171a;      /* solid dark feature card */
-  --grad-accent: #1f1f23;    /* solid dark fill (NoteEditor toggles) */
+  --grad-hero: #1B2E52;      /* lifted navy so a feature card is not just another card */
+  --grad-accent: #6E9BF7;
 
-  --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-soft: 0 10px 34px -10px rgba(0, 0, 0, 0.6);
   --shadow-glow-accent: 0 12px 36px rgba(0, 0, 0, 0.55);
   --shadow-glow-warm: 0 12px 36px rgba(0, 0, 0, 0.55);
 
-  /* Liquid glass — dark */
-  --glass-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.05));
-  --glass-border: rgba(255, 255, 255, 0.14);
-  --glass-hover: rgba(255, 255, 255, 0.08);
-  --glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 10px 34px rgba(0, 0, 0, 0.55);
+  /* Liquid glass — dark. --nav-bg on the site is a translucent --surface,
+     blurred and saturated; the same recipe here. */
+  --glass-bg: rgba(15, 25, 48, 0.40);
+  --glass-border: rgba(239, 242, 248, 0.13);
+  --glass-hover: rgba(239, 242, 248, 0.08);
+  --glass-shadow: inset 0 1px 0 rgba(239, 242, 248, 0.12), 0 10px 34px -10px rgba(0, 0, 0, 0.6);
 
   /* Card glass — dark */
-  --glass-card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
-  --glass-card-border: rgba(255, 255, 255, 0.09);
-  --glass-card-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  --glass-card-bg: rgba(15, 25, 48, 0.72);
+  --glass-card-border: rgba(239, 242, 248, 0.11);
+  --glass-card-highlight: inset 0 1px 0 rgba(239, 242, 248, 0.07);
 }
 
 /* ── Reset ────────────────────────────────────────────────── */
@@ -97,13 +161,27 @@ html, body {
   max-width: 100vw;
 }
 body {
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Bricolage Grotesque', 'Helvetica Neue', Arial, sans-serif;
+  font-optical-sizing: auto;
   background: var(--bg-base);
   color: var(--text-primary);
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeSpeed;
 }
+
+/* ── Focus ────────────────────────────────────────────────── */
+/* One ring everywhere, keyboard only, so the mouse path stays clean.
+   The outline follows each element's own border-radius, so it never
+   draws a second detached box around a pill or a card. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+:focus:not(:focus-visible) { outline: none; }
+
+::selection { background: var(--accent); color: var(--on-accent); }
 
 /* ── Scrollbar ────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -112,94 +190,117 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
 
 /* ── Typography ───────────────────────────────────────────── */
+/* Headings carry the site's settings: weight 500 rather than 600, tighter
+   tracking, and a line-height under 1 on the large sizes. Bricolage is a
+   wide grotesk, so it needs the negative tracking to hold together at
+   display sizes and looks under-set without it. Sizes are unchanged. */
 h1, h2, h3, h4, h5, h6 {
-  letter-spacing: -0.02em;
+  letter-spacing: -0.035em;
   color: var(--text-primary);
+  text-wrap: balance;
 }
-h1 { font-size: 28px; font-weight: 600; }
-h2 { font-size: 20px; font-weight: 600; }
-h3 { font-size: 16px; font-weight: 500; }
-h4 { font-size: 14px; font-weight: 500; }
-h5, h6 { font-size: 13px; font-weight: 500; }
+h1 { font-size: 28px; font-weight: 500; line-height: 1.05; }
+h2 { font-size: 20px; font-weight: 500; line-height: 1.1; }
+h3 { font-size: 16px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.15; }
+h4 { font-size: 14px; font-weight: 500; letter-spacing: -0.02em; }
+h5, h6 { font-size: 13px; font-weight: 500; letter-spacing: -0.02em; }
 
+/* The site's label recipe: small, heavy, and widely tracked, so a caption
+   reads as a different kind of thing from body copy rather than just
+   smaller body copy. */
 .label {
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.14em;
   color: var(--text-secondary);
 }
 
 /* ── Form elements ────────────────────────────────────────── */
 input, textarea, select, button { font-family: inherit; }
 
+/* Fields sit on the surface rather than in a filled box: a transparent
+   ground with a hairline edge, the site's larger radius, and generous
+   padding. Focus doubles the edge in accent rather than adding a detached
+   ring outside it. */
 .field-input {
   width: 100%;
-  padding: 11px 16px;
+  padding: 12px 18px;
   border: 1px solid var(--bg-border);
-  border-radius: var(--r-md);
+  border-radius: var(--r-lg);
   font-size: 14px;
   color: var(--text-primary);
-  background: var(--bg-surface);
+  background: transparent;
   outline: none;
   box-shadow: none;
-  transition: border-color 80ms ease, box-shadow 120ms ease;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
 }
-.field-input::placeholder { color: var(--text-tertiary); }
+.field-input::placeholder { color: var(--text-tertiary); opacity: 0.7; }
 .field-input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(20, 20, 30, 0.08);
+  box-shadow: 0 0 0 1px var(--accent);
 }
+.field-input:focus-visible { outline: none; }
 .field-input:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .field-label {
   display: block;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
   color: var(--text-secondary);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 /* ── Buttons ──────────────────────────────────────────────── */
+/* The site's button: a pill in accent, its label a touch heavier and
+   tracked in slightly, and a small scale on press instead of a filter. */
 .btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 9px 18px;
+  padding: 10px 20px;
   background: var(--accent);
   color: var(--on-accent);
-  border: none;
+  border: 1px solid transparent;
   border-radius: var(--r-pill);
   font-size: 13.5px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   cursor: pointer;
-  transition: filter 120ms ease, background 120ms ease;
+  transition: transform 140ms var(--ease-out), background 200ms ease, border-color 200ms ease;
   text-decoration: none;
+  white-space: nowrap;
 }
 .btn-primary:hover {
   background: var(--accent-hover);
 }
-.btn-primary:active { filter: brightness(0.92); }
-.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary:active { transform: scale(0.975); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
+/* The site's outline button: transparent, carried by a hairline edge alone. */
 .btn-secondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 9px 18px;
-  background: var(--bg-surface);
+  padding: 10px 20px;
+  background: transparent;
   color: var(--text-primary);
   border: 1px solid var(--bg-border);
   border-radius: var(--r-pill);
   font-size: 13.5px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   cursor: pointer;
-  transition: background 100ms ease, border-color 100ms ease, transform 120ms ease;
+  transition: transform 140ms var(--ease-out), background 200ms ease, border-color 200ms ease;
   text-decoration: none;
+  white-space: nowrap;
 }
 .btn-secondary:hover { background: var(--bg-elevated); border-color: var(--text-tertiary); }
+.btn-secondary:active { transform: scale(0.975); }
 
 .btn-danger {
   display: inline-flex;
@@ -208,28 +309,31 @@ input, textarea, select, button { font-family: inherit; }
   padding: 10px 20px;
   background: transparent;
   color: var(--danger);
-  border: 1px solid rgba(248, 113, 113, 0.3);
-  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--danger) 34%, transparent);
+  border-radius: var(--r-pill);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   cursor: pointer;
-  transition: all 150ms ease;
+  transition: transform 140ms var(--ease-out), background 200ms ease, border-color 200ms ease;
 }
-.btn-danger:hover { background: rgba(248, 113, 113, 0.1); }
+.btn-danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.btn-danger:active { transform: scale(0.975); }
 
 .btn-ghost {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 7px 14px;
-  background: var(--bg-elevated);
+  background: transparent;
   color: var(--text-secondary);
   border: 1px solid var(--bg-border);
   border-radius: var(--r-pill);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   cursor: pointer;
-  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+  transition: color 200ms ease, background 200ms ease, border-color 200ms ease;
   text-decoration: none;
 }
 .btn-ghost:hover {
@@ -248,7 +352,10 @@ input, textarea, select, button { font-family: inherit; }
   border-color: var(--accent);
 }
 
-/* Hero action buttons — color-only hover */
+/* Hero action buttons. These always sit on the navy feature card in both
+   themes, so they are written against the site's dark-ground values rather
+   than the theme tokens: --ink for the light button, --accent for the solid
+   one, --accent-ink for the text sitting on it. */
 .btn-hero-light {
   display: inline-flex;
   align-items: center;
@@ -256,15 +363,18 @@ input, textarea, select, button { font-family: inherit; }
   padding: 10px 18px;
   border-radius: var(--r-pill);
   font-size: 14px;
-  font-weight: 500;
-  background: rgba(255, 255, 255, 0.15);
-  color: #fff;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  background: rgba(239, 242, 248, 0.10);
+  color: #EFF2F8;
+  border: 1px solid rgba(239, 242, 248, 0.22);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   text-decoration: none;
-  transition: background 150ms ease;
+  transition: transform 140ms var(--ease-out), background 200ms ease;
 }
-.btn-hero-light:hover { background: rgba(255, 255, 255, 0.28); }
+.btn-hero-light:hover { background: rgba(239, 242, 248, 0.18); }
+.btn-hero-light:active { transform: scale(0.975); }
 
 .btn-hero-solid {
   display: inline-flex;
@@ -273,13 +383,16 @@ input, textarea, select, button { font-family: inherit; }
   padding: 10px 18px;
   border-radius: var(--r-pill);
   font-size: 14px;
-  font-weight: 500;
-  background: #fff;
-  color: #1a1a25;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  background: #6E9BF7;
+  color: #0A1428;
+  border: 1px solid transparent;
   text-decoration: none;
-  transition: background 150ms ease, color 150ms ease;
+  transition: transform 140ms var(--ease-out), background 200ms ease;
 }
-.btn-hero-solid:hover { background: #e7e7f0; }
+.btn-hero-solid:hover { background: #8FB2F9; }
+.btn-hero-solid:active { transform: scale(0.975); }
 
 .btn-icon {
   display: inline-flex;
@@ -289,9 +402,9 @@ input, textarea, select, button { font-family: inherit; }
   background: transparent;
   color: var(--text-secondary);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--r-pill);
   cursor: pointer;
-  transition: all 150ms ease;
+  transition: color 200ms ease, background 200ms ease;
 }
 .btn-icon:hover { background: var(--bg-elevated); color: var(--text-primary); }
 
@@ -321,7 +434,7 @@ input, textarea, select, button { font-family: inherit; }
   position: relative;
   border-radius: var(--r-xl);
   padding: 1.75rem;
-  color: #fff;
+  color: #EFF2F8;
   background: var(--grad-hero);
   overflow: hidden;
   box-shadow: var(--shadow-soft);
@@ -346,14 +459,15 @@ input, textarea, select, button { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   margin: 1px 0;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-pill);
   font-size: 13.5px;
-  font-weight: 400;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   color: var(--text-secondary);
   text-decoration: none;
-  transition: color 120ms ease, background 120ms ease;
+  transition: color 200ms ease, background 200ms ease;
   position: relative;
 }
 .nav-item:not(.active):hover {
@@ -362,9 +476,9 @@ input, textarea, select, button { font-family: inherit; }
 }
 .nav-item.active {
   color: var(--text-primary);
-  background: var(--bg-surface);
-  font-weight: 500;
-  box-shadow: var(--shadow-soft);
+  background: var(--accent-muted);
+  font-weight: 600;
+  box-shadow: none;
 }
 
 /* Nav icons — quieter than the label at rest, matching it on hover/active */
@@ -375,18 +489,16 @@ input, textarea, select, button { font-family: inherit; }
   color: var(--text-tertiary);
   transition: color 120ms ease;
 }
-.nav-item:hover .nav-item-icon,
-.nav-item.active .nav-item-icon {
-  color: var(--text-primary);
-}
+.nav-item:hover .nav-item-icon { color: var(--text-primary); }
+.nav-item.active .nav-item-icon { color: var(--accent); }
 
 .nav-section-label {
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--text-primary);
-  padding: 16px 10px 6px;
-  opacity: 0.9;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-tertiary);
+  padding: 18px 12px 6px;
 }
 .nav-section-label:first-child { padding-top: 8px; }
 
@@ -395,14 +507,14 @@ input, textarea, select, button { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 8px 14px;
   border: 1px solid var(--bg-border);
-  border-radius: var(--r-sm);
-  background: var(--bg-surface);
+  border-radius: var(--r-pill);
+  background: transparent;
   cursor: text;
-  transition: border-color 120ms ease;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
 }
-.sidebar-search:focus-within { border-color: var(--text-tertiary); }
+.sidebar-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .sidebar-search input {
   border: none;
   outline: none;
@@ -449,8 +561,8 @@ input, textarea, select, button { font-family: inherit; }
 }
 .page-title {
   font-size: 28px;
-  font-weight: 600;
-  letter-spacing: -0.03em;
+  font-weight: 500;
+  letter-spacing: -0.035em;
   color: var(--text-primary);
   line-height: 1.1;
 }
@@ -489,17 +601,17 @@ input, textarea, select, button { font-family: inherit; }
 }
 .page-tab:hover { color: var(--text-primary); }
 .page-tab.active {
-  color: var(--text-primary);
-  border-bottom-color: var(--text-primary);
-  font-weight: 500;
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
 }
 
 /* ── Tables ───────────────────────────────────────────────── */
 .table-header {
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
   color: var(--text-tertiary);
   padding: 12px 16px;
 }
@@ -519,17 +631,52 @@ input, textarea, select, button { font-family: inherit; }
   padding: 3px 10px;
   border-radius: var(--r-pill);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: -0.005em;
   white-space: nowrap;
 }
 .badge-sm { padding: 2px 8px; font-size: 10px; border-radius: var(--r-pill); }
 .badge-md { padding: 3px 10px; font-size: 12px; border-radius: var(--r-pill); }
 .badge-lg { padding: 4px 12px; font-size: 13px; border-radius: var(--r-pill); }
-.badge-success { background: rgba(74, 222, 128, 0.1); color: var(--success); }
-.badge-warning { background: rgba(251, 191, 36, 0.1); color: var(--warning); }
-.badge-danger { background: rgba(248, 113, 113, 0.1); color: var(--danger); }
+.badge-success { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success); }
+.badge-warning { background: color-mix(in srgb, var(--warning) 14%, transparent); color: var(--warning); }
+.badge-danger { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
 .badge-accent { background: var(--accent-muted); color: var(--accent); }
-.badge-muted { background: var(--bg-elevated); color: var(--text-secondary); }
+.badge-muted {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  box-shadow: inset 0 0 0 1px var(--bg-border);
+}
+
+/* ── Inline alerts ────────────────────────────────────────── */
+/* Form errors, save confirmations and warnings were each carrying their own
+   frozen rgba fill inline, from before the palette moved. They read off the
+   status tokens now, so both themes stay correct and there is one place to
+   change them. */
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--r-lg);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.alert-danger {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+  color: var(--danger);
+}
+.alert-success {
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
+  color: var(--success);
+}
+.alert-warning {
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 30%, transparent);
+  color: var(--warning);
+}
 
 /* ── Stat Card ────────────────────────────────────────────── */
 .stat-card {
@@ -541,18 +688,19 @@ input, textarea, select, button { font-family: inherit; }
 }
 .stat-card .stat-value {
   font-size: 36px;
-  font-weight: 600;
-  letter-spacing: -0.03em;
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
   color: var(--text-primary);
   line-height: 1.1;
 }
 .stat-card .stat-label {
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 700;
   color: var(--text-tertiary);
   margin-top: 8px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
 }
 .stat-change {
   display: inline-flex;
@@ -564,16 +712,17 @@ input, textarea, select, button { font-family: inherit; }
   border-radius: 999px;
 }
 .stat-change-up {
-  color: #4ade80;
-  background: rgba(74, 222, 128, 0.12);
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 14%, transparent);
 }
 .stat-change-down {
   color: var(--danger);
-  background: rgba(248, 113, 113, 0.12);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
 }
 .stat-change-flat {
   color: var(--text-tertiary);
   background: var(--bg-elevated);
+  box-shadow: inset 0 0 0 1px var(--bg-border);
 }
 .tab-pills {
   display: inline-flex;
@@ -596,7 +745,7 @@ input, textarea, select, button { font-family: inherit; }
 .tab-pill.active {
   background: var(--bg-surface);
   color: var(--text-primary);
-  box-shadow: 0 1px 2px rgba(20,20,30,0.08);
+  box-shadow: 0 1px 2px rgba(6, 13, 26, 0.10);
 }
 
 .stat-icon-bubble {
@@ -617,8 +766,8 @@ input, textarea, select, button { font-family: inherit; }
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(20, 20, 30, 0.4);
-  backdrop-filter: blur(4px);
+  background: rgba(6, 13, 26, 0.55);
+  backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -629,13 +778,13 @@ input, textarea, select, button { font-family: inherit; }
 .modal-content {
   background: var(--bg-surface);
   border: 1px solid var(--bg-border);
-  border-radius: 16px;
+  border-radius: var(--r-xl);
   padding: 1.5rem;
   width: 100%;
   max-width: 480px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 24px 60px rgba(20, 20, 30, 0.18);
+  box-shadow: 0 24px 60px rgba(6, 13, 26, 0.22);
   animation: slideUp 100ms ease;
   will-change: transform, opacity;
 }
@@ -649,7 +798,7 @@ input, textarea, select, button { font-family: inherit; }
   width: 100%;
   padding: 24px;
   border: 2px dashed var(--bg-border);
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   font-size: 14px;
   color: var(--text-secondary);
   cursor: pointer;
@@ -751,10 +900,10 @@ input, textarea, select, button { font-family: inherit; }
   animation: fadeIn 120ms ease;
 }
 .skeleton {
-  background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-border) 50%, var(--bg-elevated) 75%);
+  background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-hover) 50%, var(--bg-elevated) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
 }
 .loading-dots {
   display: flex;
@@ -780,19 +929,19 @@ input, textarea, select, button { font-family: inherit; }
   gap: 8px;
   padding: 10px 12px 10px 14px;
   border: 1px solid var(--bg-border);
-  border-radius: 8px;
+  border-radius: var(--r-lg);
   font-size: 14px;
   color: var(--text-primary);
-  background: var(--bg-elevated);
+  background: transparent;
   cursor: pointer;
   text-align: left;
-  transition: border-color 80ms ease;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
   font-family: inherit;
 }
 .custom-select-trigger:hover:not(:disabled) { border-color: var(--text-tertiary); }
-.custom-select-trigger:focus { outline: none; border-color: var(--accent); }
+.custom-select-trigger:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .custom-select-trigger:disabled { opacity: 0.5; cursor: not-allowed; }
-.custom-select-trigger[aria-expanded="true"] { border-color: var(--accent); }
+.custom-select-trigger[aria-expanded="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 
 .custom-select-value { color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .custom-select-placeholder { color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -800,8 +949,8 @@ input, textarea, select, button { font-family: inherit; }
 .custom-select-menu {
   background: var(--bg-surface);
   border: 1px solid var(--bg-border);
-  border-radius: 12px;
-  box-shadow: 0 12px 32px rgba(20, 20, 30, 0.12), 0 2px 8px rgba(20, 20, 30, 0.06);
+  border-radius: var(--r-md);
+  box-shadow: 0 18px 40px rgba(6, 13, 26, 0.20), 0 2px 8px rgba(6, 13, 26, 0.08);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   animation: selectMenuIn 100ms ease;
@@ -815,9 +964,9 @@ input, textarea, select, button { font-family: inherit; }
 
 .custom-select-search {
   width: 100%;
-  padding: 6px 10px;
+  padding: 7px 12px;
   border: 1px solid var(--bg-border);
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   background: var(--bg-elevated);
   color: var(--text-primary);
   font-size: 13px;
@@ -835,7 +984,7 @@ input, textarea, select, button { font-family: inherit; }
   background: transparent;
   color: var(--text-primary);
   font-size: 14px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   cursor: pointer;
   font-family: inherit;
   text-align: left;
@@ -858,17 +1007,18 @@ input, textarea, select, button { font-family: inherit; }
 /* ── Search ───────────────────────────────────────────────── */
 .search-input {
   width: 100%;
-  padding: 11px 16px 11px 42px;
+  padding: 12px 18px 12px 42px;
   border: 1px solid var(--bg-border);
   border-radius: var(--r-pill);
   font-size: 14px;
   color: var(--text-primary);
-  background: var(--bg-elevated);
+  background: transparent;
   outline: none;
-  transition: border-color 150ms ease;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
 }
-.search-input::placeholder { color: var(--text-tertiary); }
-.search-input:focus { border-color: var(--accent); }
+.search-input::placeholder { color: var(--text-tertiary); opacity: 0.7; }
+.search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.search-input:focus-visible { outline: none; }
 
 /* ── Tooltip ──────────────────────────────────────────────── */
 .tooltip {
@@ -883,7 +1033,7 @@ input, textarea, select, button { font-family: inherit; }
   padding: 4px 10px;
   background: var(--bg-elevated);
   border: 1px solid var(--bg-border);
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   font-size: 12px;
   color: var(--text-primary);
   white-space: nowrap;
@@ -980,7 +1130,7 @@ input, textarea, select, button { font-family: inherit; }
 .sidebar-scrim {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(6, 13, 26, 0.55);
   z-index: 55;
 }
 @media (min-width: 769px) {
@@ -1017,8 +1167,8 @@ input, textarea, select, button { font-family: inherit; }
 }
 .kpi-card .kpi-value {
   font-size: 28px;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  font-weight: 500;
+  letter-spacing: -0.035em;
   color: var(--text-primary);
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -1040,9 +1190,9 @@ input, textarea, select, button { font-family: inherit; }
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-.delta-up { color: var(--success); background: rgba(22, 163, 74, 0.10); }
-.delta-down { color: var(--danger); background: rgba(220, 38, 38, 0.10); }
-.delta-flat { color: var(--text-tertiary); background: var(--bg-elevated); }
+.delta-up { color: var(--success); background: color-mix(in srgb, var(--success) 12%, transparent); }
+.delta-down { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.delta-flat { color: var(--text-tertiary); background: var(--bg-elevated); box-shadow: inset 0 0 0 1px var(--bg-border); }
 
 /* ── Pill dropdown (period selector) ──────────────────────── */
 .pill-select {
@@ -1052,15 +1202,17 @@ input, textarea, select, button { font-family: inherit; }
   padding: 7px 12px;
   border: 1px solid var(--bg-border);
   border-radius: var(--r-pill);
-  background: var(--bg-surface);
+  background: transparent;
   font-size: 13px;
-  font-weight: 450;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
   cursor: pointer;
   transition: border-color 120ms ease, background 120ms ease;
   font-family: inherit;
 }
 .pill-select:hover { background: var(--bg-elevated); border-color: var(--text-tertiary); }
+.pill-select:active { transform: scale(0.975); }
 
 /* ── Chart legend dot ─────────────────────────────────────── */
 .legend-dot {
@@ -1075,7 +1227,7 @@ input, textarea, select, button { font-family: inherit; }
 .drawer-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(20, 20, 30, 0.35);
+  background: rgba(6, 13, 26, 0.55);
   z-index: 60;
   animation: fadeIn 140ms ease;
 }
@@ -1088,7 +1240,7 @@ input, textarea, select, button { font-family: inherit; }
   max-width: 92vw;
   background: var(--bg-surface);
   border-left: 1px solid var(--bg-border);
-  box-shadow: -16px 0 48px rgba(20, 20, 30, 0.12);
+  box-shadow: -16px 0 48px rgba(6, 13, 26, 0.18);
   z-index: 61;
   display: flex;
   flex-direction: column;
@@ -1160,10 +1312,11 @@ input, textarea, select, button { font-family: inherit; }
   transform: rotate(-90deg);
 }
 .navsec-title {
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.005em;
-  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-tertiary);
 }
 .navsec-actions {
   margin-left: auto;
@@ -1187,7 +1340,7 @@ input, textarea, select, button { font-family: inherit; }
 .canvas-gray .kpi-card,
 .canvas-gray .stat-card {
   border-color: transparent;
-  box-shadow: 0 1px 2px rgba(20, 20, 30, 0.04), 0 6px 20px rgba(20, 20, 30, 0.06);
+  box-shadow: 0 1px 2px rgba(6, 13, 26, 0.04), 0 6px 20px rgba(6, 13, 26, 0.07);
 }
 
 /* ── Thin-line icons (sidebar + controls) ─────────────────── */

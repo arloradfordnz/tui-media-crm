@@ -29,11 +29,11 @@ export default function ClearAllButton({ count }: { count: number }) {
         onClick={handleClear}
         disabled={pending || count === 0}
         className="btn-secondary text-xs"
-        style={{ color: '#f87171' }}
+        style={{ color: 'var(--danger)' }}
       >
         <Trash2 className="w-3.5 h-3.5" /> {pending ? 'Clearing...' : `Clear all (${count})`}
       </button>
-      {error && <p className="text-xs" style={{ color: '#f87171' }}>{error}</p>}
+      {error && <p className="text-xs" style={{ color: 'var(--danger)' }}>{error}</p>}
     </div>
   )
 }

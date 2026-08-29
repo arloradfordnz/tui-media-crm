@@ -68,7 +68,7 @@ export default function LoginPage() {
           </div>
 
           {state?.error && (
-            <div className="text-sm px-4 py-3 rounded-lg" style={{ background: 'rgba(248, 113, 113, 0.1)', color: 'var(--danger)', border: '1px solid rgba(248, 113, 113, 0.2)' }}>
+            <div className="alert alert-danger">
               {state.error}
             </div>
           )}

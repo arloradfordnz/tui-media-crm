@@ -178,7 +178,7 @@ export default function DatePicker({
                     cursor: 'pointer',
                     fontWeight: isSelected ? 600 : isToday ? 500 : 400,
                     background: isSelected ? 'var(--accent)' : 'none',
-                    color: isSelected ? '#fff' : isToday ? 'var(--accent)' : 'var(--text-primary)',
+                    color: isSelected ? 'var(--on-accent)' : isToday ? 'var(--accent)' : 'var(--text-primary)',
                     transition: 'background 80ms',
                   }}
                   onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'var(--bg-hover)' }}
