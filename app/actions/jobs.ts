@@ -4,8 +4,12 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { sendRevisionResponseEmail } from '@/lib/email'
+import { findDuplicateJobName, type DuplicateJobMatch } from '@/lib/job-naming'
 
-export async function createJob(prevState: { error?: string } | undefined, formData: FormData) {
+export async function createJob(
+  prevState: { error?: string; duplicate?: DuplicateJobMatch } | undefined,
+  formData: FormData
+) {
   const name = formData.get('name') as string
   const clientId = formData.get('clientId') as string
   const jobType = formData.get('jobType') as string
@@ -16,6 +20,7 @@ export async function createJob(prevState: { error?: string } | undefined, formD
   const expectedPaymentDate = formData.get('expectedPaymentDate') as string
   const tasksJson = formData.get('tasks') as string
   const deliverablesJson = formData.get('deliverables') as string
+  const confirmDuplicate = formData.get('confirmDuplicate') === 'true'
 
   if (!name || !clientId) return { error: 'Job name and client are required.' }
 
@@ -31,6 +36,16 @@ export async function createJob(prevState: { error?: string } | undefined, formD
   }
 
   const supabase = await createServerSupabaseClient()
+
+  // Same job name for the same client, e.g. creating "July Content" when
+  // "Team Bainbridge — July Content" already exists, is almost always a
+  // mistake (or a duplicate of what's already tracked), not an intentional
+  // second job. Two different clients sharing a month-based name is normal
+  // and isn't flagged. Skipped once the form resubmits with confirmDuplicate.
+  if (!confirmDuplicate) {
+    const dup = await findDuplicateJobName(supabase, clientId, name)
+    if (dup) return { duplicate: dup }
+  }
 
   const { data: job, error } = await supabase.from('jobs').insert({
     name,

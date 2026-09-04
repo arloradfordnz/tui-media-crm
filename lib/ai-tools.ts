@@ -1,6 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { fetchXeroContacts, createXeroInvoice, fetchOutstandingInvoices, approveXeroInvoice, voidXeroInvoice, deleteXeroInvoice, updateXeroInvoice, getXeroInvoice, deleteXeroPayment } from '@/lib/xero'
 import { fetchRecentEmails, fetchUnreadEmails } from '@/lib/mail'
+import { getContentBacklog } from '@/lib/content-backlog'
+import { findDuplicateJobName } from '@/lib/job-naming'
 
 // Shared tool definitions + executor for every AI surface (dashboard chat,
 // SMS assistant). One tool set, one set of side effects — a job marked
@@ -110,7 +112,7 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'create_job',
-    description: 'Create a new job. Requires a name and client_id. Optionally specify job_type to auto-populate tasks from templates.',
+    description: 'Create a new job. Requires a name and client_id. Optionally specify job_type to auto-populate tasks from templates. If a job with essentially the same name already exists for this client (e.g. "July Content" when "Team Bainbridge — July Content" already exists), this returns a duplicate warning instead of creating it — check with Arlo whether he meant that existing job, then call again with confirm:true only if he really wants a second one.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -120,6 +122,7 @@ export const TOOLS: Anthropic.Tool[] = [
         shoot_date: { type: 'string', description: 'ISO date (YYYY-MM-DD)' },
         shoot_location: { type: 'string' },
         quote_value: { type: 'number' },
+        confirm: { type: 'boolean', description: 'Set true to create anyway after a duplicate warning and Arlo confirming he wants a second job with that name. Omit on the first attempt.' },
       },
       required: ['name', 'client_id'],
     },
@@ -414,6 +417,19 @@ export const TOOLS: Anthropic.Tool[] = [
       required: [],
     },
   },
+
+  // ── Retainer content backlog ──────────────────
+  {
+    name: 'get_content_backlog',
+    description: 'How far behind Arlo is on retainer content, measured by videos actually uploaded to the client portal rather than job status. Returns per-client month-by-month history: videos expected vs uploaded, which past months still owe videos, and whether a month\'s job was ever created at all. Use this for any question about being behind, catching up, what he owes a retainer client, or how a month is tracking. Far more reliable than job status or the deliverable completed flag, neither of which reflects real progress.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        client_name: { type: 'string', description: 'Optional — filter to one retainer client by name (partial match is fine).' },
+      },
+      required: [],
+    },
+  },
 ]
 
 // ── Tool Executor ──────────────────────────────────────────────────────────────
@@ -502,6 +518,11 @@ export async function executeTool(name: string, input: Record<string, unknown>, 
     }
 
     case 'create_job': {
+      if (!input.confirm) {
+        const dup = await findDuplicateJobName(supabase, input.client_id as string, input.name as string)
+        if (dup) return JSON.stringify({ error: `A job called "${dup.name}" already exists for this client (status: ${dup.status}). Ask Arlo whether he meant that one, or call create_job again with confirm:true if he really wants a second job with this name.`, duplicate_job_id: dup.id })
+      }
+
       const { data: job, error } = await supabase.from('jobs').insert({
         name: input.name as string,
         client_id: input.client_id as string,
@@ -791,6 +812,18 @@ export async function executeTool(name: string, input: Record<string, unknown>, 
       const limit = input.limit != null ? Number(input.limit) : 15
       const emails = input.unread_only ? await fetchUnreadEmails(limit) : await fetchRecentEmails(limit)
       return JSON.stringify({ emails })
+    }
+
+    // ── Retainer content backlog ────────────
+    case 'get_content_backlog': {
+      const backlog = await getContentBacklog(supabase)
+      const filter = (input.client_name as string | undefined)?.toLowerCase().trim()
+      if (filter) {
+        const matches = backlog.clients.filter((c) => c.clientName.toLowerCase().includes(filter))
+        if (matches.length === 0) return JSON.stringify({ error: `No retainer client matching "${input.client_name}". Retainer clients: ${backlog.clients.map((c) => c.clientName).join(', ') || 'none'}.` })
+        return JSON.stringify({ ...backlog, clients: matches })
+      }
+      return JSON.stringify(backlog)
     }
 
     default:

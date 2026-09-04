@@ -3,9 +3,10 @@
 import { useActionState, useState, useEffect } from 'react'
 import { createJob } from '@/app/actions/jobs'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, Check, Film, Heart, Building2, PartyPopper, Home, Palette, Video } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Film, Heart, Building2, PartyPopper, Home, Palette, Video, AlertTriangle } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
+import { statusLabel } from '@/lib/format'
 
 type Client = { id: string; name: string; email: string | null }
 type TemplateDeliverable = { title: string; description: string | null }
@@ -170,13 +171,34 @@ export default function NewJobPage() {
               </div>
             )}
 
-            {state?.error && (
-              <div className="alert alert-danger">{state.error}</div>
+            {state?.duplicate ? (
+              <div className="space-y-3">
+                <div className="alert alert-warning">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>
+                    There&apos;s already a job called &ldquo;{state.duplicate.name}&rdquo; for this client ({statusLabel(state.duplicate.status)}).
+                    Create another one anyway, or go back and adjust the name?
+                  </span>
+                </div>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setStep(0)} className="btn-secondary flex-1">
+                    <ArrowLeft className="w-4 h-4" /> Go back and rename
+                  </button>
+                  <button type="submit" name="confirmDuplicate" value="true" disabled={pending} className="btn-primary flex-1">
+                    <Check className="w-4 h-4" /> {pending ? 'Creating...' : 'Create anyway'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {state?.error && (
+                  <div className="alert alert-danger">{state.error}</div>
+                )}
+                <button type="submit" disabled={pending} className="btn-primary w-full">
+                  <Check className="w-4 h-4" /> {pending ? 'Creating...' : 'Create Job'}
+                </button>
+              </>
             )}
-
-            <button type="submit" disabled={pending} className="btn-primary w-full">
-              <Check className="w-4 h-4" /> {pending ? 'Creating...' : 'Create Job'}
-            </button>
           </div>
         </form>
       )}

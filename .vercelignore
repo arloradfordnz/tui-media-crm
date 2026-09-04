@@ -1,0 +1,17 @@
+# Vercel deploy normally uses git to decide what to upload, but git in this
+# iCloud-synced copy points at a repo directory that doesn't exist, so
+# .gitignore isn't actually consulted (that's how a 154MB Turbopack dev cache
+# ended up in an upload and failed the 100MB file-size limit). This file is
+# the fallback so a deploy never depends on git working.
+
+/tmp/
+/dev.db
+/uploads/
+.env
+.env.local
+.env.production
+.env.*.local
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+start-dev.sh

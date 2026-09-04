@@ -7,6 +7,7 @@ import { Plus, UserPlus, ArrowUpRight } from 'lucide-react'
 import Link from 'next/link'
 import RevenueSection from './RevenueSection'
 import Greeting from './Greeting'
+import TuiPanel from './TuiPanel'
 
 const PIPELINE_STAGES = [
   { key: 'enquiry',    label: 'Enquiry',       statuses: ['enquiry'] },
@@ -39,6 +40,7 @@ export default async function DashboardPage() {
     { data: revenueHistory },
     { data: retainerClients },
     { data: recentJobs },
+    { data: tuiThread },
   ] = await Promise.all([
     supabase.from('jobs').select('*', { count: 'exact', head: true }).not('status', 'in', '("delivered","archived")'),
     supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('status', 'review'),
@@ -53,6 +55,9 @@ export default async function DashboardPage() {
     supabase.from('jobs').select('quote_value, delivered_at').in('status', ['delivered', 'archived']).gte('delivered_at', twelveMonthsAgo),
     supabase.from('clients').select('id, name, monthly_retainer, shoots_per_month').eq('client_category', 'retainer'),
     supabase.from('jobs').select('id, name, job_type, status, shoot_date, quote_value, clients(id, name)').neq('status', 'archived').order('updated_at', { ascending: false }).limit(6),
+    // Tui's shared thread — Telegram texts and dashboard chat both live in
+    // sms_messages, so the panel picks up wherever the last text left off.
+    supabase.from('sms_messages').select('direction, body, created_at').order('created_at', { ascending: false }).limit(12),
   ])
 
   const crmRevenueThisMonth = (deliveredThisMonth ?? []).reduce((sum, j) => sum + (j.quote_value || 0), 0)
@@ -213,6 +218,17 @@ export default async function DashboardPage() {
         changePct={revenueChangePct}
         reportData={reportData}
       />
+
+      {/* Tui — same assistant as the Telegram thread */}
+      <div>
+        <div className="flex items-center justify-between pb-1">
+          <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Tui</h2>
+          <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>One thread with Telegram</span>
+        </div>
+        <TuiPanel
+          initialThread={((tuiThread ?? []) as { direction: 'inbound' | 'outbound'; body: string; created_at: string }[]).slice().reverse()}
+        />
+      </div>
 
       {/* Recent jobs (transactions-style table) */}
       <div>

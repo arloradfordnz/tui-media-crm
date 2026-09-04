@@ -18,15 +18,7 @@
     },
     {
       "path": "/api/telegram/brain-tick",
-      "schedule": "0 21 * * *"
-    },
-    {
-      "path": "/api/telegram/brain-tick",
-      "schedule": "0 1 * * *"
-    },
-    {
-      "path": "/api/telegram/brain-tick",
-      "schedule": "0 4 * * *"
+      "schedule": "0 20,22,0,2,4,6,8 * * *"
     },
     {
       "path": "/api/telegram/heartbeat",

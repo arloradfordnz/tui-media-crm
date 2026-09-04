@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Send, Trash2, Bot, User, Plus, Search, CalendarDays, BarChart3, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
+import { parseLinks, cleanContent, isWorking, renderMarkdown } from './chat-markup'
 
 type Message = { role: 'user' | 'assistant'; content: string }
 
@@ -15,45 +16,6 @@ const QUICK_ACTIONS = [
   { label: 'Dashboard Stats', icon: BarChart3, prompt: 'Show me a quick overview of how the business is going' },
   { label: 'Jobs in Review', icon: Search, prompt: 'Which jobs are currently in review?' },
 ]
-
-// Parse [[LINK:path|label]] markers from message content
-function parseLinks(content: string): { text: string; links: { path: string; label: string }[] } {
-  const links: { path: string; label: string }[] = []
-  const text = content.replace(/\[\[LINK:([^|]+)\|([^\]]+)\]\]/g, (_, path, label) => {
-    links.push({ path: path.trim(), label: label.trim() })
-    return ''
-  }).trim()
-  return { text, links }
-}
-
-// Strip working markers from display text
-function cleanContent(content: string): string {
-  return content
-    .replace(/\[\[WORKING\]\]/g, '')
-    .replace(/\[\[\/WORKING\]\]/g, '')
-    .replace(/\[\[MUTATED\]\]/g, '')
-    .trim()
-}
-
-// Check if the message is currently in a working state (tool execution)
-function isWorking(content: string): boolean {
-  const lastWorking = content.lastIndexOf('[[WORKING]]')
-  const lastDone = content.lastIndexOf('[[/WORKING]]')
-  return lastWorking > lastDone
-}
-
-// Render a subset of Markdown safely: **bold** and *italic* / _italic_.
-// Input is escaped first so no HTML can sneak in.
-function renderMarkdown(text: string): string {
-  const escaped = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-  return escaped
-    .replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/(^|[\s(])\*([^*\n]+?)\*(?=[\s.,!?;:)]|$)/g, '$1<em>$2</em>')
-    .replace(/(^|[\s(])_([^_\n]+?)_(?=[\s.,!?;:)]|$)/g, '$1<em>$2</em>')
-}
 
 export default function AiChat({ fullPage = false }: { fullPage?: boolean }) {
   const [messages, setMessages] = useState<Message[]>([])

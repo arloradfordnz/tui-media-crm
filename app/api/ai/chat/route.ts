@@ -3,46 +3,74 @@ import { NextRequest } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { getAuthUser, unauthorizedResponse } from '@/lib/supabase-admin'
 import { TOOLS, MUTATING_TOOLS, executeTool } from '@/lib/ai-tools'
+import { buildDashboardSystem } from '@/lib/assistant-persona'
+import { getContentBacklog, summariseBacklog } from '@/lib/content-backlog'
 
-// Static system prompt — rules, voice, enums. Stable across turns, so we can
-// cache it with a cache_control breakpoint and reuse it on every request.
-const STATIC_SYSTEM = `You are the AI assistant for Tui Media CRM (Arlo Radford, videography, photography and marketing, Nelson NZ).
+// Dashboard surface of the Tui assistant. Same persona and same tool set as
+// the Telegram brain (lib/assistant-agent.ts) — this route just swaps the
+// delivery: streamed text into the chat panel instead of send_message.
+//
+// Every exchange here is logged into sms_messages, the same table the
+// Telegram loop reads and writes, so the dashboard panel and the Telegram
+// thread are one continuous conversation.
 
-You can search, create, and update clients, jobs, events, documents, and deliverables. You can view stats and manage tasks, have full control of Xero invoicing (create, edit, approve, void, delete), and have read-only access to the hello@tuimedia.nz inbox (subject/sender/date only, never body content).
-IMPORTANT: You CANNOT delete clients. Client deletion is not permitted via AI — tell the user to do it from the client profile page.
-IMPORTANT: void_xero_invoice, delete_xero_invoice, and remove_xero_payment are permanent, no undo. Only use them when the user explicitly names the invoice/payment and asks to void/delete/remove it — never as a side effect of something else.
-
-Voice: professional, concise New Zealand English. Correct grammar and punctuation always. Never use emojis. Keep replies to one or two sentences unless the user asks for detail. Act immediately with tools rather than narrating what you are about to do. Use sensible defaults (status "lead", pipeline "enquiry"). Confirm completed actions in a single sentence.
-
-Formatting: you may use Markdown — **bold** for emphasis on key nouns (names, statuses, dates) and *italic* sparingly for subtle emphasis. Do not use headings, lists, or code blocks unless explicitly asked.
-
-Enums — Pipeline: enquiry,discovery,proposal,negotiation,won,lost | Client status: lead,active,past,archived | Client category (type): retainer,marketing,one_off | Job status: enquiry,booked,preproduction,shootday,editing,review,approved,delivered,archived | Events: shoot,meeting,deadline,personal | Docs: contract,invoice,brief,other`
+// Static system prompt — stable across turns, cached with a cache_control
+// breakpoint and reused on every request.
+const STATIC_SYSTEM = buildDashboardSystem()
 
 async function getDynamicContext(supabase: ReturnType<typeof createServerSupabaseClient> extends Promise<infer T> ? T : never) {
   const now = new Date()
-  const today = now.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-  const todayISO = now.toISOString().split('T')[0]
-  const weekFromNow = new Date(now.getTime() + 7 * 86400000).toISOString().split('T')[0]
+  // NZ wall-clock, not UTC — the model needs the real local day and time or it
+  // greets wrong and miscompares dates.
+  const todayISO = now.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })
+  const nowNZ = now.toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit', hour12: true })
+  const weekFromNow = new Date(now.getTime() + 7 * 86400000).toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })
+  const staleThreshold = new Date(now.getTime() - 7 * 86400000).toISOString()
 
+  // All parallel — one round-trip's worth of latency for the whole context.
+  // Xero and IMAP are deliberately absent: third-party calls would slow every
+  // single message, and the model can reach for those via tools when asked.
   const [
-    { data: todayEvents },
+    { data: weekEvents },
     { data: activeJobs },
     { count: totalClients },
+    { data: overdueTasks },
+    { data: stalledJobs },
+    { data: recentThread },
+    backlog,
   ] = await Promise.all([
     supabase.from('events').select('title, event_type, date, start_time').gte('date', todayISO).lte('date', weekFromNow).order('date').order('start_time').limit(7),
     supabase.from('jobs').select('name, status, clients(name)').not('status', 'in', '("delivered","archived")').order('created_at', { ascending: false }).limit(8),
     supabase.from('clients').select('*', { count: 'exact', head: true }),
+    supabase.from('job_tasks').select('title, due_date, jobs(name)').eq('completed', false).not('due_date', 'is', null).lte('due_date', todayISO).order('due_date').limit(10),
+    supabase.from('jobs').select('name, status, updated_at, clients(name)').in('status', ['editing', 'review']).lt('updated_at', staleThreshold).order('updated_at').limit(10),
+    supabase.from('sms_messages').select('direction, body, created_at').order('created_at', { ascending: false }).limit(8),
+    getContentBacklog(supabase, now).catch(() => null),
   ])
 
-  const eventsBlock = (todayEvents ?? []).length > 0
-    ? `\nSchedule (7d): ${(todayEvents ?? []).map(e => `${e.date?.split('T')[0]} ${e.start_time || ''} ${e.title} (${e.event_type})`).join(' | ')}`
-    : ''
+  const clientName = (j: { clients: unknown }) => (j.clients as { name: string } | null)?.name
 
-  const activeBlock = (activeJobs ?? []).length > 0
-    ? `\nActive jobs: ${(activeJobs ?? []).map(j => `"${j.name}" [${j.status}]${(j.clients as unknown as { name: string })?.name ? ` — ${(j.clients as unknown as { name: string }).name}` : ''}`).join(' | ')}`
-    : ''
+  const lines = [`current_time_nz: ${nowNZ} (today: ${todayISO}). Clients: ${totalClients ?? 0}.`]
 
-  return `Today: ${today}. Clients: ${totalClients ?? 0}.${eventsBlock}${activeBlock}`
+  if ((weekEvents ?? []).length > 0)
+    lines.push(`Schedule (7d): ${(weekEvents ?? []).map(e => `${e.date?.split('T')[0]} ${e.start_time || ''} ${e.title} (${e.event_type})`).join(' | ')}`)
+
+  if ((activeJobs ?? []).length > 0)
+    lines.push(`Active jobs: ${(activeJobs ?? []).map(j => `"${j.name}" [${j.status}]${clientName(j) ? ` — ${clientName(j)}` : ''}`).join(' | ')}`)
+
+  if ((overdueTasks ?? []).length > 0)
+    lines.push(`Overdue tasks: ${(overdueTasks ?? []).map(t => `"${t.title}" due ${t.due_date}${(t.jobs as unknown as { name: string } | null)?.name ? ` (${(t.jobs as unknown as { name: string }).name})` : ''}`).join(' | ')}`)
+
+  if ((stalledJobs ?? []).length > 0)
+    lines.push(`Stalled 7d+ in editing/review: ${(stalledJobs ?? []).map(j => `"${j.name}" [${j.status}]${clientName(j) ? ` — ${clientName(j)}` : ''}`).join(' | ')}`)
+
+  const backlogText = backlog ? summariseBacklog(backlog) : ''
+  if (backlogText) lines.push(backlogText)
+
+  if ((recentThread ?? []).length > 0)
+    lines.push(`Recent thread with Arlo (oldest first, spans Telegram and this panel): ${(recentThread ?? []).slice().reverse().map(m => `${m.direction === 'inbound' ? 'Arlo' : 'You'}: ${m.body}`).join(' | ')}`)
+
+  return lines.join('\n')
 }
 
 // ── POST Handler ───────────────────────────────────────────────────────────────
@@ -68,7 +96,17 @@ export async function POST(request: NextRequest) {
     content: m.content,
   }))
 
-  const dynamicContext = await getDynamicContext(supabase)
+  // Log the inbound message into the shared Telegram thread, in parallel with
+  // building context so it costs no extra latency.
+  const lastUser = [...apiMessages].reverse().find((m) => m.role === 'user')
+  const inboundBody = typeof lastUser?.content === 'string' ? lastUser.content : null
+
+  const [dynamicContext] = await Promise.all([
+    getDynamicContext(supabase),
+    inboundBody && !inboundBody.startsWith('[Project context:')
+      ? supabase.from('sms_messages').insert({ direction: 'inbound', body: inboundBody })
+      : Promise.resolve(),
+  ])
 
   const encoder = new TextEncoder()
 
@@ -78,6 +116,7 @@ export async function POST(request: NextRequest) {
         const currentMessages: Anthropic.MessageParam[] = [...apiMessages]
         const createdLinks: { path: string; label: string }[] = []
         let mutated = false
+        let finalText = ''
         const maxRounds = 10
 
         // Two cache breakpoints: one after the large static system prompt, one
@@ -104,6 +143,7 @@ export async function POST(request: NextRequest) {
           })
 
           anthropicStream.on('text', (text) => {
+            finalText += text
             controller.enqueue(encoder.encode(text))
           })
 
@@ -121,6 +161,11 @@ export async function POST(request: NextRequest) {
               for (const link of createdLinks) {
                 controller.enqueue(encoder.encode(`\n[[LINK:${link.path}|${link.label}]]`))
               }
+            }
+            // Log the reply into the shared thread so the Telegram brain knows
+            // what was already discussed here and doesn't re-flag it.
+            if (finalText.trim()) {
+              await supabase.from('sms_messages').insert({ direction: 'outbound', body: finalText.trim() })
             }
             controller.close()
             return
@@ -170,7 +215,7 @@ export async function POST(request: NextRequest) {
         controller.close()
       } catch (err) {
         console.error('AI chat error:', err)
-        controller.enqueue(encoder.encode('Sorry, something went wrong. Please try again.'))
+        controller.enqueue(encoder.encode('Something went wrong there. Try again.'))
         controller.close()
       }
     },
