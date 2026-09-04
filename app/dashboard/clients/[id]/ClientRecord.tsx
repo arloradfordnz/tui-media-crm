@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useState } from 'react'
+import { type ClientBacklog } from '@/lib/content-backlog'
 import { updateClient, deleteClient } from '@/app/actions/clients'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo, stripJobPrefix } from '@/lib/format'
 import Link from 'next/link'
@@ -36,79 +37,100 @@ type ClientData = {
   activities: { id: string; action: string; details: string | null; createdAt: string; job: { name: string } | null }[]
 }
 
-// Week distribution: given N shoots/month, which week numbers (1-4) to schedule
-const SHOOT_WEEKS: Record<number, number[]> = {
-  1: [2],
-  2: [1, 3],
-  3: [1, 2, 4],
-  4: [1, 2, 3, 4],
-}
-
-function RetainerSchedule({ shootsPerMonth, invoiceDay }: { shootsPerMonth: number; invoiceDay: number | null }) {
+// The real month-by-month record, counted from videos actually uploaded to
+// the portal.
+//
+// What was here before drew a tidy "Week 1 / Week 2 / Week 3" strip from
+// shoots_per_month and never once checked whether a video existed. It showed
+// the same confident schedule for a client two months behind as for one fully
+// delivered — a fabricated schedule is worse than none, because it reads as
+// information. This shows what happened, and says so when nothing did.
+function RetainerSchedule({
+  backlog,
+  invoiceDay,
+}: {
+  backlog: ClientBacklog | null
+  invoiceDay: number | null
+}) {
   const now = new Date()
-  const year = now.getFullYear()
-  const month = now.getMonth()
   const monthName = now.toLocaleString('en-NZ', { month: 'long' })
-
-  const clampedShoots = Math.min(Math.max(shootsPerMonth, 1), 4)
-  const weeks = SHOOT_WEEKS[clampedShoots] ?? [1]
-
-  const shootWeeks = weeks.map((w) => {
-    const startDay = (w - 1) * 7 + 1
-    const endDay = w * 7
-    return {
-      label: `Week ${w}`,
-      range: `${startDay}–${endDay} ${monthName}`,
-      past: now.getDate() > endDay,
-      current: now.getDate() >= startDay && now.getDate() <= endDay,
-    }
-  })
 
   let invoiceDate: string | null = null
   if (invoiceDay) {
-    const d = new Date(year, month, invoiceDay)
+    const d = new Date(now.getFullYear(), now.getMonth(), invoiceDay)
     invoiceDate = d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
   }
+
+  const months = backlog ? backlog.months.slice(-6) : []
 
   return (
     <div className="card" style={{ padding: '14px 18px' }}>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-          Retainer Schedule
+          Content delivered
         </h3>
-        <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{monthName} {year}</span>
+        {backlog && (
+          <span className="text-xs" style={{ color: backlog.videosOwed > 0 ? 'var(--danger)' : 'var(--text-tertiary)' }}>
+            {backlog.videosOwed > 0 ? `${backlog.videosOwed} owed` : 'up to date'}
+          </span>
+        )}
       </div>
-      <div className="flex flex-col gap-2">
-        {shootWeeks.map((w) => (
-          <div key={w.label} className="flex items-center gap-3">
-            <Camera
-              className="w-3.5 h-3.5 shrink-0"
-              style={{ color: w.past ? 'var(--text-tertiary)' : w.current ? 'var(--accent)' : 'var(--text-secondary)' }}
-            />
-            <span
-              className="text-sm font-medium w-16 shrink-0"
-              style={{ color: w.past ? 'var(--text-tertiary)' : 'var(--text-primary)', textDecoration: w.past ? 'line-through' : 'none' }}
-            >
-              {w.label}
-            </span>
-            <span className="text-sm" style={{ color: w.past ? 'var(--text-tertiary)' : 'var(--text-secondary)' }}>{w.range}</span>
-            {w.current && (
-              <span className="badge badge-accent" style={{ fontSize: 10 }}>This week</span>
-            )}
-          </div>
-        ))}
-        <div className="flex items-center gap-3 mt-1 pt-2" style={{ borderTop: '1px solid var(--bg-border)' }}>
-          <Receipt className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-secondary)' }} />
-          <span className="text-sm font-medium w-16 shrink-0" style={{ color: 'var(--text-primary)' }}>Invoice</span>
-          {invoiceDate ? (
-            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{invoiceDate}</span>
-          ) : (
-            <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
-              No invoice day set —{' '}
-              <Link href="/dashboard/settings" style={{ color: 'var(--accent)' }}>configure in Settings</Link>
-            </span>
-          )}
+
+      {months.length === 0 ? (
+        <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
+          No month-named jobs yet, so there is no cadence to measure against.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {months.map((m) => {
+            const done = m.missing === 0 && m.expected > 0
+            const colour = m.isCurrentMonth
+              ? 'var(--text-secondary)'
+              : !m.jobExists
+                ? 'var(--danger)'
+                : m.missing > 0
+                  ? 'var(--warning)'
+                  : 'var(--success)'
+            return (
+              <div key={m.month} className="flex items-center gap-3">
+                <Camera className="w-3.5 h-3.5 shrink-0" style={{ color: colour }} />
+                <span className="text-sm font-medium w-28 shrink-0" style={{ color: 'var(--text-primary)' }}>
+                  {m.label}
+                </span>
+                <span className="text-sm tabular-nums" style={{ color: colour }}>
+                  {m.uploaded}/{m.expected}
+                </span>
+                <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
+                  {m.isCurrentMonth
+                    ? 'in progress'
+                    : !m.jobExists
+                      ? 'job never created'
+                      : done
+                        ? 'delivered'
+                        : `${m.missing} outstanding`}
+                </span>
+                {m.jobId && (
+                  <Link href={`/dashboard/jobs/${m.jobId}`} className="text-xs ml-auto" style={{ color: 'var(--accent)' }}>
+                    Open
+                  </Link>
+                )}
+              </div>
+            )
+          })}
         </div>
+      )}
+
+      <div className="flex items-center gap-3 mt-3 pt-2" style={{ borderTop: '1px solid var(--bg-border)' }}>
+        <Receipt className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-secondary)' }} />
+        <span className="text-sm font-medium w-28 shrink-0" style={{ color: 'var(--text-primary)' }}>Invoice</span>
+        {invoiceDate ? (
+          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{invoiceDate}</span>
+        ) : (
+          <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
+            No invoice day set —{' '}
+            <Link href="/dashboard/settings" style={{ color: 'var(--accent)' }}>configure in Settings</Link>
+          </span>
+        )}
       </div>
     </div>
   )
@@ -129,7 +151,7 @@ const TABS = [
   { key: 'notes', label: 'Notes', icon: StickyNote },
 ]
 
-export default function ClientRecord({ client, completedJobs, activeTab }: { client: ClientData; completedJobs: number; activeTab: string }) {
+export default function ClientRecord({ client, completedJobs, activeTab, backlog }: { client: ClientData; completedJobs: number; activeTab: string; backlog: ClientBacklog | null }) {
   const [tab, setTab] = useState(activeTab)
   const [state, action, pending] = useActionState(updateClient, undefined)
   const [deleting, setDeleting] = useState(false)
@@ -225,9 +247,9 @@ export default function ClientRecord({ client, completedJobs, activeTab }: { cli
         </div>
       </div>
 
-      {/* Retainer schedule — only for retainer clients with shoots_per_month set */}
-      {client.clientCategory === 'retainer' && client.shootsPerMonth && (
-        <RetainerSchedule shootsPerMonth={client.shootsPerMonth} invoiceDay={client.invoiceDay} />
+      {/* Retainer clients only — everyone else has no cadence to measure. */}
+      {client.clientCategory === 'retainer' && (
+        <RetainerSchedule backlog={backlog} invoiceDay={client.invoiceDay} />
       )}
 
       {/* Tabs */}

@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getContentBacklog, type ClientBacklog } from '@/lib/content-backlog'
 import { getAppSetting } from '@/app/actions/settings'
 import { notFound } from 'next/navigation'
 import ClientRecord from './ClientRecord'
@@ -86,11 +87,21 @@ export default async function ClientDetailPage({ params, searchParams }: { param
     })),
   }
 
+  // The real month-by-month picture for this client, counted from uploads.
+  // Only retainer clients have a cadence to measure, so everyone else skips
+  // the two extra queries entirely.
+  let backlog: ClientBacklog | null = null
+  if (clientData.clientCategory === 'retainer') {
+    const full = await getContentBacklog(supabase, new Date()).catch(() => null)
+    backlog = full?.clients.find((c) => c.clientId === id) ?? null
+  }
+
   return (
     <ClientRecord
       client={clientData}
       completedJobs={completedJobs}
       activeTab={tab || 'details'}
+      backlog={backlog}
     />
   )
 }

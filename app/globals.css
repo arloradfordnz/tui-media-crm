@@ -1724,3 +1724,122 @@ input, textarea, select, button { font-family: inherit; }
   .upload-indent { margin-left: 0; }
   .upload-meta-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Page subtitle ────────────────────────────────────────── */
+.page-subtitle {
+  margin-top: 6px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  max-width: 60ch;
+}
+
+/* ── Retainer month chips ─────────────────────────────────────
+   Four months at a glance, coloured by what is missing rather than by job
+   status. "Never set up" is the loudest state on purpose: a month with no
+   job is the worst case, not an absent one. */
+.retainer-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.retainer-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  font-size: 11.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.retainer-chip-done {
+  background: color-mix(in srgb, var(--success) 13%, transparent);
+  color: var(--success);
+}
+.retainer-chip-behind {
+  background: color-mix(in srgb, var(--warning) 15%, transparent);
+  color: var(--warning);
+}
+.retainer-chip-never {
+  background: color-mix(in srgb, var(--danger) 13%, transparent);
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+.retainer-chip-current {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border-color: var(--bg-border);
+}
+
+/* ── Today / Needs you ────────────────────────────────────── */
+.section-heading {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+
+.today-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 18px;
+  border: 1px dashed var(--bg-border);
+  border-radius: var(--r-lg);
+}
+
+.today-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--bg-border);
+}
+.today-row:last-child { border-bottom: none; }
+
+/* Fixed width + tabular figures so start times form a straight column. */
+.today-time {
+  flex: 0 0 96px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.today-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.today-title { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+.today-job { font-size: 12px; color: var(--accent); text-decoration: none; }
+.today-job:hover { text-decoration: underline; }
+
+/* One sentence, one action. The dot carries severity so the sentence
+   doesn't have to spend words on it. */
+.attention-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--bg-border);
+}
+.attention-row:last-child { border-bottom: none; }
+
+.attention-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-pill);
+}
+.attention-urgent { background: var(--danger); }
+.attention-due    { background: var(--warning); }
+.attention-watch  { background: var(--text-tertiary); }
+
+.attention-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.attention-sentence { font-size: 14px; color: var(--text-primary); }
+.attention-meta { font-size: 12px; color: var(--text-tertiary); }
+.attention-action { flex: 0 0 auto; }
+
+@media (max-width: 768px) {
+  .today-row,
+  .attention-row {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
+  .today-time { flex-basis: 100%; }
+  .attention-action { margin-left: auto; }
+}
