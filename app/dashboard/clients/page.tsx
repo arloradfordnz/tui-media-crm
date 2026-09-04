@@ -1,7 +1,8 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { formatNZD, getInitials, statusLabel, statusBadgeClass } from '@/lib/format'
-import { Users, Plus } from 'lucide-react'
+import { Users } from 'lucide-react'
 import Link from 'next/link'
+import ButtonArrow from '@/components/ButtonArrow'
 import SearchInput from '@/components/SearchInput'
 import FilterTabs from '@/components/FilterTabs'
 import QuickStatus from './QuickStatus'
@@ -73,7 +74,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
           <SearchInput basePath="/dashboard/clients" placeholder="Search clients..." />
           <SyncLifetimeButton />
           <Link href="/dashboard/clients/new" className="btn-primary">
-            <Plus className="w-4 h-4" /> New Client
+            New Client <ButtonArrow />
           </Link>
         </div>
       </div>

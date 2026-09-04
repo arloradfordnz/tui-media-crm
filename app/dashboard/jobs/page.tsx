@@ -5,8 +5,9 @@ function formatHours(seconds: number): string {
   const h = seconds / 3600
   return h < 1 ? `${Math.round(seconds / 60)}m` : `${h % 1 === 0 ? h : h.toFixed(1)}h`
 }
-import { Briefcase, Plus } from 'lucide-react'
+import { Briefcase } from 'lucide-react'
 import Link from 'next/link'
+import ButtonArrow from '@/components/ButtonArrow'
 import SearchInput from '@/components/SearchInput'
 import FilterTabs from '@/components/FilterTabs'
 import QuickStatus from './QuickStatus'
@@ -64,7 +65,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
         <div className="page-header-actions">
           <SearchInput basePath="/dashboard/jobs" placeholder="Search jobs..." />
           <Link href="/dashboard/jobs/new" className="btn-primary">
-            <Plus className="w-4 h-4" /> New Job
+            New Job <ButtonArrow />
           </Link>
         </div>
       </div>

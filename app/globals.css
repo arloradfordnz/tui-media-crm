@@ -256,17 +256,21 @@ input, textarea, select, button { font-family: inherit; }
 /* ── Buttons ──────────────────────────────────────────────── */
 /* The site's button: a pill in accent, its label a touch heavier and
    tracked in slightly, and a small scale on press instead of a filter. */
+/* Geometry, type and motion lifted from tuimedia.nz's .btn so a CRM button
+   and a site button are the same object: 44px pill, 15px/600 at -0.01em,
+   accent fill with accent-ink text, and the site's own easing curve. */
 .btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 10px 20px;
+  gap: 0.7em;
+  height: 44px;
+  padding: 10px 22px;
   background: var(--accent);
   color: var(--on-accent);
   border: 1px solid transparent;
   border-radius: var(--r-pill);
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
@@ -285,13 +289,14 @@ input, textarea, select, button { font-family: inherit; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 10px 20px;
+  gap: 0.7em;
+  height: 44px;
+  padding: 10px 22px;
   background: transparent;
   color: var(--text-primary);
   border: 1px solid var(--bg-border);
   border-radius: var(--r-pill);
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
@@ -1869,4 +1874,62 @@ input, textarea, select, button { font-family: inherit; }
   }
   .attention-body { grid-area: body; }
   .attention-action { grid-area: action; justify-self: end; }
+}
+
+/* ── Arrow badge ──────────────────────────────────────────────
+   tuimedia.nz's signature CTA affordance: a 30px circle in inverted
+   colours holding an arrow, which slides out to the right while an
+   identical arrow slides in from the left. Two stacked SVGs in one grid
+   area is exactly how the site does it — the second sits off to the left
+   until hover.
+
+   Gated behind (hover: hover) and (pointer: fine) like the original, so a
+   touch device gets the badge without a transition it can never trigger.
+
+   Opt-in: only buttons that navigate carry it. A "Save" or "Create Event"
+   submit should not wear a "go" affordance. */
+.btn-arrow {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--on-accent);
+  color: var(--accent);
+  overflow: hidden;
+  position: relative;
+}
+.btn-arrow svg {
+  grid-area: 1 / 1;
+  width: 12px;
+  height: 12px;
+  display: block;
+  transition: transform 420ms cubic-bezier(0.19, 1, 0.22, 1);
+}
+.btn-arrow svg:nth-child(2) { transform: translateX(-160%); }
+
+/* An arrow tucks against the right edge, so the padding goes asymmetric —
+   the same 6px/1.15rem split the site uses. */
+.btn-primary:has(.btn-arrow),
+.btn-secondary:has(.btn-arrow) {
+  padding: 6px 6px 6px 1.15rem;
+}
+
+/* Outline and ghost variants invert the badge: accent circle, ink arrow. */
+.btn-secondary .btn-arrow,
+.btn-ghost .btn-arrow {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover .btn-arrow svg:nth-child(1),
+  .btn-secondary:hover .btn-arrow svg:nth-child(1) { transform: translateX(160%); }
+  .btn-primary:hover .btn-arrow svg:nth-child(2),
+  .btn-secondary:hover .btn-arrow svg:nth-child(2) { transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-arrow svg { transition: none; }
 }
