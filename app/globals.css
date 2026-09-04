@@ -1589,18 +1589,34 @@ input, textarea, select, button { font-family: inherit; }
   .record-table td[data-role="primary"] { flex: 1 1 auto; order: 1; min-width: 0; }
   .record-table td[data-role="trailing"] { order: 2; flex: 0 0 auto; margin-left: auto; }
 
-  .record-table td[data-role="secondary"] {
+  /* Hard line break between line one and the secondary run.
+     Flex decides wrapping from BASE sizes before it distributes free space, so
+     flex-grow on the primary cell does NOT reliably push the secondaries down:
+     a short name leaves room for the first fact to ride up onto line one,
+     which also un-pins the trailing cell from the right edge. tr::after is a
+     direct child of the row and therefore a real flex item, so ordering it
+     between the two groups forces the break at every name length. */
+  .record-table tr::after {
+    content: "";
     order: 3;
+    flex: 0 0 100%;
+    height: 0;
+  }
+
+  .record-table td[data-role="secondary"] {
+    order: 4;
     flex: 0 0 auto;
     margin-top: 6px;
     font-size: 12.5px;
     line-height: 1.4;
     color: var(--text-tertiary);
   }
-  /* Dot separator between adjacent secondary facts, never a trailing one. */
-  .record-table td[data-role="secondary"] ~ td[data-role="secondary"]::before {
+  /* The separator TRAILS a fact that has another after it, rather than leading
+     the next one — a leading separator strands a dot at the start of a wrapped
+     line. :has() is what lets us ask "is there a later secondary?". */
+  .record-table td[data-role="secondary"]:has(~ td[data-role="secondary"])::after {
     content: "·";
-    margin-right: 10px;
+    margin-left: 10px;
     color: var(--bg-border);
   }
   /* A fact with nothing in it should not leave an orphan dot. */
