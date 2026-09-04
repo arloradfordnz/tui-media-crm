@@ -130,8 +130,8 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
                         </div>
                       </Link>
                     </td>
-                    <td className="px-4 py-4 text-sm" data-role="secondary" style={{ color: 'var(--text-secondary)' }}>{c.email || '—'}</td>
-                    <td className="px-4 py-4 text-sm" data-role="secondary" style={{ color: 'var(--text-secondary)' }}>{c.location || '—'}</td>
+                    <td className="px-4 py-4 text-sm" data-role="secondary" style={{ color: 'var(--text-secondary)' }}>{c.email || <span className="cell-empty">—</span>}</td>
+                    <td className="px-4 py-4 text-sm" data-role="secondary" style={{ color: 'var(--text-secondary)' }}>{c.location || <span className="cell-empty">—</span>}</td>
                     <td className="px-4 py-4" data-role="secondary">
                       <QuickCategory clientId={c.id} category={c.client_category} />
                     </td>

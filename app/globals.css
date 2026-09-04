@@ -1611,10 +1611,20 @@ input, textarea, select, button { font-family: inherit; }
     line-height: 1.4;
     color: var(--text-tertiary);
   }
+  /* An em-dash placeholder earns its keep in a table, where the column has to
+     line up. In a reflowed run it is just noise, so those cells drop out
+     entirely on mobile rather than contributing "— · — · —". */
+  .record-table td[data-role="secondary"]:has(.cell-empty) { display: none; }
+
+  /* Anything already shown by the primary cell is repetition once the row
+     reflows (the job subtitle repeating the client name, for instance). */
+  .record-table .cell-dupe { display: none; }
+
   /* The separator TRAILS a fact that has another after it, rather than leading
      the next one — a leading separator strands a dot at the start of a wrapped
-     line. :has() is what lets us ask "is there a later secondary?". */
-  .record-table td[data-role="secondary"]:has(~ td[data-role="secondary"])::after {
+     line. The :not() matters: without it, a fact followed only by hidden
+     placeholder cells still draws a dot pointing at nothing. */
+  .record-table td[data-role="secondary"]:has(~ td[data-role="secondary"]:not(:has(.cell-empty)))::after {
     content: "·";
     margin-left: 10px;
     color: var(--bg-border);
@@ -1835,11 +1845,28 @@ input, textarea, select, button { font-family: inherit; }
 .attention-action { flex: 0 0 auto; }
 
 @media (max-width: 768px) {
-  .today-row,
-  .attention-row {
-    flex-wrap: wrap;
-    gap: 6px 10px;
-  }
+  .today-row { flex-wrap: wrap; gap: 6px 10px; }
   .today-time { flex-basis: 100%; }
-  .attention-action { margin-left: auto; }
+
+  /* Explicit grid rather than flex-wrap. Wrapping let a long sentence push
+     the body onto its own line, stranding the severity dot above the text on
+     some rows and inline on others — the placement read as accidental. Here
+     the dot is always beside the first line and the action always sits below
+     it, whatever the sentence length. */
+  .attention-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "dot  body"
+      ".    action";
+    align-items: start;
+    gap: 8px 10px;
+  }
+  .attention-dot {
+    grid-area: dot;
+    /* Nudge onto the optical centre of the first line, not the block. */
+    margin-top: 7px;
+  }
+  .attention-body { grid-area: body; }
+  .attention-action { grid-area: action; justify-self: end; }
 }

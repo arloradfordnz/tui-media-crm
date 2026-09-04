@@ -112,7 +112,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
                             but scanning down the Job column alone was still
                             confusing — this subtitle means the Job cell reads
                             unambiguously on its own. */}
-                        <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                        <span className="text-xs cell-dupe" style={{ color: 'var(--text-tertiary)' }}>
                           {client.name}
                         </span>
                       </Link>
@@ -123,13 +123,13 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
                         <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{client.name}</span>
                       </Link>
                     </td>
-                    <td className="px-4 py-4 text-sm" data-role="secondary" style={{ color: 'var(--text-secondary)' }}>{formatDate(j.shoot_date)}</td>
+                    <td className="px-4 py-4 text-sm" data-role="secondary" style={{ color: 'var(--text-secondary)' }}>{j.shoot_date ? formatDate(j.shoot_date) : <span className="cell-empty">—</span>}</td>
                     <td className="px-4 py-4" data-role="secondary">
                       {j.job_type && <span className="badge badge-muted">{statusLabel(j.job_type)}</span>}
                     </td>
-                    <td className="px-4 py-4 text-sm text-right" data-role="secondary" style={{ color: 'var(--text-primary)' }}>{j.quote_value ? formatNZD(j.quote_value) : '—'}</td>
+                    <td className="px-4 py-4 text-sm text-right" data-role="secondary" style={{ color: 'var(--text-primary)' }}>{j.quote_value ? formatNZD(j.quote_value) : <span className="cell-empty">—</span>}</td>
                     <td className="px-4 py-4 text-sm text-right" data-role="secondary" style={{ color: 'var(--text-tertiary)' }}>
-                      {timeByJob[j.id] ? formatHours(timeByJob[j.id]) : '—'}
+                      {timeByJob[j.id] ? formatHours(timeByJob[j.id]) : <span className="cell-empty">—</span>}
                     </td>
                     <td className="px-4 py-4 text-right" data-role="trailing">
                       <QuickStatus jobId={j.id} status={j.status} />
