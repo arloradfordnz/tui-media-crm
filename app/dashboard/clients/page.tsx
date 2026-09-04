@@ -97,15 +97,15 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
         </div>
       ) : (
         <div className="card-flush">
-          <table className="w-full">
+          <table className="w-full record-table">
             <thead>
               <tr>
                 <th className="table-header text-left">Client</th>
-                <th className="table-header text-left hidden md:table-cell">Email</th>
-                <th className="table-header text-left hidden lg:table-cell">Location</th>
-                <th className="table-header text-left hidden sm:table-cell">Type</th>
-                <th className="table-header text-right hidden sm:table-cell">Jobs</th>
-                <th className="table-header text-right hidden sm:table-cell">Value</th>
+                <th className="table-header text-left">Email</th>
+                <th className="table-header text-left">Location</th>
+                <th className="table-header text-left">Type</th>
+                <th className="table-header text-right">Jobs</th>
+                <th className="table-header text-right">Value</th>
                 <th className="table-header text-right">Status</th>
               </tr>
             </thead>
@@ -115,7 +115,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
                 try { if (c.tags) tags = JSON.parse(c.tags) } catch { tags = [] }
                 return (
                   <tr key={c.id} className="table-row">
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-4" data-role="primary">
                       <Link href={`/dashboard/clients/${c.id}`} className="flex items-center gap-3">
                         <div className="avatar avatar-md">{getInitials(c.name)}</div>
                         <div>
@@ -130,14 +130,14 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
                         </div>
                       </Link>
                     </td>
-                    <td className="px-4 py-4 hidden md:table-cell text-sm" style={{ color: 'var(--text-secondary)' }}>{c.email || '—'}</td>
-                    <td className="px-4 py-4 hidden lg:table-cell text-sm" style={{ color: 'var(--text-secondary)' }}>{c.location || '—'}</td>
-                    <td className="px-4 py-4 hidden sm:table-cell">
+                    <td className="px-4 py-4 text-sm" data-role="secondary" style={{ color: 'var(--text-secondary)' }}>{c.email || '—'}</td>
+                    <td className="px-4 py-4 text-sm" data-role="secondary" style={{ color: 'var(--text-secondary)' }}>{c.location || '—'}</td>
+                    <td className="px-4 py-4" data-role="secondary">
                       <QuickCategory clientId={c.id} category={c.client_category} />
                     </td>
-                    <td className="px-4 py-4 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-secondary)' }}>{c.jobCount}</td>
-                    <td className="px-4 py-4 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-primary)' }}>{formatNZD(c.lifetime_value)}</td>
-                    <td className="px-4 py-4 text-right">
+                    <td className="px-4 py-4 text-sm text-right" data-role="secondary" style={{ color: 'var(--text-secondary)' }}>{c.jobCount} {c.jobCount === 1 ? 'job' : 'jobs'}</td>
+                    <td className="px-4 py-4 text-sm text-right" data-role="secondary" style={{ color: 'var(--text-primary)' }}>{formatNZD(c.lifetime_value)}</td>
+                    <td className="px-4 py-4 text-right" data-role="trailing">
                       <QuickStatus clientId={c.id} status={c.status} />
                     </td>
                   </tr>

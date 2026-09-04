@@ -9,6 +9,7 @@ import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as A
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
 import JobTimeTracker, { type TimeEntry } from './JobTimeTracker'
+import { useMediaQuery } from '@/lib/useMediaQuery'
 
 const JOB_STATUSES = ['enquiry', 'booked', 'editing', 'review', 'delivered', 'archived']
 const PHASES = ['preshoot', 'shootday', 'postproduction', 'delivery']
@@ -648,6 +649,10 @@ function DeliverableUploadForm({ deliverableId, uploading, progress, stage, onUp
   const [notes, setNotes] = useState('')
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  // There is no drag-and-drop on a touch device, so the drop-zone copy is a
+  // dead instruction there. Keyed on the input method rather than width: a
+  // touchscreen laptop at desktop width still cannot drag a file in.
+  const coarsePointer = useMediaQuery('(pointer: coarse)')
 
   // Auto-collapse once the upload finishes (stage returns to 'idle' after being active).
   const wasUploadingRef = useRef(false)
@@ -673,14 +678,14 @@ function DeliverableUploadForm({ deliverableId, uploading, progress, stage, onUp
 
   if (!expanded) {
     return (
-      <button onClick={() => setExpanded(true)} className="ml-7 flex items-center gap-2 text-xs py-2" style={{ color: 'var(--accent)' }}>
+      <button onClick={() => setExpanded(true)} className="upload-indent flex items-center gap-2 text-xs py-2" style={{ color: 'var(--accent)' }}>
         <Upload className="w-3.5 h-3.5" /> Upload file
       </button>
     )
   }
 
   return (
-    <form onSubmit={handleSubmit} className="ml-7 p-3 rounded-lg space-y-3" style={{ background: 'var(--bg-elevated)' }}>
+    <form onSubmit={handleSubmit} className="upload-indent p-3 rounded-lg space-y-3" style={{ background: 'var(--bg-elevated)' }}>
       {/* Drop zone */}
       <div
         onClick={() => inputRef.current?.click()}
@@ -716,13 +721,19 @@ function DeliverableUploadForm({ deliverableId, uploading, progress, stage, onUp
         ) : (
           <div className="flex flex-col items-center gap-1 text-center pointer-events-none">
             <Upload className="w-5 h-5" style={{ color: 'var(--text-tertiary)' }} />
-            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Drop file here or <span style={{ color: 'var(--accent)' }}>browse</span></p>
+            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+              {coarsePointer ? (
+                <span style={{ color: 'var(--accent)' }}>Choose a file</span>
+              ) : (
+                <>Drop file here or <span style={{ color: 'var(--accent)' }}>browse</span></>
+              )}
+            </p>
             <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Any file type</p>
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="upload-meta-grid">
         <div>
           <label className="field-label">Version</label>
           <CustomSelect value={version} onChange={setVersion} options={VERSION_LABELS} />

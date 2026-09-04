@@ -64,6 +64,17 @@ export default function CalendarView({ events, jobs, month, year, feedToken }: {
 
   const selectedEvents = selectedDay ? eventsForDay(selectedDay) : []
 
+  // Days that actually have something on them, in order, each day's events
+  // sorted by start time (untimed events sort last rather than jumping to 00:00).
+  const agendaDays = Array.from({ length: totalDays }, (_, i) => i + 1)
+    .map((day) => ({
+      day,
+      events: eventsForDay(day).slice().sort((a, b) =>
+        (a.startTime || '99:99').localeCompare(b.startTime || '99:99')
+      ),
+    }))
+    .filter((g) => g.events.length > 0)
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
   const webcalUrl = feedToken
     ? `webcal://${appUrl.replace(/^https?:\/\//, '')}/api/calendar/feed.ics?token=${encodeURIComponent(feedToken)}`
@@ -94,8 +105,8 @@ export default function CalendarView({ events, jobs, month, year, feedToken }: {
         <button onClick={() => navMonth(1)} className="btn-icon"><ChevronRight className="w-5 h-5" /></button>
       </div>
 
-      {/* Calendar grid */}
-      <div className="card-flush overflow-hidden">
+      {/* Calendar grid — desktop projection (see .calendar-grid-view) */}
+      <div className="card-flush overflow-hidden calendar-grid-view">
         <div className="grid grid-cols-7">
           {DAYS.map((d) => (
             <div key={d} className="table-header text-center py-3 text-xs">{d}</div>
@@ -135,6 +146,55 @@ export default function CalendarView({ events, jobs, month, year, feedToken }: {
             )
           })}
         </div>
+      </div>
+
+      {/* Agenda — mobile projection of the SAME month. A 7-column grid in
+          ~45px columns is unreadable on a phone, so below 768px the month
+          becomes a date-grouped list. Both trees render; CSS shows one.
+          Nothing is dropped either way — this is a different shape for the
+          same events, not a reduced set of them. */}
+      <div className="calendar-agenda-view">
+        {agendaDays.length === 0 ? (
+          <div className="empty-state card">
+            <Calendar className="w-10 h-10 empty-icon" />
+            <p className="empty-title">Nothing this month</p>
+            <p className="empty-description">Events you add will show up here.</p>
+          </div>
+        ) : (
+          <div className="card-flush overflow-hidden">
+            {agendaDays.map(({ day, events: dayEvents }) => {
+              const isToday = isCurrentMonth && day === todayDate
+              const weekday = DAYS[(new Date(year, month, day).getDay() + 6) % 7]
+              return (
+                <section key={day}>
+                  <h3 className={`agenda-day${isToday ? ' agenda-day-today' : ''}`}>
+                    <span className="agenda-day-num">{day}</span>
+                    <span className="agenda-day-name">{weekday}</span>
+                    {isToday && <span className="agenda-today-pill">Today</span>}
+                  </h3>
+                  {dayEvents.map((e) => (
+                    <button
+                      key={e.id}
+                      type="button"
+                      className="agenda-row"
+                      onClick={() => setSelectedDay(day)}
+                    >
+                      <span className="agenda-time">{e.startTime || '\u2014'}</span>
+                      <span
+                        className="agenda-dot"
+                        style={{ background: EVENT_COLORS[e.eventType] || 'var(--text-tertiary)' }}
+                      />
+                      <span className="agenda-body">
+                        <span className="agenda-title">{e.title}</span>
+                        {e.job && <span className="agenda-job">{e.job.name}</span>}
+                      </span>
+                    </button>
+                  ))}
+                </section>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Selected day detail */}

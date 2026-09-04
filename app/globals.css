@@ -532,7 +532,7 @@ input, textarea, select, button { font-family: inherit; }
   background: var(--bg-surface);
   border-radius: var(--r-xl);
   margin: 10px 10px 10px 0;
-  min-height: calc(100vh - 20px);
+  min-height: calc(100dvh - 20px);
   overflow: hidden;
   box-shadow: var(--shadow-soft);
   display: flex;
@@ -782,7 +782,7 @@ input, textarea, select, button { font-family: inherit; }
   padding: 1.5rem;
   width: 100%;
   max-width: 480px;
-  max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
   box-shadow: 0 24px 60px rgba(6, 13, 26, 0.22);
   animation: slideUp 100ms ease;
@@ -813,6 +813,7 @@ input, textarea, select, button { font-family: inherit; }
   border-radius: 4px;
   overflow: hidden;
   background: var(--bg-elevated);
+  contain: layout;
 }
 .pipeline-segment {
   height: 100%;
@@ -1101,31 +1102,6 @@ input, textarea, select, button { font-family: inherit; }
 .dark .logo-light { display: none; }
 .dark .logo-dark { display: block; }
 
-/* Menu button — mobile only; the sidebar is pinned open on desktop */
-.sidebar-reopen {
-  position: fixed;
-  top: 22px;
-  left: 22px;
-  z-index: 50;
-  width: 38px;
-  height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--r-pill);
-  background: var(--glass-card-bg);
-  border: 1px solid var(--glass-card-border);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  box-shadow: var(--glass-card-highlight), var(--shadow-soft);
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-.sidebar-reopen:hover { color: var(--text-primary); }
-@media (min-width: 769px) {
-  .sidebar-reopen { display: none; }
-}
-
 /* Scrim behind the sidebar on narrow viewports, closes it on outside click */
 .sidebar-scrim {
   position: fixed;
@@ -1235,7 +1211,7 @@ input, textarea, select, button { font-family: inherit; }
   position: fixed;
   top: 0;
   right: 0;
-  height: 100vh;
+  height: 100dvh;
   width: 420px;
   max-width: 92vw;
   background: var(--bg-surface);
@@ -1402,12 +1378,23 @@ input, textarea, select, button { font-family: inherit; }
 
 /* ── Liquid glass cards (site-wide) ─────────────────────────── */
 /* Every surface picks up the glass treatment: translucent fill,
-   backdrop blur, hairline border, inner top highlight. Kept last
-   in the file so it wins over earlier per-context card overrides. */
+   hairline border, inner top highlight. Kept last in the file so it
+   wins over earlier per-context card overrides.
+
+   Blur is only added below for surfaces that actually float over other
+   content (modals, dropdowns, drawers/panels, the mobile sidebar
+   overlay) — that's where translucency has anything to show through.
+   .card/.stat-card/.kpi-card sit in normal flow on the flat
+   .page-shell background, so blurring them cost a compositor layer
+   per card for a visual result identical to an opaque fill. */
 .card,
 .card-flush,
 .stat-card,
-.kpi-card,
+.kpi-card {
+  background: var(--glass-card-bg);
+  border: 1px solid var(--glass-card-border);
+  box-shadow: var(--glass-card-highlight), var(--shadow-soft);
+}
 .modal-content,
 .custom-select-menu,
 .drawer-panel,
@@ -1433,3 +1420,291 @@ input, textarea, select, button { font-family: inherit; }
   -ms-overflow-style: none;   /* old Edge */
 }
 .scroll-invisible::-webkit-scrollbar { display: none; }
+
+/* ── Mobile input sizing & safe area ──────────────────────────
+   iOS Safari force-zooms the page when a focused input's font-size is
+   under 16px. Every field below sits at 13-14px for desktop density, so
+   they are bumped to exactly 16px on narrow viewports. This is the fix
+   for auto-zoom — deliberately NOT maximum-scale/user-scalable=no, which
+   would buy the same result by taking pinch-zoom away from the user.
+
+   The safe-area padding pairs with viewportFit:"cover" in app/layout.tsx;
+   without that meta the inset resolves to 0 and these are no-ops. */
+@media (max-width: 768px) {
+  .field-input,
+  .search-input,
+  .sidebar-search input,
+  .custom-select-search,
+  .custom-select-trigger {
+    font-size: 16px;
+  }
+
+  main.p-6,
+  .page-shell-inner {
+    padding-bottom: calc(var(--tab-bar-h) + 24px + env(safe-area-inset-bottom));
+  }
+  .sidebar-panel {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* .page-header is a row on desktop; some pages (dashboard/page.tsx) set
+     an inline alignItems override on the element, which beats a plain class
+     rule — !important is the only way a breakpoint wins that fight. Stacked
+     so the title never fights the primary action for the same line. */
+  .page-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+  .page-header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    padding-top: 0;
+  }
+}
+
+/* Coarse pointer (touch), independent of viewport width — a touch-screen
+   laptop at desktop width still needs a thumb-sized target. Raises every
+   interactive control to the 44px minimum without changing its padding
+   rhythm on precise-pointer (mouse/trackpad) devices. */
+@media (pointer: coarse) {
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .btn-ghost,
+  .btn-icon,
+  .page-tab,
+  .tab,
+  .tab-pill,
+  .custom-select-trigger {
+    min-height: 44px;
+  }
+}
+
+/* ── Mobile tab bar ───────────────────────────────────────────
+   Five thumb-reachable destinations, mobile only. Hidden at >=769px,
+   where the sidebar is pinned open and there is nothing to reach for. */
+:root { --tab-bar-h: 56px; }
+
+.mobile-tab-bar { display: none; }
+
+@media (max-width: 768px) {
+  .mobile-tab-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 70;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    align-items: stretch;
+    height: calc(var(--tab-bar-h) + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--glass-bg);
+    border-top: 1px solid var(--bg-border);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+  }
+
+  .mobile-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: var(--tab-bar-h);
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    font-family: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 160ms ease;
+  }
+  .mobile-tab.active { color: var(--accent); }
+
+  .mobile-tab-icon { width: 20px; height: 20px; stroke-width: 1.75px; }
+  .mobile-tab-label { font-size: 10.5px; font-weight: 500; letter-spacing: -0.01em; }
+
+  /* Tui is the centre tab and the fastest path to an answer, so it reads as
+     an action rather than a peer destination — accent-filled, label dropped. */
+  .mobile-tab-centre .mobile-tab-icon {
+    width: 44px;
+    height: 44px;
+    padding: 11px;
+    border-radius: var(--r-pill);
+    background: var(--accent);
+    color: var(--on-accent);
+    stroke-width: 2px;
+    box-shadow: var(--shadow-glow-accent);
+  }
+  .mobile-tab-centre .mobile-tab-label { display: none; }
+  .mobile-tab-centre.active .mobile-tab-icon { background: var(--accent-hover); }
+}
+
+/* ── Tui full-page route ──────────────────────────────────── */
+.tui-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+/* ── Reflowing record rows ────────────────────────────────────
+   One DOM tree, two projections. A real <table> at >=769px; below that the
+   same rows become flex containers so every cell REFLOWS instead of being
+   display:none'd. That is the whole point — the previous approach hid shoot
+   date, client, value and type on exactly the device where you most need a
+   list to still mean something.
+
+   Cells opt in via data-role:
+     primary   — identity. Line one, grows to fill.
+     trailing  — status/action. Line one, pinned right.
+     secondary — supporting facts. Wrap to line two as one muted, dot-separated
+                 run. Because primary grows, these are pushed to the next line
+                 without any explicit break.
+   Cells with no data-role keep table behaviour and are left alone. */
+@media (max-width: 768px) {
+  .record-table,
+  .record-table tbody,
+  .record-table tr,
+  .record-table td {
+    display: block;
+  }
+  .record-table thead { display: none; }
+
+  .record-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 10px;
+    min-height: 72px;
+    padding: 12px 16px;
+  }
+
+  .record-table td {
+    padding: 0 !important;
+    text-align: left !important;
+  }
+
+  .record-table td[data-role="primary"] { flex: 1 1 auto; order: 1; min-width: 0; }
+  .record-table td[data-role="trailing"] { order: 2; flex: 0 0 auto; margin-left: auto; }
+
+  .record-table td[data-role="secondary"] {
+    order: 3;
+    flex: 0 0 auto;
+    margin-top: 6px;
+    font-size: 12.5px;
+    line-height: 1.4;
+    color: var(--text-tertiary);
+  }
+  /* Dot separator between adjacent secondary facts, never a trailing one. */
+  .record-table td[data-role="secondary"] ~ td[data-role="secondary"]::before {
+    content: "·";
+    margin-right: 10px;
+    color: var(--bg-border);
+  }
+  /* A fact with nothing in it should not leave an orphan dot. */
+  .record-table td[data-role="secondary"]:empty { display: none; }
+}
+
+/* ── Calendar: two projections of one month ───────────────────
+   Grid on desktop, agenda list on the phone. Both are rendered; this
+   toggle decides which one is shown. */
+.calendar-agenda-view { display: none; }
+
+@media (max-width: 768px) {
+  .calendar-grid-view { display: none; }
+  .calendar-agenda-view { display: block; }
+
+  .agenda-day {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--bg-border);
+  }
+  .agenda-day-num {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+  .agenda-day-name {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .agenda-day-today .agenda-day-num { color: var(--accent); }
+  .agenda-today-pill {
+    margin-left: auto;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--on-accent);
+    background: var(--accent);
+    border-radius: var(--r-pill);
+    padding: 2px 8px;
+  }
+
+  .agenda-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 64px;
+    padding: 10px 16px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--bg-border);
+    text-align: left;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .agenda-row:active { background: var(--bg-hover); }
+
+  /* Fixed width + tabular figures so times form a straight column
+     regardless of digit widths. */
+  .agenda-time {
+    flex: 0 0 46px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+  .agenda-dot {
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    border-radius: var(--r-pill);
+  }
+  .agenda-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .agenda-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .agenda-job { font-size: 12px; color: var(--accent); }
+}
+
+/* ── Deliverable upload ───────────────────────────────────────
+   The upload form is nested under a deliverable row, which on a phone left it
+   ~243px wide — for the action that actually completes a retainer. The indent
+   is desktop hierarchy; on mobile it costs more than it communicates. */
+.upload-indent { margin-left: 1.75rem; }
+
+.upload-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .upload-indent { margin-left: 0; }
+  .upload-meta-grid { grid-template-columns: 1fr; }
+}

@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, createContext, useContext, ReactNode } from 'react'
-import { Menu } from 'lucide-react'
 import Sidebar from '@/components/Sidebar'
+import { useMediaQuery } from '@/lib/useMediaQuery'
 import AiChatWidget from '@/components/AiChatWidget'
+import MobileTabBar from '@/components/MobileTabBar'
 import { logout } from '@/app/actions/auth'
 
 // ── Panel context (Monthly Report push panel) ─────────────────
@@ -28,6 +29,11 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
   const [panelContent, setPanelContent] = useState<ReactNode | null>(null)
   // Only meaningful on mobile — on desktop the sidebar is pinned open via CSS.
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  // The report panel PUSHES content on desktop. On a phone there is no room to
+  // push into — a 404px margin on a 390px viewport moves the page off-screen
+  // entirely — so there the panel overlays instead. Matches the 768px
+  // breakpoint every other rule in globals.css uses.
+  const isDesktop = useMediaQuery('(min-width: 769px)')
 
   function openPanel(content: ReactNode) {
     setPanelContent(content)
@@ -40,24 +46,13 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
 
   return (
     <PanelContext.Provider value={{ panelOpen, panelContent, openPanel, closePanel }}>
-      <div style={{ minHeight: '100vh', background: 'var(--bg-base)' }}>
+      <div style={{ minHeight: '100dvh', background: 'var(--bg-base)' }}>
 
         <Sidebar
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           onLogout={() => logout()}
         />
-
-        {/* Mobile menu button — hidden on desktop where the sidebar is pinned */}
-        {!sidebarOpen && (
-          <button
-            className="sidebar-reopen"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu className="w-4 h-4" />
-          </button>
-        )}
 
         {/* Fixed report panel — slides in from the right */}
         <div
@@ -74,11 +69,11 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
         <div
           className="main-area"
           style={{
-            marginRight: panelOpen ? PANEL_W : 0,
+            marginRight: panelOpen && isDesktop ? PANEL_W : 0,
             transition: `margin-right 240ms ${EASE}`,
             display: 'flex',
             flexDirection: 'column',
-            height: '100vh',
+            height: '100dvh',
             overflow: 'hidden',
             minWidth: 0,
           }}
@@ -90,6 +85,9 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
             </div>
           </div>
         </div>
+
+        {/* Mobile-only; hidden at >=769px in CSS where the sidebar is pinned. */}
+        <MobileTabBar onMore={() => setSidebarOpen(true)} />
 
         <AiChatWidget />
       </div>

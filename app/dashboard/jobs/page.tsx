@@ -84,15 +84,15 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
         </div>
       ) : (
         <div className="card-flush">
-          <table className="w-full">
+          <table className="w-full record-table">
             <thead>
               <tr>
                 <th className="table-header text-left">Job</th>
-                <th className="table-header text-left hidden md:table-cell">Client</th>
-                <th className="table-header text-left hidden lg:table-cell">Shoot Date</th>
-                <th className="table-header text-left hidden sm:table-cell">Type</th>
-                <th className="table-header text-right hidden sm:table-cell">Value</th>
-                <th className="table-header text-right hidden md:table-cell">Time</th>
+                <th className="table-header text-left">Client</th>
+                <th className="table-header text-left">Shoot Date</th>
+                <th className="table-header text-left">Type</th>
+                <th className="table-header text-right">Value</th>
+                <th className="table-header text-right">Time</th>
                 <th className="table-header text-right">Status</th>
               </tr>
             </thead>
@@ -101,26 +101,37 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
                 const client = j.clients as unknown as { id: string; name: string }
                 return (
                   <tr key={j.id} className="table-row">
-                    <td className="px-4 py-4">
-                      <Link href={`/dashboard/jobs/${j.id}`} className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                        {stripJobPrefix(j.name)}
+                    <td className="px-4 py-4" data-role="primary">
+                      <Link href={`/dashboard/jobs/${j.id}`} className="block">
+                        <span className="text-sm font-medium block" style={{ color: 'var(--text-primary)' }}>
+                          {stripJobPrefix(j.name)}
+                        </span>
+                        {/* Retainer jobs are named by month ("July Content"), so
+                            the same name appears for every client with that
+                            cadence. The Client column already disambiguates,
+                            but scanning down the Job column alone was still
+                            confusing — this subtitle means the Job cell reads
+                            unambiguously on its own. */}
+                        <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                          {client.name}
+                        </span>
                       </Link>
                     </td>
-                    <td className="px-4 py-4 hidden md:table-cell">
+                    <td className="px-4 py-4" data-role="secondary">
                       <Link href={`/dashboard/clients/${client.id}`} className="flex items-center gap-2">
                         <div className="avatar avatar-sm">{getInitials(client.name)}</div>
                         <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{client.name}</span>
                       </Link>
                     </td>
-                    <td className="px-4 py-4 hidden lg:table-cell text-sm" style={{ color: 'var(--text-secondary)' }}>{formatDate(j.shoot_date)}</td>
-                    <td className="px-4 py-4 hidden sm:table-cell">
+                    <td className="px-4 py-4 text-sm" data-role="secondary" style={{ color: 'var(--text-secondary)' }}>{formatDate(j.shoot_date)}</td>
+                    <td className="px-4 py-4" data-role="secondary">
                       {j.job_type && <span className="badge badge-muted">{statusLabel(j.job_type)}</span>}
                     </td>
-                    <td className="px-4 py-4 hidden sm:table-cell text-sm text-right" style={{ color: 'var(--text-primary)' }}>{j.quote_value ? formatNZD(j.quote_value) : '—'}</td>
-                    <td className="px-4 py-4 hidden md:table-cell text-sm text-right" style={{ color: 'var(--text-tertiary)' }}>
+                    <td className="px-4 py-4 text-sm text-right" data-role="secondary" style={{ color: 'var(--text-primary)' }}>{j.quote_value ? formatNZD(j.quote_value) : '—'}</td>
+                    <td className="px-4 py-4 text-sm text-right" data-role="secondary" style={{ color: 'var(--text-tertiary)' }}>
                       {timeByJob[j.id] ? formatHours(timeByJob[j.id]) : '—'}
                     </td>
-                    <td className="px-4 py-4 text-right">
+                    <td className="px-4 py-4 text-right" data-role="trailing">
                       <QuickStatus jobId={j.id} status={j.status} />
                     </td>
                   </tr>

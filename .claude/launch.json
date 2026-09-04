@@ -5,7 +5,7 @@
       "name": "tui-media-crm",
       "runtimeExecutable": "node",
       "runtimeArgs": ["node_modules/next/dist/bin/next", "dev"],
-      "cwd": "/Users/arloradford/Library/Mobile Documents/com~apple~CloudDocs/Claude/tui-media-crm",
+      "cwd": "/Users/arloradford/Developer/Claude/Tui Media/tui-media-crm",
       "port": 3003,
       "autoPort": true
     }

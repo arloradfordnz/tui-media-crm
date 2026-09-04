@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import ReactDOM from "react-dom";
 import { Patrick_Hand } from "next/font/google";
 import "./globals.css";
@@ -14,6 +14,19 @@ export const metadata: Metadata = {
   title: "Tui Media",
   description: "Tui Media — studio dashboard and client portal",
   // Favicon comes from app/icon.svg (Next.js convention) — same mark as tuimedia.nz.
+};
+
+// viewport-fit=cover is what lets env(safe-area-inset-*) resolve to anything
+// other than zero. Without it the bottom of every screen sits under Safari's
+// home indicator on a phone, which is where this app is mostly used.
+//
+// Deliberately no maximumScale/userScalable: pinch-zoom stays available. The
+// iOS auto-zoom-on-focus problem is fixed by making inputs 16px (globals.css),
+// not by taking zoom away from the user.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 // Apply the theme before first paint so it never flashes.
