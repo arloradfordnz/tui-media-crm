@@ -376,18 +376,7 @@ export default function TuiThread({
       {!hasChatted && messages.length === 0 && (
         <div className="flex flex-wrap gap-1.5 px-5 pb-3">
           {SUGGESTIONS.map((s) => (
-            <button
-              key={s}
-              onClick={() => sendMessage(s)}
-              className="px-2.5 py-1.5 rounded-full text-xs transition-colors"
-              style={{
-                background: 'var(--bg-elevated)',
-                color: 'var(--text-secondary)',
-                border: '1px solid var(--bg-border)',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--text-primary)' }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--bg-border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}
-            >
+            <button key={s} onClick={() => sendMessage(s)} className="suggestion-chip">
               {s}
             </button>
           ))}
@@ -445,3 +434,4 @@ function ReceiptRow({ receipt }: { receipt: Receipt }) {
     </div>
   )
 }
+

@@ -1436,15 +1436,23 @@ input, textarea, select, button { font-family: inherit; }
   box-shadow: 0 1px 2px rgba(6, 13, 26, 0.04), 0 6px 20px rgba(6, 13, 26, 0.07);
 }
 
-/* ── Thin-line icons (sidebar + controls) ─────────────────── */
-.nav-item svg,
-.sidebar-search svg,
-.navsec-head svg,
-.btn-primary svg,
-.btn-secondary svg,
-.btn-ghost svg,
-.pill-select svg,
-.tab-pill svg { stroke-width: 1.75px; }
+/* ── Icon weight ──────────────────────────────────────────────
+   One weight, everywhere. This used to name seven places — nav, buttons,
+   pills — and leave everything else on the 2px default, so a single screen
+   carried nine icons at 1.75 and eight at 2. That mixture is exactly what
+   stops a set reading as a system: Apple's icons look the way they do because
+   every glyph in the family shares a stroke, not because any one of them is
+   special.
+
+   The other half of that look is round caps and joins, which lucide already
+   sets on every icon, so this is the piece that was missing. */
+.lucide { stroke-width: 1.75px; }
+
+/* Small glyphs need a touch more weight or they disappear: stroke width is
+   absolute, so 1.75px inside a 12px icon is proportionally twice what it is
+   inside a 24px one, and thinning them further greys them out. */
+.lucide.w-3,
+.lucide.w-3\.5 { stroke-width: 2px; }
 
 /* ── Drawer section dividers + closing summary ────────────── */
 .drawer-body { display: flex; flex-direction: column; }
@@ -1593,9 +1601,21 @@ input, textarea, select, button { font-family: inherit; }
   .page-tab,
   .tab,
   .tab-pill,
+  .suggestion-chip,
+  .toast-close,
   .custom-select-trigger {
     min-height: 44px;
   }
+  /* Square targets grow both ways or they become lozenges. */
+  .btn-icon,
+  .toast-close,
+  .field-action {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  /* The field action sits inside the box, so a 44px target needs the corner
+     inset to grow with it to stay clear of the rounded edge. */
+  .field-action { right: 8px; bottom: 8px; }
 }
 
 /* ── Mobile tab bar ───────────────────────────────────────────
@@ -2727,3 +2747,19 @@ input, textarea, select, button { font-family: inherit; }
     bottom: calc(var(--tab-bar-h) + 16px + env(safe-area-inset-bottom));
   }
 }
+
+/* ── Suggestion chips (Tui empty state) ───────────────────────
+   Were inline-styled buttons at 30px, which is under the touch minimum and
+   invisible to the pointer:coarse rule below because that rule names classes.
+   Anything tappable needs a class for exactly this reason. */
+.suggestion-chip {
+  padding: 7px 12px;
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--bg-border);
+  cursor: pointer;
+  transition: color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+.suggestion-chip:hover { border-color: var(--accent); color: var(--text-primary); }
