@@ -18,6 +18,7 @@ export const MUTATING_TOOLS = new Set([
   'create_event', 'delete_event',
   'create_document', 'delete_document',
   'create_deliverable',
+  'create_todo', 'complete_todo',
   'create_xero_invoice', 'approve_xero_invoice', 'void_xero_invoice', 'delete_xero_invoice', 'update_xero_invoice', 'remove_xero_payment',
 ])
 
@@ -227,6 +228,48 @@ export const TOOLS: Anthropic.Tool[] = [
         completed: { type: 'boolean' },
       },
       required: ['task_id', 'completed'],
+    },
+  },
+
+  // ── Todos ─────────────────────────────────────
+  // The persona tells Arlo he can say "text me later about X", and buildSnapshot
+  // feeds open_todos back every turn — but until now there was no way to WRITE
+  // one. Tui could read the list and never add to it or close anything on it,
+  // so the one thing it explicitly promised was the one thing it could not do.
+  {
+    name: 'list_todos',
+    description: 'List Arlo\'s open todos — general reminders not tied to a job. Use this to find a todo\'s ID before completing it.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        include_completed: { type: 'boolean', description: 'Include already-completed todos. Defaults to false.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'create_todo',
+    description: 'Add a todo. Use this whenever Arlo asks to be reminded about something ("remind me to...", "text me later about..."). Without this the request is forgotten the moment the conversation moves on.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        title: { type: 'string', description: 'What to remind him about, in his own words where possible.' },
+        due_date: { type: 'string', description: 'ISO date or timestamp. Omit if he did not give one.' },
+        linked_job_id: { type: 'string' },
+        linked_client_id: { type: 'string' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'complete_todo',
+    description: 'Mark a todo done. Use when Arlo says he has handled one. Get the ID from list_todos.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        todo_id: { type: 'string' },
+      },
+      required: ['todo_id'],
     },
   },
 
@@ -683,6 +726,36 @@ export async function executeTool(
 
     case 'toggle_task': {
       const { error } = await supabase.from('job_tasks').update({ completed: input.completed as boolean }).eq('id', input.task_id as string)
+      if (error) return JSON.stringify({ error: error.message })
+      return JSON.stringify({ success: true })
+    }
+
+    // ── Todos ───────────────────────────────
+    case 'list_todos': {
+      let q = supabase.from('todos').select('id, title, completed, due_date, created_at')
+      if (!input.include_completed) q = q.eq('completed', false)
+      const { data, error } = await q.order('due_date', { ascending: true, nullsFirst: false }).limit(50)
+      if (error) return JSON.stringify({ error: error.message })
+      return JSON.stringify({ todos: data })
+    }
+
+    case 'create_todo': {
+      const { data, error } = await supabase
+        .from('todos')
+        .insert({
+          title: input.title as string,
+          due_date: (input.due_date as string) || null,
+          linked_job_id: (input.linked_job_id as string) || null,
+          linked_client_id: (input.linked_client_id as string) || null,
+        })
+        .select('id, title, due_date')
+        .single()
+      if (error) return JSON.stringify({ error: error.message })
+      return JSON.stringify({ success: true, todo: data })
+    }
+
+    case 'complete_todo': {
+      const { error } = await supabase.from('todos').update({ completed: true }).eq('id', input.todo_id as string)
       if (error) return JSON.stringify({ error: error.message })
       return JSON.stringify({ success: true })
     }

@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { TOOLS, executeTool } from '@/lib/ai-tools'
+import { TOOLS, executeTool, CONFIRM_TOOLS, toolFingerprint } from '@/lib/ai-tools'
+import { recordPendingAction } from '@/lib/assistant-approvals'
 import { buildTelegramSystem } from '@/lib/assistant-persona'
 import { sendTelegramMessage } from '@/lib/telegram'
 import { fetchOutstandingInvoices, getValidXeroAccount } from '@/lib/xero'
@@ -174,14 +175,15 @@ async function buildSnapshot(supabase: any): Promise<string> {
 export async function runAssistantTurn(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
-  opts: { trigger: 'tick' | 'inbound' | 'heartbeat'; inboundBody?: string }
+  opts: { trigger: 'tick' | 'inbound' | 'heartbeat'; inboundBody?: string; approvals?: string[] }
 ): Promise<{ messageSent: boolean; messageBody?: string; reasoning: string }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   const chatId = process.env.OWNER_TELEGRAM_CHAT_ID
   if (!apiKey || !chatId) {
     const reasoning = 'Missing ANTHROPIC_API_KEY or OWNER_TELEGRAM_CHAT_ID'
     console.error('[assistant-agent]', reasoning)
-    await supabase.from('agent_ticks').insert({ trigger: opts.trigger, reasoning, sms_sent: false })
+    const { error: tickError } = await supabase.from('agent_ticks').insert({ trigger: opts.trigger, reasoning, sms_sent: false })
+    if (tickError) console.error('[assistant-agent] agent_ticks insert failed:', tickError.message)
     return { messageSent: false, reasoning }
   }
 
@@ -253,7 +255,33 @@ export async function runAssistantTurn(
           await supabase.from('sms_messages').insert({ direction: 'outbound', body, twilio_sid: messageId ? String(messageId) : null })
           return { type: 'tool_result', tool_use_id: block.id, content: messageId != null ? 'Sent.' : 'Failed to send — Telegram error, check server logs.' }
         }
-        const result = await executeTool(block.name, block.input as Record<string, unknown>, supabase)
+        const toolInput = block.input as Record<string, unknown>
+        const result = await executeTool(block.name, toolInput, supabase, { approvals: opts.approvals })
+
+        // A destructive call the executor refused. Park it and hand the model
+        // a code to quote, so Arlo has a way to say yes from a text message.
+        if (CONFIRM_TOOLS.has(block.name) && result.includes('confirmation_required')) {
+          const fingerprint = toolFingerprint(block.name, toolInput)
+          let description = ''
+          try {
+            description = (JSON.parse(result) as { action?: string }).action ?? ''
+          } catch { /* fall through to the tool name */ }
+          const code = await recordPendingAction(supabase, {
+            fingerprint,
+            toolName: block.name,
+            toolInput,
+            description: description || block.name,
+          })
+          const withCode = code
+            ? JSON.stringify({
+                status: 'confirmation_required',
+                action: description || block.name,
+                instruction: `NOT executed. Tell Arlo exactly what this will do and ask him to reply "confirm ${code}". Quote the code exactly. Do not retry this tool.`,
+              })
+            : result
+          return { type: 'tool_result', tool_use_id: block.id, content: withCode }
+        }
+
         return { type: 'tool_result', tool_use_id: block.id, content: result }
       })
     )
@@ -309,12 +337,18 @@ export async function runAssistantTurn(
     await supabase.from('sms_messages').insert({ direction: 'outbound', body: fallbackBody, twilio_sid: messageId ? String(messageId) : null })
   }
 
-  await supabase.from('agent_ticks').insert({
+  // The result is checked now. This insert has been failing on every heartbeat
+  // since the table was created — agent_ticks.trigger's CHECK allowed only
+  // 'tick' and 'inbound' — and because nothing read the error, the daily
+  // check-in was invisible in the assistant's own history.
+  // See supabase/migration_agent_ticks_heartbeat.sql.
+  const { error: tickInsertError } = await supabase.from('agent_ticks').insert({
     trigger: opts.trigger,
     reasoning: truncated ? `[truncated at max_tokens] ${reasoning}`.trim() : reasoning || null,
     sms_sent: messageSent,
     sms_body: messageBody ?? null,
   })
+  if (tickInsertError) console.error('[assistant-agent] agent_ticks insert failed:', tickInsertError.message)
 
   return { messageSent, messageBody, reasoning }
 }
