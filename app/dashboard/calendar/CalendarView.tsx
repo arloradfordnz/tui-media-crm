@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, Plus, X, Trash2, Calendar } from 'lucide-rea
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
+import Field from '@/components/Field'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -246,13 +247,11 @@ export default function CalendarView({ events, jobs, month, year, feedToken }: {
               <button onClick={() => setShowModal(false)} className="btn-icon"><X className="w-5 h-5" /></button>
             </div>
             <form action={action} className="space-y-4">
-              <div>
-                <label className="field-label">Title *</label>
+              <Field label="Title *">
                 <input name="title" required className="field-input" placeholder="Event title" />
-              </div>
+      </Field>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="field-label">Type</label>
+                <Field label="Type">
                   <CustomSelect
                     name="eventType"
                     defaultValue="shoot"
@@ -263,35 +262,30 @@ export default function CalendarView({ events, jobs, month, year, feedToken }: {
                       { value: 'personal', label: 'Personal' },
                     ]}
                   />
-                </div>
-                <div>
-                  <label className="field-label">Date *</label>
+      </Field>
+                <Field label="Date *">
                   <DatePicker name="date" required defaultValue={selectedDay ? `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}` : ''} className="field-input" />
-                </div>
+      </Field>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="field-label">Start Time</label>
+                <Field label="Start Time">
                   <input name="startTime" type="time" className="field-input" />
-                </div>
-                <div>
-                  <label className="field-label">End Time</label>
+      </Field>
+                <Field label="End Time">
                   <input name="endTime" type="time" className="field-input" />
-                </div>
+      </Field>
               </div>
-              <div>
-                <label className="field-label">Linked Job</label>
+              <Field label="Linked Job">
                 <CustomSelect
                   name="jobId"
                   placeholder="None"
                   searchable
                   options={[{ value: '', label: 'None' }, ...jobs.map((j) => ({ value: j.id, label: j.name }))]}
                 />
-              </div>
-              <div>
-                <label className="field-label">Notes</label>
+      </Field>
+              <Field label="Notes">
                 <textarea name="notes" rows={2} className="field-input" />
-              </div>
+      </Field>
               {state?.error && <p className="text-sm" style={{ color: 'var(--danger)' }}>{state.error}</p>}
               <button type="submit" disabled={pending} className="btn-primary w-full">
                 {pending ? 'Creating...' : 'Create Event'}

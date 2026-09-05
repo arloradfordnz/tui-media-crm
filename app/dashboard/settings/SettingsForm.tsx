@@ -3,6 +3,7 @@
 import { useActionState } from 'react'
 import { changePassword } from '@/app/actions/settings'
 import { Lock } from 'lucide-react'
+import Field from '@/components/Field'
 
 export default function SettingsForm() {
   const [state, action, pending] = useActionState(changePassword, undefined)
@@ -13,18 +14,15 @@ export default function SettingsForm() {
         <span className="flex items-center gap-2"><Lock className="w-4 h-4" /> Change Password</span>
       </h2>
       <form action={action} className="space-y-4">
-        <div>
-          <label className="field-label">Current Password</label>
+        <Field label="Current Password">
           <input name="currentPassword" type="password" required className="field-input" />
-        </div>
-        <div>
-          <label className="field-label">New Password</label>
+      </Field>
+        <Field label="New Password">
           <input name="newPassword" type="password" required minLength={8} className="field-input" />
-        </div>
-        <div>
-          <label className="field-label">Confirm New Password</label>
+      </Field>
+        <Field label="Confirm New Password">
           <input name="confirmPassword" type="password" required className="field-input" />
-        </div>
+      </Field>
         {state?.error && <p className="text-sm" style={{ color: 'var(--danger)' }}>{state.error}</p>}
         {state?.success && <p className="text-sm" style={{ color: 'var(--success)' }}>Password updated successfully.</p>}
         <button type="submit" disabled={pending} className="btn-primary">

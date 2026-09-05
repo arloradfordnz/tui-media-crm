@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useActionState } from 'react'
 import { saveEmailTemplate } from '@/app/actions/settings'
 import { Mail, ChevronDown, ChevronRight, Check, AlertCircle } from 'lucide-react'
+import Field from '@/components/Field'
 
 type Template = {
   id: string
@@ -47,8 +48,7 @@ function TemplateItem({ template }: { template: Template }) {
         <form action={action} className="space-y-4 pb-4 px-1">
           <input type="hidden" name="type" value={template.type} />
 
-          <div>
-            <label className="field-label">Subject</label>
+          <Field label="Subject">
             <input
               name="subject"
               type="text"
@@ -57,10 +57,12 @@ function TemplateItem({ template }: { template: Template }) {
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
             />
-          </div>
+      </Field>
 
-          <div>
-            <label className="field-label">Body</label>
+          <Field
+            label="Body"
+            hint={<>Available variables: {'{{clientName}}'}, {'{{jobName}}'}, {'{{round}}'}, {'{{portalUrl}}'}, {'{{proposalUrl}}'}</>}
+          >
             <textarea
               name="body"
               required
@@ -70,10 +72,7 @@ function TemplateItem({ template }: { template: Template }) {
               value={body}
               onChange={(e) => setBody(e.target.value)}
             />
-            <p className="text-xs mt-1.5" style={{ color: 'var(--text-secondary)' }}>
-              Available variables: {'{{clientName}}'}, {'{{jobName}}'}, {'{{round}}'}, {'{{portalUrl}}'}, {'{{proposalUrl}}'}
-            </p>
-          </div>
+          </Field>
 
           {state?.error && (
             <p className="text-sm flex items-center gap-1.5" style={{ color: 'var(--danger)' }}>

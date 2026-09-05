@@ -3,6 +3,7 @@
 import { useActionState } from 'react'
 import { login } from '@/app/actions/auth'
 import Image from 'next/image'
+import Field from '@/components/Field'
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(login, undefined)
@@ -41,8 +42,7 @@ export default function LoginPage() {
 
         {/* Form */}
         <form action={action} className="space-y-5">
-          <div>
-            <label htmlFor="email" className="field-label">Email</label>
+          <Field label="Email">
             <input
               id="email"
               name="email"
@@ -52,10 +52,9 @@ export default function LoginPage() {
               placeholder="you@example.com"
               className="field-input"
             />
-          </div>
+          </Field>
 
-          <div>
-            <label htmlFor="password" className="field-label">Password</label>
+          <Field label="Password">
             <input
               id="password"
               name="password"
@@ -65,7 +64,7 @@ export default function LoginPage() {
               placeholder="••••••••"
               className="field-input"
             />
-          </div>
+          </Field>
 
           {state?.error && (
             <div className="alert alert-danger">

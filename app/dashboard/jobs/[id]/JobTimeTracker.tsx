@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState, useTransition } from 'react'
 import { Play, Square, Plus, Trash2, Pencil, X, Check, Timer, DollarSign } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
+import Field from '@/components/Field'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
 import { formatNZD, formatDate } from '@/lib/format'
 import {
@@ -351,29 +352,24 @@ export default function JobTimeTracker({
               <button type="button" onClick={() => setManualOpen(false)} className="btn-icon"><X className="w-3.5 h-3.5" /></button>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-              <div>
-                <label className="field-label">Date</label>
+              <Field label="Date">
                 <input type="date" name="date" defaultValue={new Date().toISOString().slice(0, 10)} className="field-input text-sm" />
-              </div>
-              <div>
-                <label className="field-label">Hours</label>
+      </Field>
+              <Field label="Hours">
                 <input type="number" name="hours" min={0} defaultValue={0} className="field-input text-sm" />
-              </div>
-              <div>
-                <label className="field-label">Minutes</label>
+      </Field>
+              <Field label="Minutes">
                 <input type="number" name="minutes" min={0} max={59} defaultValue={30} className="field-input text-sm" />
-              </div>
-              <div>
-                <label className="field-label">Category</label>
+      </Field>
+              <Field label="Category">
                 <select name="category" defaultValue="general" className="field-input text-sm">
                   {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
-              </div>
+              </Field>
             </div>
-            <div className="mb-3">
-              <label className="field-label">Description</label>
+            <Field label="Description" className="mb-3">
               <input name="description" placeholder="Optional note..." className="field-input text-sm" />
-            </div>
+      </Field>
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
                 <input type="checkbox" name="billable" defaultChecked /> Billable

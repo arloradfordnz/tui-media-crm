@@ -7,6 +7,7 @@ import { ArrowLeft, ArrowRight, Check, Film, Heart, Building2, PartyPopper, Home
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
 import { statusLabel } from '@/lib/format'
+import Field from '@/components/Field'
 
 type Client = { id: string; name: string; email: string | null }
 type TemplateDeliverable = { title: string; description: string | null }
@@ -75,8 +76,7 @@ export default function NewJobPage() {
       {/* Step 0: Basics */}
       {step === 0 && (
         <div className="card space-y-5">
-          <div>
-            <label className="field-label">Client *</label>
+          <Field label="Client *">
             <CustomSelect
               value={selectedClient}
               onChange={setSelectedClient}
@@ -84,34 +84,28 @@ export default function NewJobPage() {
               searchable
               options={clients.map((c) => ({ value: c.id, label: c.name }))}
             />
-          </div>
-          <div>
-            <label className="field-label">Job Name *</label>
+      </Field>
+          <Field label="Job Name *">
             <input value={jobName} onChange={(e) => setJobName(e.target.value)} className="field-input" placeholder="e.g. Highlight Film" />
-          </div>
+      </Field>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="field-label">Shoot Date</label>
+            <Field label="Shoot Date">
               <DatePicker value={shootDate} onChange={setShootDate} className="field-input" />
-            </div>
-            <div>
-              <label className="field-label">Quote Value (NZD)</label>
+      </Field>
+            <Field label="Quote Value (NZD)">
               <input type="number" step="0.01" value={quoteValue} onChange={(e) => setQuoteValue(e.target.value)} className="field-input" placeholder="0.00" />
-            </div>
+      </Field>
           </div>
-          <div>
-            <label className="field-label">Shoot Location</label>
+          <Field label="Shoot Location">
             <input value={shootLocation} onChange={(e) => setShootLocation(e.target.value)} className="field-input" placeholder="Venue, City" />
-          </div>
+      </Field>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="field-label">Expected Payment (NZD)</label>
+            <Field label="Expected Payment (NZD)">
               <input type="number" step="0.01" value={expectedAmount} onChange={(e) => setExpectedAmount(e.target.value)} className="field-input" placeholder="Defaults to quote" />
-            </div>
-            <div>
-              <label className="field-label">Expected Payment Date</label>
+      </Field>
+            <Field label="Expected Payment Date">
               <DatePicker value={expectedPaymentDate} onChange={setExpectedPaymentDate} className="field-input" />
-            </div>
+      </Field>
           </div>
         </div>
       )}

@@ -12,6 +12,7 @@ import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
 import DatePicker from '@/components/DatePicker'
 import JobTimeTracker, { type TimeEntry } from './JobTimeTracker'
 import { useMediaQuery } from '@/lib/useMediaQuery'
+import Field from '@/components/Field'
 
 const JOB_STATUSES = ['enquiry', 'booked', 'editing', 'review', 'delivered', 'archived']
 const PHASES = ['preshoot', 'shootday', 'postproduction', 'delivery']
@@ -302,39 +303,31 @@ export default function JobRecord({ job }: { job: JobData }) {
           <input type="hidden" name="jobId" value={job.id} />
           <input type="hidden" name="status" value={job.status} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="field-label">Job Name</label>
+            <Field label="Job Name">
               <input name="name" defaultValue={job.name} className="field-input" />
-            </div>
-            <div>
-              <label className="field-label">Shoot Date</label>
+      </Field>
+            <Field label="Shoot Date">
               <DatePicker name="shootDate" defaultValue={job.shootDate?.split('T')[0] || ''} className="field-input" />
-            </div>
-            <div>
-              <label className="field-label">Shoot Location</label>
+      </Field>
+            <Field label="Shoot Location">
               <input name="shootLocation" defaultValue={job.shootLocation || ''} className="field-input" />
-            </div>
-            <div>
-              <label className="field-label">Quote Value (NZD)</label>
+      </Field>
+            <Field label="Quote Value (NZD)">
               <input name="quoteValue" type="number" step="0.01" defaultValue={job.quoteValue || ''} className="field-input" />
-            </div>
-            <div>
-              <label className="field-label">Expected Payment (NZD)</label>
+      </Field>
+            <Field label="Expected Payment (NZD)">
               <input name="expectedAmount" type="number" step="0.01" defaultValue={job.expectedAmount ?? ''} className="field-input" placeholder="Defaults to quote" />
-            </div>
-            <div>
-              <label className="field-label">Expected Payment Date</label>
+      </Field>
+            <Field label="Expected Payment Date">
               <DatePicker name="expectedPaymentDate" defaultValue={job.expectedPaymentDate ?? ''} className="field-input" />
-            </div>
-            <div>
-              <label className="field-label">Estimated Hours</label>
+      </Field>
+            <Field label="Estimated Hours">
               <input name="estimatedHours" type="number" step="0.5" min={0} defaultValue={job.estimatedHours || ''} className="field-input" placeholder="e.g. 20" />
-            </div>
+      </Field>
           </div>
-          <div>
-            <label className="field-label">Notes</label>
+          <Field label="Notes">
             <textarea name="notes" rows={3} defaultValue={job.notes || ''} className="field-input" />
-          </div>
+      </Field>
           {state?.error && <div className="alert alert-danger">{state.error}</div>}
           <button type="submit" disabled={pending} className="btn-primary">{pending ? 'Saving...' : 'Save Changes'}</button>
         </form>
@@ -789,14 +782,12 @@ function DeliverableUploadForm({ deliverableId, uploading, progress, stage, onUp
       </div>
 
       <div className="upload-meta-grid">
-        <div>
-          <label className="field-label">Version</label>
+        <Field label="Version">
           <CustomSelect value={version} onChange={setVersion} options={VERSION_LABELS} />
-        </div>
-        <div>
-          <label className="field-label">Notes</label>
+      </Field>
+        <Field label="Notes">
           <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes..." className="field-input text-sm" />
-        </div>
+      </Field>
       </div>
       {uploading && (
         <div className="space-y-1.5">

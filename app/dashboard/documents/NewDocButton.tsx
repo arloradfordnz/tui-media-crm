@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react'
 import { createDocument } from '@/app/actions/documents'
 import { Plus, X } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
+import Field from '@/components/Field'
 
 const DOC_TYPES = ['contract', 'callsheet', 'shotlist', 'questionnaire']
 
@@ -27,21 +28,18 @@ export default function NewDocButton({ clients, defaultClientId }: { clients: Cl
               <button onClick={() => setShowModal(false)} className="btn-icon"><X className="w-5 h-5" /></button>
             </div>
             <form action={action} className="space-y-4">
-              <div>
-                <label className="field-label">Name *</label>
+              <Field label="Name *">
                 <input name="name" required className="field-input" placeholder="e.g. Wedding Contract Template" />
-              </div>
+      </Field>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="field-label">Type</label>
+                <Field label="Type">
                   <CustomSelect
                     name="docType"
                     defaultValue="contract"
                     options={DOC_TYPES.map((t) => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
                   />
-                </div>
-                <div>
-                  <label className="field-label">Client</label>
+      </Field>
+                <Field label="Client">
                   <CustomSelect
                     name="clientId"
                     defaultValue={defaultClientId || ''}
@@ -49,7 +47,7 @@ export default function NewDocButton({ clients, defaultClientId }: { clients: Cl
                     searchable
                     options={[{ value: '', label: 'None (Template)' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
                   />
-                </div>
+      </Field>
               </div>
               {state?.error && <p className="text-sm" style={{ color: 'var(--danger)' }}>{state.error}</p>}
               <button type="submit" disabled={pending} className="btn-primary w-full">{pending ? 'Creating...' : 'Create'}</button>

@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
+import Field from '@/components/Field'
 
 const LEAD_SOURCES = ['Referral', 'Website', 'Social Media', 'Google', 'Word of Mouth', 'Other']
 const PIPELINE_STAGES = ['enquiry', 'discovery', 'proposal', 'negotiation', 'won']
@@ -31,77 +32,64 @@ export default function NewClientPage() {
 
       <form action={action} className="card space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="field-label">Client / Business Name *</label>
+          <Field label="Client / Business Name *">
             <input name="name" required className="field-input" placeholder="Acme Co. or full name" />
-          </div>
-          <div>
-            <label className="field-label">Key Contact Person</label>
+      </Field>
+          <Field label="Key Contact Person">
             <input name="contactPerson" className="field-input" placeholder="Jane Smith" />
-          </div>
-          <div>
-            <label className="field-label">Email</label>
+      </Field>
+          <Field label="Email">
             <input name="email" type="email" className="field-input" placeholder="email@example.com" />
-          </div>
-          <div>
-            <label className="field-label">Phone</label>
+      </Field>
+          <Field label="Phone">
             <input name="phone" className="field-input" placeholder="+64..." />
-          </div>
-          <div>
-            <label className="field-label">Location</label>
+      </Field>
+          <Field label="Location">
             <input name="location" className="field-input" placeholder="City, NZ" />
-          </div>
-          <div>
-            <label className="field-label">Lead Source</label>
+      </Field>
+          <Field label="Lead Source">
             <CustomSelect
               name="leadSource"
               placeholder="Select..."
               options={[{ value: '', label: 'Select...' }, ...LEAD_SOURCES.map((s) => ({ value: s, label: s }))]}
             />
-          </div>
-          <div>
-            <label className="field-label">First Contact</label>
+      </Field>
+          <Field label="First Contact">
             <DatePicker name="firstContact" className="field-input" />
-          </div>
-          <div>
-            <label className="field-label">Pipeline Stage</label>
+      </Field>
+          <Field label="Pipeline Stage">
             <CustomSelect
               name="pipelineStage"
               defaultValue="enquiry"
               options={PIPELINE_STAGES.map((s) => ({ value: s, label: statusLabel(s) }))}
             />
-          </div>
-          <div>
-            <label className="field-label">Status</label>
+      </Field>
+          <Field label="Status">
             <CustomSelect
               name="status"
               defaultValue="lead"
               options={STATUSES.map((s) => ({ value: s, label: statusLabel(s) }))}
             />
-          </div>
-          <div>
-            <label className="field-label">Client Type</label>
+      </Field>
+          <Field label="Client Type">
             <CustomSelect
               name="clientCategory"
               defaultValue=""
               options={CATEGORIES}
             />
-          </div>
-          <div>
-            <label className="field-label">Monthly Retainer</label>
+      </Field>
+          <Field label="Monthly Retainer">
             <input name="monthlyRetainer" type="number" min="0" step="0.01" className="field-input" placeholder="e.g. 480 — leave blank if not a retainer" />
-          </div>
+      </Field>
         </div>
 
-        <div>
-          <label className="field-label">Tags</label>
+        <Field label="Tags">
           <input name="tags" className="field-input" placeholder="Wedding, Referral, Corporate (comma-separated)" />
-        </div>
+      </Field>
 
-        <div>
-          <label className="field-label">Notes</label>
+        <Field label="Notes">
           <textarea name="notes" rows={3} className="field-input" placeholder="Private notes..." />
-        </div>
+      </Field>
 
         {state?.error && (
           <div className="alert alert-danger">

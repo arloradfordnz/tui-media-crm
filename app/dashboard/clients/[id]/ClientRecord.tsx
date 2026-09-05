@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { ArrowLeft, Trash2, Briefcase, MessageSquare, StickyNote, UserCircle, Copy, Check, FileText, ExternalLink, Camera, Receipt } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
+import Field from '@/components/Field'
 
 const PIPELINE_STAGES = ['enquiry', 'discovery', 'proposal', 'negotiation', 'won']
 const LEAD_SOURCES = ['Referral', 'Website', 'Social Media', 'Google', 'Word of Mouth', 'Other']
@@ -276,65 +277,54 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
         <form action={action} className="card space-y-5">
           <input type="hidden" name="clientId" value={client.id} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="field-label">Client / Business Name *</label>
+            <Field label="Client / Business Name *">
               <input name="name" required defaultValue={client.name} className="field-input" />
-            </div>
-            <div>
-              <label className="field-label">Key Contact Person</label>
+      </Field>
+            <Field label="Key Contact Person">
               <input name="contactPerson" defaultValue={client.contactPerson || ''} className="field-input" placeholder="Jane Smith" />
-            </div>
-            <div>
-              <label className="field-label">Email</label>
+      </Field>
+            <Field label="Email">
               <input name="email" type="email" defaultValue={client.email || ''} className="field-input" />
-            </div>
-            <div>
-              <label className="field-label">Phone</label>
+      </Field>
+            <Field label="Phone">
               <input name="phone" defaultValue={client.phone || ''} className="field-input" />
-            </div>
-            <div>
-              <label className="field-label">Location</label>
+      </Field>
+            <Field label="Location">
               <input name="location" defaultValue={client.location || ''} className="field-input" />
-            </div>
-            <div>
-              <label className="field-label">Lead Source</label>
+      </Field>
+            <Field label="Lead Source">
               <CustomSelect
                 name="leadSource"
                 defaultValue={client.leadSource || ''}
                 placeholder="Select..."
                 options={[{ value: '', label: 'Select...' }, ...LEAD_SOURCES.map((s) => ({ value: s, label: s }))]}
               />
-            </div>
-            <div>
-              <label className="field-label">First Contact</label>
+      </Field>
+            <Field label="First Contact">
               <DatePicker name="firstContact" defaultValue={client.firstContact?.split('T')[0] || ''} className="field-input" />
-            </div>
-            <div>
-              <label className="field-label">Pipeline Stage</label>
+      </Field>
+            <Field label="Pipeline Stage">
               <CustomSelect
                 name="pipelineStage"
                 defaultValue={client.pipelineStage}
                 options={PIPELINE_STAGES.map((s) => ({ value: s, label: statusLabel(s) }))}
               />
-            </div>
-            <div>
-              <label className="field-label">Status</label>
+      </Field>
+            <Field label="Status">
               <CustomSelect
                 name="status"
                 defaultValue={client.status}
                 options={['lead', 'active', 'past', 'archived'].map((s) => ({ value: s, label: statusLabel(s) }))}
               />
-            </div>
-            <div>
-              <label className="field-label">Client Type</label>
+      </Field>
+            <Field label="Client Type">
               <CustomSelect
                 name="clientCategory"
                 defaultValue={client.clientCategory || ''}
                 options={CLIENT_CATEGORIES}
               />
-            </div>
-            <div>
-              <label className="field-label">Monthly Retainer</label>
+      </Field>
+            <Field label="Monthly Retainer">
               <input
                 name="monthlyRetainer"
                 type="number"
@@ -344,9 +334,8 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
                 className="field-input"
                 placeholder="e.g. 480 — leave blank if not a retainer"
               />
-            </div>
-            <div>
-              <label className="field-label">Shoots per Month</label>
+      </Field>
+            <Field label="Shoots per month" hint="Used to calculate your shoot schedule">
               <input
                 name="shootsPerMonth"
                 type="number"
@@ -356,8 +345,7 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
                 className="field-input"
                 placeholder="1–4 — retainer clients only"
               />
-              <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>Used to calculate your shoot schedule</p>
-            </div>
+            </Field>
           </div>
 
           {/* Pipeline Progress */}
@@ -495,18 +483,18 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
           <input type="hidden" name="status" value={client.status} />
           <input type="hidden" name="pipelineStage" value={client.pipelineStage} />
           <div>
-            <label className="field-label">Tags</label>
-            <input name="tags" defaultValue={tags.join(', ')} className="field-input" placeholder="Wedding, Corporate, Referral..." />
+            <Field label="Tags">
+              <input name="tags" defaultValue={tags.join(', ')} className="field-input" placeholder="Wedding, Corporate, Referral..." />
+            </Field>
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">
                 {tags.map((t) => <span key={t} className="badge badge-accent">{t}</span>)}
               </div>
             )}
           </div>
-          <div>
-            <label className="field-label">Private Notes</label>
+          <Field label="Private Notes">
             <textarea name="notes" rows={6} defaultValue={client.notes || ''} className="field-input" placeholder="Notes about this client..." />
-          </div>
+      </Field>
           <button type="submit" disabled={pending} className="btn-primary">{pending ? 'Saving...' : 'Save Notes'}</button>
         </form>
       )}

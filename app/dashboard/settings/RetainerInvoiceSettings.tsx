@@ -3,6 +3,7 @@
 import { useActionState } from 'react'
 import { saveRetainerInvoiceDay } from '@/app/actions/settings'
 import { CalendarDays } from 'lucide-react'
+import Field from '@/components/Field'
 
 export default function RetainerInvoiceSettings({ currentDay }: { currentDay: number }) {
   const [state, action, pending] = useActionState(saveRetainerInvoiceDay, undefined)
@@ -16,8 +17,11 @@ export default function RetainerInvoiceSettings({ currentDay }: { currentDay: nu
         Set the day of the month when retainer invoices should be created. You&apos;ll see a reminder on the Finance page when that day arrives.
       </p>
       <form action={action} className="flex items-end gap-3">
-        <div className="flex-1">
-          <label className="field-label">Invoice day of month</label>
+        <Field
+          label="Invoice day of month"
+          className="flex-1"
+          hint="Day 1–28 (use 28 to avoid month-end issues)"
+        >
           <input
             name="retainerInvoiceDay"
             type="number"
@@ -25,18 +29,18 @@ export default function RetainerInvoiceSettings({ currentDay }: { currentDay: nu
             max="28"
             defaultValue={currentDay}
             className="field-input"
-            placeholder="1–28"
           />
-          <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
-            Day 1–28 (use 28 to avoid month-end issues)
-          </p>
-        </div>
+        </Field>
         <button type="submit" disabled={pending} className="btn-primary mb-6">
           {pending ? 'Saving…' : 'Save'}
         </button>
       </form>
       {state?.error && <p className="text-sm mt-2" style={{ color: 'var(--danger)' }}>{state.error}</p>}
-      {state?.success && <p className="text-sm mt-2" style={{ color: 'var(--success)' }}>Saved.</p>}
+      {/* The action returns a union — one arm has `success`, the other only
+          `error` — so this needs an `in` check rather than a property read. */}
+      {state && 'success' in state && state.success && (
+        <p className="text-sm mt-2" style={{ color: 'var(--success)' }}>Saved.</p>
+      )}
     </div>
   )
 }
