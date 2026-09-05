@@ -6,6 +6,7 @@ import { acceptProposal, declineProposal } from '@/app/actions/proposals'
 import { formatNZD, formatDate, statusLabel } from '@/lib/format'
 import Image from 'next/image'
 import { Check, X, MapPin, Calendar, CheckCircle2 } from 'lucide-react'
+import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
 
 type ServiceLine = { description: string; amount: number }
 
@@ -33,6 +34,7 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [responded, setResponded] = useState(proposal.status === 'accepted' || proposal.status === 'declined')
+  const [confirmSpec, setConfirm] = useState<ConfirmSpec | null>(null)
 
   let services: ServiceLine[] = []
   try { services = JSON.parse(proposal.services) } catch { /* empty */ }
@@ -40,20 +42,31 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
   const inclusionLines = proposal.inclusions?.split('\n').filter((l) => l.trim()) || []
 
   function handleAccept() {
-    if (!confirm('Accept this proposal? This confirms you would like to proceed with the project.')) return
-    startTransition(async () => {
-      await acceptProposal(proposal.token)
-      setResponded(true)
-      router.refresh()
+    setConfirm({
+      title: 'Accept this proposal?',
+      body: 'This confirms you would like to go ahead. We will be in touch to lock in dates and next steps.',
+      confirmLabel: 'Accept proposal',
+      onConfirm: () =>
+        startTransition(async () => {
+          await acceptProposal(proposal.token)
+          setResponded(true)
+          router.refresh()
+        }),
     })
   }
 
   function handleDecline() {
-    if (!confirm('Decline this proposal? You can contact us to discuss alternative options.')) return
-    startTransition(async () => {
-      await declineProposal(proposal.token)
-      setResponded(true)
-      router.refresh()
+    setConfirm({
+      title: 'Decline this proposal?',
+      body: 'Nothing is final — if the scope or budget is not quite right, reply to us and we can look at alternatives.',
+      confirmLabel: 'Decline',
+      destructive: true,
+      onConfirm: () =>
+        startTransition(async () => {
+          await declineProposal(proposal.token)
+          setResponded(true)
+          router.refresh()
+        }),
     })
   }
 
@@ -166,6 +179,8 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
           <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>&copy; {new Date().getFullYear()} Tui Media &middot; New Zealand</p>
         </div>
       </div>
+
+      <ConfirmSheet spec={confirmSpec} onClose={() => setConfirm(null)} />
     </div>
   )
 }

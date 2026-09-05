@@ -8,6 +8,7 @@ import { renderDocBody } from '@/lib/markdown'
 import { statusLabel, statusBadgeClass, formatDate } from '@/lib/format'
 import Image from 'next/image'
 import { Briefcase, FileText, Film, Image as ImageIcon, File, Music, Download, ChevronDown, ChevronRight, Check, MessageSquare, PenLine } from 'lucide-react'
+import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
 
 type DeliveryFile = {
   id: string
@@ -80,6 +81,7 @@ function fileKind(mime: string | null, name: string): 'video' | 'image' | 'audio
 }
 
 export default function ClientPortalView({ data }: { data: PortalData }) {
+  const [confirmSpec, setConfirm] = useState<ConfirmSpec | null>(null)
   const router = useRouter()
   const [expandedJob, setExpandedJob] = useState<string | null>(data.jobs[0]?.id || null)
 
@@ -96,11 +98,19 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
     }
   }, [data])
 
-  async function handleApprove(fileId: string, jobId: string) {
-    if (!confirm('Approve this file? This confirms you are happy with the delivery.')) return
-    await approveDelivery(fileId, jobId, data.portalToken)
-    // Re-fetch the server component data in place — no full page flash.
-    router.refresh()
+  // Approving is the client saying "this is finished" — it belongs in a sheet
+  // that looks like Tui Media, not a browser dialog stamped with the domain.
+  function handleApprove(fileId: string, jobId: string) {
+    setConfirm({
+      title: 'Approve this delivery?',
+      body: 'This lets us know you are happy with it and the work is signed off. If you would like changes instead, use Request a revision.',
+      confirmLabel: 'Approve',
+      onConfirm: async () => {
+        await approveDelivery(fileId, jobId, data.portalToken)
+        // Re-fetch the server component data in place — no full page flash.
+        router.refresh()
+      },
+    })
   }
 
   return (
@@ -230,6 +240,8 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
         <div className="text-center pt-8 pb-4">
           <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>&copy; {new Date().getFullYear()} Tui Media</p>
         </div>
+
+      <ConfirmSheet spec={confirmSpec} onClose={() => setConfirm(null)} />
       </div>
     </div>
   )
@@ -267,27 +279,45 @@ function FileCard({ file, jobId, portalToken, onApprove }: { file: DeliveryFile;
 
       {/* Preview */}
       {file.fileUrl && kind === 'vimeo' && (
-        <div className="relative w-full mb-3" style={{ paddingBottom: '56.25%', background: '#060D1A', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
-          <iframe
-            src={file.fileUrl.replace('vimeo.com/', 'player.vimeo.com/video/')}
-            className="absolute inset-0 w-full h-full"
-            allow="autoplay; fullscreen"
-            allowFullScreen
-          />
+        <div className="media-band">
+          <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+            <iframe
+              src={file.fileUrl.replace('vimeo.com/', 'player.vimeo.com/video/')}
+              className="absolute inset-0 w-full h-full"
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
         </div>
       )}
       {file.fileUrl && kind === 'video' && (
-        <video controls className="w-full rounded-lg mb-3" style={{ maxHeight: '480px', background: '#060D1A' }}>
-          <source src={file.fileUrl} type={file.mimeType || undefined} />
-        </video>
+        <div className="media-band">
+          {/* playsInline is the whole ballgame on iOS: without it Safari yanks
+              the client out of the page into its own fullscreen player the
+              moment they hit play, and they land back on a scroll position
+              that is not where they left. preload="metadata" pulls the first
+              frame so the player shows the video rather than a black rectangle
+              — the closest thing to a poster frame without storing one. */}
+          <video
+            controls
+            playsInline
+            preload="metadata"
+            className="w-full"
+            style={{ maxHeight: '70vh', background: '#060D1A', display: 'block' }}
+          >
+            <source src={file.fileUrl} type={file.mimeType || undefined} />
+          </video>
+        </div>
       )}
       {file.fileUrl && kind === 'image' && (
-        <a href={file.fileUrl} target="_blank" rel="noreferrer">
-          <img src={file.fileUrl} alt={file.originalName} className="w-full rounded-lg mb-3" style={{ maxHeight: '480px', objectFit: 'contain', background: '#060D1A' }} />
+        <a href={file.fileUrl} target="_blank" rel="noreferrer" className="media-band">
+          <img src={file.fileUrl} alt={file.originalName} className="w-full" style={{ maxHeight: '70vh', objectFit: 'contain', background: '#060D1A', display: 'block' }} />
         </a>
       )}
       {file.fileUrl && kind === 'pdf' && (
-        <iframe src={file.fileUrl} className="w-full rounded-lg mb-3" style={{ height: '480px', background: '#060D1A', border: 0 }} />
+        <div className="media-band">
+          <iframe src={file.fileUrl} className="w-full" style={{ height: '70vh', background: '#060D1A', border: 0, display: 'block' }} />
+        </div>
       )}
       {file.fileUrl && kind === 'audio' && (
         <audio controls className="w-full mb-3">
