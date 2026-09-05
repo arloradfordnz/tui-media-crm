@@ -67,6 +67,39 @@ type PortalData = {
   documents: Document[]
 }
 
+// The client's view of where a job is up to.
+//
+// The portal was rendering the internal pipeline status verbatim, so clients
+// saw "Pre-production" and "Shoot Day" — scheduling states that describe how
+// Tui Media organises its own week, not anything the client can act on. Worse,
+// several of them came through statusBadgeClass in amber, which reads as a
+// warning about their project when nothing is wrong.
+//
+// This collapses the pipeline into the four things a client actually cares
+// about: is it booked, is it being made, does it need me, is it done. The one
+// state that is genuinely about them — review — says so in words that ask.
+const CLIENT_STATUS: Record<string, { label: string; badge: string }> = {
+  enquiry:       { label: 'Getting started', badge: 'badge-muted' },
+  discovery:     { label: 'Getting started', badge: 'badge-muted' },
+  proposal:      { label: 'Getting started', badge: 'badge-muted' },
+  negotiation:   { label: 'Getting started', badge: 'badge-muted' },
+  contract:      { label: 'Getting started', badge: 'badge-muted' },
+  booked:        { label: 'Booked', badge: 'badge-accent' },
+  preproduction: { label: 'In production', badge: 'badge-accent' },
+  shootday:      { label: 'In production', badge: 'badge-accent' },
+  editing:       { label: 'In production', badge: 'badge-accent' },
+  review:        { label: 'Ready for your review', badge: 'badge-warning' },
+  approved:      { label: 'Approved', badge: 'badge-success' },
+  delivered:     { label: 'Delivered', badge: 'badge-success' },
+  archived:      { label: 'Complete', badge: 'badge-muted' },
+}
+
+function clientStatus(status: string): { label: string; badge: string } {
+  // An unmapped status must never fall through to the raw internal string —
+  // that is exactly how "shootday" would reach a client.
+  return CLIENT_STATUS[status] ?? { label: 'In progress', badge: 'badge-muted' }
+}
+
 function fileKind(mime: string | null, name: string): 'video' | 'image' | 'audio' | 'pdf' | 'vimeo' | 'other' {
   const lower = (name || '').toLowerCase()
   const m = (mime || '').toLowerCase()
@@ -168,7 +201,7 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
                       <div className="flex-1">
                         <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{job.name}</h3>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className={`badge ${statusBadgeClass(job.status)}`}>{statusLabel(job.status)}</span>
+                          <span className={`badge ${clientStatus(job.status).badge}`}>{clientStatus(job.status).label}</span>
                           {job.jobType && <span className="badge badge-muted">{statusLabel(job.jobType)}</span>}
                           {job.shootDate && <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{formatDate(job.shootDate)}</span>}
                         </div>
