@@ -5,7 +5,7 @@ import RetainerInvoiceSettings from './RetainerInvoiceSettings'
 import { APP_VERSION } from '@/lib/version'
 import { getAppSetting } from '@/app/actions/settings'
 import Link from 'next/link'
-import { Users, CalendarDays, Wallet, FileText } from 'lucide-react'
+import { Users, CalendarDays, Wallet, FileText, TrendingUp } from 'lucide-react'
 
 export default async function SettingsPage() {
   const supabase = await createServerSupabaseClient()
@@ -34,7 +34,8 @@ export default async function SettingsPage() {
         {[
           { href: '/dashboard/clients', label: 'Clients', icon: Users },
           { href: '/dashboard/calendar', label: 'Calendar', icon: CalendarDays },
-          { href: '/dashboard/finance', label: 'Money', icon: Wallet },
+          { href: '/dashboard/money', label: 'Money', icon: Wallet },
+          { href: '/dashboard/finance', label: 'Finance', icon: TrendingUp },
           { href: '/dashboard/documents', label: 'Documents', icon: FileText },
         ].map(({ href, label, icon: Icon }) => (
           <Link key={href} href={href} className="settings-nav-tile">

@@ -12,6 +12,7 @@ import {
   FileText,
   Settings,
   LogOut,
+  Receipt,
 } from 'lucide-react'
 
 const mainNav = [
@@ -21,7 +22,11 @@ const mainNav = [
   { href: '/dashboard/calendar', label: 'Calendar', icon: CalendarDays },
 ]
 
+// Money is the operational half (who owes what, how late), Finance the
+// analytical half (revenue over time, averages). Same split as Today and
+// Insights, and Money comes first because it is the one you act on.
 const businessNav = [
+  { href: '/dashboard/money', label: 'Money', icon: Receipt },
   { href: '/dashboard/finance', label: 'Finance', icon: Wallet },
   { href: '/dashboard/documents', label: 'Documents', icon: FileText },
 ]

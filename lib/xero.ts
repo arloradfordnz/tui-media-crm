@@ -484,6 +484,13 @@ export function fetchXeroSummaryCached(): Promise<XeroSummary | null> {
   return swrCached('summary', fetchXeroSummary)
 }
 
+/** Cached fetchOutstandingInvoices — same stale-while-revalidate treatment, so
+ *  the Money page does not pay a token refresh plus a REST round trip on every
+ *  visit. */
+export function fetchOutstandingInvoicesCached(): Promise<XeroCreatedInvoice[]> {
+  return swrCached('outstanding-invoices', fetchOutstandingInvoices).then((r) => r ?? [])
+}
+
 export type XeroTransaction = {
   id: string
   date: string          // ISO date YYYY-MM-DD
@@ -747,6 +754,8 @@ export type XeroCreatedInvoice = {
   AmountDue: number
   DateString?: string
   DueDateString?: string
+  /** Present on reads; Xero returns it inline on the invoice. */
+  Contact?: { ContactID?: string; Name?: string }
 }
 
 export async function createXeroInvoice(input: XeroInvoiceCreateInput): Promise<XeroCreatedInvoice | null> {
