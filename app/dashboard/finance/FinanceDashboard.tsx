@@ -9,7 +9,7 @@ import type { XeroSummary, XeroTransaction, MonthlyPnl } from '@/lib/xero'
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
-type MonthsWindow = 3 | 6 | 12
+type MonthsWindow = 3 | 6 | 12 | 'all'
 
 const fmtShort = (n: number) =>
   n >= 1000 ? `$${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : `$${Math.round(n)}`
@@ -228,10 +228,25 @@ export default function FinanceDashboard({
   // adding up bank lines. See fetchMonthlyPnl for what that was getting wrong:
   // it reported five times the real spending, because every transfer, drawing
   // and personal card swipe leaving the account counted as an expense.
-  const shown = useMemo(() => monthly.slice(-months), [monthly, months])
+  // "All time" is every month Xero has anything in. Thirty-six months are
+  // fetched, and the empty ones before the business had activity are dropped
+  // rather than drawn as a flat run of zeros leading into the data.
+  const allTime = useMemo(() => {
+    const first = monthly.findIndex((m) => m.income !== 0 || m.expenses !== 0)
+    return first === -1 ? monthly : monthly.slice(first)
+  }, [monthly])
+
+  const span = months === 'all' ? allTime.length : months
+  const shown = useMemo(
+    () => (months === 'all' ? allTime : monthly.slice(-span)),
+    [monthly, allTime, months, span],
+  )
+  // All time has nothing before it to compare against.
   const prior = useMemo(
-    () => monthly.slice(Math.max(0, monthly.length - months * 2), Math.max(0, monthly.length - months)),
-    [monthly, months],
+    () => (months === 'all'
+      ? []
+      : monthly.slice(Math.max(0, monthly.length - span * 2), Math.max(0, monthly.length - span))),
+    [monthly, months, span],
   )
 
   const sum = (rows: MonthlyPnl[], key: 'income' | 'expenses') =>
@@ -259,9 +274,9 @@ export default function FinanceDashboard({
   // window over the raw list.
   const windowStart = useMemo(() => {
     const d = new Date()
-    d.setMonth(d.getMonth() - (months - 1), 1)
+    d.setMonth(d.getMonth() - (span - 1), 1)
     return d.toISOString().slice(0, 10)
-  }, [months])
+  }, [span])
   const filtered = useMemo(
     () => transactions.filter((t) => t.date >= windowStart),
     [transactions, windowStart],
@@ -316,13 +331,19 @@ export default function FinanceDashboard({
 
       <section>
         <p className="label" style={{ marginBottom: 6 }}>
-          {losing ? 'Net loss' : 'Net profit'} · last {months} months
+          {losing ? 'Net loss' : 'Net profit'} · {months === 'all' ? 'all time' : `last ${months} months`}
         </p>
         <p className="finance-hero" style={{ color: losing ? 'var(--danger)' : 'var(--text-primary)' }}>
           {fmtBig(Math.round(current.net))}
         </p>
         <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '10px 0 0' }}>
-          <Delta now={current.net} before={previous.net} against={`the ${months} months before`} />
+          {/* All time has nothing before it, so it gets no comparison clause
+              rather than "no figure to compare against", which is a sentence
+              about an absence nobody asked about. */}
+          {months !== 'all' && (
+            <Delta now={current.net} before={previous.net} against={`the ${span} months before`} />
+          )}
+          {months === 'all' && `${shown.length} months of trading`}
           {losing && ' · you are spending more than you are bringing in'}
         </p>
         <p style={{ fontSize: 12, color: 'var(--text-tertiary)', margin: '4px 0 0' }}>
@@ -342,11 +363,12 @@ export default function FinanceDashboard({
         control={
           <CustomSelect
             value={String(months)}
-            onChange={(v) => setMonths(Number(v) as MonthsWindow)}
+            onChange={(v) => setMonths(v === 'all' ? 'all' : (Number(v) as MonthsWindow))}
             options={[
               { value: '3', label: 'Last 3 months' },
               { value: '6', label: 'Last 6 months' },
               { value: '12', label: 'Last 12 months' },
+              { value: 'all', label: 'All time' },
             ]}
             className="flow-range"
           />

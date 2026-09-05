@@ -54,12 +54,18 @@ export default function Field({
   return (
     <div className={className}>
       <div className="field" ref={wrapRef}>
-        {/* placeholder defaults to a single space so :placeholder-shown can
-            tell empty from filled; a real placeholder passed by the caller
-            wins and shows on focus. */}
+        {/* The single-space placeholder is only for NATIVE controls, where
+            :placeholder-shown is what tells the label whether the field is
+            empty. Passing it to a picker overwrites that component's own
+            placeholder with a space, which collapses the line it renders: the
+            Shoot date button came out 39px tall against 60px for every other
+            field. A picker's label is permanently lifted by CSS anyway, so it
+            never needed the trick. */}
         {cloneElement(children, {
           id: controlId,
-          placeholder: children.props.placeholder ?? ' ',
+          ...(typeof children.type === 'string'
+            ? { placeholder: children.props.placeholder ?? ' ' }
+            : {}),
         })}
         <label className="field-label" htmlFor={controlId}>{label}</label>
         {action}

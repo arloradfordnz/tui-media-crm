@@ -549,7 +549,29 @@ function num(raw: string | undefined): number {
   return Number.isNaN(n) ? 0 : n
 }
 
+// Xero caps `periods` at 11, so one call returns at most twelve columns. Longer
+// spans are stitched from several calls, each anchored a year earlier.
 export async function fetchMonthlyPnl(months = 12): Promise<MonthlyPnl[] | null> {
+  if (months <= 12) return fetchMonthlyPnlChunk(months, 0)
+
+  const chunks: MonthlyPnl[][] = []
+  for (let offset = 0; offset < months; offset += 12) {
+    const chunk = await fetchMonthlyPnlChunk(Math.min(12, months - offset), offset)
+    // A failed chunk means an incomplete history, and a chart with a hole in
+    // the middle is worse than a shorter one. Keep what came back contiguously
+    // from the present and stop.
+    if (!chunk) break
+    chunks.push(chunk)
+  }
+  if (chunks.length === 0) return null
+
+  const merged = new Map<string, MonthlyPnl>()
+  for (const chunk of chunks) for (const m of chunk) merged.set(m.month, m)
+  return [...merged.values()].sort((a, b) => a.month.localeCompare(b.month))
+}
+
+/** One report call: `months` columns ending `monthsBack` months before now. */
+async function fetchMonthlyPnlChunk(months: number, monthsBack: number): Promise<MonthlyPnl[] | null> {
   const account = await getValidXeroAccount()
   if (!account || !account.account_id) return null
 
@@ -566,8 +588,9 @@ export async function fetchMonthlyPnl(months = 12): Promise<MonthlyPnl[] | null>
   // made every comparative a five-day window too: August came back as $100
   // against its real $1,300, because it was only reporting 1-5 August.
   const now = new Date()
-  const from = new Date(now.getFullYear(), now.getMonth(), 1)
-  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  const anchor = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1)
+  const from = new Date(anchor.getFullYear(), anchor.getMonth(), 1)
+  const to = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0)
   // Formatted in LOCAL time. toISOString() converts local midnight to UTC,
   // which in NZ (+12) rolls back a day: 1 Sept became 31 Aug and 30 Sept
   // became 29 Sept, so Xero reported thirty-day windows straddling two months

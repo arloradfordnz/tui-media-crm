@@ -2589,7 +2589,11 @@ input, textarea, select, button { font-family: inherit; }
   height: 34px;
   display: inline-grid;
   place-items: center;
-  border-radius: var(--r-pill);
+  /* Concentric with the corner it sits in. The box rounds at --r-lg and the
+     button is inset 12px, so the inner radius that reads as parallel to it is
+     that minus the inset — a pill in the corner of a 22px curve looks like a
+     coin dropped there. */
+  border-radius: calc(var(--r-lg) - 12px);
   border: 1px solid var(--bg-border);
   background: var(--bg-elevated);
   color: var(--accent);

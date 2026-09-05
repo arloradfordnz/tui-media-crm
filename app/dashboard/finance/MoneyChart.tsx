@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { Table2, LineChart } from 'lucide-react'
 import RevenueChart from '../RevenueChart'
 
@@ -40,14 +40,28 @@ export default function MoneyChart({
   // Click a figure to read its line on its own. Clicking it again, or the
   // other one, releases it.
   const [focus, setFocus] = useState<'primary' | 'comparison' | null>(null)
-  const wrapRef = useRef<HTMLDivElement>(null)
+  // Measured through a CALLBACK REF, not an effect. The wrapper unmounts every
+  // time you switch to the table view, and an effect with no dependency array
+  // tore down and rebuilt the observer on every render — the pending callback
+  // was disconnected before it could fire, every time. Coming back from the
+  // table left wrapWidth at 0, so the chart collapsed to its 300px minimum
+  // showing a single month label, and stayed there until a full reload.
+  //
+  // A callback ref is the supported way to observe a node that comes and goes:
+  // React hands it the element on mount and null on unmount, once each.
   const [wrapWidth, setWrapWidth] = useState<number | null>(null)
-  useEffect(() => {
-    const el = wrapRef.current
+  const observerRef = useRef<ResizeObserver | null>(null)
+  const wrapRef = useCallback((el: HTMLDivElement | null) => {
+    observerRef.current?.disconnect()
     if (!el) return
-    const ro = new ResizeObserver(([entry]) => setWrapWidth(entry.contentRect.width))
+    const ro = new ResizeObserver(([entry]) => {
+      const w = entry.contentRect.width
+      // A detached or hidden element reports 0. Keeping the last real width
+      // means the chart redraws at its true size instead of collapsing.
+      if (w > 0) setWrapWidth(w)
+    })
     ro.observe(el)
-    return () => ro.disconnect()
+    observerRef.current = ro
   }, [])
 
   const PX_PER_POINT = 96
@@ -79,9 +93,10 @@ export default function MoneyChart({
           {control}
           {/* A plain secondary button at the same size as everything else on
               the page. It was a btn-ghost with an inline font-size override,
-              which made it the only button on Finance with its own geometry. */}
+              then a btn-sm, which left it 36px tall beside a 44px range
+              control. */}
           <button
-            className="btn-secondary btn-sm"
+            className="btn-secondary"
             onClick={() => setAsTable((v) => !v)}
             aria-pressed={asTable}
           >

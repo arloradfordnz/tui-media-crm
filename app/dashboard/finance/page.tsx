@@ -47,7 +47,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Sear
     const [s, t, m, dayStr] = await Promise.all([
       fetchXeroSummaryCached(),
       fetchXeroTransactionsCached(),
-      fetchMonthlyPnlCached(12),
+      fetchMonthlyPnlCached(36),
       getAppSetting('retainer_invoice_day'),
     ])
     summary = s

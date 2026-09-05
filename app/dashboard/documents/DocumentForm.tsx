@@ -394,7 +394,7 @@ async function persistNew() {
             model is told the format instead, which is where that knowledge
             belongs. */}
         <Field
-          label="Content"
+          label="What the document says"
           className="sm:col-span-2"
           action={
             <button
