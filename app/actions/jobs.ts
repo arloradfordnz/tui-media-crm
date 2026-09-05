@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { sendRevisionResponseEmail } from '@/lib/email'
 import { findDuplicateJobName, type DuplicateJobMatch } from '@/lib/job-naming'
+import { syncShootEvent, removeShootEvent } from '@/lib/job-calendar'
 
 export async function createJob(
   prevState: { error?: string; duplicate?: DuplicateJobMatch } | undefined,
@@ -104,7 +105,10 @@ export async function createJob(
     client_id: clientId,
   })
 
+  await syncShootEvent(supabase, job.id)
+
   revalidatePath('/dashboard/jobs')
+  revalidatePath('/dashboard/calendar')
   revalidatePath('/dashboard')
   redirect('/dashboard/jobs')
 }
@@ -148,8 +152,14 @@ export async function updateJob(prevState: { error?: string } | undefined, formD
     await logStatusChange(jobId, job.client_id, name, status)
   }
 
+  // Runs on every save, not just when the date visibly changed: the job name
+  // and location are on the event too, and reconciling unconditionally is
+  // cheaper than deciding whether it was needed.
+  await syncShootEvent(supabase, jobId)
+
   revalidatePath('/dashboard/jobs')
   revalidatePath(`/dashboard/jobs/${jobId}`)
+  revalidatePath('/dashboard/calendar')
   redirect(`/dashboard/jobs/${jobId}`)
 }
 
@@ -179,8 +189,13 @@ export async function updateJobStatus(jobId: string, newStatus: string) {
 
 export async function deleteJob(jobId: string) {
   const supabase = await createServerSupabaseClient()
+  // Before the job row goes: events.job_id is ON DELETE SET NULL, so deleting
+  // the job would otherwise leave its shoot on the calendar detached from
+  // anything, with no way to tell what it was for.
+  await removeShootEvent(supabase, jobId)
   await supabase.from('jobs').delete().eq('id', jobId)
   revalidatePath('/dashboard/jobs')
+  revalidatePath('/dashboard/calendar')
   revalidatePath('/dashboard')
   redirect('/dashboard/jobs')
 }

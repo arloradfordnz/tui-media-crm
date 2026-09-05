@@ -4,6 +4,7 @@ import { fetchXeroContacts, createXeroInvoice, fetchOutstandingInvoices, approve
 import { fetchRecentEmails, fetchUnreadEmails } from '@/lib/mail'
 import { getContentBacklog } from '@/lib/content-backlog'
 import { findDuplicateJobName } from '@/lib/job-naming'
+import { syncShootEvent, removeShootEvent } from '@/lib/job-calendar'
 
 // Shared tool definitions + executor for every AI surface (dashboard chat,
 // SMS assistant). One tool set, one set of side effects — a job marked
@@ -703,6 +704,10 @@ export async function executeTool(
           job_id: job.id,
           client_id: input.client_id as string,
         })
+        // Same mirror the dashboard uses. A shoot Tui books over Telegram has
+        // to land on the calendar too, or the two surfaces disagree about the
+        // one date that cannot move.
+        await syncShootEvent(supabase, job.id)
       }
 
       return JSON.stringify({ success: true, job })
@@ -730,6 +735,8 @@ export async function executeTool(
         })
       }
 
+      await syncShootEvent(supabase, input.job_id as string)
+
       return JSON.stringify({ success: true, job: data })
     }
 
@@ -748,6 +755,9 @@ export async function executeTool(
     }
 
     case 'delete_job': {
+      // Before the row goes — events.job_id is ON DELETE SET NULL, so the
+      // shoot would otherwise survive its job as an orphan on the calendar.
+      await removeShootEvent(supabase, input.job_id as string)
       const { error } = await supabase.from('jobs').delete().eq('id', input.job_id as string)
       if (error) return JSON.stringify({ error: error.message })
       return JSON.stringify({ success: true })
