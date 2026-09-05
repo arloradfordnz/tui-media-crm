@@ -4,6 +4,7 @@ import { recordPendingAction } from '@/lib/assistant-approvals'
 import { buildTelegramSystem } from '@/lib/assistant-persona'
 import { sendTelegramMessage } from '@/lib/telegram'
 import { buildContext, tierForTrigger } from '@/lib/tui/context'
+import { syncFlags, markNotified } from '@/lib/tui/flags'
 
 // One place to change the model. Both the agent loop and the forced
 // send_message round must run the same one — thinking blocks are echoed back
@@ -31,6 +32,13 @@ const SEND_MESSAGE_TOOL: Anthropic.Tool = {
     type: 'object' as const,
     properties: {
       body: { type: 'string', description: 'Message text. One or two short sentences — texting length, not paragraph length. Plain language, no markdown, no emojis, no em dashes.' },
+      // The dedup ledger. Marked only after Telegram accepts the message, so a
+      // send that fails does not silently bury the concern for a day.
+      raised_flag_keys: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'The exact key of every flag from flags_worth_raising that this message actually mentions. Leave empty if the message raises none of them. Getting this right is what stops you repeating yourself next time.',
+      },
     },
     required: ['body'],
   },
@@ -54,7 +62,20 @@ export async function runAssistantTurn(
   // Tier the context to the trigger. An inbound reply gets two queries and no
   // third-party calls; only the daily heartbeat pays for Xero and IMAP.
   const tier = tierForTrigger(opts.trigger)
-  const snapshot = await buildContext(supabase, tier)
+  const context = await buildContext(supabase, tier)
+
+  // Reconcile what is true against what has already been said. An inbound
+  // reply skips this: it is a conversation, and Arlo asking a question is not
+  // an occasion to audit the pipeline.
+  const flags = tier === 'micro' ? null : await syncFlags(supabase, context)
+  if (flags) {
+    context.flags_worth_raising = flags.due
+    context.flags_held_back = flags.held
+    context.flags_just_resolved = flags.resolved
+    if (flags.note) context.flags_note = flags.note
+  }
+
+  const snapshot = JSON.stringify(context)
 
   const userTurn = opts.trigger === 'inbound'
     ? `Arlo just messaged: "${opts.inboundBody}"\n\nCurrent CRM snapshot:\n${snapshot}`
@@ -114,11 +135,21 @@ export async function runAssistantTurn(
     const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
       toolUseBlocks.map(async (block): Promise<Anthropic.ToolResultBlockParam> => {
         if (block.name === 'send_message') {
-          const body = (block.input as { body: string }).body
+          const input = block.input as { body: string; raised_flag_keys?: unknown }
+          const body = input.body
           const messageId = await sendTelegramMessage(body)
           messageSent = messageId != null
           messageBody = body
           await supabase.from('sms_messages').insert({ direction: 'outbound', body, twilio_sid: messageId ? String(messageId) : null })
+          // Only on a delivered message. A flag marked notified for a text that
+          // never arrived is a concern buried for a day with no trace.
+          if (messageId != null && Array.isArray(input.raised_flag_keys)) {
+            const claimed = input.raised_flag_keys.filter((k): k is string => typeof k === 'string')
+            // Intersected with what was actually offered this turn, so the
+            // model cannot silence a flag it was never shown.
+            const offered = new Set((flags?.due ?? []).map((f) => f.key))
+            await markNotified(supabase, claimed.filter((k) => offered.has(k)))
+          }
           return { type: 'tool_result', tool_use_id: block.id, content: messageId != null ? 'Sent.' : 'Failed to send — Telegram error, check server logs.' }
         }
         const toolInput = block.input as Record<string, unknown>

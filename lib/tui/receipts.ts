@@ -87,6 +87,8 @@ const TOOL_VERBS: Record<string, string> = {
   update_xero_invoice: 'Updating Xero invoice',
   list_recent_emails: 'Reading recent email',
   get_content_backlog: 'Checking retainer backlog',
+  snooze_flag: 'Snoozing that',
+  resolve_flag: 'Marking that resolved',
 }
 
 // The most identifying free-text argument, if the call has one. A receipt that

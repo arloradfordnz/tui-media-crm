@@ -45,11 +45,14 @@ export function tierForTrigger(trigger: AssistantTrigger): ContextTier {
 
 type Supa = any // eslint-disable-line @typescript-eslint/no-explicit-any
 
+// Returns the snapshot as an object rather than a string. The flag sweep in
+// lib/tui/flags.ts reads the same fields the model does, and re-parsing a
+// string we had just serialised was pure ceremony.
 export async function buildContext(
   supabase: Supa,
   tier: ContextTier,
   now: Date = new Date()
-): Promise<string> {
+): Promise<Record<string, unknown>> {
   const todayISO = now.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })
   const nowNZ = now.toLocaleString('en-NZ', {
     timeZone: 'Pacific/Auckland',
@@ -82,7 +85,7 @@ export async function buildContext(
     recent_messages_last_12_oldest_first: (recentMessages?.data ?? []).slice().reverse(),
   }
 
-  if (tier === 'micro') return JSON.stringify(base)
+  if (tier === 'micro') return base
 
   // ── standard: delivery signals ──────────────────────────────
   const stale7d = new Date(now.getTime() - 7 * 86400000).toISOString()
@@ -138,7 +141,7 @@ export async function buildContext(
     recent_brain_ticks: recentTicks?.data ?? [],
   })
 
-  if (tier === 'standard') return JSON.stringify(base)
+  if (tier === 'standard') return base
 
   // ── sweep: third-party + slow-moving growth signals ─────────
   const staleLead5d = new Date(now.getTime() - 5 * 86400000).toISOString()
@@ -192,7 +195,7 @@ export async function buildContext(
     system_health: integrations,
   })
 
-  return JSON.stringify(base)
+  return base
 }
 
 /**

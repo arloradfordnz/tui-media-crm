@@ -20,6 +20,7 @@ export const MUTATING_TOOLS = new Set([
   'create_deliverable',
   'create_todo', 'complete_todo',
   'create_xero_invoice', 'approve_xero_invoice', 'void_xero_invoice', 'delete_xero_invoice', 'update_xero_invoice', 'remove_xero_payment',
+  'snooze_flag', 'resolve_flag',
 ])
 
 // ── Confirmation gate ────────────────────────────────────────
@@ -523,6 +524,34 @@ export const TOOLS: Anthropic.Tool[] = [
       required: [],
     },
   },
+
+  // ── Assistant flags ───────────────────────────
+  // Arlo's controls over his own notification stream. Without these, "not now"
+  // has nowhere to live: the model would agree in the chat and then raise the
+  // same thing again on the next tick, because agreement is not state.
+  {
+    name: 'snooze_flag',
+    description: 'Stop raising one flagged concern for a while. Use this when Arlo says "not now", "leave it", "I know", or "remind me next week" about something you flagged. The concern stays tracked and comes back when the snooze expires.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        key: { type: 'string', description: 'The exact key from flags_worth_raising.' },
+        days: { type: 'number', description: 'How many days to stay quiet about it. Default 7.' },
+      },
+      required: ['key'],
+    },
+  },
+  {
+    name: 'resolve_flag',
+    description: 'Mark a flagged concern as dealt with, when Arlo tells you it is done but the CRM does not show it yet. Prefer fixing the underlying record (update_job_status, toggle_task) when you can, because the sweep resolves flags on its own from real data. Use this only when there is nothing to update.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        key: { type: 'string', description: 'The exact key from flags_worth_raising.' },
+      },
+      required: ['key'],
+    },
+  },
 ]
 
 // ── Tool Executor ──────────────────────────────────────────────────────────────
@@ -970,6 +999,27 @@ export async function executeTool(
         return JSON.stringify({ ...backlog, clients: matches })
       }
       return JSON.stringify(backlog)
+    }
+
+    // ── Assistant flags ─────────────────────
+    case 'snooze_flag': {
+      const days = input.days != null ? Number(input.days) : 7
+      const until = new Date(Date.now() + days * 86400000).toISOString()
+      const { error } = await supabase
+        .from('assistant_flags')
+        .update({ snooze_until: until })
+        .eq('key', input.key as string)
+      if (error) return JSON.stringify({ error: `Could not snooze that flag: ${error.message}` })
+      return JSON.stringify({ success: true, key: input.key, snoozed_until: until })
+    }
+
+    case 'resolve_flag': {
+      const { error } = await supabase
+        .from('assistant_flags')
+        .update({ resolved_at: new Date().toISOString() })
+        .eq('key', input.key as string)
+      if (error) return JSON.stringify({ error: `Could not resolve that flag: ${error.message}` })
+      return JSON.stringify({ success: true, key: input.key })
     }
 
     default:
