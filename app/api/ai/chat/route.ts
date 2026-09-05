@@ -74,6 +74,35 @@ async function getDynamicContext(supabase: ReturnType<typeof createServerSupabas
   return lines.join('\n')
 }
 
+// A turn can fail for reasons that are worth naming. "Something went wrong"
+// on an expired key or an empty credit balance costs an afternoon of debugging
+// the wrong thing — this is a single-operator tool, and the person reading the
+// message is the person who can fix the account.
+function describeFailure(err: unknown): string {
+  const status = (err as { status?: number })?.status
+  // Belt and braces on the shape. The SDK's APIError carries the parsed body
+  // on .error, but it also stringifies the whole body into .message, and which
+  // one survives depends on where in the stream the failure surfaced — so
+  // match against both rather than guessing.
+  const detail = (err as { error?: { error?: { message?: string } } })?.error?.error?.message ?? ''
+  const raw = err instanceof Error ? err.message : String(err ?? '')
+  const message = `${detail} ${raw}`
+
+  if (/credit balance/i.test(message)) {
+    return 'Out of Anthropic API credit, so I can\'t think right now. Top up the account and I\'ll be back.'
+  }
+  if (status === 401 || /api key/i.test(message)) {
+    return 'My Anthropic API key is being rejected. Worth checking ANTHROPIC_API_KEY.'
+  }
+  if (status === 429) {
+    return 'Rate limited by Anthropic. Give it a minute and ask again.'
+  }
+  if (status === 529 || status === 503) {
+    return 'Anthropic is overloaded right now. Try again shortly.'
+  }
+  return 'Something went wrong there. Try again.'
+}
+
 // ── POST Handler ───────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
@@ -239,7 +268,7 @@ export async function POST(request: NextRequest) {
         controller.close()
       } catch (err) {
         console.error('AI chat error:', err)
-        send({ t: 'error', v: 'Something went wrong there. Try again.' })
+        send({ t: 'error', v: describeFailure(err) })
         controller.close()
       }
     },

@@ -370,8 +370,10 @@ export default function TuiThread({
         })}
       </div>
 
-      {/* Suggestions — only until the first message of this session */}
-      {!hasChatted && (
+      {/* Suggestions are an empty-state affordance, so they only appear on an
+          empty thread. Stacked above forty messages of real history they were
+          four rows of clutter between the conversation and the composer. */}
+      {!hasChatted && messages.length === 0 && (
         <div className="flex flex-wrap gap-1.5 px-5 pb-3">
           {SUGGESTIONS.map((s) => (
             <button

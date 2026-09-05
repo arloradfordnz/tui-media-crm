@@ -1576,11 +1576,36 @@ input, textarea, select, button { font-family: inherit; }
 }
 
 /* ── Tui full-page route ──────────────────────────────────── */
+/* Tui as a full-page surface.
+   height:100% was silently doing nothing. .page-shell-inner is a plain block
+   inside the scroll container, so its own height is auto, and a percentage
+   height against an auto parent resolves to auto too. The panel therefore grew
+   to fit the entire conversation — seven screens of it — which put the
+   composer that far below the fold on the one surface whose whole job is being
+   the fastest way to ask a question. It only showed up once the page started
+   seeding from the real Telegram thread; on an empty thread it collapsed to
+   nothing and looked fine.
+   The height has to be stated against the viewport, minus the shell's own
+   padding, which is the only definite measurement in the chain. */
 .tui-page {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  height: 100%;
+  height: calc(100dvh - 2 * clamp(28px, 4vh, 44px));
+}
+
+/* Kept here rather than in the main mobile block further up the file: both
+   rules have the same specificity, so the one that comes last wins, and up
+   there this one silently lost to the base rule below it. */
+@media (max-width: 768px) {
+  /* The shell's bottom padding is the tab bar's clearance, not the symmetric
+     top value, so the panel has to subtract the same thing or it slides its
+     composer under the tab bar. */
+  .tui-page {
+    height: calc(
+      100dvh - clamp(28px, 4vh, 44px) - var(--tab-bar-h) - 24px - env(safe-area-inset-bottom)
+    );
+  }
 }
 
 /* ── Reflowing record rows ────────────────────────────────────
