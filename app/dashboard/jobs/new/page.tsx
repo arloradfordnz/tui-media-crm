@@ -39,13 +39,14 @@ export default function NewJobPage() {
     fetch('/api/clients').then((r) => r.json()).then(setClients).catch((err) => console.warn('Failed to load clients:', err))
   }, [])
 
-  useEffect(() => {
-    if (jobType === 'social_media') {
-      setDeliverables([{ title: 'Instagram Reel', description: null }])
-    } else {
-      setDeliverables([])
-    }
-  }, [jobType])
+  // Picking a type seeds its default deliverables. This belongs in the click
+  // handler, not in an effect watching jobType: an effect made the seeding a
+  // second render that also clobbered any edit the user made, since it re-ran
+  // whenever jobType was merely re-set to the same value.
+  function chooseJobType(value: string) {
+    setJobType(value)
+    setDeliverables(value === 'social_media' ? [{ title: 'Instagram Reel', description: null }] : [])
+  }
 
   const canNext = () => {
     if (step === 0) return selectedClient && jobName
@@ -121,7 +122,7 @@ export default function NewJobPage() {
           {JOB_TYPES.map((t) => (
             <button
               key={t.value}
-              onClick={() => setJobType(t.value)}
+              onClick={() => chooseJobType(t.value)}
               className="card flex flex-col items-center gap-3 py-6 cursor-pointer transition-all"
               style={{
                 borderColor: jobType === t.value ? 'var(--accent)' : 'var(--bg-border)',

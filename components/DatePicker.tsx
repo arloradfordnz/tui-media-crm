@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useMounted } from '@/lib/useMounted'
 
 type Props = {
   name?: string
@@ -40,7 +41,7 @@ export default function DatePicker({
   const value = isControlled ? controlledValue : internal
 
   const [open, setOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  const mounted = useMounted()
   const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null)
 
   const initDate = value ? new Date(value + 'T00:00:00') : new Date()
@@ -51,15 +52,20 @@ export default function DatePicker({
   const menuRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { setMounted(true) }, [])
 
-  useEffect(() => {
+  // Swing the visible month to whatever the value became. Adjusting state
+  // during render against a remembered previous prop is React's own answer to
+  // this — the effect version rendered one frame on the old month first, and
+  // was a setState in an effect body.
+  const [lastValue, setLastValue] = useState(value)
+  if (value !== lastValue) {
+    setLastValue(value)
     if (value) {
       const d = new Date(value + 'T00:00:00')
       setViewYear(d.getFullYear())
       setViewMonth(d.getMonth())
     }
-  }, [value])
+  }
 
   useEffect(() => {
     if (!open) return
@@ -75,9 +81,10 @@ export default function DatePicker({
     return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey) }
   }, [open])
 
+  // See CustomSelect: menuPos is only read while open and is recomputed
+  // before paint on every open, so clearing it on close bought nothing.
   useLayoutEffect(() => {
-    if (!open) { setMenuPos(null); return }
-    if (!btnRef.current) return
+    if (!open || !btnRef.current) return
     function position() {
       const r = btnRef.current!.getBoundingClientRect()
       const menuH = 290

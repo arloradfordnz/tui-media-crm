@@ -46,9 +46,6 @@ export async function GET(req: NextRequest) {
   const todayISO = nzDate(now)
   const weekAgoISO = nzDate(new Date(now.getTime() - 7 * 86400000))
   const twoWeeksAheadISO = nzDate(new Date(now.getTime() + 14 * 86400000))
-  const [nzYear, nzMonth] = todayISO.split('-').map(Number)
-  const monthStart = new Date(nzYear, nzMonth - 1, 1).toISOString().split('T')[0]
-  const monthEnd = new Date(nzYear, nzMonth, 0).toISOString().split('T')[0]
 
   const [
     weatherRes,

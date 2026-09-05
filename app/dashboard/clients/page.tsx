@@ -1,5 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
-import { formatNZD, getInitials, statusLabel, statusBadgeClass } from '@/lib/format'
+import { formatNZD, getInitials } from '@/lib/format'
 import { Users } from 'lucide-react'
 import Link from 'next/link'
 import ButtonArrow from '@/components/ButtonArrow'

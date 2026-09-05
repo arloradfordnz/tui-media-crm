@@ -98,14 +98,13 @@ function groupByPeriod(txs: XeroTransaction[], period: Period, kind: 'in' | 'out
 // ─── Card wrapper ─────────────────────────────────────────────────────────────
 
 function Card({
-  title, metric, sub, children, wide, chartBottom,
+  title, metric, sub, children, wide,
 }: {
   title: string
   metric?: string
   sub?: string
   children?: React.ReactNode
   wide?: boolean
-  chartBottom?: boolean
 }) {
   return (
     <div
@@ -470,13 +469,18 @@ function Donut({ segments, centre }: {
   const [hover, setHover] = useState<number | null>(null)
   const total = segments.reduce((s, x) => s + x.value, 0) || 1
   const R = 42; const CX = 54; const CY = 54; const CIRC = 2 * Math.PI * R
-  let offset = 0
-  const arcs = segments.map((s) => {
-    const dash = (s.value / total) * CIRC
-    const cur = -offset
-    offset += dash
-    return { ...s, dash, gap: CIRC - dash, offset: cur }
-  })
+  // Each arc starts where the previous one ended. Accumulated through reduce
+  // rather than by mutating a `let` inside map — same result, and it does not
+  // reassign a render-scoped variable from inside a callback.
+  const arcs = segments.reduce<{ label: string; value: number; color: string; dash: number; gap: number; offset: number }[]>(
+    (acc, s) => {
+      const dash = (s.value / total) * CIRC
+      const consumed = acc.reduce((sum, a) => sum + a.dash, 0)
+      acc.push({ ...s, dash, gap: CIRC - dash, offset: -consumed })
+      return acc
+    },
+    []
+  )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>

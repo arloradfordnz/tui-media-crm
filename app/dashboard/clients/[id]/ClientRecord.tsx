@@ -5,7 +5,6 @@ import { type ClientBacklog } from '@/lib/content-backlog'
 import { updateClient, deleteClient } from '@/app/actions/clients'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo, stripJobPrefix } from '@/lib/format'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { ArrowLeft, Trash2, Briefcase, MessageSquare, StickyNote, UserCircle, Copy, Check, FileText, ExternalLink, Camera, Receipt } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
@@ -53,7 +52,6 @@ function RetainerSchedule({
   invoiceDay: number | null
 }) {
   const now = new Date()
-  const monthName = now.toLocaleString('en-NZ', { month: 'long' })
 
   let invoiceDate: string | null = null
   if (invoiceDay) {
@@ -156,7 +154,6 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
   const [state, action, pending] = useActionState(updateClient, undefined)
   const [deleting, setDeleting] = useState(false)
   const [copied, setCopied] = useState(false)
-  const router = useRouter()
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
   const portalLink = client.portalToken ? `${appUrl}/portal/client/${client.portalToken}` : null

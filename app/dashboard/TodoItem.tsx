@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { toggleTodo, deleteTodo } from '@/app/actions/todos'
-import { CheckCircle2, Circle, Trash2 } from 'lucide-react'
+import { Circle, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 
 type TodoItemProps = {

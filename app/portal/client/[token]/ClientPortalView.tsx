@@ -398,9 +398,14 @@ function RevisionPanel({ deliverable, portalToken }: { deliverable: Deliverable;
   const remaining = Math.max(limit - used, 0)
   const allApproved = deliverable.deliveryFiles.length > 0 && deliverable.deliveryFiles.every((f) => f.deliveryStatus === 'approved')
 
-  useEffect(() => {
+  // Collapse the form once the action succeeds. Compared against the previous
+  // result during render rather than in an effect, which painted the still-open
+  // form for a frame and tripped react-hooks/set-state-in-effect.
+  const [lastState, setLastState] = useState(state)
+  if (state !== lastState) {
+    setLastState(state)
     if (state?.success) setOpen(false)
-  }, [state?.success])
+  }
 
   return (
     <div className="rounded-lg p-4" style={{ background: 'var(--bg-elevated)' }}>

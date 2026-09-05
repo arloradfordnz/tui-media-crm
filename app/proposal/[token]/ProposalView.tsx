@@ -33,7 +33,6 @@ type ProposalData = {
 export default function ProposalView({ proposal }: { proposal: ProposalData }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [responded, setResponded] = useState(proposal.status === 'accepted' || proposal.status === 'declined')
   const [confirmSpec, setConfirm] = useState<ConfirmSpec | null>(null)
 
   let services: ServiceLine[] = []
@@ -49,7 +48,6 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
       onConfirm: () =>
         startTransition(async () => {
           await acceptProposal(proposal.token)
-          setResponded(true)
           router.refresh()
         }),
     })
@@ -64,7 +62,6 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
       onConfirm: () =>
         startTransition(async () => {
           await declineProposal(proposal.token)
-          setResponded(true)
           router.refresh()
         }),
     })

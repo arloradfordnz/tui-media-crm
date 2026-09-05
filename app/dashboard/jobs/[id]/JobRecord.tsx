@@ -43,8 +43,8 @@ type JobData = {
 
 export default function JobRecord({ job }: { job: JobData }) {
   const [state, action, pending] = useActionState(updateJob, undefined)
-  const [revState, revAction, revPending] = useActionState(addRevision, undefined)
-  const [isPending, startTransition] = useTransition()
+  const [, revAction, revPending] = useActionState(addRevision, undefined)
+  const [, startTransition] = useTransition()
   const [deleting, setDeleting] = useState(false)
   const [uploadingFor, setUploadingFor] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -654,13 +654,17 @@ function DeliverableUploadForm({ deliverableId, uploading, progress, stage, onUp
   // touchscreen laptop at desktop width still cannot drag a file in.
   const coarsePointer = useMediaQuery('(pointer: coarse)')
 
-  // Auto-collapse once the upload finishes (stage returns to 'idle' after being active).
-  const wasUploadingRef = useRef(false)
-  if (uploading) wasUploadingRef.current = true
-  else if (wasUploadingRef.current && !uploading) {
-    wasUploadingRef.current = false
-    // Reset local state after an upload completes.
-    queueMicrotask(() => { setFile(null); setNotes(''); setExpanded(false) })
+  // Auto-collapse once the upload finishes. This was a ref written and read
+  // during render, with the resets deferred through queueMicrotask to dodge
+  // the "setState during render" warning — which is a workaround for the
+  // supported pattern rather than a use of it. Adjusting state against a
+  // remembered previous value IS the supported pattern: React re-runs this
+  // component before touching the DOM, so the collapsed state paints in the
+  // same frame instead of a microtask later.
+  const [wasUploading, setWasUploading] = useState(uploading)
+  if (uploading !== wasUploading) {
+    setWasUploading(uploading)
+    if (!uploading) { setFile(null); setNotes(''); setExpanded(false) }
   }
 
   function handleSubmit(e: React.FormEvent) {

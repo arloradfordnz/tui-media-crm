@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, Check } from 'lucide-react'
+import { useMounted } from '@/lib/useMounted'
 
 export type Option = { value: string; label: string; group?: string }
 
@@ -37,14 +38,13 @@ export default function CustomSelect({
   searchable,
 }: Props) {
   const [open, setOpen] = useState(false)
+  const mounted = useMounted()
   const [internal, setInternal] = useState(defaultValue ?? '')
   const [query, setQuery] = useState('')
   const [activeIdx, setActiveIdx] = useState(0)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null)
-  const [mounted, setMounted] = useState(false)
   const isControlled = controlledValue !== undefined
 
-  useEffect(() => { setMounted(true) }, [])
   const value = isControlled ? controlledValue : internal
 
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -72,9 +72,12 @@ export default function CustomSelect({
     }
   }, [open])
 
+  // No clearing branch when closed: menuPos is only read while open, and the
+  // layout effect recomputes it synchronously before paint every time it
+  // opens. Setting it back to null was a setState in an effect body buying
+  // nothing but an extra render.
   useLayoutEffect(() => {
-    if (!open) { setMenuPos(null); return }
-    if (!btnRef.current) return
+    if (!open || !btnRef.current) return
     function position() {
       const r = btnRef.current!.getBoundingClientRect()
       const spaceBelow = window.innerHeight - r.bottom

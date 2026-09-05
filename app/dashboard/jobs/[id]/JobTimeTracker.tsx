@@ -107,12 +107,17 @@ export default function JobTimeTracker({
     return () => clearInterval(id)
   }, [running])
 
-  // Reset manual form on successful submit
-  useEffect(() => {
+  // Collapse the manual form once its action comes back clean. Compared
+  // against the previous result during render rather than in an effect: the
+  // effect version painted the still-open form for a frame first, and was a
+  // setState in an effect body.
+  const [lastManualState, setLastManualState] = useState(manualState)
+  if (manualState !== lastManualState) {
+    setLastManualState(manualState)
     if (manualState && !manualState.error && manualPending === false) {
       setManualOpen(false)
     }
-  }, [manualState, manualPending])
+  }
 
   function handleStart() {
     if (isPending) return
