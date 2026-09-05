@@ -83,10 +83,18 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'ANTHROPIC_API_KEY is not configured.' }, { status: 500 })
   }
 
-  const { messages } = await request.json()
+  const { messages, approvals } = await request.json()
   if (!messages || !Array.isArray(messages)) {
     return Response.json({ error: 'Messages array is required.' }, { status: 400 })
   }
+  // Fingerprints the user has explicitly approved for THIS request. They are
+  // bound to the tool name plus its exact arguments (lib/ai-tools
+  // toolFingerprint), so approving one deletion cannot authorise a different
+  // one, and they are never persisted — an approval dies with the request that
+  // carried it.
+  const approvedFingerprints: string[] = Array.isArray(approvals)
+    ? approvals.filter((a: unknown): a is string => typeof a === 'string')
+    : []
 
   const anthropic = new Anthropic({ apiKey })
   const supabase = await createServerSupabaseClient()
@@ -182,7 +190,7 @@ export async function POST(request: NextRequest) {
           const results = await Promise.all(
             toolUseBlocks.map(async (block) => {
               if (block.type !== 'tool_use') return null
-              const result = await executeTool(block.name, block.input as Record<string, unknown>, supabase)
+              const result = await executeTool(block.name, block.input as Record<string, unknown>, supabase, { approvals: approvedFingerprints })
               return { block, result }
             })
           )

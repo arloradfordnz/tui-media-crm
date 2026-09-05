@@ -6,6 +6,11 @@ import { fetchOutstandingInvoices, getValidXeroAccount } from '@/lib/xero'
 import { fetchUnreadEmails, checkMailConnection } from '@/lib/mail'
 import { getContentBacklog } from '@/lib/content-backlog'
 
+// One place to change the model. Both the agent loop and the forced
+// send_message round must run the same one — thinking blocks are echoed back
+// between rounds and are only valid on the model that produced them.
+const MODEL = 'claude-sonnet-5'
+
 // The Telegram "brain" — same tool-using agent as the dashboard chat, reused
 // for two triggers: a scheduled proactive check-in (brain-tick cron) and a
 // reactive reply to an inbound message. Both paths share this one loop so
@@ -202,15 +207,29 @@ export async function runAssistantTurn(
   let messageSent = false
   let messageBody: string | undefined
   let reasoning = ''
+  let truncated = false
 
   for (let round = 0; round < 8; round++) {
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-5',
-      max_tokens: 1024,
+      model: MODEL,
+      // Sonnet 5 thinks by default and thinking tokens are drawn from the same
+      // max_tokens budget as the visible reply, so a 1024 ceiling was cutting
+      // turns off mid-thought. Depth is controlled by effort below, not by
+      // starving the ceiling.
+      max_tokens: 8192,
+      output_config: { effort: 'medium' },
       system: systemBlocks,
       messages,
       tools,
     })
+
+    // A truncated turn is not an answer. Its partial text is the model's
+    // working-out, and the old code fell through to the fallback and texted
+    // exactly that to Arlo. Stop here and compose a real message instead.
+    if (message.stop_reason === 'max_tokens') {
+      truncated = true
+      break
+    }
 
     const textBlocks = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join(' ').trim()
     if (textBlocks) reasoning = textBlocks
@@ -248,7 +267,42 @@ export async function runAssistantTurn(
   // heartbeat it means Arlo was owed a message and didn't get one. Force it.
   const mustRespond = opts.trigger === 'inbound' || opts.trigger === 'heartbeat'
   if (mustRespond && !messageSent) {
-    const fallbackBody = reasoning || 'Hey, couldn\'t pull a proper summary together just now but I\'m still up — flag it if this keeps happening.'
+    // One forced round: send_message is the only tool on offer and tool_choice
+    // requires it, so this returns a written message or nothing.
+    //
+    // `reasoning` is deliberately NOT a candidate here. It holds the model's
+    // own text blocks — its working-out — and using it as the body is how a
+    // truncated turn ended up texting Arlo raw internal reasoning. The generic
+    // line below is worse prose and infinitely better behaviour.
+    let composed: string | null = null
+    try {
+      const forced = await anthropic.messages.create({
+        model: MODEL,
+        max_tokens: 1024,
+        output_config: { effort: 'low' },
+        system: systemBlocks,
+        messages: [
+          { role: 'user', content: userTurn },
+          {
+            role: 'user',
+            content: truncated
+              ? 'Your previous attempt ran past the token limit. Send one short text now with what actually matters.'
+              : 'Send one short text now.',
+          },
+        ],
+        tools: [SEND_MESSAGE_TOOL],
+        tool_choice: { type: 'tool', name: 'send_message' },
+      })
+      const block = forced.content.find(
+        (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'send_message'
+      )
+      const body = block ? (block.input as { body?: string }).body : undefined
+      if (body && body.trim()) composed = body.trim()
+    } catch (err) {
+      console.error('[assistant] forced send_message round failed:', err)
+    }
+
+    const fallbackBody = composed ?? 'Hey, couldn\'t pull a proper summary together just now but I\'m still up — flag it if this keeps happening.'
     const messageId = await sendTelegramMessage(fallbackBody)
     messageSent = messageId != null
     messageBody = fallbackBody
@@ -257,7 +311,7 @@ export async function runAssistantTurn(
 
   await supabase.from('agent_ticks').insert({
     trigger: opts.trigger,
-    reasoning: reasoning || null,
+    reasoning: truncated ? `[truncated at max_tokens] ${reasoning}`.trim() : reasoning || null,
     sms_sent: messageSent,
     sms_body: messageBody ?? null,
   })

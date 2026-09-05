@@ -1,3 +1,4 @@
+import { createHash } from 'crypto'
 import Anthropic from '@anthropic-ai/sdk'
 import { fetchXeroContacts, createXeroInvoice, fetchOutstandingInvoices, approveXeroInvoice, voidXeroInvoice, deleteXeroInvoice, updateXeroInvoice, getXeroInvoice, deleteXeroPayment } from '@/lib/xero'
 import { fetchRecentEmails, fetchUnreadEmails } from '@/lib/mail'
@@ -19,6 +20,55 @@ export const MUTATING_TOOLS = new Set([
   'create_deliverable',
   'create_xero_invoice', 'approve_xero_invoice', 'void_xero_invoice', 'delete_xero_invoice', 'update_xero_invoice', 'remove_xero_payment',
 ])
+
+// ── Confirmation gate ────────────────────────────────────────
+// Tools that destroy something a person cannot get back: a voided Xero
+// invoice has no un-void, a deleted job takes its tasks and deliverables with
+// it, and removing a payment un-reconciles the bank transaction behind it.
+//
+// Until now the only thing standing between the model and any of these was a
+// sentence in a prompt asking it to be careful. That is not a control — it is
+// a preference, and one bad turn or one crafted inbound message is enough to
+// lose the data. This gate lives at the executor, below the model, so no
+// wording in any prompt can route around it.
+export const CONFIRM_TOOLS = new Set([
+  'delete_job',
+  'delete_event',
+  'delete_document',
+  'void_xero_invoice',
+  'delete_xero_invoice',
+  'remove_xero_payment',
+])
+
+// Stable identity for one specific proposed action. Keys are sorted so the
+// same call always fingerprints the same way, and approving "delete job X"
+// can never authorise "delete job Y" — the approval is bound to the arguments,
+// not just to the tool name.
+export function toolFingerprint(name: string, input: Record<string, unknown>): string {
+  const sorted = Object.keys(input).sort().map((k) => [k, input[k]] as const)
+  const payload = JSON.stringify([name, sorted])
+  return createHash('sha256').update(payload).digest('hex').slice(0, 16)
+}
+
+// Plain-English description of what is about to happen, so the confirmation
+// the user sees is about the act, not about a tool name.
+function describeAction(name: string, input: Record<string, unknown>): string {
+  const id = (k: string) => String(input[k] ?? '')
+  switch (name) {
+    case 'delete_job': return `Permanently delete job ${id('job_id')}, including its tasks and deliverables.`
+    case 'delete_event': return `Permanently delete calendar event ${id('event_id')}.`
+    case 'delete_document': return `Permanently delete document ${id('document_id')}.`
+    case 'void_xero_invoice': return `Void Xero invoice ${id('invoice_id')}. Xero has no un-void.`
+    case 'delete_xero_invoice': return `Permanently delete Xero invoice ${id('invoice_id')}.`
+    case 'remove_xero_payment': return `Remove Xero payment ${id('payment_id')}. This also un-reconciles the bank transaction it was matched to.`
+    default: return `Run ${name}.`
+  }
+}
+
+export type ExecuteToolOptions = {
+  /** Fingerprints the user has explicitly approved this turn. */
+  approvals?: string[]
+}
 
 export const TOOLS: Anthropic.Tool[] = [
   // ── Clients ───────────────────────────────────
@@ -434,8 +484,31 @@ export const TOOLS: Anthropic.Tool[] = [
 
 // ── Tool Executor ──────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function executeTool(name: string, input: Record<string, unknown>, supabase: any): Promise<string> {
+export async function executeTool(
+  name: string,
+  input: Record<string, unknown>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  opts: ExecuteToolOptions = {}
+): Promise<string> {
+  // Enforced before the switch, so every destructive branch is covered by
+  // construction — including any added later, as long as its name is listed
+  // in CONFIRM_TOOLS.
+  if (CONFIRM_TOOLS.has(name)) {
+    const fingerprint = toolFingerprint(name, input)
+    if (!opts.approvals?.includes(fingerprint)) {
+      // Returned as a normal tool_result so the model reads it and relays the
+      // question, rather than throwing and losing the turn.
+      return JSON.stringify({
+        status: 'confirmation_required',
+        fingerprint,
+        action: describeAction(name, input),
+        instruction:
+          'NOT executed. Tell Arlo exactly what you are about to do and ask him to confirm. Do not retry this tool until he has.',
+      })
+    }
+  }
+
   switch (name) {
     // ── Clients ─────────────────────────────
     case 'search_clients': {
