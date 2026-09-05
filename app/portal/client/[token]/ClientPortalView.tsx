@@ -480,6 +480,8 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
             location: get('location'),
             body: get('body'),
             clientSignature: get('clientSignature'),
+            clientSignedAtISO: get('clientSignedAtISO'),
+            clientSignedIp: get('clientSignedIp'),
             clientSignedAt: get('clientSignedAt'),
             documentNumber: get('documentNumber'),
           },
@@ -582,7 +584,23 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
                   <Check className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
                   <div>
                     <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Signed by {parsed.form.clientSignature}</p>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{parsed.form.clientSignedAt}</p>
+                    {/* The audit trail is the thing that makes this defensible,
+                        so it is shown rather than merely stored: who, exactly
+                        when (to the minute, with timezone), and from where. */}
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                      {parsed.form.clientSignedAtISO
+                        ? new Date(parsed.form.clientSignedAtISO).toLocaleString('en-NZ', {
+                            day: 'numeric', month: 'long', year: 'numeric',
+                            hour: 'numeric', minute: '2-digit',
+                            timeZone: 'Pacific/Auckland', timeZoneName: 'short',
+                          })
+                        : parsed.form.clientSignedAt}
+                    </p>
+                    {parsed.form.clientSignedIp && (
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                        IP {parsed.form.clientSignedIp}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -648,9 +666,16 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
                     autoFocus
                   />
                   {signatureInput && (
-                    <div className="p-3 rounded-md" style={{ background: 'var(--bg-base)', border: '1px dashed var(--bg-border)' }}>
-                      <p className="text-xs mb-1" style={{ color: 'var(--text-tertiary)' }}>Signature preview</p>
-                      <p style={{ fontFamily: 'var(--font-patrick-hand), cursive', fontSize: '28px', color: 'var(--text-primary)', lineHeight: 1 }}>{signatureInput}</p>
+                    <div className="signature-preview">
+                      {/* Rendered as a typed name on a signing rule, not in a
+                          handwriting face. A script font imitating ink is the
+                          weaker artefact of the two: it invites the question
+                          "did they actually write that", and the honest answer
+                          is no — they typed it. A typed name that looks typed,
+                          sitting above a printed audit trail, is what actually
+                          holds up. */}
+                      <p className="signature-name">{signatureInput}</p>
+                      <p className="signature-rule-label">Signature</p>
                     </div>
                   )}
                   {signState?.error && (

@@ -1,14 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import ReactDOM from "react-dom";
-import { Patrick_Hand } from "next/font/google";
 import "./globals.css";
-
-const patrickHand = Patrick_Hand({
-  subsets: ["latin"],
-  weight: "400",
-  display: "swap",
-  variable: "--font-patrick-hand",
-});
 
 export const metadata: Metadata = {
   title: "Tui Media",
@@ -47,7 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // pre-paint script (as it was when light mode existed and the choice had
     // to be read from localStorage/prefers-color-scheme before first paint),
     // because a static class needs no such script.
-    <html lang="en" className={`${patrickHand.variable} dark`}>
+    <html lang="en" className="dark">
       <body>
         {children}
       </body>

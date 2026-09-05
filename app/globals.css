@@ -2041,3 +2041,36 @@ input, textarea, select, button { font-family: inherit; }
   .confirm-scrim,
   .confirm-sheet { animation: none; }
 }
+
+/* ── Signature ────────────────────────────────────────────────
+   A typed name presented as a typed name, on a signing rule. The previous
+   version rendered it in a handwriting face, which is the weaker artefact:
+   imitating ink invites "did they actually write that", and the honest
+   answer is no. Bricolage at 600 over a rule reads as a deliberate,
+   attributable act — and the audit trail beneath it is what carries the
+   actual weight. */
+.signature-preview {
+  padding: 18px 16px 10px;
+  border-radius: var(--r-md);
+  background: var(--bg-base);
+  border: 1px solid var(--bg-border);
+}
+
+.signature-name {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  line-height: 1.2;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--text-tertiary);
+  overflow-wrap: anywhere;
+}
+
+.signature-rule-label {
+  margin-top: 6px;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}

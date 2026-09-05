@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { sendAdminDocumentSignedEmail } from '@/lib/email'
+import { headers } from 'next/headers'
 
 // Service-role client bypasses RLS. The portal/client table is anon-readable
 // but anon cannot UPDATE documents/INSERT activities — we authorise the
@@ -122,11 +123,23 @@ export async function signDocumentByClient(
   const signedAt = new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
   // Keep a machine-readable audit timestamp alongside the display date — the
   // pretty string has no time or timezone, which is weak for a signed contract.
+  // Originating IP, for the audit trail. x-forwarded-for is a list when the
+  // request crossed proxies; the first entry is the client. Best-effort — a
+  // missing IP must not block someone signing.
+  let signedIp: string | null = null
+  try {
+    const h = await headers()
+    signedIp = (h.get('x-forwarded-for') || '').split(',')[0].trim() || h.get('x-real-ip') || null
+  } catch {
+    signedIp = null
+  }
+
   const nextForm = {
     ...(parsed.form || {}),
     clientSignature: signature,
     clientSignedAt: signedAt,
     clientSignedAtISO: new Date().toISOString(),
+    clientSignedIp: signedIp,
   }
   // Ensure a template is always present — the portal/editor parsers require
   // both `template` and `form` keys to recognise a structured doc, and a
