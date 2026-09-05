@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { sendProposalEmail, sendProposalAcceptedEmail } from '@/lib/email'
+import { emitAssistantEvent } from '@/lib/tui/events'
 
 export async function createProposal(jobId: string) {
   const supabase = await createServerSupabaseClient()
@@ -119,6 +120,17 @@ export async function acceptProposal(token: string) {
   // Notify admin via email — use first authenticated user's metadata or a fixed address
   await sendProposalAcceptedEmail('hello@tuimedia.nz', job.clients.name, job.name)
 
+  // Won work. Also the moment a proposals_awaiting_response flag stops being
+  // true, which the next sweep resolves on its own.
+  emitAssistantEvent(supabase, {
+    kind: 'client_action',
+    key: `client_action:proposal_accepted:${proposal.id}`,
+    subject: `${job.clients.name} accepted the proposal for ${job.name}${proposal.total_value ? ` ($${proposal.total_value})` : ''}`,
+    severity: 'high',
+    urgent: true,
+    detail: { job_id: proposal.job_id, value: proposal.total_value },
+  })
+
   revalidatePath(`/dashboard/jobs/${proposal.job_id}`)
 }
 
@@ -139,6 +151,17 @@ export async function declineProposal(token: string) {
   await supabase.from('proposals').update({ status: 'declined', responded_at: new Date().toISOString() }).eq('id', proposal.id)
   await supabase.from('activities').insert({ action: 'proposal_declined', details: `Proposal declined for "${job.name}"`, job_id: proposal.job_id, client_id: job.client_id })
   await supabase.from('notifications').insert({ title: 'Proposal Declined', message: `Proposal for "${job.name}" was declined`, type: 'status_change', job_id: proposal.job_id, client_id: job.client_id })
+
+  // Losing one is worth knowing about promptly too, while the reasons are
+  // still askable.
+  emitAssistantEvent(supabase, {
+    kind: 'client_action',
+    key: `client_action:proposal_declined:${proposal.id}`,
+    subject: `The proposal for ${job.name} was declined`,
+    severity: 'normal',
+    urgent: true,
+    detail: { job_id: proposal.job_id },
+  })
 
   revalidatePath(`/dashboard/jobs/${proposal.job_id}`)
 }

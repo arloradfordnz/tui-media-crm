@@ -14,7 +14,12 @@
 //
 // See supabase/migration_assistant_flags.sql.
 
+// 'client_action' is the one kind deriveFlags never mints. Those flags are
+// pushed by lib/tui/events.ts when a client actually does something, and they
+// are point-in-time facts rather than standing conditions — which changes how
+// they resolve. See syncFlags.
 export type FlagKind =
+  | 'client_action'
   | 'overdue_task'
   | 'stalled_job'
   | 'missed_deadline'
@@ -272,8 +277,13 @@ export async function syncFlags(supabase: Supa, ctx: Ctx, now: Date = new Date()
     if (upsertError) console.error('[flags] upsert failed:', upsertError.message)
   }
 
-  // Anything previously open that no longer appears has genuinely gone away.
-  const nowResolved = [...existing.values()].filter((r) => !r.resolved_at && !derivedKeys.has(r.key))
+  // Anything previously open that no longer appears has genuinely gone away —
+  // except event flags, which by nature are never in the derived set. Those
+  // describe a moment, not a condition, so the sweep cannot see whether they
+  // are "still true"; they are retired by markNotified once actually said.
+  const nowResolved = [...existing.values()].filter(
+    (r) => !r.resolved_at && r.kind !== 'client_action' && !derivedKeys.has(r.key)
+  )
   if (nowResolved.length > 0) {
     const { error: resolveError } = await supabase
       .from('assistant_flags')
@@ -304,6 +314,28 @@ export async function syncFlags(supabase: Supa, ctx: Ctx, now: Date = new Date()
     }
   }
 
+  // Event flags live only in the table, so they have to be folded in here
+  // rather than coming out of deriveFlags. Same eligibility rules.
+  for (const row of existing.values()) {
+    if (row.kind !== 'client_action' || row.resolved_at) continue
+    if (isDue(row, now)) {
+      due.push({
+        key: row.key,
+        kind: row.kind,
+        subject: row.subject,
+        severity: row.severity,
+        first_seen_at: row.first_seen_at,
+        notify_count: row.notify_count,
+      })
+    } else {
+      held.push({
+        key: row.key,
+        subject: row.subject,
+        reason: row.snooze_until && new Date(row.snooze_until) > now ? 'snoozed' : 'recently_raised',
+      })
+    }
+  }
+
   // High severity first, then longest-standing — the order Arlo would want to
   // hear them in if only one gets said.
   const weight = { high: 0, normal: 1, low: 2 }
@@ -325,15 +357,21 @@ export async function markNotified(supabase: Supa, keys: string[], now: Date = n
   if (keys.length === 0) return
   const { data, error } = await supabase
     .from('assistant_flags')
-    .select('key, notify_count')
+    .select('key, kind, notify_count')
     .in('key', keys)
   if (error) return
 
   await Promise.all(
-    ((data ?? []) as { key: string; notify_count: number }[]).map((row) =>
+    ((data ?? []) as { key: string; kind: string; notify_count: number }[]).map((row) =>
       supabase
         .from('assistant_flags')
-        .update({ last_notified_at: now.toISOString(), notify_count: row.notify_count + 1 })
+        .update({
+          last_notified_at: now.toISOString(),
+          notify_count: row.notify_count + 1,
+          // An event is done once it has been said. A standing condition is
+          // not — it stays open and comes back on the backoff.
+          ...(row.kind === 'client_action' ? { resolved_at: now.toISOString() } : {}),
+        })
         .eq('key', row.key)
     )
   )

@@ -28,17 +28,22 @@ import { getContentBacklog } from '@/lib/content-backlog'
 
 export type ContextTier = 'micro' | 'standard' | 'sweep'
 
-export type AssistantTrigger = 'tick' | 'inbound' | 'heartbeat'
+export type AssistantTrigger = 'tick' | 'inbound' | 'heartbeat' | 'event'
 
 /**
- * An inbound reply is a conversation, not an audit. The daily heartbeat is
- * the one turn that should look at everything, because it is the one turn
- * whose whole job is noticing what changed.
+ * An inbound reply is a conversation, not an audit. The daily digest is the
+ * one turn that should look at everything, because it is the one turn whose
+ * whole job is noticing what changed.
+ *
+ * An event turn already knows what happened — something pushed it. It needs
+ * enough context to say something sensible about the surrounding job, not a
+ * Xero refresh and two IMAP logins.
  */
 export function tierForTrigger(trigger: AssistantTrigger): ContextTier {
   switch (trigger) {
     case 'inbound': return 'micro'
     case 'heartbeat': return 'sweep'
+    case 'event': return 'standard'
     case 'tick': return 'standard'
   }
 }

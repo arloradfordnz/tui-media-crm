@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { sendApprovalConfirmationEmail, sendRevisionRequestEmail, sendAdminDeliveryViewedEmail, sendAdminDeliveryApprovedEmail, sendAdminRevisionRequestedEmail, sendAdminFileDownloadedEmail } from '@/lib/email'
 import { isAdminViewing } from '@/lib/admin-ip'
 import { createAdminClient } from '@/lib/supabase-admin'
+import { emitAssistantEvent } from '@/lib/tui/events'
 
 // The client portal is a PUBLIC page authenticated only by the unguessable
 // portal_token in the URL. RLS no longer grants the anon role any access, so
@@ -71,6 +72,16 @@ export async function approveDelivery(deliveryFileId: string, jobId: string, por
     ])
   }
 
+  // Good news, and the one client action that doesn't need chasing — worth
+  // recording, not worth a text mid-lesson.
+  emitAssistantEvent(admin, {
+    kind: 'client_action',
+    key: `client_action:approved:${deliveryFileId}`,
+    subject: `${clientRel.name} approved a cut on ${job.name}`,
+    severity: 'low',
+    detail: { job_id: jobId, file: fileName },
+  })
+
   revalidatePath('/portal/')
   return { success: true }
 }
@@ -110,6 +121,17 @@ export async function requestChanges(prevState: { error?: string; success?: bool
       sendAdminRevisionRequestedEmail(clientRel.name, job.name, round, request, jobId, job.client_id),
     ])
   }
+
+  // A revision request is the client waiting on Arlo. Every hour it sits
+  // unseen is an hour of turnaround, which is the thing Tui Media sells.
+  emitAssistantEvent(admin, {
+    kind: 'client_action',
+    key: `client_action:revision:${jobId}:${round}`,
+    subject: `${clientRel.name} requested changes on ${job.name} (round ${round}): ${request.slice(0, 140)}`,
+    severity: 'high',
+    urgent: true,
+    detail: { job_id: jobId, round },
+  })
 
   revalidatePath('/portal/')
   return { success: true }
@@ -172,6 +194,15 @@ export async function requestDeliverableRevision(prevState: { error?: string; su
       sendAdminRevisionRequestedEmail(clientRel?.name || 'Your client', `${job.name} — ${deliverable.title}`, round, request, job.id, job.client_id),
     ])
   }
+
+  emitAssistantEvent(admin, {
+    kind: 'client_action',
+    key: `client_action:revision:${deliverableId}:${round}`,
+    subject: `${clientRel?.name || 'A client'} requested changes on "${deliverable.title}" for ${job.name} (round ${round}): ${request.slice(0, 140)}`,
+    severity: 'high',
+    urgent: true,
+    detail: { job_id: job.id, deliverable_id: deliverableId, round },
+  })
 
   revalidatePath('/portal/')
   return { success: true }
