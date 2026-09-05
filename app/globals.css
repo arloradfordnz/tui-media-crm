@@ -1235,9 +1235,11 @@ input, textarea, select, button { font-family: inherit; }
 }
 
 /* ── KPI cards (flat stat cards, reference style) ─────────── */
+/* No border here either — this one was missed when the others were stripped,
+   which is why the Insights KPIs were the only boxes left with a hairline
+   around them. */
 .kpi-card {
   background: var(--bg-surface);
-  border: 1px solid var(--bg-border);
   border-radius: var(--r-lg);
   padding: 22px 24px;
   display: flex;
@@ -1300,6 +1302,7 @@ input, textarea, select, button { font-family: inherit; }
   cursor: pointer;
   transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease;
   font-family: inherit;
+  white-space: nowrap;
 }
 .pill-select:hover { background: var(--bg-elevated); border-color: var(--text-tertiary); }
 .pill-select:active { transform: scale(0.975); }
@@ -2535,5 +2538,36 @@ input, textarea, select, button { font-family: inherit; }
 .field-hint {
   margin: 6px 2px 0;
   font-size: 11.5px;
+  color: var(--text-tertiary);
+}
+
+/* ── Stat row ─────────────────────────────────────────────────
+   Four headline numbers as one row of facts, not four boxed tiles. A grid of
+   equal cards gives every figure the same authority, so nothing leads and the
+   reader has to weigh them up themselves. Separated by a hairline and space
+   instead of by four borders. */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 24px 32px;
+  padding-bottom: 4px;
+}
+.stat-row-item { min-width: 0; }
+.stat-row-label {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.stat-row-value {
+  margin: 0;
+  font-size: clamp(24px, 3vw, 30px);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+}
+.stat-row-sub {
+  margin: 5px 0 0;
+  font-size: 12px;
   color: var(--text-tertiary);
 }

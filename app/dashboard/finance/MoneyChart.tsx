@@ -59,8 +59,8 @@ export default function MoneyChart({
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
-        <div className="flex flex-wrap gap-x-10 gap-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 mb-4">
+        <div className="flex flex-wrap gap-x-8 gap-y-3">
           <Figure label="Money in" value={inTotal} colour="var(--accent)" delta={inDelta} />
           <Figure label="Money out" value={outTotal} colour="var(--chart-out)" delta={outDelta} goodWhenUp={false} />
         </div>

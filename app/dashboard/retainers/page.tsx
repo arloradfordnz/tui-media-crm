@@ -62,7 +62,7 @@ export default async function RetainersPage() {
               <tr>
                 <th className="table-header text-left">Client</th>
                 <th className="table-header text-left">Recent months</th>
-                <th className="table-header text-right">Owed</th>
+                <th className="table-header text-right">Status</th>
                 <th className="table-header text-right">Action</th>
               </tr>
             </thead>
@@ -76,8 +76,18 @@ export default async function RetainersPage() {
                       <Link href={`/dashboard/clients/${c.clientId}`} className="flex items-center gap-3">
                         <div className="avatar avatar-md">{getInitials(c.clientName)}</div>
                         <div>
-                          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                          {/* The owed count sits on line one, beside the name.
+                              As its own column it fell into the reflowed
+                              secondary run below the month chips, which put the
+                              one number that matters per row at the bottom of
+                              that row on every width under 1025px. */}
+                          <p className="text-sm font-medium flex items-center gap-2 flex-wrap" style={{ color: 'var(--text-primary)' }}>
                             {c.clientName}
+                            {c.videosOwed > 0 && (
+                              <span style={{ color: 'var(--danger)', fontWeight: 600, fontSize: 12 }}>
+                                {c.videosOwed} owed
+                              </span>
+                            )}
                           </p>
                           <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                             ~{c.typicalVideosPerMonth}/month
@@ -101,11 +111,7 @@ export default async function RetainersPage() {
                     </td>
 
                     <td className="px-4 py-4 text-sm text-right" data-role="secondary">
-                      {c.videosOwed > 0 ? (
-                        <span style={{ color: 'var(--danger)', fontWeight: 600 }}>
-                          {c.videosOwed} owed
-                        </span>
-                      ) : (
+                      {c.videosOwed === 0 && (
                         <span style={{ color: 'var(--text-tertiary)' }}>up to date</span>
                       )}
                     </td>

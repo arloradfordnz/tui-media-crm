@@ -67,8 +67,12 @@ export default function RevenueSection({
   return (
     <div>
       {/* Stats row */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
-        <div className="flex flex-wrap gap-x-10 gap-y-3">
+      {/* Wraps as a whole. With justify-between and no wrap, the controls held
+          their width and squeezed the figures into 302px, so two numbers that
+          fit side by side in 318px stacked instead. Now the controls drop to
+          their own line and the figures get the room. */}
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 mb-4">
+        <div className="flex flex-wrap gap-x-8 gap-y-3">
           <div>
             <div className="flex items-center gap-2">
               <span className="legend-dot" style={{ background: 'var(--accent)' }} />

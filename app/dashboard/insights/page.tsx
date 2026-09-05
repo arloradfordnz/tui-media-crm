@@ -153,11 +153,15 @@ export default async function InsightsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Monthly retainers" value={formatNZD(mrr)} sub={`${(retainerClients ?? []).length} client${(retainerClients ?? []).length === 1 ? '' : 's'}`} />
-        <KpiCard label="Pipeline value" value={formatNZD(pipelineValue)} sub={`${inFlightJobs} in flight`} />
-        <KpiCard label="Active jobs" value={String(activeJobs ?? 0)} sub={`${reviewJobs ?? 0} awaiting review`} />
-        <KpiCard label="Booked shoots" value={String(upcomingShoots.length)} sub="next 7 scheduled" />
+      {/* One row of facts rather than four boxed tiles. A grid of equal cards
+          gave a retainer figure and a count of booked shoots the same weight
+          and the same border, so nothing led and the reader had to rank them
+          themselves. */}
+      <div className="stat-row">
+        <Stat label="Monthly retainers" value={formatNZD(mrr)} sub={`${(retainerClients ?? []).length} client${(retainerClients ?? []).length === 1 ? '' : 's'}`} />
+        <Stat label="Pipeline value" value={formatNZD(pipelineValue)} sub={`${inFlightJobs} in flight`} />
+        <Stat label="Active jobs" value={String(activeJobs ?? 0)} sub={`${reviewJobs ?? 0} awaiting review`} />
+        <Stat label="Booked shoots" value={String(upcomingShoots.length)} sub="next 7 days" />
       </div>
 
       {/* CRM figures render immediately; the Xero-derived version swaps in
@@ -192,14 +196,12 @@ export default async function InsightsPage() {
   )
 }
 
-function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="kpi-card">
-      <p className="kpi-label">{label}</p>
-      <div className="kpi-value-row">
-        <span className="kpi-value">{value}</span>
-      </div>
-      {sub && <p className="kpi-sub">{sub}</p>}
+    <div className="stat-row-item">
+      <p className="stat-row-label">{label}</p>
+      <p className="stat-row-value">{value}</p>
+      {sub && <p className="stat-row-sub">{sub}</p>}
     </div>
   )
 }
