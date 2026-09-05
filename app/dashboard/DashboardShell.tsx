@@ -27,8 +27,11 @@ const EASE = 'cubic-bezier(0.4, 0, 0.2, 1)'
 export default function DashboardShell({ children }: { children: ReactNode }) {
   const [panelOpen, setPanelOpen] = useState(false)
   const [panelContent, setPanelContent] = useState<ReactNode | null>(null)
-  // Only meaningful on mobile — on desktop the sidebar is pinned open via CSS.
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  // The sidebar is pinned open on desktop via CSS and is no longer opened as a
+  // drawer on mobile — the tab bar's fifth tab goes to Settings, which carries
+  // the links the drawer used to. Kept as a constant rather than state so the
+  // Sidebar's own API is unchanged.
+  const sidebarOpen = false
   // The report panel PUSHES content on desktop. On a phone there is no room to
   // push into — a 404px margin on a 390px viewport moves the page off-screen
   // entirely — so there the panel overlays instead. Matches the 768px
@@ -48,11 +51,7 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
     <PanelContext.Provider value={{ panelOpen, panelContent, openPanel, closePanel }}>
       <div style={{ minHeight: '100dvh', background: 'var(--bg-base)' }}>
 
-        <Sidebar
-          open={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          onLogout={() => logout()}
-        />
+        <Sidebar open={sidebarOpen} onClose={() => {}} onLogout={() => logout()} />
 
         {/* Fixed report panel — slides in from the right */}
         <div
@@ -87,7 +86,7 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
         </div>
 
         {/* Mobile-only; hidden at >=769px in CSS where the sidebar is pinned. */}
-        <MobileTabBar onMore={() => setSidebarOpen(true)} />
+        <MobileTabBar />
 
         <AiChatWidget />
       </div>

@@ -1504,10 +1504,6 @@ input, textarea, select, button { font-family: inherit; }
     align-items: stretch;
     height: calc(var(--tab-bar-h) + env(safe-area-inset-bottom));
     padding-bottom: env(safe-area-inset-bottom);
-    background: var(--glass-bg);
-    border-top: 1px solid var(--bg-border);
-    backdrop-filter: blur(20px) saturate(160%);
-    -webkit-backdrop-filter: blur(20px) saturate(160%);
   }
 
   .mobile-tab {
@@ -1532,16 +1528,23 @@ input, textarea, select, button { font-family: inherit; }
 
   /* Tui is the centre tab and the fastest path to an answer, so it reads as
      an action rather than a peer destination — accent-filled, label dropped. */
+  /* Tui breaks the plane of the bar rather than sitting inside it — lifted
+     above the top edge with its own shadow so it reads as a control floating
+     over the chrome, not another tab. This is why the bar carries no
+     border-top: a hairline would cut straight through it. */
+  .mobile-tab-centre { position: relative; }
   .mobile-tab-centre .mobile-tab-icon {
-    width: 44px;
-    height: 44px;
-    padding: 11px;
+    width: 54px;
+    height: 54px;
+    padding: 15px;
     border-radius: var(--r-pill);
     background: var(--accent);
     color: var(--on-accent);
-    stroke-width: 2px;
-    box-shadow: var(--shadow-glow-accent);
+    stroke-width: 2.25px;
+    transform: translateY(-16px);
+    box-shadow: 0 10px 24px -6px rgba(0, 0, 0, 0.55), var(--shadow-glow-accent);
   }
+  .mobile-tab-centre:active .mobile-tab-icon { transform: translateY(-16px) scale(0.94); }
   .mobile-tab-centre .mobile-tab-label { display: none; }
   .mobile-tab-centre.active .mobile-tab-icon { background: var(--accent-hover); }
 }
@@ -2073,4 +2076,103 @@ input, textarea, select, button { font-family: inherit; }
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-tertiary);
+}
+
+/* ── Liquid glass, matched to tuimedia.nz ─────────────────────
+   Measured off the live site's .nav rather than approximated:
+
+     background:       rgba(15, 25, 48, 0.40)   (= --glass-bg in dark)
+     backdrop-filter:  blur(30px) saturate(190%)
+     border:           none
+     box-shadow:       0 10px 34px -10px rgba(0, 0, 0, 0.6)
+
+   The border matters as much as the blur. The site's nav has none at all —
+   it's separated from the page by the drop shadow and the blur alone, and
+   adding a hairline is what made these surfaces read as CRM chrome rather
+   than as the brand's own glass. Kept last in the file so it wins over the
+   earlier generic .card/.drawer glass rule.
+
+   These sit after the shared glass block on purpose; both selectors appear
+   there too, and this is the override. */
+.sidebar-panel {
+  background: var(--glass-bg);
+  border: none;
+  box-shadow: 0 10px 34px -10px rgba(0, 0, 0, 0.6);
+}
+/* Split across two rules on purpose — see the note above .glass-blur below. */
+.sidebar-panel { -webkit-backdrop-filter: blur(30px) saturate(190%); }
+.sidebar-panel { backdrop-filter: blur(30px) saturate(190%); }
+
+@media (max-width: 768px) {
+  .mobile-tab-bar {
+    background: var(--glass-bg);
+    border: none;
+    /* Shadow thrown upward — the bar sits at the bottom, so the light has to
+       come from the same direction it does everywhere else. */
+    box-shadow: 0 -10px 34px -10px rgba(0, 0, 0, 0.6);
+    /* Must not clip: the Tui button deliberately overflows the top edge. */
+    overflow: visible;
+  }
+  .mobile-tab-bar { -webkit-backdrop-filter: blur(30px) saturate(190%); }
+  .mobile-tab-bar { backdrop-filter: blur(30px) saturate(190%); }
+}
+
+/* ── Settings: mobile section nav ─────────────────────────────
+   Only exists below the sidebar breakpoint. Above it the sidebar is pinned
+   open and already lists these, so a second copy would be noise. */
+.settings-mobile-nav { display: none; }
+
+@media (max-width: 768px) {
+  .settings-mobile-nav {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .settings-nav-tile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 56px;
+    padding: 0 16px;
+    border-radius: var(--r-lg);
+    background: var(--bg-surface);
+    border: 1px solid var(--bg-border);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+  }
+  .settings-nav-tile:active { background: var(--bg-hover); }
+}
+
+/* ── Restoring the standard backdrop-filter ───────────────────
+   Tailwind v4's Lightning CSS treats `backdrop-filter` and
+   `-webkit-backdrop-filter` as the same declaration and keeps only the last
+   one written. Every glass rule in this file wrote the standard property
+   first and the -webkit- alias second, so the build was emitting ONLY the
+   prefixed form — 8 declarations in source, 1 in the compiled output.
+
+   Chromium and Firefox do not implement -webkit-backdrop-filter at all
+   (CSS.supports('-webkit-backdrop-filter', 'blur(30px)') is false there), so
+   every "liquid glass" surface in the app has in fact been rendering as flat
+   translucency. It never threw and never looked obviously wrong, which is why
+   it survived: a slightly-too-flat panel reads as a design choice.
+
+   Re-declaring in standalone rules is what defeats the dedupe — the minifier
+   collapses duplicate properties within a rule, not across rules. The
+   -webkit- forms stay where they are for iOS Safari before 18, which needs
+   them; these add back the form everything else needs.
+
+   Keep this last in the file, and if you add a new glass surface, add its
+   selector here too. */
+.btn-hero-light { backdrop-filter: blur(8px); }
+.modal-overlay { backdrop-filter: blur(6px); }
+.custom-select-menu { backdrop-filter: blur(8px); }
+.confirm-scrim { backdrop-filter: blur(6px); }
+
+.modal-content,
+.custom-select-menu,
+.drawer-panel,
+.report-panel {
+  backdrop-filter: blur(20px) saturate(160%);
 }
