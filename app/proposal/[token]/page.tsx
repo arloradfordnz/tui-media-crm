@@ -1,5 +1,26 @@
 import { createAdminClient } from '@/lib/supabase-admin'
 import ProposalView from './ProposalView'
+import type { Metadata } from 'next'
+
+// Same reasoning as the portal page: previews should name the client, and an
+// invalid token must fall back to the generic title rather than surface
+// whether a token exists.
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params
+  const supabase = createAdminClient()
+  const fallback: Metadata = { title: 'Tui Media — Proposal' }
+  if (!supabase) return fallback
+
+  const { data: proposal } = await supabase
+    .from('proposals')
+    .select('jobs(clients(name))')
+    .eq('token', token)
+    .single()
+
+  const clientName = (proposal?.jobs as unknown as { clients: { name: string } | null } | null)?.clients?.name
+  if (!clientName) return fallback
+  return { title: `Proposal for ${clientName} — Tui Media` }
+}
 
 export default async function PublicProposalPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params

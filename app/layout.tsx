@@ -34,7 +34,12 @@ export const viewport: Viewport = {
 // follows the device's prefers-color-scheme, live — the media-query listener
 // re-checks localStorage so an explicit choice made later still sticks.
 // Client-facing pages swap logos via .logo-light/.logo-dark in globals.css.
-const themeInit = `(function(){var d=document.documentElement;function set(dark){d.classList.toggle('dark',dark);d.classList.toggle('light',!dark);}try{var t=localStorage.getItem('tui-theme');var mq=window.matchMedia('(prefers-color-scheme: dark)');set(t==='dark'||(t!=='light'&&mq.matches));mq.addEventListener('change',function(e){var s=localStorage.getItem('tui-theme');if(s==='dark'||s==='light')return;set(e.matches);});}catch(e){set(false);}})();`;
+// Portal and proposal pages are pinned dark regardless of the viewer's device
+// theme or any localStorage choice — they're tuimedia.nz's own navy brand
+// surface shown to a client, not a themeable CRM screen, and a client who
+// happens to run light mode should not see a page that looks nothing like the
+// brand. Checked first, before either preference is read.
+const themeInit = `(function(){var d=document.documentElement;function set(dark){d.classList.toggle('dark',dark);d.classList.toggle('light',!dark);}try{var p=location.pathname;if(p.indexOf('/portal/')===0||p.indexOf('/proposal/')===0){set(true);return;}var t=localStorage.getItem('tui-theme');var mq=window.matchMedia('(prefers-color-scheme: dark)');set(t==='dark'||(t!=='light'&&mq.matches));mq.addEventListener('change',function(e){var s=localStorage.getItem('tui-theme');if(s==='dark'||s==='light')return;set(e.matches);});}catch(e){set(false);}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   // Bricolage Grotesque is declared as @font-face in globals.css (its two

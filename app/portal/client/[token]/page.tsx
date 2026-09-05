@@ -1,6 +1,28 @@
 import { createAdminClient } from '@/lib/supabase-admin'
 import { signedDownloadUrl, signedDownloadUrlAttachment } from '@/lib/r2'
 import ClientPortalView from './ClientPortalView'
+import type { Metadata } from 'next'
+
+// A shared portal link previews as "Tui Media" generically today — every
+// client's link looks identical in a Slack/iMessage preview. This scopes the
+// title to the client without leaking anything beyond their own name: an
+// invalid token still falls back to the generic title rather than a lookup
+// error, so a bad link reveals nothing about which tokens are real.
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params
+  const supabase = createAdminClient()
+  const fallback: Metadata = { title: 'Tui Media — Client Portal' }
+  if (!supabase) return fallback
+
+  const { data: client } = await supabase
+    .from('clients')
+    .select('name')
+    .eq('portal_token', token)
+    .single()
+
+  if (!client) return fallback
+  return { title: `${client.name} — Tui Media` }
+}
 
 export default async function ClientPortalPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
