@@ -926,6 +926,19 @@ input, textarea, select, button { font-family: inherit; }
 .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
 .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
 
+/* Tui tool receipts — the spinner on a call that is still in flight. Honours
+   reduced-motion by holding still rather than disappearing, so the icon still
+   distinguishes "running" from "done". */
+.tui-receipt-spin {
+  animation: tui-receipt-spin 900ms linear infinite;
+}
+@keyframes tui-receipt-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tui-receipt-spin { animation: none; opacity: 0.6; }
+}
+
 /* ── Custom Select ────────────────────────────────────────── */
 .custom-select-trigger {
   width: 100%;

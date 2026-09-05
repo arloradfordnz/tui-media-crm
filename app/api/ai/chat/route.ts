@@ -5,6 +5,7 @@ import { getAuthUser, unauthorizedResponse } from '@/lib/supabase-admin'
 import { TOOLS, MUTATING_TOOLS, executeTool } from '@/lib/ai-tools'
 import { buildDashboardSystem } from '@/lib/assistant-persona'
 import { getContentBacklog, summariseBacklog } from '@/lib/content-backlog'
+import { encodeEvent, toolLabel, summariseResult, type TuiEvent } from '@/lib/tui/receipts'
 
 // Dashboard surface of the Tui assistant. Same persona and same tool set as
 // the Telegram brain (lib/assistant-agent.ts) — this route just swaps the
@@ -120,9 +121,10 @@ export async function POST(request: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      const send = (event: TuiEvent) => controller.enqueue(encoder.encode(encodeEvent(event)))
+
       try {
         const currentMessages: Anthropic.MessageParam[] = [...apiMessages]
-        const createdLinks: { path: string; label: string }[] = []
         let mutated = false
         let finalText = ''
         const maxRounds = 10
@@ -152,7 +154,7 @@ export async function POST(request: NextRequest) {
 
           anthropicStream.on('text', (text) => {
             finalText += text
-            controller.enqueue(encoder.encode(text))
+            send({ t: 'text', v: text })
           })
 
           const finalMessage = await anthropicStream.finalMessage()
@@ -162,24 +164,30 @@ export async function POST(request: NextRequest) {
           )
 
           if (toolUseBlocks.length === 0) {
-            if (mutated) {
-              controller.enqueue(encoder.encode('[[MUTATED]]'))
-            }
-            if (createdLinks.length > 0) {
-              for (const link of createdLinks) {
-                controller.enqueue(encoder.encode(`\n[[LINK:${link.path}|${link.label}]]`))
-              }
-            }
+            if (mutated) send({ t: 'mutated' })
             // Log the reply into the shared thread so the Telegram brain knows
             // what was already discussed here and doesn't re-flag it.
             if (finalText.trim()) {
               await supabase.from('sms_messages').insert({ direction: 'outbound', body: finalText.trim() })
             }
+            send({ t: 'done' })
             controller.close()
             return
           }
 
-          controller.enqueue(encoder.encode('[[WORKING]]'))
+          // Announce every call BEFORE running it, so the receipt appears while
+          // the work is in flight rather than after it. This is the whole point
+          // of the rewrite: a turn that voids an invoice should not look
+          // identical to a turn that reads the calendar.
+          for (const block of toolUseBlocks) {
+            if (block.type !== 'tool_use') continue
+            send({
+              t: 'tool',
+              id: block.id,
+              name: block.name,
+              label: toolLabel(block.name, block.input as Record<string, unknown>),
+            })
+          }
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           currentMessages.push({ role: 'assistant', content: finalMessage.content as any })
@@ -203,27 +211,35 @@ export async function POST(request: NextRequest) {
 
             if (MUTATING_TOOLS.has(block.name)) mutated = true
 
+            const { ok, detail } = summariseResult(result)
+            send({ t: 'tool_done', id: block.id, ok, detail })
+
             try {
               const parsed = JSON.parse(result)
+              // A destructive call the user has not approved. Surface the
+              // fingerprint so the UI can offer a real approve button rather
+              // than relying on the model to relay the question faithfully.
+              if (parsed.status === 'confirmation_required' && parsed.fingerprint) {
+                send({ t: 'confirm', fingerprint: parsed.fingerprint, action: parsed.action ?? 'Confirm this action.' })
+              }
               if (parsed.success) {
-                if (parsed.client?.id) createdLinks.push({ path: `/dashboard/clients/${parsed.client.id}`, label: `View ${parsed.client.name || 'Client'}` })
-                if (parsed.job?.id) createdLinks.push({ path: `/dashboard/jobs/${parsed.job.id}`, label: `View ${parsed.job.name || 'Job'}` })
-                if (parsed.document?.id) createdLinks.push({ path: `/dashboard/documents/${parsed.document.id}`, label: `View ${parsed.document.name || 'Document'}` })
-                if (parsed.event?.id) createdLinks.push({ path: `/dashboard/calendar`, label: 'View Calendar' })
+                if (parsed.client?.id) send({ t: 'link', path: `/dashboard/clients/${parsed.client.id}`, label: `View ${parsed.client.name || 'Client'}` })
+                if (parsed.job?.id) send({ t: 'link', path: `/dashboard/jobs/${parsed.job.id}`, label: `View ${parsed.job.name || 'Job'}` })
+                if (parsed.document?.id) send({ t: 'link', path: `/dashboard/documents/${parsed.document.id}`, label: `View ${parsed.document.name || 'Document'}` })
+                if (parsed.event?.id) send({ t: 'link', path: `/dashboard/calendar`, label: 'View Calendar' })
               }
             } catch { /* not JSON or no link needed */ }
           }
 
-          controller.enqueue(encoder.encode('[[/WORKING]]'))
-
           currentMessages.push({ role: 'user', content: toolResults })
         }
 
-        controller.enqueue(encoder.encode('\n\n(Reached maximum tool rounds.)'))
+        send({ t: 'text', v: '\n\n(Reached maximum tool rounds.)' })
+        send({ t: 'done' })
         controller.close()
       } catch (err) {
         console.error('AI chat error:', err)
-        controller.enqueue(encoder.encode('Something went wrong there. Try again.'))
+        send({ t: 'error', v: 'Something went wrong there. Try again.' })
         controller.close()
       }
     },
@@ -231,7 +247,9 @@ export async function POST(request: NextRequest) {
 
   return new Response(stream, {
     headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
+      // Newline-delimited JSON. Not text/event-stream: this is a plain fetch
+      // reader, not EventSource, and NDJSON keeps the framing to one newline.
+      'Content-Type': 'application/x-ndjson; charset=utf-8',
       'Cache-Control': 'no-cache, no-transform',
     },
   })
