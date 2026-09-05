@@ -611,6 +611,35 @@ input, textarea, select, button { font-family: inherit; }
   font-weight: 600;
 }
 
+/* Record tabs. Four labels do not fit across a 390px phone, so the row
+   scrolls sideways rather than wrapping into two ragged lines that break the
+   single underline the tabs sit on. */
+.page-tabs-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.page-tabs-scroll::-webkit-scrollbar { display: none; }
+
+.page-tab-count {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--text-tertiary);
+}
+.page-tab.active .page-tab-count {
+  background: var(--accent-muted);
+  color: var(--accent);
+}
+
+/* A hidden tab panel must not participate in layout at all — otherwise the
+   surrounding space-y rules still reserve room for it. */
+[role="tabpanel"][hidden] { display: none; }
+
 /* ── Tables ───────────────────────────────────────────────── */
 .table-header {
   font-size: 11px;
