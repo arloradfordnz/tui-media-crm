@@ -9,10 +9,16 @@ const fmt = (n: number) => n >= 1000 ? `$${(n / 1000).toFixed(n >= 10000 ? 0 : 1
 export default function RevenueChart({
   data,
   comparisonData,
+  comparisonColor,
   width,
 }: {
   data: Point[]
   comparisonData?: Point[]
+  /** Colour for the second line. Defaults to the muted dashed treatment that
+   *  means "the period before this one". Pass a real colour when the second
+   *  line is a series in its own right — money out, say — rather than a
+   *  comparison, so it does not read as history. */
+  comparisonColor?: string
   /** Measured container width in px. When set, the chart renders 1:1
    *  (no scaling) so narrowing the container never shrinks it — the
    *  parent cuts months instead. */
@@ -31,11 +37,11 @@ export default function RevenueChart({
   const max = Math.max(...allValues.map((v) => Math.max(0, v)), 1)
 
   const W = Math.max(300, Math.round(width ?? 720))
-  const H = 220
-  const Y_W = 38
+  const H = 240
+  const Y_W = 44
   const PAD_R = 12
   const PAD_T = 14
-  const PAD_B = 20
+  const PAD_B = 24
   const chartW = W - Y_W - PAD_R
   const chartH = H - PAD_T - PAD_B
   const fillBottom = PAD_T + chartH
@@ -157,7 +163,7 @@ export default function RevenueChart({
         {/* Grid lines */}
         {gridLines.map((gl, i) => (
           <g key={i}>
-            <text x={0} y={gl.y + 3} textAnchor="start" fill="var(--text-tertiary)" fontSize="10.5" style={{ fontFamily: 'inherit' }}>
+            <text x={0} y={gl.y + 3} textAnchor="start" fill="var(--text-tertiary)" fontSize="12" style={{ fontFamily: 'inherit' }}>
               {fmt(gl.val)}
             </text>
             <line x1={Y_W} y1={gl.y} x2={W - PAD_R} y2={gl.y} stroke="var(--bg-border)" strokeWidth="0.5" opacity="0.6" />
@@ -170,12 +176,12 @@ export default function RevenueChart({
             <path
               d={compPath}
               fill="none"
-              stroke="var(--text-tertiary)"
-              strokeWidth="1.25"
+              stroke={comparisonColor ?? 'var(--text-tertiary)'}
+              strokeWidth={comparisonColor ? 1.5 : 1.25}
               strokeLinejoin="round"
               strokeLinecap="round"
-              opacity="0.35"
-              strokeDasharray="4 3"
+              opacity={comparisonColor ? 1 : 0.35}
+              strokeDasharray={comparisonColor ? undefined : '4 3'}
             />
           )}
 
@@ -189,7 +195,7 @@ export default function RevenueChart({
           <text
             key={i} x={x} y={H - 4} textAnchor="middle"
             fill={indicator?.nearestIdx === i ? 'var(--text-primary)' : 'var(--text-tertiary)'}
-            fontSize="10.5" style={{ fontFamily: 'inherit', transition: 'fill 120ms' }}
+            fontSize="12" style={{ fontFamily: 'inherit', transition: 'fill 120ms' }}
           >
             {data[i].label}
           </text>

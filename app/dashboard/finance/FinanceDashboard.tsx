@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useMemo, useId, useRef } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
+import MoneyChart from './MoneyChart'
 import type { XeroSummary, XeroTransaction } from '@/lib/xero'
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
@@ -139,250 +140,6 @@ const PERIOD_NOUN: Record<Period, string> = {
   all: 'the period before',
 }
 
-// ─── Chart scale ──────────────────────────────────────────────────────────────
-
-// Clean axis ticks — 0 / 5,000 / 10,000, never 0 / 4,317 / 8,634.
-function niceScale(peak: number, ticks = 4): { max: number; step: number } {
-  if (peak <= 0) return { max: 100, step: 25 }
-  const raw = peak / ticks
-  const mag = Math.pow(10, Math.floor(Math.log10(raw)))
-  const norm = raw / mag
-  // 1 / 2 / 5 / 10 only. A 2.5 step is "nice" arithmetically and unreadable in
-  // practice: rounded to whole thousands it printed 0 / 3k / 5k / 8k / 10k,
-  // labels that disagree with their own evenly-spaced gridlines.
-  const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag
-  // Round the top up to the first step above the peak, rather than always
-  // taking step × ticks. The old form drew a 20k axis over a 9.8k peak and
-  // spent half the plot on empty space.
-  return { max: Math.ceil(peak / step) * step, step }
-}
-
-const AXIS_FMT = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(Math.round(n)))
-
-// ─── Money flow chart ─────────────────────────────────────────────────────────
-
-type Series = { key: 'in' | 'out'; label: string; color: string; dashed?: boolean; points: number[] }
-
-// One chart replacing three, and it sits on the page rather than in a box.
-//
-// The page used to carry three ~60px charts — revenue area, net-profit bars,
-// expenses bars — none of which had an axis, a gridline or a hover value. You
-// could see a shape and read nothing off it, and net profit was a third chart
-// showing the arithmetic of the other two.
-//
-// This is one plot, one y-axis (never two — the scales would be arbitrary and
-// would invent a correlation), with revenue and expenses as two lines. Net
-// profit is the gap between them, which is what it actually is.
-//
-// Full-bleed on purpose: the chart is the page's centrepiece, and a card
-// border around it made it read as one tile among several.
-function FlowChart({
-  labels,
-  series,
-  height = 260,
-}: {
-  labels: string[]
-  series: Series[]
-  height?: number
-}) {
-  const [hover, setHover] = useState<number | null>(null)
-  const svgRef = useRef<SVGSVGElement>(null)
-  const titleId = useId()
-
-  // Generous left gutter so a "$10.4k" tick never crowds the plot, and a tall
-  // bottom band so month labels have room at any width.
-  const PAD = { top: 14, right: 16, bottom: 34, left: 58 }
-  const W = 1000
-  const plotW = W - PAD.left - PAD.right
-  const plotH = height - PAD.top - PAD.bottom
-
-  const peak = Math.max(1, ...series.flatMap((s) => s.points))
-  const { max, step } = niceScale(peak)
-  const ticks = Array.from({ length: Math.round(max / step) + 1 }, (_, i) => i * step)
-
-  const x = (i: number) => PAD.left + (labels.length === 1 ? plotW / 2 : (i / (labels.length - 1)) * plotW)
-  const y = (v: number) => PAD.top + plotH - (v / max) * plotH
-
-  function onMove(e: React.PointerEvent<SVGSVGElement>) {
-    const rect = svgRef.current?.getBoundingClientRect()
-    if (!rect) return
-    // The reader aims at a month, never at a 2px line — snap to the nearest
-    // data position across the full height of the plot.
-    const px = ((e.clientX - rect.left) / rect.width) * W
-    const t = (px - PAD.left) / plotW
-    const idx = Math.round(t * (labels.length - 1))
-    setHover(Math.max(0, Math.min(labels.length - 1, idx)))
-  }
-
-  const hoverIn = hover != null ? (series.find((s) => s.key === 'in')?.points[hover] ?? 0) : 0
-  const hoverOut = hover != null ? (series.find((s) => s.key === 'out')?.points[hover] ?? 0) : 0
-
-  return (
-    <div style={{ position: 'relative' }}>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${W} ${height}`}
-        width="100%"
-        role="img"
-        aria-labelledby={titleId}
-        preserveAspectRatio="none"
-        className="flow-chart-svg"
-        style={{ display: 'block', touchAction: 'pan-y' }}
-        onPointerMove={onMove}
-        onPointerLeave={() => setHover(null)}
-      >
-        <title id={titleId}>Money in and money out over the selected period</title>
-
-        {/* Gridlines — solid hairlines, one step off the surface, recessive. */}
-        {ticks.map((t) => (
-          <line
-            key={t}
-            x1={PAD.left} x2={W - PAD.right} y1={y(t)} y2={y(t)}
-            stroke="var(--bg-border)" strokeWidth={1}
-            vectorEffect="non-scaling-stroke" shapeRendering="crispEdges"
-          />
-        ))}
-
-        {series.map((s) => (
-          <polyline
-            key={s.key}
-            points={s.points.map((v, i) => `${x(i)},${y(v)}`).join(' ')}
-            fill="none" stroke={s.color} strokeWidth={2}
-            strokeDasharray={s.dashed ? '5 5' : undefined}
-            strokeLinejoin="round" strokeLinecap="round"
-            vectorEffect="non-scaling-stroke"
-          />
-        ))}
-
-        {/* Crosshair sits above the grid but below the markers. */}
-        {hover != null && (
-          <line
-            x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={PAD.top + plotH}
-            stroke="var(--text-tertiary)" strokeWidth={1} opacity={0.55}
-            vectorEffect="non-scaling-stroke"
-          />
-        )}
-
-        {/* End markers, each with a 2px surface ring so they stay legible
-            where the two lines cross. */}
-        {series.map((s) => {
-          const i = s.points.length - 1
-          return (
-            <circle
-              key={s.key} cx={x(i)} cy={y(s.points[i])} r={4}
-              fill={s.color} stroke="var(--bg-base)" strokeWidth={2}
-              vectorEffect="non-scaling-stroke"
-            />
-          )
-        })}
-
-        {hover != null && series.map((s) => (
-          <circle
-            key={s.key} cx={x(hover)} cy={y(s.points[hover])} r={4.5}
-            fill={s.color} stroke="var(--bg-base)" strokeWidth={2}
-            vectorEffect="non-scaling-stroke"
-          />
-        ))}
-      </svg>
-
-      {/* Axis labels are HTML, not SVG text.
-          In SVG they scale with the viewBox, so the same chart rendered "$2.8k"
-          at readable size on a desktop and at about six pixels on a phone —
-          the one complaint about the chart this replaces. As positioned HTML
-          they hold their real type size at every width. */}
-      <div aria-hidden="true" className="flow-axis-y">
-        {ticks.map((t) => (
-          <span key={t} style={{ top: `${(y(t) / height) * 100}%` }}>{AXIS_FMT(t)}</span>
-        ))}
-      </div>
-
-      <div aria-hidden="true" className="flow-axis-x">
-        {labels.map((l, i) => {
-          // Thin the labels rather than shrink them: on a narrow screen you get
-          // fewer months, not unreadable ones.
-          const keep = labels.length <= 7 ? 1 : Math.ceil(labels.length / 6)
-          if (i % keep !== 0 && i !== labels.length - 1) return null
-          return (
-            <span key={l + i} style={{ left: `${(x(i) / W) * 100}%` }}>{l}</span>
-          )
-        })}
-      </div>
-
-      {/* Readout — value leads, series name follows. */}
-      {hover != null && (
-        <div
-          className="flow-tooltip"
-          style={{
-            left: `${(x(hover) / W) * 100}%`,
-            transform: hover > labels.length / 2 ? 'translate(calc(-100% - 14px), 0)' : 'translate(14px, 0)',
-          }}
-        >
-          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 5 }}>{labels[hover]}</div>
-          {series.map((s) => (
-            <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
-              <span style={{ width: 10, height: 2, borderRadius: 1, background: s.color, flexShrink: 0 }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
-                {fmtBig(s.points[hover])}
-              </span>
-              <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{s.label}</span>
-            </div>
-          ))}
-          <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px solid var(--bg-border)', fontSize: 11, color: 'var(--text-secondary)' }}>
-            Net{' '}
-            <span style={{ fontWeight: 600, color: hoverIn - hoverOut < 0 ? 'var(--danger)' : 'var(--success)' }}>
-              {fmtBig(hoverIn - hoverOut)}
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// The chart's own table twin — every value the tooltip shows, reachable
-// without a pointer.
-function FlowTable({ labels, series }: { labels: string[]; series: Series[] }) {
-  return (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-        <thead>
-          <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
-            <th style={thStyle('left')}>Period</th>
-            {series.map((s) => <th key={s.key} style={thStyle('right')}>{s.label}</th>)}
-            <th style={thStyle('right')}>Net</th>
-          </tr>
-        </thead>
-        <tbody>
-          {labels.map((l, i) => {
-            const inc = series.find((s) => s.key === 'in')?.points[i] ?? 0
-            const out = series.find((s) => s.key === 'out')?.points[i] ?? 0
-            return (
-              <tr key={l + i} style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                <td style={tdStyle('left')}>{l}</td>
-                <td style={tdStyle('right')}>{fmtBig(inc)}</td>
-                <td style={tdStyle('right')}>{fmtBig(out)}</td>
-                <td style={{ ...tdStyle('right'), color: inc - out < 0 ? 'var(--danger)' : 'var(--success)' }}>
-                  {fmtBig(inc - out)}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-const thStyle = (align: 'left' | 'right') => ({
-  padding: '5px 10px', textAlign: align,
-  color: 'var(--text-tertiary)', fontWeight: 500,
-  textTransform: 'uppercase' as const, fontSize: 10, letterSpacing: '0.05em',
-})
-const tdStyle = (align: 'left' | 'right') => ({
-  padding: '7px 10px', textAlign: align,
-  color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' as const,
-})
-
 // ─── Figures ──────────────────────────────────────────────────────────────────
 
 // Renders the whole comparison phrase rather than just the percentage, so the
@@ -400,29 +157,6 @@ function Delta({ now, before, against, goodWhenUp = true }: { now: number; befor
         {pct > 0 ? '↑' : pct < 0 ? '↓' : ''}{Math.abs(pct)}%
       </span>{' '}
       against {against}
-    </span>
-  )
-}
-
-// The compact form, sitting inline beside a figure. Same rule as Delta: red
-// and green mean "worse" and "better", not "down" and "up" — spending more is
-// not an improvement.
-function DeltaPill({ now, before, goodWhenUp = true }: { now: number; before: number; goodWhenUp?: boolean }) {
-  if (before === 0) return null
-  const pct = Math.round(((now - before) / Math.abs(before)) * 100)
-  if (pct === 0) return null
-  const good = (pct > 0) === goodWhenUp
-  return (
-    <span
-      className="flow-delta-pill"
-      style={{
-        color: good ? 'var(--success)' : 'var(--danger)',
-        background: good
-          ? 'color-mix(in srgb, var(--success) 14%, transparent)'
-          : 'color-mix(in srgb, var(--danger) 14%, transparent)',
-      }}
-    >
-      {pct > 0 ? '↑' : '↓'}{Math.abs(pct)}%
     </span>
   )
 }
@@ -610,7 +344,6 @@ export default function FinanceDashboard({
   retainerInvoiceDay?: number
 }) {
   const [period, setPeriod] = useState<Period>('year')
-  const [asTable, setAsTable] = useState(false)
   const { label: rangeLabel, start: periodStart } = periodRange(period)
 
   const filtered = useMemo(() => filterTx(transactions, period), [transactions, period])
@@ -625,11 +358,6 @@ export default function FinanceDashboard({
   const inPoints = useMemo(() => groupByPeriod(filtered, period, 'in'), [filtered, period])
   const outPoints = useMemo(() => groupByPeriod(filtered, period, 'out'), [filtered, period])
 
-  const chartLabels = inPoints.map((p) => p.label)
-  const chartSeries: Series[] = [
-    { key: 'in', label: 'In', color: 'var(--chart-in)', points: inPoints.map((p) => p.value) },
-    { key: 'out', label: 'Out', color: 'var(--chart-out)', points: outPoints.map((p) => p.value) },
-  ]
 
   const topClients = useMemo(() => {
     const totals = new Map<string, number>()
@@ -712,58 +440,28 @@ export default function FinanceDashboard({
         </p>
       </section>
 
-      {/* The chart is the page's centrepiece, so it sits ON the page rather
-          than inside a card. Its own figures carry the legend — a coloured key
-          beside the number the reader is already looking at beats a legend box
-          off to one side. */}
-      <section className="flow-block">
-        <div className="flow-head">
-          <div className="flow-figures">
-            {[
-              { key: 'in', label: 'Money in', value: current.inc, prev: previous.inc, color: 'var(--chart-in)', goodWhenUp: true },
-              { key: 'out', label: 'Money out', value: current.out, prev: previous.out, color: 'var(--chart-out)', goodWhenUp: false },
-            ].map((f) => (
-              <div key={f.key}>
-                <p className="flow-figure-label">
-                  <span className="flow-key" style={{ background: f.color }} />
-                  {f.label}
-                </p>
-                <p className="flow-figure-value">
-                  {fmtBig(Math.round(f.value))}
-                  <DeltaPill now={f.value} before={f.prev} goodWhenUp={f.goodWhenUp} />
-                </p>
-              </div>
-            ))}
-          </div>
-
-          <div className="flow-controls">
-            <CustomSelect
-              value={period}
-              onChange={(v) => setPeriod(v as Period)}
-              options={[
-                { value: 'week', label: 'Last 7 days' },
-                { value: 'month', label: 'This month' },
-                { value: 'year', label: 'This year' },
-              ]}
-              className="flow-range"
-            />
-            <button className="btn-secondary btn-sm" onClick={() => setAsTable((v) => !v)}>
-              {asTable ? 'Show chart' : 'Show table'}
-            </button>
-          </div>
-        </div>
-
-        {asTable ? (
-          <FlowTable labels={chartLabels} series={chartSeries} />
-        ) : (
-          <FlowChart labels={chartLabels} series={chartSeries} />
-        )}
-
-        <p className="flow-caption">
-          Live from Xero · {rangeLabel}
-          {inPoints.length > 0 && ` · ${inPoints[inPoints.length - 1].label} is still in progress`}
-        </p>
-      </section>
+      {/* The chart, on the page rather than in a card. */}
+      <MoneyChart
+        inData={inPoints}
+        outData={outPoints}
+        inTotal={fmtBig(Math.round(current.inc))}
+        outTotal={fmtBig(Math.round(current.out))}
+        inDelta={previous.inc === 0 ? undefined : ((current.inc - previous.inc) / Math.abs(previous.inc)) * 100}
+        outDelta={previous.out === 0 ? undefined : ((current.out - previous.out) / Math.abs(previous.out)) * 100}
+        caption={`Live from Xero · ${rangeLabel}${inPoints.length > 0 ? ` · ${inPoints[inPoints.length - 1].label} is still in progress` : ''}`}
+        control={
+          <CustomSelect
+            value={period}
+            onChange={(v) => setPeriod(v as Period)}
+            options={[
+              { value: 'week', label: 'Last 7 days' },
+              { value: 'month', label: 'This month' },
+              { value: 'year', label: 'This year' },
+            ]}
+            className="flow-range"
+          />
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="card">

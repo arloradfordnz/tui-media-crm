@@ -2421,3 +2421,30 @@ input, textarea, select, button { font-family: inherit; }
   .flow-range { flex: 1; width: auto; }
   .flow-chart-svg { height: 220px; }
 }
+
+/* ── Money table (the Finance chart's table twin) ─────────────
+   Deliberately not .record-table: that one reflows into cards below 1025px,
+   which is right for a list of records and wrong for four numeric columns
+   that read as a grid at any width. */
+.money-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.money-table th {
+  padding: 6px 10px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--bg-border);
+}
+.money-table td {
+  padding: 8px 10px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--bg-border);
+}
+.money-table tr:last-child td { border-bottom: none; }
+.money-table .num { text-align: right; font-variant-numeric: tabular-nums; }
