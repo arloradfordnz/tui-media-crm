@@ -107,6 +107,19 @@
   --grad-hero: #1B2E52;
   --grad-accent: #6E9BF7;
 
+  /* ── Chart marks ───────────────────────────────────────────
+     Chart hues are NOT the UI accent and status tokens, on purpose.
+     --accent (#6E9BF7) and --warning (#F5C06B) both sit above the OKLCH
+     lightness band a dark-surface data mark needs (0.48-0.67), and --danger
+     is a reserved status colour that must not double as "series 2" — an
+     expense is a normal fact, not a failure.
+     These two are the same two hues stepped down into the band. Validated
+     against #0F1930: adjacent CVD dE 25.2 under protanopia, 26.4 at normal
+     vision, chroma and 3:1 contrast both clear. Re-run the check before
+     changing either value. */
+  --chart-in: #5A87EE;       /* money in — cool */
+  --chart-out: #BA8746;      /* money out — warm, the opposite pole */
+
   /* Shadows — soft and navy-tinted rather than neutral grey */
   --shadow-soft: 0 10px 34px -10px rgba(0, 0, 0, 0.6);
   --shadow-glow-accent: 0 12px 36px rgba(0, 0, 0, 0.55);
@@ -294,37 +307,81 @@ input, textarea, select, button { font-family: inherit; }
 .btn-danger {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
+  justify-content: center;
+  gap: 0.7em;
+  height: 44px;
+  padding: 10px 22px;
   background: transparent;
   color: var(--danger);
   border: 1px solid color-mix(in srgb, var(--danger) 34%, transparent);
   border-radius: var(--r-pill);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
+  white-space: nowrap;
   transition: transform var(--dur-fast) var(--ease-out), background var(--dur-base) ease, border-color var(--dur-base) ease;
 }
 .btn-danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
 .btn-danger:active { transform: scale(0.975); }
 
+/* The quiet one. Deliberately smaller than the other three by default —
+   it is a tertiary action, and that is a size decision, not a per-call-site
+   inline style. */
 .btn-ghost {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 7px 14px;
+  height: 32px;
+  padding: 6px 14px;
   background: transparent;
   color: var(--text-secondary);
   border: 1px solid var(--bg-border);
   border-radius: var(--r-pill);
   font-size: 12px;
+  white-space: nowrap;
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
   transition: color var(--dur-base) ease, background var(--dur-base) ease, border-color var(--dur-base) ease;
   text-decoration: none;
 }
+/* ── Button sizes ──────────────────────────────────────────────
+   One scale, three steps. Before this, size was expressed by pinning a
+   Tailwind text class onto a fixed-height pill — `btn-secondary text-xs` left
+   a 44px-tall button with 12px text and 22px of padding, and half the call
+   sites then patched the padding back with an inline style while the other
+   half did not. Same button, four different shapes across the app.
+
+   Height and padding move together here. The pointer:coarse rule further down
+   still lifts every one of them to a 44px touch target, so a compact desktop
+   row is not a compact phone tap target. */
+.btn-sm {
+  height: 36px;
+  padding: 8px 16px;
+  font-size: 13px;
+  gap: 0.55em;
+}
+.btn-xs {
+  height: 30px;
+  padding: 6px 13px;
+  font-size: 12px;
+  gap: 0.5em;
+}
+
+/* Icon-only. Square rather than a pill, so a lone glyph is not stretched into
+   a lozenge — which is what the two inline `padding: 8px 10px` patches on the
+   send buttons were working around. */
+.btn-round {
+  padding: 0;
+  width: 44px;
+  aspect-ratio: 1;
+  gap: 0;
+}
+.btn-sm.btn-round { width: 36px; }
+.btn-xs.btn-round { width: 30px; }
+
 .btn-ghost:hover {
   color: var(--text-primary);
   background: var(--bg-elevated);
@@ -398,20 +455,21 @@ input, textarea, select, button { font-family: inherit; }
 .btn-icon:hover { background: var(--bg-elevated); color: var(--text-primary); }
 
 /* ── Cards ────────────────────────────────────────────────── */
+/* Surfaces carry NO border and NO drop shadow — the same treatment as
+   tuimedia.nz. A card is a lift in the background, nothing more. The hairline
+   plus shadow that used to sit on every one of these drew a box around every
+   idea on the page and made a dashboard read as a grid of equally important
+   containers. Separation is the surface step and the gap between cards. */
 .card {
   background: var(--bg-surface);
-  border: 1px solid var(--bg-border);
   border-radius: var(--r-lg);
   padding: 1.5rem;
-  box-shadow: var(--shadow-soft);
   contain: layout style;
 }
 
 .card-flush {
   background: var(--bg-surface);
-  border: 1px solid var(--bg-border);
   border-radius: var(--r-lg);
-  box-shadow: var(--shadow-soft);
   overflow-x: auto;
   overflow-y: hidden;
   contain: layout style;
@@ -535,25 +593,46 @@ input, textarea, select, button { font-family: inherit; }
 }
 
 /* ── Page header (breadcrumb + title + actions) ───────────── */
+/* Wraps. Without flex-wrap the title column was the only thing that could
+   give, so between roughly 700px and 900px the heading squeezed down to three
+   ragged lines while the action buttons — flex-shrink: 0 — ran off the right
+   edge of the page. The actions now drop to their own line instead.
+
+   This margin-bottom is THE gap under a page header, everywhere. Do not
+   override it per page: Tailwind v4 wraps `space-y-*` in `:where()`, which has
+   zero specificity, so a parent's space-y can never beat this rule. Four pages
+   had noticed the symptom and "fixed" it by setting margin-bottom to 0 or 4px
+   inline, which left their headings sitting directly on top of the first
+   section instead. */
 .page-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+  flex-wrap: wrap;
   margin-bottom: 32px;
 }
-.page-header-left {}
+.page-header-left {
+  min-width: min(100%, 260px);
+  flex: 1 1 auto;
+}
 .page-breadcrumb {
   font-size: 12px;
   color: var(--text-tertiary);
   margin-bottom: 4px;
 }
+/* The page heading. This is the ONLY way to set a page title — several pages
+   used to hand-roll `text-2xl font-semibold` with an inline letter-spacing
+   instead, which is a different size (24px vs 28px) at a different weight
+   (600 vs 500) with different tracking, so no two pages started at the same
+   rhythm. Pair it with .page-subtitle, which owns the gap beneath. */
 .page-title {
   font-size: 28px;
   font-weight: 500;
   letter-spacing: -0.035em;
   color: var(--text-primary);
   line-height: 1.1;
+  margin: 0;
 }
 .page-header-actions {
   display: flex;
@@ -699,10 +778,8 @@ input, textarea, select, button { font-family: inherit; }
 /* ── Stat Card ────────────────────────────────────────────── */
 .stat-card {
   background: var(--bg-surface);
-  border: 1px solid var(--bg-border);
   border-radius: var(--r-lg);
   padding: 1.5rem;
-  box-shadow: var(--shadow-soft);
 }
 .stat-card .stat-value {
   font-size: 36px;
@@ -1418,13 +1495,13 @@ input, textarea, select, button { font-family: inherit; }
    .card/.stat-card/.kpi-card sit in normal flow on the flat
    .page-shell background, so blurring them cost a compositor layer
    per card for a visual result identical to an opaque fill. */
+/* The glass pass gives surfaces their translucency. It must NOT reintroduce
+   the border or the drop shadow the base rules above deliberately drop. */
 .card,
 .card-flush,
 .stat-card,
 .kpi-card {
   background: var(--glass-card-bg);
-  border: 1px solid var(--glass-card-border);
-  box-shadow: var(--glass-card-highlight), var(--shadow-soft);
 }
 .modal-content,
 .custom-select-menu,
@@ -1437,12 +1514,13 @@ input, textarea, select, button { font-family: inherit; }
   -webkit-backdrop-filter: blur(20px) saturate(160%);
   box-shadow: var(--glass-card-highlight), var(--shadow-soft);
 }
+/* Deliberately no border or shadow here either — this rule used to put both
+   back on the very surfaces the base rules strip them from. */
 .canvas-gray .card,
 .canvas-gray .card-flush,
 .canvas-gray .kpi-card,
 .canvas-gray .stat-card {
-  border-color: var(--glass-card-border);
-  box-shadow: var(--glass-card-highlight), var(--shadow-soft);
+  background: var(--glass-card-bg);
 }
 
 /* ── Invisible scrollbar (scroll still works) ───────────────── */
@@ -2226,4 +2304,143 @@ input, textarea, select, button { font-family: inherit; }
 .drawer-panel,
 .report-panel {
   backdrop-filter: blur(20px) saturate(160%);
+}
+
+/* ── Finance flow chart ───────────────────────────────────────
+   The page's centrepiece, sitting ON the page rather than in a card. A border
+   around it made it read as one tile among several instead of the thing the
+   page is about. */
+/* The page's answer, stated once. Sized against the viewport so it stays the
+   largest thing on the page at any width without overflowing a phone. */
+.finance-hero {
+  margin: 0;
+  font-size: clamp(38px, 7vw, 56px);
+  font-weight: 600;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+}
+
+.flow-block {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.flow-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.flow-figures {
+  display: flex;
+  gap: 36px;
+  flex-wrap: wrap;
+}
+
+/* The legend, living on the figure the reader is already looking at rather
+   than in a box off to one side. */
+.flow-figure-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.flow-key {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+.flow-figure-value {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: clamp(28px, 4.4vw, 40px);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+}
+.flow-delta-pill {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+}
+
+.flow-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.flow-range { width: 168px; }
+
+/* The plot stretches; its stroke widths do not (vector-effect on the marks). */
+.flow-chart-svg { height: 260px; width: 100%; }
+
+/* Axis labels are HTML rather than SVG <text> on purpose.
+   Inside a stretched viewBox, SVG text scales with the plot — the same chart
+   rendered "$2.8k" at a comfortable size on a desktop and at roughly six
+   pixels on a phone. That was the single complaint about the chart this
+   replaces. As positioned HTML they hold their real type size at every width,
+   and the label row thins itself instead of shrinking. */
+.flow-axis-y,
+.flow-axis-x {
+  position: absolute;
+  pointer-events: none;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.flow-axis-y {
+  inset: 0 auto 0 0;
+  width: 50px;
+}
+.flow-axis-y span {
+  position: absolute;
+  right: 8px;
+  transform: translateY(-50%);
+  white-space: nowrap;
+}
+.flow-axis-x {
+  inset: auto 0 4px 0;
+  height: 16px;
+}
+.flow-axis-x span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.flow-tooltip {
+  position: absolute;
+  top: 0;
+  pointer-events: none;
+  background: var(--bg-elevated);
+  border-radius: var(--r-md);
+  padding: 9px 11px;
+  min-width: 152px;
+  z-index: 2;
+}
+
+.flow-caption {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+@media (max-width: 768px) {
+  .flow-figures { gap: 24px; }
+  .flow-controls { width: 100%; }
+  .flow-range { flex: 1; width: auto; }
+  .flow-chart-svg { height: 220px; }
 }

@@ -84,7 +84,7 @@ export default function CalendarView({ events, jobs, month, year, feedToken }: {
 
   return (
     <div className="space-y-6">
-      <div className="page-header" style={{ marginBottom: 0 }}>
+      <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Calendar</h1>
         </div>

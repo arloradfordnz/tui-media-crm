@@ -259,7 +259,7 @@ export default function AIDocumentAssistant({
                   onInsert(draft)
                   onClose()
                 }}
-                className="btn-primary text-xs"
+                className="btn-primary btn-xs"
                 style={{ padding: '6px 10px' }}
               >
                 <Check className="w-3.5 h-3.5" /> Insert into document
@@ -282,8 +282,7 @@ export default function AIDocumentAssistant({
             <button
               type="submit"
               disabled={!input.trim() || streaming}
-              className="btn-primary"
-              style={{ padding: '8px 12px' }}
+              className="btn-primary btn-sm btn-round"
               aria-label="Send"
             >
               <Send className="w-4 h-4" />

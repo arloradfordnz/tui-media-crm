@@ -32,7 +32,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="space-y-6">
-      <div className="page-header" style={{ marginBottom: 0 }}>
+      <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Documents</h1>
         </div>

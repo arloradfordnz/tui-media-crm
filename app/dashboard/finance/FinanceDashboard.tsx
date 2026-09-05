@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useMemo, useId, useRef } from 'react'
-import { ArrowDownLeft, ArrowUpRight, Calendar } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowDownLeft, ArrowUpRight } from 'lucide-react'
+import CustomSelect from '@/components/CustomSelect'
 import type { XeroSummary, XeroTransaction } from '@/lib/xero'
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
@@ -80,7 +82,10 @@ function groupByPeriod(txs: XeroTransaction[], period: Period, kind: 'in' | 'out
   }
 
   if (period === 'year') {
-    return Array.from({ length: 12 }, (_, m) => {
+    // Only months that have happened. Plotting Oct-Dec as zero draws a cliff
+    // to the right of today and reads as revenue collapsing, when it just
+    // means the year is not over.
+    return Array.from({ length: now.getMonth() + 1 }, (_, m) => {
       const key = `${now.getFullYear()}-${String(m + 1).padStart(2, '0')}`
       const label = new Date(now.getFullYear(), m, 1).toLocaleString('en-NZ', { month: 'short' })
       return { label, value: calc(paid.filter((t) => t.date.startsWith(key))) }
@@ -95,462 +100,409 @@ function groupByPeriod(txs: XeroTransaction[], period: Period, kind: 'in' | 'out
   })
 }
 
-// ─── Card wrapper ─────────────────────────────────────────────────────────────
+// ─── Previous-period comparison ───────────────────────────────────────────────
 
-function Card({
-  title, metric, sub, children, wide,
+// Every figure on this page is now stated against the equivalent span before it.
+// An absolute number ("$16,483") is unreadable on its own — up or down is the
+// only question anyone actually has, and the old page never answered it.
+function previousRange(period: Period): { start: string; end: string } {
+  const now = new Date()
+  const iso = (d: Date) => d.toISOString().slice(0, 10)
+  if (period === 'week') {
+    const end = new Date(now); end.setDate(now.getDate() - 7)
+    const start = new Date(now); start.setDate(now.getDate() - 13)
+    return { start: iso(start), end: iso(end) }
+  }
+  if (period === 'month') {
+    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    // Same day-of-month as today, so a part-month compares against a part-month
+    // rather than against a full one — which would always look like a collapse.
+    const end = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
+    return { start: iso(start), end: iso(end) }
+  }
+  const start = new Date(now.getFullYear() - 1, 0, 1)
+  const end = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
+  return { start: iso(start), end: iso(end) }
+}
+
+function totalsFor(txs: XeroTransaction[], start: string, end: string) {
+  const paid = txs.filter((t) => t.status === 'PAID' && t.date >= start && t.date <= end)
+  const inc = paid.filter((t) => t.type === 'in').reduce((s, t) => s + t.amount, 0)
+  const out = paid.filter((t) => t.type === 'out').reduce((s, t) => s + t.amount, 0)
+  return { inc, out, net: inc - out }
+}
+
+const PERIOD_NOUN: Record<Period, string> = {
+  week: 'last week',
+  month: 'last month',
+  year: 'last year',
+  all: 'the period before',
+}
+
+// ─── Chart scale ──────────────────────────────────────────────────────────────
+
+// Clean axis ticks — 0 / 5,000 / 10,000, never 0 / 4,317 / 8,634.
+function niceScale(peak: number, ticks = 4): { max: number; step: number } {
+  if (peak <= 0) return { max: 100, step: 25 }
+  const raw = peak / ticks
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)))
+  const norm = raw / mag
+  // 1 / 2 / 5 / 10 only. A 2.5 step is "nice" arithmetically and unreadable in
+  // practice: rounded to whole thousands it printed 0 / 3k / 5k / 8k / 10k,
+  // labels that disagree with their own evenly-spaced gridlines.
+  const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag
+  // Round the top up to the first step above the peak, rather than always
+  // taking step × ticks. The old form drew a 20k axis over a 9.8k peak and
+  // spent half the plot on empty space.
+  return { max: Math.ceil(peak / step) * step, step }
+}
+
+const AXIS_FMT = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(Math.round(n)))
+
+// ─── Money flow chart ─────────────────────────────────────────────────────────
+
+type Series = { key: 'in' | 'out'; label: string; color: string; dashed?: boolean; points: number[] }
+
+// One chart replacing three, and it sits on the page rather than in a box.
+//
+// The page used to carry three ~60px charts — revenue area, net-profit bars,
+// expenses bars — none of which had an axis, a gridline or a hover value. You
+// could see a shape and read nothing off it, and net profit was a third chart
+// showing the arithmetic of the other two.
+//
+// This is one plot, one y-axis (never two — the scales would be arbitrary and
+// would invent a correlation), with revenue and expenses as two lines. Net
+// profit is the gap between them, which is what it actually is.
+//
+// Full-bleed on purpose: the chart is the page's centrepiece, and a card
+// border around it made it read as one tile among several.
+function FlowChart({
+  labels,
+  series,
+  height = 260,
 }: {
-  title: string
-  metric?: string
-  sub?: string
-  children?: React.ReactNode
-  wide?: boolean
+  labels: string[]
+  series: Series[]
+  height?: number
 }) {
+  const [hover, setHover] = useState<number | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+  const titleId = useId()
+
+  // Generous left gutter so a "$10.4k" tick never crowds the plot, and a tall
+  // bottom band so month labels have room at any width.
+  const PAD = { top: 14, right: 16, bottom: 34, left: 58 }
+  const W = 1000
+  const plotW = W - PAD.left - PAD.right
+  const plotH = height - PAD.top - PAD.bottom
+
+  const peak = Math.max(1, ...series.flatMap((s) => s.points))
+  const { max, step } = niceScale(peak)
+  const ticks = Array.from({ length: Math.round(max / step) + 1 }, (_, i) => i * step)
+
+  const x = (i: number) => PAD.left + (labels.length === 1 ? plotW / 2 : (i / (labels.length - 1)) * plotW)
+  const y = (v: number) => PAD.top + plotH - (v / max) * plotH
+
+  function onMove(e: React.PointerEvent<SVGSVGElement>) {
+    const rect = svgRef.current?.getBoundingClientRect()
+    if (!rect) return
+    // The reader aims at a month, never at a 2px line — snap to the nearest
+    // data position across the full height of the plot.
+    const px = ((e.clientX - rect.left) / rect.width) * W
+    const t = (px - PAD.left) / plotW
+    const idx = Math.round(t * (labels.length - 1))
+    setHover(Math.max(0, Math.min(labels.length - 1, idx)))
+  }
+
+  const hoverIn = hover != null ? (series.find((s) => s.key === 'in')?.points[hover] ?? 0) : 0
+  const hoverOut = hover != null ? (series.find((s) => s.key === 'out')?.points[hover] ?? 0) : 0
+
   return (
-    <div
-      className="card"
+    <div style={{ position: 'relative' }}>
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${W} ${height}`}
+        width="100%"
+        role="img"
+        aria-labelledby={titleId}
+        preserveAspectRatio="none"
+        className="flow-chart-svg"
+        style={{ display: 'block', touchAction: 'pan-y' }}
+        onPointerMove={onMove}
+        onPointerLeave={() => setHover(null)}
+      >
+        <title id={titleId}>Money in and money out over the selected period</title>
+
+        {/* Gridlines — solid hairlines, one step off the surface, recessive. */}
+        {ticks.map((t) => (
+          <line
+            key={t}
+            x1={PAD.left} x2={W - PAD.right} y1={y(t)} y2={y(t)}
+            stroke="var(--bg-border)" strokeWidth={1}
+            vectorEffect="non-scaling-stroke" shapeRendering="crispEdges"
+          />
+        ))}
+
+        {series.map((s) => (
+          <polyline
+            key={s.key}
+            points={s.points.map((v, i) => `${x(i)},${y(v)}`).join(' ')}
+            fill="none" stroke={s.color} strokeWidth={2}
+            strokeDasharray={s.dashed ? '5 5' : undefined}
+            strokeLinejoin="round" strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+
+        {/* Crosshair sits above the grid but below the markers. */}
+        {hover != null && (
+          <line
+            x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={PAD.top + plotH}
+            stroke="var(--text-tertiary)" strokeWidth={1} opacity={0.55}
+            vectorEffect="non-scaling-stroke"
+          />
+        )}
+
+        {/* End markers, each with a 2px surface ring so they stay legible
+            where the two lines cross. */}
+        {series.map((s) => {
+          const i = s.points.length - 1
+          return (
+            <circle
+              key={s.key} cx={x(i)} cy={y(s.points[i])} r={4}
+              fill={s.color} stroke="var(--bg-base)" strokeWidth={2}
+              vectorEffect="non-scaling-stroke"
+            />
+          )
+        })}
+
+        {hover != null && series.map((s) => (
+          <circle
+            key={s.key} cx={x(hover)} cy={y(s.points[hover])} r={4.5}
+            fill={s.color} stroke="var(--bg-base)" strokeWidth={2}
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+      </svg>
+
+      {/* Axis labels are HTML, not SVG text.
+          In SVG they scale with the viewBox, so the same chart rendered "$2.8k"
+          at readable size on a desktop and at about six pixels on a phone —
+          the one complaint about the chart this replaces. As positioned HTML
+          they hold their real type size at every width. */}
+      <div aria-hidden="true" className="flow-axis-y">
+        {ticks.map((t) => (
+          <span key={t} style={{ top: `${(y(t) / height) * 100}%` }}>{AXIS_FMT(t)}</span>
+        ))}
+      </div>
+
+      <div aria-hidden="true" className="flow-axis-x">
+        {labels.map((l, i) => {
+          // Thin the labels rather than shrink them: on a narrow screen you get
+          // fewer months, not unreadable ones.
+          const keep = labels.length <= 7 ? 1 : Math.ceil(labels.length / 6)
+          if (i % keep !== 0 && i !== labels.length - 1) return null
+          return (
+            <span key={l + i} style={{ left: `${(x(i) / W) * 100}%` }}>{l}</span>
+          )
+        })}
+      </div>
+
+      {/* Readout — value leads, series name follows. */}
+      {hover != null && (
+        <div
+          className="flow-tooltip"
+          style={{
+            left: `${(x(hover) / W) * 100}%`,
+            transform: hover > labels.length / 2 ? 'translate(calc(-100% - 14px), 0)' : 'translate(14px, 0)',
+          }}
+        >
+          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 5 }}>{labels[hover]}</div>
+          {series.map((s) => (
+            <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
+              <span style={{ width: 10, height: 2, borderRadius: 1, background: s.color, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                {fmtBig(s.points[hover])}
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{s.label}</span>
+            </div>
+          ))}
+          <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px solid var(--bg-border)', fontSize: 11, color: 'var(--text-secondary)' }}>
+            Net{' '}
+            <span style={{ fontWeight: 600, color: hoverIn - hoverOut < 0 ? 'var(--danger)' : 'var(--success)' }}>
+              {fmtBig(hoverIn - hoverOut)}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// The chart's own table twin — every value the tooltip shows, reachable
+// without a pointer.
+function FlowTable({ labels, series }: { labels: string[]; series: Series[] }) {
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead>
+          <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
+            <th style={thStyle('left')}>Period</th>
+            {series.map((s) => <th key={s.key} style={thStyle('right')}>{s.label}</th>)}
+            <th style={thStyle('right')}>Net</th>
+          </tr>
+        </thead>
+        <tbody>
+          {labels.map((l, i) => {
+            const inc = series.find((s) => s.key === 'in')?.points[i] ?? 0
+            const out = series.find((s) => s.key === 'out')?.points[i] ?? 0
+            return (
+              <tr key={l + i} style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                <td style={tdStyle('left')}>{l}</td>
+                <td style={tdStyle('right')}>{fmtBig(inc)}</td>
+                <td style={tdStyle('right')}>{fmtBig(out)}</td>
+                <td style={{ ...tdStyle('right'), color: inc - out < 0 ? 'var(--danger)' : 'var(--success)' }}>
+                  {fmtBig(inc - out)}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+const thStyle = (align: 'left' | 'right') => ({
+  padding: '5px 10px', textAlign: align,
+  color: 'var(--text-tertiary)', fontWeight: 500,
+  textTransform: 'uppercase' as const, fontSize: 10, letterSpacing: '0.05em',
+})
+const tdStyle = (align: 'left' | 'right') => ({
+  padding: '7px 10px', textAlign: align,
+  color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' as const,
+})
+
+// ─── Figures ──────────────────────────────────────────────────────────────────
+
+// Renders the whole comparison phrase rather than just the percentage, so the
+// no-data case reads as a sentence instead of leaving a dangling preposition
+// behind ("nothing to compare against against last year").
+function Delta({ now, before, against, goodWhenUp = true }: { now: number; before: number; against: string; goodWhenUp?: boolean }) {
+  if (before === 0) {
+    return <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>No {against} figure to compare against</span>
+  }
+  const pct = Math.round(((now - before) / Math.abs(before)) * 100)
+  const good = (pct > 0) === goodWhenUp
+  return (
+    <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+      <span style={{ color: pct === 0 ? 'var(--text-tertiary)' : good ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
+        {pct > 0 ? '↑' : pct < 0 ? '↓' : ''}{Math.abs(pct)}%
+      </span>{' '}
+      against {against}
+    </span>
+  )
+}
+
+// The compact form, sitting inline beside a figure. Same rule as Delta: red
+// and green mean "worse" and "better", not "down" and "up" — spending more is
+// not an improvement.
+function DeltaPill({ now, before, goodWhenUp = true }: { now: number; before: number; goodWhenUp?: boolean }) {
+  if (before === 0) return null
+  const pct = Math.round(((now - before) / Math.abs(before)) * 100)
+  if (pct === 0) return null
+  const good = (pct > 0) === goodWhenUp
+  return (
+    <span
+      className="flow-delta-pill"
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 0,
-        padding: '18px 20px 16px',
-        gridColumn: wide ? '1 / -1' : undefined,
+        color: good ? 'var(--success)' : 'var(--danger)',
+        background: good
+          ? 'color-mix(in srgb, var(--success) 14%, transparent)'
+          : 'color-mix(in srgb, var(--danger) 14%, transparent)',
       }}
     >
-      <div style={{ marginBottom: 4 }}>
-        <h2 style={{ fontSize: '22px', color: 'var(--text-primary)', fontWeight: 600, letterSpacing: '-0.02em', margin: 0 }}>
-          {title}
-        </h2>
-      </div>
-      {metric && (
-        <div style={{ fontSize: '20px', fontWeight: 400, color: 'var(--text-secondary)', marginBottom: 10, letterSpacing: '-0.01em' }}>
-          {metric}
-        </div>
-      )}
-      {sub && (
-        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: 10 }}>{sub}</div>
-      )}
-      {children && (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {children}
-        </div>
-      )}
-    </div>
+      {pct > 0 ? '↑' : '↓'}{Math.abs(pct)}%
+    </span>
   )
 }
 
-// ─── Area / line chart ────────────────────────────────────────────────────────
+// ─── Cash & runway ────────────────────────────────────────────────────────────
 
-type AreaIndicator = { x: number; y: number; nearestIdx: number }
-
-function AreaChart({ points, color = 'var(--accent)' }: { points: { label: string; value: number }[]; color?: string }) {
-  const [indicator, setIndicator] = useState<AreaIndicator | null>(null)
-  const svgRef = useRef<SVGSVGElement>(null)
-  const uid = useId().replace(/:/g, '')
-  const gradId = `ag${uid}`
-  const clipId = `cl${uid}`
-
-  const max = Math.max(...points.map((p) => Math.max(0, p.value)), 1)
-
-  const W = 600
-  const H = 120
-  const Y_W = 28
-  const PAD_R = 22
-  const PAD_T = 16
-  const PAD_B = 14
-  const chartW = W - Y_W - PAD_R
-  const chartH = H - PAD_T - PAD_B
-  const fillBottom = PAD_T + chartH
-
-  const gridLines = Array.from({ length: 4 }, (_, i) => {
-    const frac = i / 3
-    return { y: PAD_T + chartH - frac * chartH, val: frac * max }
-  })
-
-  const xs = points.map((_, i) =>
-    Y_W + (i / Math.max(points.length - 1, 1)) * chartW
-  )
-  const ys = points.map((p) => {
-    const v = Math.max(0, p.value)
-    return PAD_T + chartH - (v / max) * chartH
-  })
-
-  function smooth(pts: number[][]): string {
-    if (pts.length < 2) return pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0]},${p[1]}`).join(' ')
-    const clampY = (y: number) => Math.max(PAD_T, Math.min(fillBottom, y))
-    let d = `M${pts[0][0]},${pts[0][1]}`
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[Math.max(i - 1, 0)]
-      const p1 = pts[i]
-      const p2 = pts[i + 1]
-      const p3 = pts[Math.min(i + 2, pts.length - 1)]
-      const cp1x = p1[0] + (p2[0] - p0[0]) / 6
-      const cp1y = clampY(p1[1] + (p2[1] - p0[1]) / 6)
-      const cp2x = p2[0] - (p3[0] - p1[0]) / 6
-      const cp2y = clampY(p2[1] - (p3[1] - p1[1]) / 6)
-      d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2[0]},${p2[1]}`
-    }
-    return d
+// The old Cash Position card drew cash-in-bank, outstanding and overdue as one
+// stacked bar, as though they were parts of a whole. They are not: the first is
+// an asset you have and the other two are money you are owed, so the bar's total
+// meant nothing. Runway is the question that cash actually answers.
+function CashAndRunway({ balance, burn, runway }: { balance: number | null; burn: number; runway: number | null }) {
+  if (balance == null) {
+    return <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>No bank account connected in Xero.</p>
   }
 
-  const linePath = smooth(xs.map((x, i) => [x, ys[i]]))
-  const fillPath = `${linePath} L${xs[xs.length - 1]},${fillBottom} L${xs[0]},${fillBottom} Z`
-
-  // Precompute bezier control points for each segment (matches smooth() exactly)
-  const clampY = (y: number) => Math.max(PAD_T, Math.min(fillBottom, y))
-  const bezierSegs = xs.length >= 2 ? Array.from({ length: xs.length - 1 }, (_, i) => {
-    const p0 = [xs[Math.max(i - 1, 0)], ys[Math.max(i - 1, 0)]]
-    const p1 = [xs[i], ys[i]]
-    const p2 = [xs[i + 1], ys[i + 1]]
-    const p3 = [xs[Math.min(i + 2, xs.length - 1)], ys[Math.min(i + 2, xs.length - 1)]]
-    return {
-      x1: p1[0], y1: p1[1],
-      cx1: p1[0] + (p2[0] - p0[0]) / 6,
-      cy1: clampY(p1[1] + (p2[1] - p0[1]) / 6),
-      cx2: p2[0] - (p3[0] - p1[0]) / 6,
-      cy2: clampY(p2[1] - (p3[1] - p1[1]) / 6),
-      x2: p2[0], y2: p2[1],
-    }
-  }) : []
-
-  function evalBezier(seg: (typeof bezierSegs)[0], t: number) {
-    const mt = 1 - t
-    return {
-      x: mt*mt*mt*seg.x1 + 3*mt*mt*t*seg.cx1 + 3*mt*t*t*seg.cx2 + t*t*t*seg.x2,
-      y: mt*mt*mt*seg.y1 + 3*mt*mt*t*seg.cy1 + 3*mt*t*t*seg.cy2 + t*t*t*seg.y2,
-    }
-  }
-
-  function handleMouseMove(e: React.MouseEvent) {
-    if (!svgRef.current || xs.length < 2) return
-    const rect = svgRef.current.getBoundingClientRect()
-    const svgX = ((e.clientX - rect.left) / rect.width) * W
-    const clamped = Math.max(xs[0], Math.min(xs[xs.length - 1], svgX))
-
-    // Find segment
-    let segIdx = xs.length - 2
-    for (let i = 0; i < xs.length - 1; i++) {
-      if (clamped <= xs[i + 1]) { segIdx = i; break }
-    }
-
-    // Binary search for t where bezier x ≈ clamped (follows the actual curve)
-    const seg = bezierSegs[segIdx]
-    let lo = 0, hi = 1
-    for (let k = 0; k < 50; k++) {
-      const mid = (lo + hi) / 2
-      if (evalBezier(seg, mid).x < clamped) lo = mid
-      else hi = mid
-    }
-    const interpY = evalBezier(seg, (lo + hi) / 2).y
-
-    const nearestIdx = xs.reduce((best, x, i) =>
-      Math.abs(x - clamped) < Math.abs(xs[best] - clamped) ? i : best, 0)
-
-    setIndicator({ x: clamped, y: interpY, nearestIdx })
-  }
-
-  const tipValue = indicator != null ? points[indicator.nearestIdx]?.value ?? 0 : 0
-  const tipX = indicator ? Math.max(Y_W + 2, Math.min(indicator.x - 15, W - PAD_R - 32)) : 0
-  const tipY = indicator ? Math.max(PAD_T + 2, indicator.y - 15) : 0
+  const tone = runway == null ? 'var(--text-primary)' : runway < 3 ? 'var(--danger)' : runway < 6 ? 'var(--warning)' : 'var(--success)'
+  // Twelve months is "comfortable" — the meter is a ratio against that, capped.
+  const pct = runway == null ? 0 : Math.min(100, (runway / 12) * 100)
 
   return (
-    <svg
-      ref={svgRef}
-      viewBox={`0 0 ${W} ${H}`}
-      style={{ width: '100%', height: 'auto', display: 'block', marginTop: 4, overflow: 'hidden' }}
-    >
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-        <clipPath id={clipId}>
-          <rect x={Y_W} y={PAD_T - 1} width={chartW} height={chartH + 2} />
-        </clipPath>
-      </defs>
-
-      {/* Y-labels + grid lines */}
-      {gridLines.map((gl, i) => (
-        <g key={i}>
-          <text x={0} y={gl.y + 3} textAnchor="start" fill="var(--text-tertiary)" fontSize="6.5" style={{ fontFamily: 'inherit' }}>
-            {fmtShort(gl.val)}
-          </text>
-          <line x1={Y_W} y1={gl.y} x2={W - PAD_R} y2={gl.y} stroke="var(--bg-border)" strokeWidth="0.5" opacity="0.5" />
-        </g>
-      ))}
-
-      {/* Clipped fill + line */}
-      <g clipPath={`url(#${clipId})`}>
-        <path d={fillPath} fill={`url(#${gradId})`} />
-        <path d={linePath} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-      </g>
-
-      {/* X-axis labels */}
-      {xs.map((x, i) => (
-        <text
-          key={i} x={x} y={H - 2} textAnchor="middle"
-          fill={indicator?.nearestIdx === i ? color : 'var(--text-tertiary)'}
-          fontSize="6.5" style={{ fontFamily: 'inherit', transition: 'fill 120ms' }}
+    <div>
+      <p style={{ fontSize: 32, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-primary)', margin: 0 }}>
+        {fmtBig(balance)}
+      </p>
+      <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '6px 0 14px' }}>
+        {burn > 0 && runway != null ? (
+          <>
+            At {fmtBig(Math.round(burn))} a month of spending, that is{' '}
+            <span style={{ color: tone, fontWeight: 600 }}>{runway} month{runway === 1 ? '' : 's'}</span> of runway.
+          </>
+        ) : (
+          'Not enough spending history yet to work out runway.'
+        )}
+      </p>
+      {runway != null && (
+        <div
+          role="meter"
+          aria-valuenow={runway}
+          aria-valuemin={0}
+          aria-valuemax={12}
+          aria-label="Months of runway, against twelve"
+          style={{ height: 8, borderRadius: 999, background: 'color-mix(in srgb, var(--accent) 14%, transparent)', overflow: 'hidden' }}
         >
-          {points[i].label}
-        </text>
-      ))}
-
-      {/* Sliding indicator — rendered above everything */}
-      {indicator && (
-        <>
-          <line
-            x1={indicator.x} y1={PAD_T} x2={indicator.x} y2={fillBottom}
-            stroke="var(--bg-border)" strokeWidth="0.8"
-          />
-          <circle cx={indicator.x} cy={indicator.y} r={3} fill={color} />
-          <rect x={tipX} y={tipY} width={32} height={11} rx={3}
-            fill="var(--bg-elevated)" stroke="var(--bg-border)" strokeWidth="0.5" />
-          <text
-            x={tipX + 16} y={tipY + 7.5}
-            fill="var(--text-primary)" fontSize="7" fontWeight="600" textAnchor="middle"
-            style={{ fontFamily: 'inherit' }}
-          >
-            {fmtShort(tipValue)}
-          </text>
-        </>
+          <div style={{ width: `${pct}%`, height: '100%', background: tone, borderRadius: 999 }} />
+        </div>
       )}
-
-      {/* Full-width invisible overlay for continuous mouse tracking */}
-      <rect
-        x={Y_W} y={PAD_T} width={chartW} height={chartH + PAD_B}
-        fill="transparent"
-        style={{ cursor: 'crosshair' }}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={() => setIndicator(null)}
-      />
-    </svg>
-  )
-}
-
-// ─── Bar chart (compact — for narrow cards) ───────────────────────────────────
-
-function BarChart({
-  points,
-  color = 'var(--accent)',
-  colorBySign = false,
-}: {
-  points: { label: string; value: number }[]
-  color?: string
-  colorBySign?: boolean
-}) {
-  const [hover, setHover] = useState<number | null>(null)
-  const W = 300; const H = 82
-  const PAD_T = 8; const PAD_B = 16; const PAD_LR = 3
-  const chartW = W - PAD_LR * 2
-  const chartH = H - PAD_T - PAD_B
-
-  const max = Math.max(...points.map((p) => Math.abs(p.value)), 1)
-  const hasNeg = colorBySign && points.some((p) => p.value < 0)
-  const halfH = chartH / 2
-  const zeroY = hasNeg ? PAD_T + halfH : PAD_T + chartH
-  const slot = chartW / points.length
-  const barW = Math.max(3, slot * 0.55)
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block', marginTop: 4 }}>
-      {/* Zero / baseline rule */}
-      <line x1={PAD_LR} y1={zeroY} x2={W - PAD_LR} y2={zeroY}
-        stroke="var(--bg-border)" strokeWidth="0.6" opacity="0.7" />
-
-      {points.map((p, i) => {
-        const cx = PAD_LR + slot * i + slot / 2
-        const x = cx - barW / 2
-        const pct = Math.abs(p.value) / max
-        const rawH = Math.max(2, pct * (hasNeg ? halfH - 1 : chartH - 2))
-        const isPos = p.value >= 0
-        const barY = isPos ? zeroY - rawH : zeroY
-        const barColor = colorBySign
-          ? (p.value > 0 ? 'var(--success)' : p.value < 0 ? 'var(--danger)' : 'var(--bg-border)')
-          : color
-        const tipY = isPos ? barY - 13 : barY + rawH + 2
-
-        return (
-          <g key={i}
-            onMouseEnter={() => setHover(i)}
-            onMouseLeave={() => setHover(null)}
-            style={{ cursor: 'default' }}
-          >
-            <rect x={x} y={barY} width={barW} height={rawH} rx={2}
-              fill={hover === i ? barColor : `color-mix(in srgb, ${barColor} 70%, transparent)`}
-              style={{ transition: 'fill 120ms' }}
-            />
-            {hover === i && (
-              <>
-                <rect
-                  x={Math.max(PAD_LR, Math.min(cx - 16, W - PAD_LR - 34))}
-                  y={tipY} width={34} height={11} rx={3}
-                  fill="var(--bg-elevated)" stroke="var(--bg-border)" strokeWidth="0.5"
-                />
-                <text
-                  x={Math.max(PAD_LR, Math.min(cx - 16, W - PAD_LR - 34)) + 17}
-                  y={tipY + 7.5}
-                  fill="var(--text-primary)" fontSize="7.5" fontWeight="600" textAnchor="middle"
-                  style={{ fontFamily: 'inherit' }}
-                >
-                  {fmtShort(Math.abs(p.value))}
-                </text>
-              </>
-            )}
-            <text x={cx} y={H - 2}
-              textAnchor="middle" fill="var(--text-tertiary)" fontSize="8.5"
-              style={{ fontFamily: 'inherit' }}>
-              {p.label}
-            </text>
-          </g>
-        )
-      })}
-    </svg>
-  )
-}
-
-// ─── Cash position (bank balance card) ───────────────────────────────────────
-
-function CashPosition({
-  balance,
-  outstanding,
-  overdue,
-}: {
-  balance: number | null
-  outstanding: number
-  overdue: number
-}) {
-  const cash = balance ?? 0
-  const nonOverdue = Math.max(0, outstanding - overdue)
-  const total = Math.max(cash + outstanding, 1)
-
-  const segments = [
-    { label: 'Cash in bank', value: cash, color: 'var(--accent)' },
-    { label: 'Due (not overdue)', value: nonOverdue, color: 'var(--warning)' },
-    { label: 'Overdue', value: overdue, color: 'var(--danger)' },
-  ]
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
-      {/* Segmented bar */}
-      <div style={{ height: 8, borderRadius: 4, overflow: 'hidden', display: 'flex', background: 'var(--bg-elevated)' }}>
-        {segments.map(({ value, color }) => value > 0 && (
-          <div key={color} style={{
-            width: `${(value / total) * 100}%`,
-            background: color,
-            transition: 'width 300ms',
-          }} />
-        ))}
-      </div>
-      {/* Legend */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-        {segments.map(({ label, value, color }) => (
-          <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
-              <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{label}</span>
-            </div>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
-              {value === 0 && balance === null && label === 'Cash in bank' ? '—' : fmtShort(value)}
-            </span>
-          </div>
-        ))}
-      </div>
     </div>
   )
 }
 
-// ─── Donut chart ──────────────────────────────────────────────────────────────
+// ─── Top clients ──────────────────────────────────────────────────────────────
 
-function Donut({ segments, centre }: {
-  segments: { label: string; value: number; color: string }[]
-  centre: string
-}) {
-  const [hover, setHover] = useState<number | null>(null)
-  const total = segments.reduce((s, x) => s + x.value, 0) || 1
-  const R = 42; const CX = 54; const CY = 54; const CIRC = 2 * Math.PI * R
-  // Each arc starts where the previous one ended. Accumulated through reduce
-  // rather than by mutating a `let` inside map — same result, and it does not
-  // reassign a render-scoped variable from inside a callback.
-  const arcs = segments.reduce<{ label: string; value: number; color: string; dash: number; gap: number; offset: number }[]>(
-    (acc, s) => {
-      const dash = (s.value / total) * CIRC
-      const consumed = acc.reduce((sum, a) => sum + a.dash, 0)
-      acc.push({ ...s, dash, gap: CIRC - dash, offset: -consumed })
-      return acc
-    },
-    []
-  )
+// Nominal categories, so every bar takes the same hue. Colouring them by value
+// would spend the identity channel re-encoding what bar length already shows.
+function TopClients({ clients }: { clients: { name: string; total: number }[] }) {
+  if (clients.length === 0) {
+    return <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>No paid invoices in this period.</p>
+  }
+  const max = Math.max(...clients.map((c) => c.total))
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-      <svg width="108" height="108" viewBox="0 0 108 108">
-        <circle cx={CX} cy={CY} r={R} fill="none" stroke="var(--bg-elevated)" strokeWidth="13" />
-        {arcs.map((arc, i) => arc.dash > 0 && (
-          <circle key={i} cx={CX} cy={CY} r={R} fill="none"
-            stroke={arc.color} strokeWidth={hover === i ? 15 : 12}
-            strokeDasharray={`${arc.dash} ${arc.gap}`}
-            strokeDashoffset={arc.offset}
-            style={{
-              transform: 'rotate(-90deg)', transformOrigin: `${CX}px ${CY}px`,
-              opacity: hover !== null && hover !== i ? 0.4 : 1,
-              transition: 'stroke-width 120ms, opacity 120ms', cursor: 'default',
-            }}
-            onMouseEnter={() => setHover(i)}
-            onMouseLeave={() => setHover(null)}
-          />
-        ))}
-        <text x={CX} y={CY - 4} textAnchor="middle" fill="var(--text-primary)"
-          fontSize="15" fontWeight="700" style={{ fontFamily: 'inherit' }}>{centre}</text>
-        <text x={CX} y={CY + 12} textAnchor="middle" fill="var(--text-tertiary)"
-          fontSize="9" style={{ fontFamily: 'inherit' }}>collected</text>
-      </svg>
-      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {segments.map((s, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
-            opacity: hover !== null && hover !== i ? 0.35 : 1, transition: 'opacity 120ms', cursor: 'default' }}
-            onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, display: 'inline-block', flexShrink: 0 }} />
-              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{s.label}</span>
-            </div>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
-              {fmtShort(s.value)}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {clients.map((c) => (
+        <div key={c.name}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 5 }}>
+            <span style={{ fontSize: 13, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {c.name}
+            </span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+              {fmtBig(c.total)}
             </span>
           </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ─── Horizontal client bars ───────────────────────────────────────────────────
-
-function ClientBars({ clients }: { clients: { name: string; total: number }[] }) {
-  const max = Math.max(...clients.map((c) => c.total), 1)
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-      {clients.map((c, i) => (
-        <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-            <span style={{ color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0, marginRight: 8 }}>{c.name}</span>
-            <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{fmtShort(c.total)}</span>
-          </div>
-          <div style={{ height: 5, borderRadius: 3, background: 'var(--bg-elevated)', overflow: 'hidden' }}>
-            <div style={{
-              height: '100%',
-              width: `${(c.total / max) * 100}%`,
-              background: i === 0 ? 'var(--accent)' : `color-mix(in srgb, var(--accent) ${85 - i * 13}%, transparent)`,
-              borderRadius: 3,
-            }} />
+          <div style={{ height: 8, borderRadius: 4, background: 'var(--bg-elevated)' }}>
+            <div style={{ width: `${(c.total / max) * 100}%`, height: '100%', borderRadius: 4, background: 'var(--chart-in)' }} />
           </div>
         </div>
       ))}
     </div>
   )
 }
-
-// ─── Transactions table ───────────────────────────────────────────────────────
 
 function fmtTxDate(iso: string) {
   const [y, m, d] = iso.split('-')
@@ -561,8 +513,11 @@ const TX_PAGE = 15
 
 function TxTable({ txs }: { txs: XeroTransaction[] }) {
   const [visible, setVisible] = useState(TX_PAGE)
-  const totalIn = txs.filter((t) => t.type === 'in').reduce((s, t) => s + t.amount, 0)
-  const totalOut = txs.filter((t) => t.type === 'out').reduce((s, t) => s + t.amount, 0)
+  // PAID only, matching every figure above. These totals used to count every
+  // status, so the header said one thing and the hero said another about the
+  // same period — the fastest way to make a reader distrust the whole page.
+  const totalIn = txs.filter((t) => t.type === 'in' && t.status === 'PAID').reduce((s, t) => s + t.amount, 0)
+  const totalOut = txs.filter((t) => t.type === 'out' && t.status === 'PAID').reduce((s, t) => s + t.amount, 0)
   const shown = txs.slice(0, visible)
 
   return (
@@ -655,43 +610,46 @@ export default function FinanceDashboard({
   retainerInvoiceDay?: number
 }) {
   const [period, setPeriod] = useState<Period>('year')
-  const { label: rangeLabel } = periodRange(period)
+  const [asTable, setAsTable] = useState(false)
+  const { label: rangeLabel, start: periodStart } = periodRange(period)
 
   const filtered = useMemo(() => filterTx(transactions, period), [transactions, period])
 
-  // Chart data — all three respond to period filter
-  const revenuePoints = useMemo(() => groupByPeriod(transactions, period, 'in'), [transactions, period])
-  const netPoints = useMemo(() => groupByPeriod(transactions, period, 'net'), [transactions, period])
-  const expPoints = useMemo(() => groupByPeriod(transactions, period, 'out'), [transactions, period])
+  const today = new Date().toISOString().slice(0, 10)
+  const current = useMemo(() => totalsFor(transactions, periodStart, today), [transactions, periodStart, today])
+  const previous = useMemo(() => {
+    const { start, end } = previousRange(period)
+    return totalsFor(transactions, start, end)
+  }, [transactions, period])
 
-  // Totals
-  const totalIn = filtered.filter((t) => t.type === 'in' && t.status === 'PAID').reduce((s, t) => s + t.amount, 0)
-  const totalOut = filtered.filter((t) => t.type === 'out' && t.status === 'PAID').reduce((s, t) => s + t.amount, 0)
-  const netProfit = totalIn - totalOut
+  const inPoints = useMemo(() => groupByPeriod(filtered, period, 'in'), [filtered, period])
+  const outPoints = useMemo(() => groupByPeriod(filtered, period, 'out'), [filtered, period])
 
-  // Top clients
+  const chartLabels = inPoints.map((p) => p.label)
+  const chartSeries: Series[] = [
+    { key: 'in', label: 'In', color: 'var(--chart-in)', points: inPoints.map((p) => p.value) },
+    { key: 'out', label: 'Out', color: 'var(--chart-out)', points: outPoints.map((p) => p.value) },
+  ]
+
   const topClients = useMemo(() => {
-    const map: Record<string, number> = {}
-    filtered.filter((t) => t.type === 'in' && t.status === 'PAID').forEach((t) => { map[t.description] = (map[t.description] ?? 0) + t.amount })
-    return Object.entries(map).map(([name, total]) => ({ name, total: Math.round(total) })).sort((a, b) => b.total - a.total).slice(0, 6)
+    const totals = new Map<string, number>()
+    for (const t of filtered) {
+      if (t.type !== 'in' || t.status !== 'PAID') continue
+      totals.set(t.description, (totals.get(t.description) ?? 0) + t.amount)
+    }
+    return [...totals.entries()]
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5)
   }, [filtered])
 
-  // Invoice health (all time, from summary)
-  const paidTotal = Math.round(transactions.filter((t) => t.type === 'in' && t.status === 'PAID').reduce((s, t) => s + t.amount, 0))
-  const outstandingTotal = summary.outstanding_invoices_nzd
-  const overdueTotal = summary.overdue_invoices_nzd
-  const grandTotal = paidTotal + outstandingTotal + overdueTotal || 1
-  const collectedPct = `${Math.round((paidTotal / grandTotal) * 100)}%`
-
-  // Key metrics
-  const allPaidIn = transactions.filter((t) => t.type === 'in' && t.status === 'PAID')
-  const avgInvoice = allPaidIn.length > 0 ? Math.round(allPaidIn.reduce((s, t) => s + t.amount, 0) / allPaidIn.length) : 0
-
-  // Runway = bank balance ÷ avg monthly burn (last 3 completed months)
+  // Burn is measured over whole past months only — the current month is
+  // partial, and including it drags the average down and flatters runway.
   const avgMonthlyBurn = useMemo(() => {
     const now = new Date()
-    let total = 0; let months = 0
-    for (let i = 1; i <= 3; i++) {
+    let total = 0
+    let months = 0
+    for (let i = 1; i <= 6; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       const spend = transactions
@@ -701,24 +659,19 @@ export default function FinanceDashboard({
     }
     return months > 0 ? total / months : 0
   }, [transactions])
+
   const runwayMonths = summary.bank_balance_nzd != null && avgMonthlyBurn > 0
     ? Math.floor(summary.bank_balance_nzd / avgMonthlyBurn)
     : null
 
-  const PERIODS: { key: Period; label: string }[] = [
-    { key: 'week', label: 'Week' },
-    { key: 'month', label: 'Month' },
-    { key: 'year', label: 'Year' },
-  ]
-
-  // Retainer invoice day reminder
   const todayDay = new Date().getDate()
   const showRetainerReminder = retainerInvoiceDay != null && todayDay === retainerInvoiceDay
+
+  const losing = current.net < 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-      {/* Retainer invoice reminder banner */}
       {showRetainerReminder && (
         <div style={{ padding: '10px 16px', borderRadius: 10, background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: '1px solid var(--accent)' }}>
           <p style={{ fontSize: 13, color: 'var(--text-primary)', margin: 0 }}>
@@ -727,94 +680,102 @@ export default function FinanceDashboard({
         </div>
       )}
 
-      {/* Header + period filter */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <div>
-          <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em', margin: 0 }}>Finance</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-            Live data from {summary.org_name ?? 'Xero'}.
-          </p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Period buttons */}
-          <div style={{ display: 'flex', gap: 6 }}>
-            {PERIODS.map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setPeriod(key)}
-                className={period === key ? 'btn-primary' : 'btn-secondary'}
-                style={{ fontSize: 12 }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          {/* Date range */}
-          <div className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'default' }}>
-            <Calendar style={{ width: 13, height: 13, color: 'var(--accent)', flexShrink: 0 }} />
-            {rangeLabel}
-          </div>
-        </div>
+      {/* Header */}
+      <div>
+        <h1 className="page-title">Finance</h1>
+        <p className="page-subtitle">
+          Live from {summary.org_name ?? 'Xero'}. For who owes what, see{' '}
+          <Link href="/dashboard/money" style={{ color: 'var(--accent)' }}>Money</Link>.
+        </p>
       </div>
 
-      {/* Row 1 — wide revenue chart */}
-      <Card title="Revenue" metric={fmtBig(Math.round(totalIn))} wide>
-        <AreaChart points={revenuePoints} color="var(--accent)" />
-      </Card>
+      {/* The hero, and deliberately not in a card. It is the page's answer, not
+          one tile among several — a box around it made it compete with the
+          chart instead of introducing it.
 
-      {/* Row 2 — 3 cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card title="Net Profit" metric={fmtBig(Math.round(netProfit))}>
-          <BarChart points={netPoints} colorBySign />
-        </Card>
-        <Card title="Expenses" metric={fmtBig(Math.round(totalOut))}>
-          <BarChart points={expPoints} color="var(--danger)" />
-        </Card>
-        <Card title="Cash Position" metric={summary.bank_balance_nzd == null ? '—' : fmtBig(summary.bank_balance_nzd)}>
-          <CashPosition
-            balance={summary.bank_balance_nzd}
-            outstanding={summary.outstanding_invoices_nzd}
-            overdue={summary.overdue_invoices_nzd}
-          />
-        </Card>
-      </div>
+          Money in and money out used to be repeated here as well as on the
+          chart below, one directly above the other. The chart owns them now. */}
+      <section>
+        <p className="label" style={{ marginBottom: 6 }}>
+          {losing ? 'Net loss' : 'Net profit'} · {period === 'week' ? 'this week' : period === 'month' ? 'this month' : 'this year'}
+        </p>
+        <p className="finance-hero" style={{ color: losing ? 'var(--danger)' : 'var(--text-primary)' }}>
+          {fmtBig(Math.round(current.net))}
+        </p>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '10px 0 0' }}>
+          <Delta now={current.net} before={previous.net} against={PERIOD_NOUN[period]} />
+          {losing && ' · you are spending more than you are bringing in'}
+        </p>
+        <p style={{ fontSize: 12, color: 'var(--text-tertiary)', margin: '4px 0 0' }}>
+          Money that has actually moved. Invoices raised but not yet paid are on{' '}
+          <Link href="/dashboard/money" style={{ color: 'var(--accent)' }}>Money</Link>.
+        </p>
+      </section>
 
-      {/* Row 3 — 3 cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card title="Invoice Health">
-          <Donut
-            centre={collectedPct}
-            segments={[
-              { label: 'Collected', value: paidTotal, color: 'var(--success)' },
-              { label: 'Outstanding', value: outstandingTotal, color: 'var(--accent)' },
-              { label: 'Overdue', value: overdueTotal, color: 'var(--danger)' },
-            ]}
-          />
-        </Card>
-        <Card title="Top Clients">
-          {topClients.length > 0
-            ? <ClientBars clients={topClients} />
-            : <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>No paid invoices in this period.</p>
-          }
-        </Card>
-        <Card title="Key Metrics">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 8px', marginTop: 4 }}>
+      {/* The chart is the page's centrepiece, so it sits ON the page rather
+          than inside a card. Its own figures carry the legend — a coloured key
+          beside the number the reader is already looking at beats a legend box
+          off to one side. */}
+      <section className="flow-block">
+        <div className="flow-head">
+          <div className="flow-figures">
             {[
-              { label: 'Avg Invoice', value: fmtShort(avgInvoice), color: undefined },
-              { label: 'Runway', value: runwayMonths != null ? `${runwayMonths}mo` : '—', color: runwayMonths != null && runwayMonths < 3 ? 'var(--danger)' : runwayMonths != null && runwayMonths < 6 ? 'var(--warning)' : undefined },
-              { label: 'Outstanding', value: fmtShort(outstandingTotal), color: undefined },
-              { label: 'Overdue', value: fmtShort(overdueTotal), color: overdueTotal > 0 ? 'var(--danger)' : undefined },
-            ].map(({ label, value, color }) => (
-              <div key={label}>
-                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', marginBottom: 2 }}>{label}</div>
-                <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', color: color ?? 'var(--text-primary)' }}>{value}</div>
+              { key: 'in', label: 'Money in', value: current.inc, prev: previous.inc, color: 'var(--chart-in)', goodWhenUp: true },
+              { key: 'out', label: 'Money out', value: current.out, prev: previous.out, color: 'var(--chart-out)', goodWhenUp: false },
+            ].map((f) => (
+              <div key={f.key}>
+                <p className="flow-figure-label">
+                  <span className="flow-key" style={{ background: f.color }} />
+                  {f.label}
+                </p>
+                <p className="flow-figure-value">
+                  {fmtBig(Math.round(f.value))}
+                  <DeltaPill now={f.value} before={f.prev} goodWhenUp={f.goodWhenUp} />
+                </p>
               </div>
             ))}
           </div>
-        </Card>
+
+          <div className="flow-controls">
+            <CustomSelect
+              value={period}
+              onChange={(v) => setPeriod(v as Period)}
+              options={[
+                { value: 'week', label: 'Last 7 days' },
+                { value: 'month', label: 'This month' },
+                { value: 'year', label: 'This year' },
+              ]}
+              className="flow-range"
+            />
+            <button className="btn-secondary btn-sm" onClick={() => setAsTable((v) => !v)}>
+              {asTable ? 'Show chart' : 'Show table'}
+            </button>
+          </div>
+        </div>
+
+        {asTable ? (
+          <FlowTable labels={chartLabels} series={chartSeries} />
+        ) : (
+          <FlowChart labels={chartLabels} series={chartSeries} />
+        )}
+
+        <p className="flow-caption">
+          Live from Xero · {rangeLabel}
+          {inPoints.length > 0 && ` · ${inPoints[inPoints.length - 1].label} is still in progress`}
+        </p>
+      </section>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="card">
+          <p className="label" style={{ marginBottom: 10 }}>Cash and runway</p>
+          <CashAndRunway balance={summary.bank_balance_nzd} burn={avgMonthlyBurn} runway={runwayMonths} />
+        </div>
+        <div className="card">
+          <p className="label" style={{ marginBottom: 14 }}>Who paid the most</p>
+          <TopClients clients={topClients} />
+        </div>
       </div>
 
-      {/* Transactions table */}
       <TxTable txs={filtered} />
     </div>
   )

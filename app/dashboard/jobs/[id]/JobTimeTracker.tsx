@@ -340,7 +340,7 @@ export default function JobTimeTracker({
       {/* Manual Entry Toggle */}
       <div className="mb-4">
         {!manualOpen ? (
-          <button onClick={() => setManualOpen(true)} className="btn-secondary text-sm flex items-center gap-2">
+          <button onClick={() => setManualOpen(true)} className="btn-secondary btn-sm flex items-center gap-2">
             <Plus className="w-3.5 h-3.5" /> Log time manually
           </button>
         ) : (
@@ -499,8 +499,8 @@ function EntryRow({
         </div>
         <input value={editDescription} onChange={(ev) => onEditDescription(ev.target.value)} placeholder="Description" className="field-input text-sm mb-2" />
         <div className="flex justify-end gap-2">
-          <button onClick={onCancelEdit} className="btn-secondary text-sm flex items-center gap-1"><X className="w-3.5 h-3.5" /> Cancel</button>
-          <button onClick={onSaveEdit} className="btn-primary text-sm flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Save</button>
+          <button onClick={onCancelEdit} className="btn-secondary btn-sm flex items-center gap-1"><X className="w-3.5 h-3.5" /> Cancel</button>
+          <button onClick={onSaveEdit} className="btn-primary btn-sm flex items-center gap-1"><Check className="w-3.5 h-3.5" /> Save</button>
         </div>
       </div>
     )

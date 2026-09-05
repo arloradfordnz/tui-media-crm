@@ -11,7 +11,7 @@ function NotConnected({ error }: { error?: string }) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
       <img src="/Xero_software_logo.svg.png" alt="Xero" width={120} height={120} className="mb-6" style={{ objectFit: 'contain' }} />
-      <h1 className="text-2xl font-semibold mb-2" style={{ letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+      <h1 className="page-title mb-2">
         Financial Dashboard
       </h1>
       <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>

@@ -60,7 +60,7 @@ export default function NewJobPage() {
         <ArrowLeft className="w-4 h-4" /> Back to Jobs
       </Link>
 
-      <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>New Job</h1>
+      <h1 className="page-title">New Job</h1>
 
       {/* Step indicator */}
       <div className="flex gap-2 mb-8">

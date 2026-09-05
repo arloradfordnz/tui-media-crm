@@ -27,7 +27,7 @@ export default function NewClientPage() {
         <ArrowLeft className="w-4 h-4" /> Back to Clients
       </Link>
 
-      <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>New Client</h1>
+      <h1 className="page-title">New Client</h1>
 
       <form action={action} className="card space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

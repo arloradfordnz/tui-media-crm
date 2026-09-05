@@ -218,7 +218,7 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>{client.name}</h1>
+          <h1 className="page-title">{client.name}</h1>
           {client.contactPerson && (
             <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>Contact: {client.contactPerson}</p>
           )}
@@ -230,7 +230,7 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
         </div>
         <div className="flex items-center gap-3">
           {portalLink && (
-            <button onClick={copyPortalLink} className="btn-secondary text-sm">
+            <button onClick={copyPortalLink} className="btn-secondary btn-sm">
               {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
               {copied ? 'Copied!' : 'Copy Client Portal Link'}
             </button>
@@ -430,7 +430,7 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
         <div className="card">
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Client Documents</p>
-            <Link href={`/dashboard/documents?clientId=${client.id}`} className="btn-primary text-sm">
+            <Link href={`/dashboard/documents?clientId=${client.id}`} className="btn-primary btn-sm">
               <FileText className="w-3.5 h-3.5" /> Create Document
             </Link>
           </div>

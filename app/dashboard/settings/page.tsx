@@ -18,7 +18,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="page-header" style={{ marginBottom: 0 }}>
+      <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Settings</h1>
         </div>

@@ -265,7 +265,7 @@ export default function JobRecord({ job }: { job: JobData }) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>{stripJobPrefix(job.name)}</h1>
+          <h1 className="page-title">{stripJobPrefix(job.name)}</h1>
           <div className="flex items-center gap-4 mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
             <Link href={`/dashboard/clients/${job.client.id}`} style={{ color: 'var(--accent)' }}>{job.client.name}</Link>
             {job.shootDate && <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {formatDate(job.shootDate)}</span>}
@@ -400,7 +400,7 @@ export default function JobRecord({ job }: { job: JobData }) {
                           autoFocus
                           onKeyDown={(e) => { if (e.key === 'Enter') handleEditDeliverable(d.id); if (e.key === 'Escape') setEditingDeliverable(null) }}
                         />
-                        <button onClick={() => handleEditDeliverable(d.id)} className="btn-primary text-xs" style={{ padding: '6px 12px' }}>Save</button>
+                        <button onClick={() => handleEditDeliverable(d.id)} className="btn-primary btn-xs">Save</button>
                         <button onClick={() => setEditingDeliverable(null)} className="btn-icon"><X className="w-4 h-4" /></button>
                       </div>
                     ) : (
@@ -480,7 +480,7 @@ export default function JobRecord({ job }: { job: JobData }) {
               className="field-input text-sm flex-1"
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddDeliverable() } }}
             />
-            <button onClick={handleAddDeliverable} disabled={!newDeliverableTitle.trim()} className="btn-primary text-sm">
+            <button onClick={handleAddDeliverable} disabled={!newDeliverableTitle.trim()} className="btn-primary btn-sm">
               <Plus className="w-3.5 h-3.5" /> Add
             </button>
           </div>
@@ -541,7 +541,7 @@ export default function JobRecord({ job }: { job: JobData }) {
                       {p.respondedAt && ` · Responded ${formatDate(p.respondedAt)}`}
                     </p>
                   </div>
-                  <Link href={`/dashboard/jobs/${job.id}/proposal/${p.id}`} className="btn-secondary text-sm">
+                  <Link href={`/dashboard/jobs/${job.id}/proposal/${p.id}`} className="btn-secondary btn-sm">
                     <FileText className="w-3.5 h-3.5" /> {p.status === 'draft' ? 'Edit Proposal' : 'View Proposal'}
                   </Link>
                 </div>
@@ -551,7 +551,7 @@ export default function JobRecord({ job }: { job: JobData }) {
             <div className="flex items-center justify-between">
               <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No proposal created yet.</p>
               <form action={async () => { await createProposal(job.id) }}>
-                <button type="submit" className="btn-primary text-sm">
+                <button type="submit" className="btn-primary btn-sm">
                   <FileText className="w-3.5 h-3.5" /> Create Proposal
                 </button>
               </form>
@@ -660,19 +660,19 @@ function RevisionItem({ revision, jobId }: { revision: RevisionData; jobId: stri
             />
           )}
           <div className="flex items-center gap-2 flex-wrap">
-            <button type="button" disabled={busy !== null} onClick={() => respond('accepted')} className="btn-primary text-xs" style={{ padding: '6px 14px' }}>
+            <button type="button" disabled={busy !== null} onClick={() => respond('accepted')} className="btn-primary btn-xs">
               <CheckCheck className="w-3.5 h-3.5" /> {busy === 'accepted' ? 'Accepting...' : 'Accept'}
             </button>
-            <button type="button" disabled={busy !== null} onClick={() => respond('declined')} className="btn-secondary text-xs" style={{ padding: '6px 14px', color: 'var(--danger)' }}>
+            <button type="button" disabled={busy !== null} onClick={() => respond('declined')} className="btn-secondary btn-xs" style={{ color: 'var(--danger)' }}>
               <X className="w-3.5 h-3.5" /> {busy === 'declined' ? 'Declining...' : 'Decline'}
             </button>
             {!replyOpen ? (
-              <button type="button" disabled={busy !== null} onClick={() => setReplyOpen(true)} className="btn-secondary text-xs" style={{ padding: '6px 14px' }}>
+              <button type="button" disabled={busy !== null} onClick={() => setReplyOpen(true)} className="btn-secondary btn-xs">
                 <MessageSquare className="w-3.5 h-3.5" /> Reply
               </button>
             ) : (
               <>
-                <button type="button" disabled={busy !== null || !replyText.trim()} onClick={() => respond('reply')} className="btn-secondary text-xs" style={{ padding: '6px 14px' }}>
+                <button type="button" disabled={busy !== null || !replyText.trim()} onClick={() => respond('reply')} className="btn-secondary btn-xs">
                   <MessageSquare className="w-3.5 h-3.5" /> {busy === 'reply' ? 'Sending...' : 'Send reply only'}
                 </button>
                 <button type="button" disabled={busy !== null} onClick={() => { setReplyOpen(false); setReplyText('') }} className="btn-icon"><X className="w-3.5 h-3.5" /></button>
@@ -821,10 +821,10 @@ function DeliverableUploadForm({ deliverableId, uploading, progress, stage, onUp
         </div>
       )}
       <div className="flex gap-2">
-        <button type="submit" disabled={!file || uploading} className="btn-primary text-sm">
+        <button type="submit" disabled={!file || uploading} className="btn-primary btn-sm">
           <Upload className="w-3.5 h-3.5" /> {uploading ? 'Uploading...' : 'Upload'}
         </button>
-        <button type="button" disabled={uploading} onClick={() => { setExpanded(false); setFile(null) }} className="btn-secondary text-sm">Cancel</button>
+        <button type="button" disabled={uploading} onClick={() => { setExpanded(false); setFile(null) }} className="btn-secondary btn-sm">Cancel</button>
       </div>
     </form>
   )

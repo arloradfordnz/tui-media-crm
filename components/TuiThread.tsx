@@ -408,8 +408,7 @@ export default function TuiThread({
           <button
             type="submit"
             disabled={!input.trim() || loading}
-            className="btn-primary"
-            style={{ padding: '8px 10px', borderRadius: 999 }}
+            className="btn-primary btn-sm btn-round"
             aria-label="Send"
           >
             <ArrowUp className="w-4 h-4" />

@@ -27,10 +27,10 @@ export default function MoneyPage() {
     <div className="space-y-6">
       <div className="page-header">
         <div>
-          <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>Money</h1>
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Invoices raised and not yet paid.</p>
+          <h1 className="page-title">Money</h1>
+          <p className="page-subtitle">Invoices raised and not yet paid.</p>
         </div>
-        <Link href="/dashboard/finance" className="btn-secondary text-sm">
+        <Link href="/dashboard/finance" className="btn-secondary btn-sm">
           Revenue and trends <ArrowUpRight className="w-3.5 h-3.5" />
         </Link>
       </div>

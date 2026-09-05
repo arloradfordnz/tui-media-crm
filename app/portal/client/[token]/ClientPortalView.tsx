@@ -376,12 +376,12 @@ function FileCard({ file, jobId, portalToken, onApprove }: { file: DeliveryFile;
 
       <div className="flex gap-2 flex-wrap">
         {(file.downloadUrl || file.fileUrl) && (
-          <button onClick={handleDownload} className="btn-secondary text-sm">
+          <button onClick={handleDownload} className="btn-secondary btn-sm">
             <Download className="w-3.5 h-3.5" /> Download
           </button>
         )}
         {canApprove && (
-          <button onClick={() => onApprove(file.id, jobId)} className="btn-primary text-sm">
+          <button onClick={() => onApprove(file.id, jobId)} className="btn-primary btn-sm">
             <Check className="w-3.5 h-3.5" /> Approve
           </button>
         )}
@@ -436,7 +436,7 @@ function RevisionPanel({ deliverable, portalToken }: { deliverable: Deliverable;
       ) : remaining === 0 ? (
         <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>You&apos;ve used all {limit} included revision{limit !== 1 ? 's' : ''} for this deliverable. Get in touch if you need more.</p>
       ) : !open ? (
-        <button onClick={() => setOpen(true)} className="btn-secondary text-sm">
+        <button onClick={() => setOpen(true)} className="btn-secondary btn-sm">
           <MessageSquare className="w-3.5 h-3.5" /> Request changes
         </button>
       ) : (
@@ -455,10 +455,10 @@ function RevisionPanel({ deliverable, portalToken }: { deliverable: Deliverable;
           </div>
           {state?.error && <p className="text-sm" style={{ color: 'var(--danger)' }}>{state.error}</p>}
           <div className="flex gap-2">
-            <button type="submit" disabled={pending} className="btn-primary text-sm">
+            <button type="submit" disabled={pending} className="btn-primary btn-sm">
               {pending ? 'Sending...' : 'Send feedback'}
             </button>
-            <button type="button" onClick={() => setOpen(false)} className="btn-secondary text-sm">Cancel</button>
+            <button type="button" onClick={() => setOpen(false)} className="btn-secondary btn-sm">Cancel</button>
           </div>
         </form>
       )}
@@ -581,12 +581,12 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
         </button>
         <div className="flex items-center gap-2">
           {canSign && (
-            <button onClick={() => { setExpanded(true); setSigning(true) }} className="btn-primary text-sm">
+            <button onClick={() => { setExpanded(true); setSigning(true) }} className="btn-primary btn-sm">
               <PenLine className="w-3.5 h-3.5" /> Sign
             </button>
           )}
           {parsed && (
-            <button onClick={handleDownload} disabled={generating} className="btn-secondary text-sm">
+            <button onClick={handleDownload} disabled={generating} className="btn-secondary btn-sm">
               <Download className="w-3.5 h-3.5" /> {generating ? 'Generating...' : 'Download PDF'}
             </button>
           )}
@@ -660,7 +660,7 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
               )}
 
               {!feedbackOpen ? (
-                <button onClick={() => setFeedbackOpen(true)} className="btn-secondary text-sm">
+                <button onClick={() => setFeedbackOpen(true)} className="btn-secondary btn-sm">
                   <MessageSquare className="w-3.5 h-3.5" /> Leave feedback
                 </button>
               ) : (
@@ -679,10 +679,10 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
                   />
                   {fbState?.error && <p className="text-xs" style={{ color: 'var(--danger)' }}>{fbState.error}</p>}
                   <div className="flex gap-2">
-                    <button type="submit" disabled={fbPending || !feedbackInput.trim()} className="btn-primary text-sm">
+                    <button type="submit" disabled={fbPending || !feedbackInput.trim()} className="btn-primary btn-sm">
                       {fbPending ? 'Sending...' : 'Send feedback'}
                     </button>
-                    <button type="button" onClick={() => { setFeedbackOpen(false); setFeedbackInput('') }} className="btn-secondary text-sm">Cancel</button>
+                    <button type="button" onClick={() => { setFeedbackOpen(false); setFeedbackInput('') }} className="btn-secondary btn-sm">Cancel</button>
                   </div>
                 </form>
               )}
@@ -720,10 +720,10 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
                     <p className="text-xs" style={{ color: 'var(--danger)' }}>{signState.error}</p>
                   )}
                   <div className="flex gap-2">
-                    <button type="submit" disabled={signPending || !signatureInput.trim()} className="btn-primary text-sm">
+                    <button type="submit" disabled={signPending || !signatureInput.trim()} className="btn-primary btn-sm">
                       <Check className="w-3.5 h-3.5" /> {signPending ? 'Signing...' : 'Sign Document'}
                     </button>
-                    <button type="button" onClick={() => { setSigning(false); setSignatureInput('') }} className="btn-secondary text-sm">
+                    <button type="button" onClick={() => { setSigning(false); setSignatureInput('') }} className="btn-secondary btn-sm">
                       Cancel
                     </button>
                   </div>

@@ -98,7 +98,7 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold" style={{ letterSpacing: '-0.02em' }}>Proposal</h1>
+          <h1 className="page-title">Proposal</h1>
           <div className="flex items-center gap-3 mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
             <span>{proposal.job.name}</span>
             <span>&middot;</span>
@@ -108,7 +108,7 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
         <div className="flex items-center gap-3">
           <span className={`badge ${statusBadgeClass(proposal.status)}`}>{statusLabel(proposal.status)}</span>
           {isDraft && (
-            <button onClick={handleSend} disabled={isPending} className="btn-primary text-sm">
+            <button onClick={handleSend} disabled={isPending} className="btn-primary btn-sm">
               <Send className="w-3.5 h-3.5" /> {isPending ? 'Sending...' : 'Send to Client'}
             </button>
           )}
@@ -120,10 +120,10 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
         <div className="card flex items-center gap-3">
           <span className="label shrink-0">Proposal Link</span>
           <code className="text-xs flex-1 truncate" style={{ color: 'var(--text-secondary)' }}>{proposalUrl}</code>
-          <button onClick={copyLink} className="btn-secondary text-sm">
+          <button onClick={copyLink} className="btn-secondary btn-sm">
             <Copy className="w-3.5 h-3.5" /> {copied ? 'Copied!' : 'Copy'}
           </button>
-          <a href={proposalUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary text-sm">
+          <a href={proposalUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm">
             <Eye className="w-3.5 h-3.5" /> Preview
           </a>
         </div>
@@ -182,7 +182,7 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
             ))}
           </div>
           {isDraft && (
-            <button type="button" onClick={addServiceLine} className="btn-secondary text-sm">
+            <button type="button" onClick={addServiceLine} className="btn-secondary btn-sm">
               <Plus className="w-3.5 h-3.5" /> Add Service Line
             </button>
           )}

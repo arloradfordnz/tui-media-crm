@@ -43,17 +43,9 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-10">
       {/* Header */}
-      <div className="page-header" style={{ marginBottom: 4, alignItems: 'flex-end' }}>
+      <div className="page-header">
         <div className="page-header-left">
-          <h1
-            style={{
-              fontSize: 30,
-              fontWeight: 500,
-              letterSpacing: '-0.02em',
-              color: 'var(--text-primary)',
-              lineHeight: 1,
-            }}
-          >
+          <h1 className="page-title">
             <Greeting />
           </h1>
           <p className="page-subtitle" style={{ marginTop: 8 }}>{todayLabel}</p>

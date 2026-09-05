@@ -37,7 +37,7 @@ export default function ClearAllButton({ count }: { count: number }) {
       <button
         onClick={handleClear}
         disabled={pending || count === 0}
-        className="btn-secondary text-xs"
+        className="btn-secondary btn-xs"
         style={{ color: 'var(--danger)' }}
       >
         <Trash2 className="w-3.5 h-3.5" /> {pending ? 'Clearing...' : `Clear all (${count})`}
