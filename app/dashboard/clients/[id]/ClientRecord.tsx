@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react'
 import { type ClientBacklog } from '@/lib/content-backlog'
 import { updateClient, deleteClient } from '@/app/actions/clients'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
+import { useToast } from '@/components/Toast'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo, stripJobPrefix } from '@/lib/format'
 import Link from 'next/link'
 import { ArrowLeft, Trash2, Briefcase, MessageSquare, StickyNote, UserCircle, Copy, Check, FileText, ExternalLink, Camera, Receipt } from 'lucide-react'
@@ -157,6 +158,7 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
   const [deleting, setDeleting] = useState(false)
   const [copied, setCopied] = useState(false)
   const [confirmSpec, setConfirm] = useState<ConfirmSpec | null>(null)
+  const toast = useToast()
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
   const portalLink = client.portalToken ? `${appUrl}/portal/client/${client.portalToken}` : null
@@ -198,14 +200,14 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
       const result = await deleteClient(client.id)
       // On success, deleteClient calls redirect() which throws and never reaches here.
       if (result && 'error' in result && result.error) {
-        alert(`Couldn't delete client: ${result.error}`)
+        toast({ tone: 'error', title: `Couldn't delete ${client.name}`, detail: result.error })
         setDeleting(false)
       }
     } catch (err) {
       // Re-throw redirect errors so Next.js can handle them
       if (err && typeof err === 'object' && 'digest' in err) throw err
       console.error('Delete failed:', err)
-      alert('Failed to delete client. Check the console for details.')
+      toast({ tone: 'error', title: `Couldn't delete ${client.name}`, detail: 'Something went wrong. The console has the details.' })
       setDeleting(false)
     }
   }

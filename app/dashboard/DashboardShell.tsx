@@ -5,6 +5,7 @@ import Sidebar from '@/components/Sidebar'
 import { useMediaQuery } from '@/lib/useMediaQuery'
 import AiChatWidget from '@/components/AiChatWidget'
 import MobileTabBar from '@/components/MobileTabBar'
+import { ToastProvider } from '@/components/Toast'
 import { logout } from '@/app/actions/auth'
 
 // ── Panel context (Monthly Report push panel) ─────────────────
@@ -47,6 +48,7 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
   }
 
   return (
+    <ToastProvider>
     <PanelContext.Provider value={{ panelOpen, panelContent, openPanel, closePanel }}>
       <div style={{ minHeight: '100dvh', background: 'var(--bg-base)' }}>
 
@@ -93,5 +95,6 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
         <AiChatWidget />
       </div>
     </PanelContext.Provider>
+    </ToastProvider>
   )
 }

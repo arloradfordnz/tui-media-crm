@@ -9,6 +9,7 @@ import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as A
 import CustomSelect from '@/components/CustomSelect'
 import RecordTabs, { RecordPanel } from '@/components/RecordTabs'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
+import { useToast } from '@/components/Toast'
 import DatePicker from '@/components/DatePicker'
 import JobTimeTracker, { type TimeEntry } from './JobTimeTracker'
 import { useMediaQuery } from '@/lib/useMediaQuery'
@@ -61,6 +62,7 @@ export default function JobRecord({ job }: { job: JobData }) {
   const [, startTransition] = useTransition()
   const [deleting, setDeleting] = useState(false)
   const [confirmSpec, setConfirm] = useState<ConfirmSpec | null>(null)
+  const toast = useToast()
   const [uploadingFor, setUploadingFor] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadStage, setUploadStage] = useState<'idle' | 'preparing' | 'uploading' | 'finalising'>('idle')
@@ -176,7 +178,7 @@ export default function JobRecord({ job }: { job: JobData }) {
       }))
     } catch (e) {
       console.error('[upload]', e)
-      alert(`Upload failed: ${(e as Error).message}`)
+      toast({ tone: 'error', title: 'Upload failed', detail: (e as Error).message })
       if (fileId) {
         fetch('/api/deliverables/upload', {
           method: 'DELETE',
