@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react'
 import { type ClientBacklog } from '@/lib/content-backlog'
 import { updateClient, deleteClient } from '@/app/actions/clients'
+import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo, stripJobPrefix } from '@/lib/format'
 import Link from 'next/link'
 import { ArrowLeft, Trash2, Briefcase, MessageSquare, StickyNote, UserCircle, Copy, Check, FileText, ExternalLink, Camera, Receipt } from 'lucide-react'
@@ -154,6 +155,7 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
   const [state, action, pending] = useActionState(updateClient, undefined)
   const [deleting, setDeleting] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [confirmSpec, setConfirm] = useState<ConfirmSpec | null>(null)
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
   const portalLink = client.portalToken ? `${appUrl}/portal/client/${client.portalToken}` : null
@@ -179,8 +181,17 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
   const tags: string[] = client.tags ? JSON.parse(client.tags) : []
   const pipelineIndex = Math.max(0, PIPELINE_STAGES.indexOf(client.pipelineStage))
 
-  async function handleDelete() {
-    if (!confirm('Delete this client and all their data? This cannot be undone.')) return
+  function handleDelete() {
+    setConfirm({
+      title: `Delete ${client.name}?`,
+      body: 'Their jobs, notes and history go with them. There is no undo.',
+      confirmLabel: 'Delete client',
+      destructive: true,
+      onConfirm: () => { void reallyDelete() },
+    })
+  }
+
+  async function reallyDelete() {
     setDeleting(true)
     try {
       const result = await deleteClient(client.id)
@@ -506,6 +517,7 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
           <Trash2 className="w-4 h-4" /> {deleting ? 'Deleting...' : 'Delete Client'}
         </button>
       </div>
+      <ConfirmSheet spec={confirmSpec} onClose={() => setConfirm(null)} />
     </div>
   )
 }

@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as ActivityIcon, MapPin, Calendar, FileText, Upload, Download, FileVideo, Plus, Pencil, X, CheckCheck, MessageSquare } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import RecordTabs, { RecordPanel } from '@/components/RecordTabs'
+import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
 import DatePicker from '@/components/DatePicker'
 import JobTimeTracker, { type TimeEntry } from './JobTimeTracker'
 import { useMediaQuery } from '@/lib/useMediaQuery'
@@ -58,6 +59,7 @@ export default function JobRecord({ job }: { job: JobData }) {
   const [, revAction, revPending] = useActionState(addRevision, undefined)
   const [, startTransition] = useTransition()
   const [deleting, setDeleting] = useState(false)
+  const [confirmSpec, setConfirm] = useState<ConfirmSpec | null>(null)
   const [uploadingFor, setUploadingFor] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadStage, setUploadStage] = useState<'idle' | 'preparing' | 'uploading' | 'finalising'>('idle')
@@ -94,10 +96,17 @@ export default function JobRecord({ job }: { job: JobData }) {
     })
   }
 
-  async function handleDelete() {
-    if (!confirm('Delete this job and all its data?')) return
-    setDeleting(true)
-    await deleteJob(job.id)
+  function handleDelete() {
+    setConfirm({
+      title: `Delete ${stripJobPrefix(job.name)}?`,
+      body: 'Its tasks, deliverables, uploaded files and shoot booking all go with it. There is no undo.',
+      confirmLabel: 'Delete job',
+      destructive: true,
+      onConfirm: () => {
+        setDeleting(true)
+        void deleteJob(job.id)
+      },
+    })
   }
 
   async function handleFileUpload(deliverableId: string, file: File, versionLabel: string, notes: string) {
@@ -220,14 +229,22 @@ export default function JobRecord({ job }: { job: JobData }) {
     setEditingDeliverable(null)
   }
 
-  async function handleDeleteDeliverable(id: string) {
-    if (!confirm('Delete this deliverable and all its files?')) return
-    await fetch('/api/deliverables', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
+  function handleDeleteDeliverable(id: string) {
+    const title = deliverables.find((d) => d.id === id)?.title ?? 'this deliverable'
+    setConfirm({
+      title: `Delete "${title}"?`,
+      body: 'Every version uploaded against it goes too, including anything the client has already seen.',
+      confirmLabel: 'Delete deliverable',
+      destructive: true,
+      onConfirm: async () => {
+        await fetch('/api/deliverables', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id }),
+        })
+        setDeliverables((prev) => prev.filter((d) => d.id !== id))
+      },
     })
-    setDeliverables((prev) => prev.filter((d) => d.id !== id))
   }
 
   async function handleRevisionLimitChange(val: number) {
@@ -572,6 +589,8 @@ export default function JobRecord({ job }: { job: JobData }) {
           <Trash2 className="w-4 h-4" /> {deleting ? 'Deleting...' : 'Delete Job'}
         </button>
       </div>
+
+      <ConfirmSheet spec={confirmSpec} onClose={() => setConfirm(null)} />
     </div>
   )
 }

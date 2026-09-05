@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Plus, X, Trash2, Calendar } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
+import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -33,6 +34,7 @@ export default function CalendarView({ events, jobs, month, year, feedToken }: {
   const router = useRouter()
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const [showModal, setShowModal] = useState(false)
+  const [confirmSpec, setConfirm] = useState<ConfirmSpec | null>(null)
   const [state, action, pending] = useActionState(createEvent, undefined)
 
   const today = new Date()
@@ -218,7 +220,17 @@ export default function CalendarView({ events, jobs, month, year, feedToken }: {
                   {e.notes && <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>{e.notes}</p>}
                   {e.job && <p className="text-xs mt-1" style={{ color: 'var(--accent)' }}>Job: {e.job.name}</p>}
                 </div>
-                <button onClick={() => { if (confirm('Delete this event?')) deleteEvent(e.id) }} className="btn-icon"><Trash2 className="w-4 h-4" style={{ color: 'var(--danger)' }} /></button>
+                <button
+                  onClick={() => setConfirm({
+                    title: 'Delete this event?',
+                    body: `"${e.title}" comes off the calendar. If it is a shoot mirrored from a job, editing the job is the better move — this removes only the calendar entry.`,
+                    confirmLabel: 'Delete event',
+                    destructive: true,
+                    onConfirm: () => { deleteEvent(e.id) },
+                  })}
+                  className="btn-icon"
+                  aria-label={`Delete ${e.title}`}
+                ><Trash2 className="w-4 h-4" style={{ color: 'var(--danger)' }} /></button>
               </div>
             ))
           )}
@@ -288,6 +300,8 @@ export default function CalendarView({ events, jobs, month, year, feedToken }: {
           </div>
         </div>
       )}
+
+      <ConfirmSheet spec={confirmSpec} onClose={() => setConfirm(null)} />
     </div>
   )
 }

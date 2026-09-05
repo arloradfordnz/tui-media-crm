@@ -5,6 +5,7 @@ import { updateProposal, sendProposal } from '@/app/actions/proposals'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass } from '@/lib/format'
 import Link from 'next/link'
 import { ArrowLeft, Send, Eye, Plus, Trash2, Copy } from 'lucide-react'
+import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
 
 type ServiceLine = { description: string; amount: number }
 
@@ -38,6 +39,7 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
     try { return JSON.parse(proposal.services) } catch { return [] }
   })
   const [copied, setCopied] = useState(false)
+  const [confirmSpec, setConfirm] = useState<ConfirmSpec | null>(null)
 
   const isDraft = proposal.status === 'draft'
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
@@ -63,8 +65,12 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
   }
 
   function handleSend() {
-    if (!confirm('Send this proposal to the client? They will receive a link to view and respond.')) return
-    startTransition(() => { sendProposal(proposal.id) })
+    setConfirm({
+      title: 'Send this proposal?',
+      body: 'The client gets a link to view it and respond. Sending is not something you can take back, so check the figures first.',
+      confirmLabel: 'Send proposal',
+      onConfirm: () => startTransition(() => { sendProposal(proposal.id) }),
+    })
   }
 
   async function copyLink() {
@@ -236,6 +242,7 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
           </p>
         </div>
       )}
+      <ConfirmSheet spec={confirmSpec} onClose={() => setConfirm(null)} />
     </div>
   )
 }

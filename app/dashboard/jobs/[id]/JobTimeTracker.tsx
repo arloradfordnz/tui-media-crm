@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState, useTransition } from 'react'
 import { Play, Square, Plus, Trash2, Pencil, X, Check, Timer, DollarSign } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
+import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
 import { formatNZD, formatDate } from '@/lib/format'
 import {
   startTimer,
@@ -87,6 +88,7 @@ export default function JobTimeTracker({
   const [newCategory, setNewCategory] = useState<string>('general')
 
   const [manualOpen, setManualOpen] = useState(false)
+  const [confirmSpec, setConfirm] = useState<ConfirmSpec | null>(null)
   const [manualState, manualAction, manualPending] = useActionState(addManualEntry, undefined)
 
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -132,8 +134,13 @@ export default function JobTimeTracker({
   }
 
   function handleDelete(entryId: string) {
-    if (!confirm('Delete this time entry?')) return
-    startTransition(async () => { await deleteTimeEntry(entryId) })
+    setConfirm({
+      title: 'Delete this time entry?',
+      body: 'The hours come off the job, which changes what it looks like it cost to make.',
+      confirmLabel: 'Delete entry',
+      destructive: true,
+      onConfirm: () => startTransition(async () => { await deleteTimeEntry(entryId) }),
+    })
   }
 
   function beginEdit(e: TimeEntry) {
@@ -422,6 +429,7 @@ export default function JobTimeTracker({
           })}
         </div>
       )}
+      <ConfirmSheet spec={confirmSpec} onClose={() => setConfirm(null)} />
     </div>
   )
 }

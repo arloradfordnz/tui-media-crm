@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Download, Save, Mail, Trash2, Check, Sparkles } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
+import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
 import AIDocumentAssistant from './AIDocumentAssistant'
 
 const TEMPLATES = ['Contract', 'Quote', 'Call Sheet', 'General Document']
@@ -83,6 +84,7 @@ export default function DocumentForm({ clients, mode }: { clients: ClientOption[
 
   const [template, setTemplate] = useState(mode.kind === 'edit' ? mode.initialTemplate || 'Contract' : 'Contract')
   const [selectedClientId, setSelectedClientId] = useState(initialClientId)
+  const [confirmSpec, setConfirm] = useState<ConfirmSpec | null>(null)
   const [form, setForm] = useState<DocFormShape>(() => {
     if (mode.kind === 'edit') return { ...EMPTY_FORM, ...mode.initialForm }
     return {
@@ -256,14 +258,22 @@ async function persistNew() {
     setEmailing(false)
   }
 
-  async function handleDelete() {
+  function handleDelete() {
     if (mode.kind !== 'edit') return
-    if (!confirm('Delete this document?')) return
-    setDeleting(true)
-    const fd = new FormData()
-    fd.append('docId', mode.docId)
-    await fetch('/api/documents/delete', { method: 'POST', body: fd }).catch(() => {})
-    router.push('/dashboard/documents')
+    const docId = mode.docId
+    setConfirm({
+      title: `Delete ${docName || 'this document'}?`,
+      body: 'The saved document goes. Anything already sent to a client stays sent.',
+      confirmLabel: 'Delete document',
+      destructive: true,
+      onConfirm: async () => {
+        setDeleting(true)
+        const fd = new FormData()
+        fd.append('docId', docId)
+        await fetch('/api/documents/delete', { method: 'POST', body: fd }).catch(() => {})
+        router.push('/dashboard/documents')
+      },
+    })
   }
 
   return (
@@ -385,6 +395,7 @@ async function persistNew() {
       businessName={form.businessName}
       onInsert={(markdown) => update('body', form.body ? form.body + '\n\n' + markdown : markdown)}
     />
+    <ConfirmSheet spec={confirmSpec} onClose={() => setConfirm(null)} />
     </div>
   )
 }
