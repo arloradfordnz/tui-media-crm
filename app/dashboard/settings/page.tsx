@@ -2,7 +2,6 @@ import { createServerSupabaseClient } from '@/lib/supabase'
 import SettingsForm from './SettingsForm'
 import EmailTemplatesForm from './EmailTemplatesForm'
 import RetainerInvoiceSettings from './RetainerInvoiceSettings'
-import AppearanceSettings from './AppearanceSettings'
 import { APP_VERSION } from '@/lib/version'
 import { getAppSetting } from '@/app/actions/settings'
 
@@ -22,9 +21,6 @@ export default async function SettingsPage() {
           <h1 className="page-title">Settings</h1>
         </div>
       </div>
-
-      {/* Appearance */}
-      <AppearanceSettings />
 
       {/* Profile */}
       <div className="card">

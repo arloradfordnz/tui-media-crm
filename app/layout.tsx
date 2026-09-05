@@ -29,18 +29,6 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-// Apply the theme before first paint so it never flashes.
-// Explicit 'light'/'dark' choices (Settings → Appearance) win; anything else
-// follows the device's prefers-color-scheme, live — the media-query listener
-// re-checks localStorage so an explicit choice made later still sticks.
-// Client-facing pages swap logos via .logo-light/.logo-dark in globals.css.
-// Portal and proposal pages are pinned dark regardless of the viewer's device
-// theme or any localStorage choice — they're tuimedia.nz's own navy brand
-// surface shown to a client, not a themeable CRM screen, and a client who
-// happens to run light mode should not see a page that looks nothing like the
-// brand. Checked first, before either preference is read.
-const themeInit = `(function(){var d=document.documentElement;function set(dark){d.classList.toggle('dark',dark);d.classList.toggle('light',!dark);}try{var p=location.pathname;if(p.indexOf('/portal/')===0||p.indexOf('/proposal/')===0){set(true);return;}var t=localStorage.getItem('tui-theme');var mq=window.matchMedia('(prefers-color-scheme: dark)');set(t==='dark'||(t!=='light'&&mq.matches));mq.addEventListener('change',function(e){var s=localStorage.getItem('tui-theme');if(s==='dark'||s==='light')return;set(e.matches);});}catch(e){set(false);}})();`;
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   // Bricolage Grotesque is declared as @font-face in globals.css (its two
   // subsets each need their own unicode-range, which next/font/local has no
@@ -54,9 +42,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   });
 
   return (
-    <html lang="en" className={patrickHand.variable} suppressHydrationWarning>
+    // Dark is the only theme — the CRM has no light mode and no user setting
+    // for one. The .dark class is applied statically rather than by a
+    // pre-paint script (as it was when light mode existed and the choice had
+    // to be read from localStorage/prefers-color-scheme before first paint),
+    // because a static class needs no such script.
+    <html lang="en" className={`${patrickHand.variable} dark`}>
       <body>
-        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
         {children}
       </body>
     </html>
