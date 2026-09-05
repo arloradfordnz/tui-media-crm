@@ -491,6 +491,152 @@ export function fetchOutstandingInvoicesCached(): Promise<XeroCreatedInvoice[]> 
   return swrCached('outstanding-invoices', fetchOutstandingInvoices).then((r) => r ?? [])
 }
 
+// ── Monthly profit and loss ───────────────────────────────────────────────────
+//
+// Money in and money out, per month, as Xero itself reports them.
+//
+// The Finance chart used to build these from raw transactions: every ACCPAY
+// invoice plus every SPEND bank transaction. That is not what "expenses"
+// means. Checked against Xero's own cash-basis P&L for 1 Jan to 6 Sep 2026,
+// it reported $21,314 of spending against a real figure of $4,148 — five times
+// over — because a SPEND line in the bank feed is any money leaving the
+// account, including transfers, drawings and personal spending that is coded
+// to a non-expense account or not coded at all. Xero excludes those from the
+// P&L. We were counting them.
+//
+// One report call replaces up to eight hundred transaction rows, and the
+// numbers agree with the accountant's.
+// The shape Xero's report endpoints return: sections of rows of cells, with a
+// Header row carrying the column dates.
+type XeroReportRow = {
+  RowType?: string
+  Title?: string
+  Cells?: Array<{ Value?: string }>
+  Rows?: XeroReportRow[]
+}
+type XeroReport = { Rows?: XeroReportRow[] }
+
+export type MonthlyPnl = {
+  /** 'YYYY-MM' */
+  month: string
+  /** 'Aug' */
+  label: string
+  income: number
+  expenses: number
+}
+
+/** YYYY-MM-DD in the machine's own timezone, not shifted into UTC. */
+function localISODate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+const MONTH_ABBR = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+
+/** Xero column headers arrive as "Sep-26", "Sep 2026" or "30 Sep 2026". */
+function parseColumnMonth(raw: string): string | null {
+  const m = raw.toLowerCase().match(/([a-z]{3})[a-z]*[\s-]+(\d{2,4})/)
+  if (!m) return null
+  const idx = MONTH_ABBR.indexOf(m[1])
+  if (idx === -1) return null
+  const yearRaw = parseInt(m[2], 10)
+  const year = yearRaw < 100 ? 2000 + yearRaw : yearRaw
+  return `${year}-${String(idx + 1).padStart(2, '0')}`
+}
+
+function num(raw: string | undefined): number {
+  if (!raw) return 0
+  const n = parseFloat(raw.replace(/,/g, ''))
+  return Number.isNaN(n) ? 0 : n
+}
+
+export async function fetchMonthlyPnl(months = 12): Promise<MonthlyPnl[] | null> {
+  const account = await getValidXeroAccount()
+  if (!account || !account.account_id) return null
+
+  // fromDate..toDate defines ONE period; periods + timeframe then repeat that
+  // period backwards. So the base period has to be a single month.
+  //
+  // Passing a twelve-month span here instead was the trap: Xero honoured it and
+  // returned twelve OVERLAPPING twelve-month windows, each offset by a month,
+  // which reads as a cumulative running total. The chart showed money in
+  // climbing to $83k over six months against a real figure of $15k, and the
+  // line only ever went up because each column contained the one before it.
+  // The base period must be a WHOLE calendar month. Xero repeats the base
+  // period's LENGTH backwards, so ending it at today (1-5 Sept, five days)
+  // made every comparative a five-day window too: August came back as $100
+  // against its real $1,300, because it was only reporting 1-5 August.
+  const now = new Date()
+  const from = new Date(now.getFullYear(), now.getMonth(), 1)
+  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  // Formatted in LOCAL time. toISOString() converts local midnight to UTC,
+  // which in NZ (+12) rolls back a day: 1 Sept became 31 Aug and 30 Sept
+  // became 29 Sept, so Xero reported thirty-day windows straddling two months
+  // instead of calendar months, and anything dated on a 30th or 31st landed in
+  // the wrong bucket.
+  const fromDate = localISODate(from)
+  const toDate = localISODate(to)
+
+  try {
+    // paymentsOnly=true is cash basis: money that actually moved, which is what
+    // the page says it is showing. periods counts the ADDITIONAL columns beside
+    // the main one, hence months - 1.
+    const res = await xeroGet<{ Reports?: XeroReport[] }>(
+      `/Reports/ProfitAndLoss?fromDate=${fromDate}&toDate=${toDate}&periods=${months - 1}&timeframe=MONTH&paymentsOnly=true&standardLayout=true`,
+      account.access_token,
+      account.account_id,
+    )
+
+    const rows = res.Reports?.[0]?.Rows ?? []
+
+    // Column order is not guaranteed, so read the header and map by month
+    // rather than trusting position.
+    const header = rows.find((r) => r.RowType === 'Header')
+    const columns = (header?.Cells ?? []).slice(1).map((c) => parseColumnMonth(c.Value ?? ''))
+    if (columns.length === 0) return null
+
+    const seriesFor = (label: RegExp): number[] => {
+      for (const section of rows) {
+        for (const r of section.Rows ?? []) {
+          const first = r.Cells?.[0]?.Value ?? ''
+          if (label.test(first)) return (r.Cells ?? []).slice(1).map((c) => num(c.Value))
+        }
+      }
+      return []
+    }
+
+    const income = seriesFor(/^Total\s+Income$/i)
+    // Xero names this row differently depending on the chart of accounts, and
+    // an org with cost of sales splits it out separately.
+    const expenses = seriesFor(/^Total\s+(Operating\s+)?Expenses$/i)
+    const costOfSales = seriesFor(/^Total\s+Cost\s+of\s+Sales$/i)
+
+    const out: MonthlyPnl[] = []
+    columns.forEach((month, i) => {
+      if (!month) return
+      const idx = parseInt(month.slice(5), 10) - 1
+      out.push({
+        month,
+        label: new Date(2000, idx, 1).toLocaleString('en-NZ', { month: 'short' }),
+        income: Math.round((income[i] ?? 0) * 100) / 100,
+        // Cost of sales is money out too, and can be negative in Xero when a
+        // credit lands, so it is added rather than assumed positive.
+        expenses: Math.round(((expenses[i] ?? 0) + (costOfSales[i] ?? 0)) * 100) / 100,
+      })
+    })
+
+    out.sort((a, b) => a.month.localeCompare(b.month))
+    return out
+  } catch (err) {
+    console.error('[Xero] monthly P&L failed:', err)
+    return null
+  }
+}
+
+/** Cached monthly P&L — same stale-while-revalidate treatment as the rest. */
+export function fetchMonthlyPnlCached(months = 12): Promise<MonthlyPnl[] | null> {
+  return swrCached(`monthly-pnl-${months}`, () => fetchMonthlyPnl(months))
+}
+
 export type XeroTransaction = {
   id: string
   date: string          // ISO date YYYY-MM-DD
@@ -640,10 +786,20 @@ export async function fetchXeroTransactions(): Promise<XeroTransaction[] | null>
     fetchBankTransactions(accessToken, tenantId),
   ])
 
-  const results: XeroTransaction[] = [
-    ...(invoices.status === 'fulfilled' ? invoices.value : []),
-    ...(bankTxs.status === 'fulfilled' ? bankTxs.value : []),
-  ]
+  // A half-failure must not be cached as a whole answer. Both legs feed one
+  // list, so if either throws the result is a silently incomplete set of
+  // transactions — and swrCached would store it as the new truth, making
+  // months of spending vanish until the TTL expired. Returning null instead
+  // leaves the last good value in place.
+  if (invoices.status === 'rejected' || bankTxs.status === 'rejected') {
+    console.error('[Xero] transactions partially failed, keeping previous data:', {
+      invoices: invoices.status === 'rejected' ? invoices.reason : 'ok',
+      bankTxs: bankTxs.status === 'rejected' ? bankTxs.reason : 'ok',
+    })
+    return null
+  }
+
+  const results: XeroTransaction[] = [...invoices.value, ...bankTxs.value]
 
   results.sort((a, b) => b.date.localeCompare(a.date))
   return results

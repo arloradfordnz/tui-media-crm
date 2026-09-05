@@ -2453,93 +2453,152 @@ input, textarea, select, button { font-family: inherit; }
 .money-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* ── Floating-label fields ────────────────────────────────────
-   The tuimedia.nz form treatment: the label sits INSIDE the control as its
-   resting state, then shrinks up to the top edge once the field is focused or
-   filled. One box per field instead of a label stacked above a box, which is
-   both tighter and stops a column of shouty uppercase labels competing with
-   the values.
+   Ported from the rebrand wireframe (tui-media-rebrand-website/wireframe,
+   the .field--float block) rather than approximated. Values are its values:
+   1rem label and control text, 1.5rem/0.55rem vertical padding, and the lift
+   to translateY(-0.55rem) scale(0.72) in accent.
 
-   Requires the input to carry placeholder=" " so :placeholder-shown can tell
-   empty from filled — an input with no placeholder attribute never matches it,
-   which would leave the label floated permanently over an empty box. The Field
-   component sets that; do not hand-roll one without it. */
+   Two details from that file worth keeping the reasoning for:
+
+   - The lift is ONE transform. Animating `top` alongside a scale makes the two
+     properties settle on different pixel grids mid-flight, so the label
+     visibly hitches on its way up. A single composited transform has nothing
+     to disagree with. (My first pass animated top AND font-size — same bug.)
+   - The label must come AFTER the control in the markup so the sibling
+     selectors can read :focus / :not(:placeholder-shown), and the control
+     needs a real placeholder (a single space) or :placeholder-shown never
+     matches and the label sits lifted over an empty box forever. Field sets
+     that; do not hand-roll one without it. */
 .field {
-  position: relative;
   display: block;
+  position: relative;
 }
 
 .field > .field-input,
 .field .custom-select-trigger {
   width: 100%;
-  padding-top: 22px;
-  padding-bottom: 8px;
+  font-size: 1rem;
+  padding-top: 1.5rem;
+  padding-bottom: 0.55rem;
 }
 
-.field textarea.field-input {
-  padding-top: 26px;
+.field > textarea.field-input {
+  padding-top: 1.65rem;
+  min-height: 132px;
+  /* The drag handle clips the rounded corner, and the box grows to its content
+     anyway (see autoGrow in Field). */
+  resize: none;
+  overflow-y: auto;
 }
 
 .field > .field-label {
   position: absolute;
-  left: 19px;
-  top: 50%;
-  transform: translateY(-50%);
-  transform-origin: left center;
+  left: 18px;
+  top: 1.05rem;
   margin: 0;
   padding: 0;
-  font-size: 13px;
+  font-size: 1rem;
   font-weight: 400;
-  letter-spacing: 0;
+  letter-spacing: normal;
   text-transform: none;
   color: var(--text-tertiary);
   pointer-events: none;
-  transition:
-    top var(--dur-fast) var(--ease-out),
-    font-size var(--dur-fast) var(--ease-out),
-    color var(--dur-fast) var(--ease-out),
-    transform var(--dur-fast) var(--ease-out);
+  transform-origin: left top;
+  will-change: transform;
+  transform: translateY(0) scale(1);
+  transition: transform 180ms var(--ease-out), color 180ms ease;
 }
 
-/* A textarea's label belongs at the top of the box, not its middle. */
-.field:has(textarea.field-input) > .field-label {
-  top: 18px;
-  transform: none;
-}
+.field > textarea.field-input + .field-label { top: 1.15rem; }
 
-.field:has(.field-input:focus) > .field-label,
-.field:has(.field-input:not(:placeholder-shown)) > .field-label,
-.field:has(textarea.field-input:focus) > .field-label,
-.field:has(textarea.field-input:not(:placeholder-shown)) > .field-label,
-/* Pickers always show a value or a placeholder of their own, so their label
-   never has a resting centred state. */
-.field:has(.custom-select-trigger) > .field-label {
-  top: 9px;
-  transform: none;
-  font-size: 10.5px;
-  letter-spacing: 0.04em;
-  color: var(--text-tertiary);
-}
-
-/* The doubled .field is load-bearing. Lightning CSS merges the selector list
-   above into a single :is(...), and :is() takes the specificity of its MOST
-   specific argument — the textarea one — so the merged rule outranks a plain
-   .field:has(...) written after it and this colour never applied. Same family
-   of problem as the backdrop-filter dedupe: the authored CSS is correct and
-   the compiled CSS is not what you wrote. */
-.field.field:has(.field-input:focus) > .field-label {
+.field > .field-input:focus + .field-label,
+.field > .field-input:not(:placeholder-shown) + .field-label {
+  transform: translateY(-0.55rem) scale(0.72);
   color: var(--accent);
 }
 
-/* The placeholder is a spacer, not content — never show it. A real hint goes
-   in .field-hint underneath. */
+.field > textarea.field-input:focus + .field-label,
+.field > textarea.field-input:not(:placeholder-shown) + .field-label {
+  transform: translateY(-0.65rem) scale(0.72);
+  color: var(--accent);
+}
+
+/* Pickers show their own value or placeholder, so their label has no resting
+   state to sit in. */
+.field:has(.custom-select-trigger) > .field-label {
+  transform: translateY(-0.55rem) scale(0.72);
+}
+
+/* The chevron centres on the BOX, not on the padded content area. The float
+   padding is deliberately lopsided (1.5rem over 0.55rem) to make room for the
+   lifted label, which otherwise drags the arrow down with it. */
+.field .custom-select-trigger > svg {
+  margin-top: -0.72rem;
+}
+
+/* A textarea that grows to its content still needs a ceiling, or a long
+   document body pushes the form's buttons off the bottom of the page. */
+.field > textarea.field-input { max-height: 60vh; }
+
+/* The placeholder is a spacer, not content. A real hint lives in .field-hint. */
 .field > .field-input::placeholder { color: transparent; }
-.field > .field-input:focus::placeholder { color: var(--text-tertiary); opacity: 0.6; }
+.field > .field-input:focus::placeholder { color: var(--text-tertiary); opacity: 0.7; }
+
+/* The control carries focus on its own edge — the global focus ring sits 3px
+   outside on a 4px radius, which against a 22px pill reads as a second,
+   detached box. */
+.field > .field-input:focus,
+.field .custom-select-trigger:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* A thin scrollbar instead of the default, which paints its own track on this
+   ground and draws two visible lines down the side of the box. */
+.field > textarea.field-input {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-border) transparent;
+}
+.field > textarea.field-input::-webkit-scrollbar { width: 11px; }
+.field > textarea.field-input::-webkit-scrollbar-track { background: transparent; }
+.field > textarea.field-input::-webkit-scrollbar-thumb {
+  background: var(--bg-border);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.field > textarea.field-input::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+  background-clip: content-box;
+}
 
 .field-hint {
   margin: 6px 2px 0;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-tertiary);
 }
+
+/* An action tucked into the corner of a field — the AI draft button on the
+   document body. Inside the box rather than a pill above it, so it belongs to
+   the field it writes into. */
+.field-action {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--bg-border);
+  background: var(--bg-elevated);
+  color: var(--accent);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.field-action:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-muted); }
+.field-action:disabled { opacity: 0.55; cursor: default; }
+.field-action svg { width: 16px; height: 16px; }
 
 /* ── Stat row ─────────────────────────────────────────────────
    Four headline numbers as one row of facts, not four boxed tiles. A grid of
@@ -2571,3 +2630,25 @@ input, textarea, select, button { font-family: inherit; }
   font-size: 12px;
   color: var(--text-tertiary);
 }
+
+/* ── Chart legend figures ─────────────────────────────────────
+   The figure above the chart IS the legend, so it is also the control: click
+   one to read its trend line on its own. Dimming the other rather than hiding
+   it, because the point of isolating one line is usually to see it against
+   the other. */
+.flow-figure {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 6px 10px;
+  margin: -6px -10px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) ease, border-color var(--dur-fast) ease, opacity var(--dur-fast) ease;
+}
+.flow-figure:hover { background: var(--bg-elevated); }
+.flow-figure.is-active { border-color: var(--bg-border); background: var(--bg-elevated); }
+.flow-figure.is-dimmed { opacity: 0.45; }

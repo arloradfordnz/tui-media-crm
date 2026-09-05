@@ -1,5 +1,5 @@
 import { AlertCircle, Plug } from 'lucide-react'
-import { fetchXeroSummaryCached, fetchXeroTransactionsCached, type XeroSummary, type XeroTransaction } from '@/lib/xero'
+import { fetchXeroSummaryCached, fetchXeroTransactionsCached, fetchMonthlyPnlCached, type XeroSummary, type XeroTransaction, type MonthlyPnl } from '@/lib/xero'
 import FinanceDashboard from './FinanceDashboard'
 import { getAppSetting } from '@/app/actions/settings'
 
@@ -40,12 +40,19 @@ export default async function FinancePage({ searchParams }: { searchParams: Sear
   const params = await searchParams
   let summary: XeroSummary | null = null
   let transactions: XeroTransaction[] = []
+  let monthly: MonthlyPnl[] = []
   let fetchError: string | null = null
   let retainerInvoiceDay: number | undefined
   try {
-    const [s, t, dayStr] = await Promise.all([fetchXeroSummaryCached(), fetchXeroTransactionsCached(), getAppSetting('retainer_invoice_day')])
+    const [s, t, m, dayStr] = await Promise.all([
+      fetchXeroSummaryCached(),
+      fetchXeroTransactionsCached(),
+      fetchMonthlyPnlCached(12),
+      getAppSetting('retainer_invoice_day'),
+    ])
     summary = s
     transactions = t ?? []
+    monthly = m ?? []
     retainerInvoiceDay = dayStr ? parseInt(dayStr, 10) : 1
   } catch (e) {
     fetchError = (e as Error).message
@@ -61,5 +68,6 @@ export default async function FinancePage({ searchParams }: { searchParams: Sear
       ?? 'No active Xero connection found — if you connected before, the login may have expired. Reconnect below.'
     return <NotConnected error={reason} />
   }
-  return <FinanceDashboard summary={summary} transactions={transactions} retainerInvoiceDay={retainerInvoiceDay} />
+  return <FinanceDashboard summary={summary} transactions={transactions}
+      monthly={monthly} retainerInvoiceDay={retainerInvoiceDay} />
 }

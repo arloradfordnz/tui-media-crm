@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Download, Save, Mail, Trash2, Check, Sparkles } from 'lucide-react'
+import { Download, Save, Mail, Trash2, Check, Sparkles, Loader2 } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import Field from '@/components/Field'
 import DatePicker from '@/components/DatePicker'
@@ -273,6 +273,8 @@ async function persistNew() {
           clientName: form.clientName,
           businessName: form.businessName,
           contactPerson: form.contactPerson,
+          clientEmail: form.clientEmail,
+          clientPhone: form.clientPhone,
           jobDescription: form.jobDescription,
           location: form.location,
           date: form.date,
@@ -355,12 +357,16 @@ async function persistNew() {
         />
       </Field>
 
+      {/* Grouped by who each field is about, in the order you fill them:
+          who it is for, then what the work is, then the body. It used to be a
+          flat eight-field grid in schema order, with the client's phone number
+          sitting between their email and our own business name. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Client name">
           <input value={form.clientName} onChange={(e) => update('clientName', e.target.value)} className="field-input" />
         </Field>
         <Field label="Key contact person">
-          <input value={form.contactPerson} onChange={(e) => update('contactPerson', e.target.value)} className="field-input" placeholder="Jane Smith" />
+          <input value={form.contactPerson} onChange={(e) => update('contactPerson', e.target.value)} className="field-input" />
         </Field>
         <Field label="Client email">
           <input value={form.clientEmail} onChange={(e) => update('clientEmail', e.target.value)} className="field-input" type="email" />
@@ -368,50 +374,49 @@ async function persistNew() {
         <Field label="Client phone">
           <input value={form.clientPhone} onChange={(e) => update('clientPhone', e.target.value)} className="field-input" />
         </Field>
-        {/* Ours, not theirs. Two fields both reading as "business name" was the
-            confusion; this is the one that signs the document. */}
-        <Field label="Your business">
-          <input value={form.businessName} onChange={(e) => update('businessName', e.target.value)} className="field-input" />
+
+        <Field label="Job description" className="sm:col-span-2">
+          <input value={form.jobDescription} onChange={(e) => update('jobDescription', e.target.value)} className="field-input" />
         </Field>
-        <Field label="Date">
-          <DatePicker value={form.date} onChange={(v) => update('date', v)} className="field-input" />
+        <Field label="Location">
+          <input value={form.location} onChange={(e) => update('location', e.target.value)} className="field-input" />
         </Field>
         <Field label="Shoot date">
           <DatePicker value={form.shootDate} onChange={(v) => update('shootDate', v)} className="field-input" />
         </Field>
-        <Field label="Job description" className="sm:col-span-2">
-          <input value={form.jobDescription} onChange={(e) => update('jobDescription', e.target.value)} className="field-input" />
+        <Field label="Document date" className="sm:col-span-2">
+          <DatePicker value={form.date} onChange={(v) => update('date', v)} className="field-input" />
         </Field>
-        <Field label="Location" className="sm:col-span-2">
-          <input value={form.location} onChange={(e) => update('location', e.target.value)} className="field-input" />
-        </Field>
-        <div className="sm:col-span-2">
-          <div className="flex items-center justify-between gap-3 mb-1">
-            <label className="field-label !mb-0">Content</label>
-            {/* Drafting is one button on the field it fills, not a side panel
-                that interviews you first. Everything the interview asked for
-                is already on this form. */}
+
+        {/* The label lives inside the box like every other field, and the
+            drafting action lives inside it too — bottom right, on the field it
+            writes into. The formatting note is gone from under the box; the
+            model is told the format instead, which is where that knowledge
+            belongs. */}
+        <Field
+          label="Content"
+          className="sm:col-span-2"
+          action={
             <button
               type="button"
               onClick={handleDraft}
               disabled={drafting}
-              className="btn-ghost"
+              className="field-action"
+              title={form.body.trim() ? 'Rewrite this with AI' : 'Draft this with AI'}
+              aria-label={form.body.trim() ? 'Rewrite this with AI' : 'Draft this with AI'}
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              {drafting ? 'Writing…' : form.body.trim() ? 'Redraft with AI' : 'Draft with AI'}
+              {drafting ? <Loader2 className="tui-receipt-spin" /> : <Sparkles />}
             </button>
-          </div>
+          }
+        >
           <textarea
             value={form.body}
             onChange={(e) => update('body', e.target.value)}
-            rows={10}
             className="field-input"
             style={drafting ? { opacity: 0.75 } : undefined}
-            placeholder="Write your document content here, or press Draft with AI to have one written from the details above.&#10;&#10;Formatting: # Heading, ## Subheading, ### Small heading, **bold text**"
           />
-          {draftError && <p className="text-xs mt-1" style={{ color: 'var(--danger)' }}>{draftError}</p>}
-          <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>Formatting: <code># Heading</code>, <code>## Subheading</code>, <code>### Small heading</code>, <code>**bold**</code></p>
-        </div>
+        </Field>
+        {draftError && <p className="text-xs sm:col-span-2" style={{ color: 'var(--danger)' }}>{draftError}</p>}
       </div>
 
       {emailError && (

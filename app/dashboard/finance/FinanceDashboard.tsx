@@ -5,140 +5,17 @@ import Link from 'next/link'
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import MoneyChart from './MoneyChart'
-import type { XeroSummary, XeroTransaction } from '@/lib/xero'
+import type { XeroSummary, XeroTransaction, MonthlyPnl } from '@/lib/xero'
 
 // ─── Types & helpers ──────────────────────────────────────────────────────────
 
-type Period = 'week' | 'month' | 'year' | 'all'
+type MonthsWindow = 3 | 6 | 12
 
 const fmtShort = (n: number) =>
   n >= 1000 ? `$${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : `$${Math.round(n)}`
 
 const fmtBig = (n: number) =>
   new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', maximumFractionDigits: 0 }).format(n)
-
-function periodRange(period: Period): { start: string; label: string } {
-  const now = new Date()
-  if (period === 'week') {
-    const d = new Date(now); d.setDate(now.getDate() - 6)
-    return {
-      start: d.toISOString().slice(0, 10),
-      label: `${d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })} – ${now.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}`,
-    }
-  }
-  if (period === 'month') {
-    const d = new Date(now.getFullYear(), now.getMonth(), 1)
-    return {
-      start: d.toISOString().slice(0, 10),
-      label: `${d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })} – ${now.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}`,
-    }
-  }
-  if (period === 'year') {
-    const d = new Date(now.getFullYear(), 0, 1)
-    return {
-      start: d.toISOString().slice(0, 10),
-      label: `1 Jan ${now.getFullYear()} – ${now.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}`,
-    }
-  }
-  return { start: '2000-01-01', label: 'All time' }
-}
-
-function filterTx(txs: XeroTransaction[], period: Period) {
-  const { start } = periodRange(period)
-  return txs.filter((t) => t.date >= start)
-}
-
-// Generic grouping for revenue, expenses, or net profit
-function groupByPeriod(txs: XeroTransaction[], period: Period, kind: 'in' | 'out' | 'net') {
-  const paid = txs.filter((t) => t.status === 'PAID')
-  const now = new Date()
-
-  const calc = (subset: XeroTransaction[]) => {
-    if (kind === 'in') return Math.round(subset.filter((t) => t.type === 'in').reduce((s, t) => s + t.amount, 0))
-    if (kind === 'out') return Math.round(subset.filter((t) => t.type === 'out').reduce((s, t) => s + t.amount, 0))
-    const r = subset.filter((t) => t.type === 'in').reduce((s, t) => s + t.amount, 0)
-    const e = subset.filter((t) => t.type === 'out').reduce((s, t) => s + t.amount, 0)
-    return Math.round(r - e)
-  }
-
-  if (period === 'week') {
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(now); d.setDate(now.getDate() - (6 - i))
-      const key = d.toISOString().slice(0, 10)
-      return { label: d.toLocaleDateString('en-NZ', { weekday: 'short' }), value: calc(paid.filter((t) => t.date === key)) }
-    })
-  }
-
-  if (period === 'month') {
-    const start = new Date(now.getFullYear(), now.getMonth(), 1)
-    const weeks: { label: string; s: string; e: string }[] = []
-    let cur = new Date(start); let wk = 1
-    while (cur <= now) {
-      const s = cur.toISOString().slice(0, 10)
-      const e = new Date(Math.min(cur.getTime() + 6 * 86400000, now.getTime())).toISOString().slice(0, 10)
-      weeks.push({ label: `W${wk}`, s, e })
-      cur = new Date(cur.getTime() + 7 * 86400000); wk++
-    }
-    return weeks.map(({ label, s, e }) => ({ label, value: calc(paid.filter((t) => t.date >= s && t.date <= e)) }))
-  }
-
-  if (period === 'year') {
-    // Only months that have happened. Plotting Oct-Dec as zero draws a cliff
-    // to the right of today and reads as revenue collapsing, when it just
-    // means the year is not over.
-    return Array.from({ length: now.getMonth() + 1 }, (_, m) => {
-      const key = `${now.getFullYear()}-${String(m + 1).padStart(2, '0')}`
-      const label = new Date(now.getFullYear(), m, 1).toLocaleString('en-NZ', { month: 'short' })
-      return { label, value: calc(paid.filter((t) => t.date.startsWith(key))) }
-    })
-  }
-
-  // Fallback: rolling 12 months
-  return Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1)
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    return { label: d.toLocaleString('en-NZ', { month: 'short' }), value: calc(paid.filter((t) => t.date.startsWith(key))) }
-  })
-}
-
-// ─── Previous-period comparison ───────────────────────────────────────────────
-
-// Every figure on this page is now stated against the equivalent span before it.
-// An absolute number ("$16,483") is unreadable on its own — up or down is the
-// only question anyone actually has, and the old page never answered it.
-function previousRange(period: Period): { start: string; end: string } {
-  const now = new Date()
-  const iso = (d: Date) => d.toISOString().slice(0, 10)
-  if (period === 'week') {
-    const end = new Date(now); end.setDate(now.getDate() - 7)
-    const start = new Date(now); start.setDate(now.getDate() - 13)
-    return { start: iso(start), end: iso(end) }
-  }
-  if (period === 'month') {
-    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    // Same day-of-month as today, so a part-month compares against a part-month
-    // rather than against a full one — which would always look like a collapse.
-    const end = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
-    return { start: iso(start), end: iso(end) }
-  }
-  const start = new Date(now.getFullYear() - 1, 0, 1)
-  const end = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
-  return { start: iso(start), end: iso(end) }
-}
-
-function totalsFor(txs: XeroTransaction[], start: string, end: string) {
-  const paid = txs.filter((t) => t.status === 'PAID' && t.date >= start && t.date <= end)
-  const inc = paid.filter((t) => t.type === 'in').reduce((s, t) => s + t.amount, 0)
-  const out = paid.filter((t) => t.type === 'out').reduce((s, t) => s + t.amount, 0)
-  return { inc, out, net: inc - out }
-}
-
-const PERIOD_NOUN: Record<Period, string> = {
-  week: 'last week',
-  month: 'last month',
-  year: 'last year',
-  all: 'the period before',
-}
 
 // ─── Figures ──────────────────────────────────────────────────────────────────
 
@@ -337,27 +214,58 @@ function TxTable({ txs }: { txs: XeroTransaction[] }) {
 export default function FinanceDashboard({
   summary,
   transactions,
+  monthly,
   retainerInvoiceDay,
 }: {
   summary: XeroSummary
   transactions: XeroTransaction[]
+  monthly: MonthlyPnl[]
   retainerInvoiceDay?: number
 }) {
-  const [period, setPeriod] = useState<Period>('year')
-  const { label: rangeLabel, start: periodStart } = periodRange(period)
+  const [months, setMonths] = useState<MonthsWindow>(6)
 
-  const filtered = useMemo(() => filterTx(transactions, period), [transactions, period])
+  // Money in and money out come from Xero's own cash-basis P&L now, not from
+  // adding up bank lines. See fetchMonthlyPnl for what that was getting wrong:
+  // it reported five times the real spending, because every transfer, drawing
+  // and personal card swipe leaving the account counted as an expense.
+  const shown = useMemo(() => monthly.slice(-months), [monthly, months])
+  const prior = useMemo(
+    () => monthly.slice(Math.max(0, monthly.length - months * 2), Math.max(0, monthly.length - months)),
+    [monthly, months],
+  )
 
-  const today = new Date().toISOString().slice(0, 10)
-  const current = useMemo(() => totalsFor(transactions, periodStart, today), [transactions, periodStart, today])
-  const previous = useMemo(() => {
-    const { start, end } = previousRange(period)
-    return totalsFor(transactions, start, end)
-  }, [transactions, period])
+  const sum = (rows: MonthlyPnl[], key: 'income' | 'expenses') =>
+    rows.reduce((t, r) => t + r[key], 0)
 
-  const inPoints = useMemo(() => groupByPeriod(filtered, period, 'in'), [filtered, period])
-  const outPoints = useMemo(() => groupByPeriod(filtered, period, 'out'), [filtered, period])
+  const current = {
+    inc: sum(shown, 'income'),
+    out: sum(shown, 'expenses'),
+    net: sum(shown, 'income') - sum(shown, 'expenses'),
+  }
+  const previous = {
+    inc: sum(prior, 'income'),
+    out: sum(prior, 'expenses'),
+    net: sum(prior, 'income') - sum(prior, 'expenses'),
+  }
 
+  const inPoints = shown.map((m) => ({ label: m.label, value: m.income }))
+  const outPoints = shown.map((m) => ({ label: m.label, value: m.expenses }))
+
+  const rangeLabel = shown.length > 0
+    ? `${shown[0].label} to ${shown[shown.length - 1].label}`
+    : 'no data'
+
+  // The transactions table still lists real transactions, so it keeps its own
+  // window over the raw list.
+  const windowStart = useMemo(() => {
+    const d = new Date()
+    d.setMonth(d.getMonth() - (months - 1), 1)
+    return d.toISOString().slice(0, 10)
+  }, [months])
+  const filtered = useMemo(
+    () => transactions.filter((t) => t.date >= windowStart),
+    [transactions, windowStart],
+  )
 
   const topClients = useMemo(() => {
     const totals = new Map<string, number>()
@@ -371,22 +279,12 @@ export default function FinanceDashboard({
       .slice(0, 5)
   }, [filtered])
 
-  // Burn is measured over whole past months only — the current month is
-  // partial, and including it drags the average down and flatters runway.
+  // Burn over whole past months only — the current month is partial, and
+  // including it drags the average down and flatters runway.
   const avgMonthlyBurn = useMemo(() => {
-    const now = new Date()
-    let total = 0
-    let months = 0
-    for (let i = 1; i <= 6; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-      const spend = transactions
-        .filter((t) => t.type === 'out' && t.status === 'PAID' && t.date.startsWith(key))
-        .reduce((s, t) => s + t.amount, 0)
-      if (spend > 0) { total += spend; months++ }
-    }
-    return months > 0 ? total / months : 0
-  }, [transactions])
+    const past = monthly.slice(0, -1).slice(-6).filter((m) => m.expenses > 0)
+    return past.length > 0 ? past.reduce((t, m) => t + m.expenses, 0) / past.length : 0
+  }, [monthly])
 
   const runwayMonths = summary.bank_balance_nzd != null && avgMonthlyBurn > 0
     ? Math.floor(summary.bank_balance_nzd / avgMonthlyBurn)
@@ -408,7 +306,6 @@ export default function FinanceDashboard({
         </div>
       )}
 
-      {/* Header */}
       <div>
         <h1 className="page-title">Finance</h1>
         <p className="page-subtitle">
@@ -417,30 +314,23 @@ export default function FinanceDashboard({
         </p>
       </div>
 
-      {/* The hero, and deliberately not in a card. It is the page's answer, not
-          one tile among several — a box around it made it compete with the
-          chart instead of introducing it.
-
-          Money in and money out used to be repeated here as well as on the
-          chart below, one directly above the other. The chart owns them now. */}
       <section>
         <p className="label" style={{ marginBottom: 6 }}>
-          {losing ? 'Net loss' : 'Net profit'} · {period === 'week' ? 'this week' : period === 'month' ? 'this month' : 'this year'}
+          {losing ? 'Net loss' : 'Net profit'} · last {months} months
         </p>
         <p className="finance-hero" style={{ color: losing ? 'var(--danger)' : 'var(--text-primary)' }}>
           {fmtBig(Math.round(current.net))}
         </p>
         <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '10px 0 0' }}>
-          <Delta now={current.net} before={previous.net} against={PERIOD_NOUN[period]} />
+          <Delta now={current.net} before={previous.net} against={`the ${months} months before`} />
           {losing && ' · you are spending more than you are bringing in'}
         </p>
         <p style={{ fontSize: 12, color: 'var(--text-tertiary)', margin: '4px 0 0' }}>
-          Money that has actually moved. Invoices raised but not yet paid are on{' '}
+          Cash basis, straight from Xero&apos;s profit and loss. Invoices raised but not yet paid are on{' '}
           <Link href="/dashboard/money" style={{ color: 'var(--accent)' }}>Money</Link>.
         </p>
       </section>
 
-      {/* The chart, on the page rather than in a card. */}
       <MoneyChart
         inData={inPoints}
         outData={outPoints}
@@ -448,15 +338,15 @@ export default function FinanceDashboard({
         outTotal={fmtBig(Math.round(current.out))}
         inDelta={previous.inc === 0 ? undefined : ((current.inc - previous.inc) / Math.abs(previous.inc)) * 100}
         outDelta={previous.out === 0 ? undefined : ((current.out - previous.out) / Math.abs(previous.out)) * 100}
-        caption={`Live from Xero · ${rangeLabel}${inPoints.length > 0 ? ` · ${inPoints[inPoints.length - 1].label} is still in progress` : ''}`}
+        caption={`Live from Xero · ${rangeLabel}`}
         control={
           <CustomSelect
-            value={period}
-            onChange={(v) => setPeriod(v as Period)}
+            value={String(months)}
+            onChange={(v) => setMonths(Number(v) as MonthsWindow)}
             options={[
-              { value: 'week', label: 'Last 7 days' },
-              { value: 'month', label: 'This month' },
-              { value: 'year', label: 'This year' },
+              { value: '3', label: 'Last 3 months' },
+              { value: '6', label: 'Last 6 months' },
+              { value: '12', label: 'Last 12 months' },
             ]}
             className="flow-range"
           />

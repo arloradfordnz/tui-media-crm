@@ -37,6 +37,9 @@ export default function MoneyChart({
   // never shrink to unreadable. This is the fix for the one complaint about
   // this chart: it was the unmeasured case that scaled the SVG down.
   const [asTable, setAsTable] = useState(false)
+  // Click a figure to read its line on its own. Clicking it again, or the
+  // other one, releases it.
+  const [focus, setFocus] = useState<'primary' | 'comparison' | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [wrapWidth, setWrapWidth] = useState<number | null>(null)
   useEffect(() => {
@@ -61,8 +64,16 @@ export default function MoneyChart({
     <div>
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 mb-4">
         <div className="flex flex-wrap gap-x-8 gap-y-3">
-          <Figure label="Money in" value={inTotal} colour="var(--accent)" delta={inDelta} />
-          <Figure label="Money out" value={outTotal} colour="var(--chart-out)" delta={outDelta} goodWhenUp={false} />
+          <Figure
+            label="Money in" value={inTotal} colour="var(--accent)" delta={inDelta}
+            active={focus === 'primary'} dimmed={focus === 'comparison'}
+            onClick={() => setFocus((f) => (f === 'primary' ? null : 'primary'))}
+          />
+          <Figure
+            label="Money out" value={outTotal} colour="var(--chart-out)" delta={outDelta} goodWhenUp={false}
+            active={focus === 'comparison'} dimmed={focus === 'primary'}
+            onClick={() => setFocus((f) => (f === 'comparison' ? null : 'comparison'))}
+          />
         </div>
         <div className="flex items-center gap-2">
           {control}
@@ -92,6 +103,7 @@ export default function MoneyChart({
             data={shownIn}
             comparisonData={shownOut}
             comparisonColor="var(--chart-out)"
+            focus={focus}
             width={wrapWidth ?? undefined}
           />
         </div>
@@ -103,17 +115,24 @@ export default function MoneyChart({
 }
 
 function Figure({
-  label, value, colour, delta, goodWhenUp = true,
+  label, value, colour, delta, goodWhenUp = true, active, dimmed, onClick,
 }: {
-  label: string; value: string; colour: string; delta?: number; goodWhenUp?: boolean
+  label: string; value: string; colour: string; delta?: number
+  goodWhenUp?: boolean; active: boolean; dimmed: boolean; onClick: () => void
 }) {
   return (
-    <div>
-      <div className="flex items-center gap-2">
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flow-figure${active ? ' is-active' : ''}${dimmed ? ' is-dimmed' : ''}`}
+      aria-pressed={active}
+      title={active ? `Show both series again` : `Show only ${label.toLowerCase()}`}
+    >
+      <span className="flex items-center gap-2">
         <span className="legend-dot" style={{ background: colour }} />
-        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{label}</p>
-      </div>
-      <div className="flex items-baseline gap-2 mt-1.5">
+        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+      </span>
+      <span className="flex items-baseline gap-2 mt-1.5">
         <span
           className="text-3xl font-semibold tabular-nums"
           style={{ letterSpacing: '-0.03em', color: 'var(--text-primary)', lineHeight: 1 }}
@@ -121,8 +140,8 @@ function Figure({
           {value}
         </span>
         <Delta pct={delta} goodWhenUp={goodWhenUp} />
-      </div>
-    </div>
+      </span>
+    </button>
   )
 }
 

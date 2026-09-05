@@ -10,10 +10,13 @@ export default function RevenueChart({
   data,
   comparisonData,
   comparisonColor,
+  focus,
   width,
 }: {
   data: Point[]
   comparisonData?: Point[]
+  /** Dim the other line so one trend can be read on its own. */
+  focus?: 'primary' | 'comparison' | null
   /** Colour for the second line. Defaults to the muted dashed treatment that
    *  means "the period before this one". Pass a real colour when the second
    *  line is a series in its own right — money out, say — rather than a
@@ -28,7 +31,14 @@ export default function RevenueChart({
   const svgRef = useRef<SVGSVGElement>(null)
   const uid = useId().replace(/:/g, '')
   const gradId = `rg${uid}`
+  const gradCompId = `rgc${uid}`
   const clipId = `rc${uid}`
+
+  // Focus dims the other line rather than hiding it: the point of looking at
+  // one trend is usually to see it against the other.
+  const dim = 0.16
+  const mainOpacity = focus === 'comparison' ? dim : 1
+  const compOpacity = focus === 'primary' ? dim : 1
 
   const allValues = [
     ...data.map((p) => p.value),
@@ -155,6 +165,14 @@ export default function RevenueChart({
             <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.10" />
             <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
           </linearGradient>
+          {/* The second line gets the same wash when it is a real series
+              rather than a muted period comparison. */}
+          {comparisonColor && (
+            <linearGradient id={gradCompId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={comparisonColor} stopOpacity="0.10" />
+              <stop offset="100%" stopColor={comparisonColor} stopOpacity="0" />
+            </linearGradient>
+          )}
           <clipPath id={clipId}>
             <rect x={Y_W} y={PAD_T - 1} width={chartW} height={chartH + 2} />
           </clipPath>
@@ -172,6 +190,14 @@ export default function RevenueChart({
 
         <g clipPath={`url(#${clipId})`}>
           {/* Comparison line (previous period) — opacified */}
+          {compPath && comparisonColor && (
+            <path
+              d={`${compPath} L${cxs[cxs.length - 1]},${fillBottom} L${cxs[0]},${fillBottom} Z`}
+              fill={`url(#${gradCompId})`}
+              opacity={compOpacity}
+              style={{ transition: 'opacity 160ms ease' }}
+            />
+          )}
           {compPath && (
             <path
               d={compPath}
@@ -180,14 +206,15 @@ export default function RevenueChart({
               strokeWidth={comparisonColor ? 1.5 : 1.25}
               strokeLinejoin="round"
               strokeLinecap="round"
-              opacity={comparisonColor ? 1 : 0.35}
+              opacity={comparisonColor ? compOpacity : 0.35 * compOpacity}
               strokeDasharray={comparisonColor ? undefined : '4 3'}
+              style={{ transition: 'opacity 160ms ease' }}
             />
           )}
 
           {/* Current period fill + line */}
-          <path d={fillPath} fill={`url(#${gradId})`} />
-          <path d={linePath} fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+          <path d={fillPath} fill={`url(#${gradId})`} opacity={mainOpacity} style={{ transition: 'opacity 160ms ease' }} />
+          <path d={linePath} fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" opacity={mainOpacity} style={{ transition: 'opacity 160ms ease' }} />
         </g>
 
         {/* X-axis labels */}
