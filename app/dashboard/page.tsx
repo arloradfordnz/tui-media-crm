@@ -1,9 +1,8 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { getAttention, type AttentionItem } from '@/lib/attention'
 import { getTuiThread } from '@/lib/tui/thread'
-import { ArrowUpRight, Camera, CheckCircle2 } from 'lucide-react'
+import { ArrowUpRight, Camera, CheckCircle2, Plus, UserPlus } from 'lucide-react'
 import Link from 'next/link'
-import ButtonArrow from '@/components/ButtonArrow'
 import Greeting from './Greeting'
 import TuiThread from '@/components/TuiThread'
 
@@ -55,10 +54,10 @@ export default async function DashboardPage() {
             Revenue <ArrowUpRight className="w-3.5 h-3.5" />
           </Link>
           <Link href="/dashboard/clients/new" className="btn-secondary">
-            New Client <ButtonArrow />
+            <UserPlus className="w-4 h-4" /> New Client
           </Link>
           <Link href="/dashboard/jobs/new" className="btn-primary">
-            New Job <ButtonArrow />
+            <Plus className="w-4 h-4" /> New Job
           </Link>
         </div>
       </div>

@@ -141,8 +141,7 @@
 
      Deliberately NOT tokenised: the entrance choreography on ConfirmSheet
      (140ms scrim, 160ms dialog, 220ms sheet) is a tuned relationship between
-     three elements rather than three independent guesses, and the 420ms
-     arrow on .btn-arrow is a signature, not a transition. */
+     three elements rather than three independent guesses. */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --dur-fast: 120ms;
   --dur-base: 200ms;
@@ -634,11 +633,15 @@ input, textarea, select, button { font-family: inherit; }
   line-height: 1.1;
   margin: 0;
 }
+/* Wraps internally AND is allowed to shrink. flex-shrink: 0 meant a header
+   with a search box plus two buttons stayed 533px wide inside a 508px column
+   and the last button hung off the right edge of the page. */
 .page-header-actions {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-shrink: 0;
+  flex-wrap: wrap;
+  max-width: 100%;
   padding-top: 4px;
 }
 
@@ -649,7 +652,10 @@ input, textarea, select, button { font-family: inherit; }
   gap: 0;
   border-bottom: 1px solid var(--bg-border);
   margin-bottom: 24px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.page-tabs::-webkit-scrollbar { display: none; }
 .page-tab {
   padding: 10px 14px;
   font-size: 13.5px;
@@ -1686,8 +1692,33 @@ input, textarea, select, button { font-family: inherit; }
   }
 }
 
+/* Record tables fit their container instead of scrolling sideways.
+   Seven columns sized to their content wanted 855px inside a 438px card, so
+   the clients list scrolled horizontally — a scroll nobody goes looking for,
+   hiding whole columns behind it. Squeezing them to fit is worse: every
+   column becomes "E…", "L…", "$…".
+
+   The reflowed layout below already solves this, and the only reason it did
+   not apply is that it was keyed to the viewport rather than to the space the
+   table actually has. A 1024px laptop with a 248px sidebar leaves about 700px
+   of content, which is a phone's worth of room for seven columns. The
+   threshold moves up to match. */
+@media (min-width: 1025px) {
+  .record-table { table-layout: fixed; width: 100%; }
+
+  /* Identity gets the room; the rest share what is left. */
+  .record-table th:first-child,
+  .record-table td:first-child { width: 26%; }
+
+  .record-table td[data-role="secondary"],
+  .record-table th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* The primary cell stacks a name over tags or a subtitle, so it wraps. */
+  .record-table td[data-role="primary"] { white-space: normal; }
+}
+
 /* ── Reflowing record rows ────────────────────────────────────
-   One DOM tree, two projections. A real <table> at >=769px; below that the
+   One DOM tree, two projections. A real <table> at >=1025px; below that the
    same rows become flex containers so every cell REFLOWS instead of being
    display:none'd. That is the whole point — the previous approach hid shoot
    date, client, value and type on exactly the device where you most need a
@@ -1699,8 +1730,12 @@ input, textarea, select, button { font-family: inherit; }
      secondary — supporting facts. Wrap to line two as one muted, dot-separated
                  run. Because primary grows, these are pushed to the next line
                  without any explicit break.
-   Cells with no data-role keep table behaviour and are left alone. */
-@media (max-width: 768px) {
+   Cells with no data-role keep table behaviour and are left alone.
+
+   Keyed at 1024px rather than 768px: the breakpoint is about how much room
+   the table has, not what kind of device is asking. A narrow laptop beside a
+   248px sidebar has a phone's worth of content width. */
+@media (max-width: 1024px) {
   .record-table,
   .record-table tbody,
   .record-table tr,
@@ -2006,64 +2041,6 @@ input, textarea, select, button { font-family: inherit; }
   }
   .attention-body { grid-area: body; }
   .attention-action { grid-area: action; justify-self: end; }
-}
-
-/* ── Arrow badge ──────────────────────────────────────────────
-   tuimedia.nz's signature CTA affordance: a 30px circle in inverted
-   colours holding an arrow, which slides out to the right while an
-   identical arrow slides in from the left. Two stacked SVGs in one grid
-   area is exactly how the site does it — the second sits off to the left
-   until hover.
-
-   Gated behind (hover: hover) and (pointer: fine) like the original, so a
-   touch device gets the badge without a transition it can never trigger.
-
-   Opt-in: only buttons that navigate carry it. A "Save" or "Create Event"
-   submit should not wear a "go" affordance. */
-.btn-arrow {
-  width: 30px;
-  height: 30px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--on-accent);
-  color: var(--accent);
-  overflow: hidden;
-  position: relative;
-}
-.btn-arrow svg {
-  grid-area: 1 / 1;
-  width: 12px;
-  height: 12px;
-  display: block;
-  transition: transform 420ms cubic-bezier(0.19, 1, 0.22, 1);
-}
-.btn-arrow svg:nth-child(2) { transform: translateX(-160%); }
-
-/* An arrow tucks against the right edge, so the padding goes asymmetric —
-   the same 6px/1.15rem split the site uses. */
-.btn-primary:has(.btn-arrow),
-.btn-secondary:has(.btn-arrow) {
-  padding: 6px 6px 6px 1.15rem;
-}
-
-/* Outline and ghost variants invert the badge: accent circle, ink arrow. */
-.btn-secondary .btn-arrow,
-.btn-ghost .btn-arrow {
-  background: var(--accent);
-  color: var(--on-accent);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .btn-primary:hover .btn-arrow svg:nth-child(1),
-  .btn-secondary:hover .btn-arrow svg:nth-child(1) { transform: translateX(160%); }
-  .btn-primary:hover .btn-arrow svg:nth-child(2),
-  .btn-secondary:hover .btn-arrow svg:nth-child(2) { transform: translateX(0); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .btn-arrow svg { transition: none; }
 }
 
 /* ── Portal media band ────────────────────────────────────────

@@ -1,8 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { formatNZD, getInitials } from '@/lib/format'
-import { Users } from 'lucide-react'
+import { Users, UserPlus } from 'lucide-react'
 import Link from 'next/link'
-import ButtonArrow from '@/components/ButtonArrow'
 import SearchInput from '@/components/SearchInput'
 import FilterTabs from '@/components/FilterTabs'
 import QuickStatus from './QuickStatus'
@@ -74,13 +73,13 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
           <SearchInput basePath="/dashboard/clients" placeholder="Search clients..." />
           <SyncLifetimeButton />
           <Link href="/dashboard/clients/new" className="btn-primary">
-            New Client <ButtonArrow />
+            <UserPlus className="w-4 h-4" /> New Client
           </Link>
         </div>
       </div>
 
       {/* Status + category tabs */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
         <FilterTabs options={STATUS_OPTIONS} paramName="status" defaultValue="active" />
         <div className="hidden sm:block">
           <FilterTabs options={CATEGORY_OPTIONS} paramName="category" defaultValue="all" />
