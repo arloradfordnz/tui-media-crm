@@ -1,10 +1,11 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { getAttention, type AttentionItem } from '@/lib/attention'
+import { getTuiThread } from '@/lib/tui/thread'
 import { ArrowUpRight, Camera, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 import ButtonArrow from '@/components/ButtonArrow'
 import Greeting from './Greeting'
-import TuiPanel from './TuiPanel'
+import TuiThread from '@/components/TuiThread'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,13 +31,9 @@ function timeLabel(start: string | null, end: string | null): string {
 
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient()
-  const [attention, { data: tuiThread }] = await Promise.all([
+  const [attention, tuiThread] = await Promise.all([
     getAttention(supabase, new Date()),
-    supabase
-      .from('sms_messages')
-      .select('direction, body, created_at')
-      .order('created_at', { ascending: false })
-      .limit(12),
+    getTuiThread(supabase),
   ])
 
   const { todayLabel, todayEvents, items } = attention
@@ -148,13 +145,7 @@ export default async function DashboardPage() {
             One thread with Telegram
           </span>
         </div>
-        <TuiPanel
-          initialThread={(
-            (tuiThread ?? []) as { direction: 'inbound' | 'outbound'; body: string; created_at: string }[]
-          )
-            .slice()
-            .reverse()}
-        />
+        <TuiThread initialThread={tuiThread} variant="panel" />
       </section>
     </div>
   )

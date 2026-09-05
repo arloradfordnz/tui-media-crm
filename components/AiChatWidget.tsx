@@ -2,9 +2,11 @@
 
 import { useState, useEffect, lazy, Suspense } from 'react'
 
-const AiChat = lazy(() => import('./AiChat'))
+const TuiThread = lazy(() => import('./TuiThread'))
 
-// Keyboard-launched AI assistant: press ⌘K (or Ctrl+K) to toggle.
+// Keyboard-launched Tui: press ⌘K (or Ctrl+K) to toggle. This is the same
+// assistant and the same thread as the home-screen panel and /dashboard/tui —
+// it just fetches its own history, having no server parent to seed it.
 export default function AiChatWidget() {
   const [open, setOpen] = useState(false)
   const [hasOpened, setHasOpened] = useState(false)
@@ -37,8 +39,8 @@ export default function AiChatWidget() {
           fallback={
             <div
               style={{
-                height: 400,
-                width: 340,
+                height: 440,
+                width: 360,
                 background: 'var(--bg-surface)',
                 borderRadius: 12,
                 border: '1px solid var(--bg-border)',
@@ -46,7 +48,7 @@ export default function AiChatWidget() {
             />
           }
         >
-          <AiChat />
+          <TuiThread variant="overlay" />
         </Suspense>
       </div>
     </div>

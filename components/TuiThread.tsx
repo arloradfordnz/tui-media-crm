@@ -4,39 +4,74 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowUp, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
-import { parseLinks, cleanContent, isWorking, renderMarkdown } from '@/components/chat-markup'
+import type { ThreadMessage } from '@/lib/tui/thread'
+import { parseLinks, cleanContent, isWorking, renderMarkdown } from './chat-markup'
 
-// Tui on the home screen — the same assistant that texts Arlo on Telegram,
-// same persona, same tools, same thread. The panel is seeded with the recent
-// sms_messages history (both surfaces write to it), so the conversation picks
-// up exactly where the last text left off.
+// The one Tui surface. Before this component there were two — an AiChat widget
+// behind ⌘K with its own empty in-memory history, and a TuiPanel on the home
+// screen seeded from the Telegram thread — so the same assistant answered
+// differently depending on which box you typed into, and anything you asked
+// via ⌘K was invisible to Telegram and to the next page load.
+//
+// There is now one component with three mounts: the Today panel, the /dashboard/tui
+// page, and the ⌘K overlay. All three read and write sms_messages, which is the
+// same table the Telegram brain uses, so it is genuinely one conversation.
 
-type ThreadMessage = { direction: 'inbound' | 'outbound'; body: string; created_at: string }
 type Message = { role: 'user' | 'assistant'; content: string }
+
+export type TuiVariant = 'panel' | 'page' | 'overlay'
 
 const SUGGESTIONS = [
   'What needs attention today?',
   'Who owes me money?',
   "What's on this week?",
+  'Which jobs are in review?',
 ]
 
-// How much history to send back to the model per turn — enough for
-// continuity, bounded so the payload stays small and the turn stays fast.
+// How much history to send back to the model per turn — enough for continuity,
+// bounded so the payload stays small and the turn stays fast.
 const HISTORY_CAP = 20
 
-export default function TuiPanel({ initialThread }: { initialThread: ThreadMessage[] }) {
-  const [messages, setMessages] = useState<Message[]>(() =>
-    initialThread.map((m) => ({
-      role: m.direction === 'inbound' ? 'user' as const : 'assistant' as const,
-      content: m.body,
-    }))
-  )
+function toMessages(thread: ThreadMessage[]): Message[] {
+  return thread.map((m) => ({
+    role: m.direction === 'inbound' ? ('user' as const) : ('assistant' as const),
+    content: m.body,
+  }))
+}
+
+export default function TuiThread({
+  initialThread,
+  variant = 'panel',
+}: {
+  // Server-rendered mounts pass the thread straight in. The overlay has no
+  // server parent, so it passes nothing and fetches it on mount instead.
+  initialThread?: ThreadMessage[]
+  variant?: TuiVariant
+}) {
+  const [messages, setMessages] = useState<Message[]>(() => toMessages(initialThread ?? []))
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [hasChatted, setHasChatted] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+
+  const seeded = initialThread !== undefined
+
+  // Overlay-only: pull the shared thread once so ⌘K opens mid-conversation
+  // rather than on a blank slate.
+  useEffect(() => {
+    if (seeded) return
+    let cancelled = false
+    fetch('/api/ai/thread')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.thread) return
+        setMessages((prev) => (prev.length > 0 ? prev : toMessages(data.thread)))
+      })
+      .catch(() => { /* an empty thread is a fine fallback */ })
+    return () => { cancelled = true }
+  }, [seeded])
 
   useEffect(() => {
     const el = scrollRef.current
@@ -53,6 +88,65 @@ export default function TuiPanel({ initialThread }: { initialThread: ThreadMessa
     setLoading(true)
     setHasChatted(true)
 
+    // Pending buffer + rAF-driven typewriter so streamed chunks reveal smoothly
+    // instead of jumping in bursts. Control markers ([[WORKING]] etc.) must flush
+    // instantly so the UI state doesn't lag behind tool execution.
+    let pending = ''
+    let streamDone = false
+    let rafId: number | null = null
+
+    const flushTick = () => {
+      if (pending.length === 0) {
+        if (streamDone) { rafId = null; return }
+        rafId = requestAnimationFrame(flushTick)
+        return
+      }
+
+      // Reveal a slice proportional to buffer size so big dumps don't lag,
+      // but small chunks still animate. Floor of 2 chars/frame ≈ ~120 cps.
+      const sliceLen = Math.max(2, Math.ceil(pending.length / 20))
+      const ctrlIdx = pending.indexOf('[[')
+      let emit: string
+      if (ctrlIdx === 0) {
+        // Flush the entire control marker atomically.
+        const end = pending.indexOf(']]')
+        if (end === -1) {
+          rafId = requestAnimationFrame(flushTick)
+          return
+        }
+        emit = pending.slice(0, end + 2)
+        pending = pending.slice(end + 2)
+      } else if (ctrlIdx > 0 && ctrlIdx < sliceLen) {
+        emit = pending.slice(0, ctrlIdx)
+        pending = pending.slice(ctrlIdx)
+      } else {
+        emit = pending.slice(0, sliceLen)
+        pending = pending.slice(sliceLen)
+      }
+
+      setMessages((prev) => {
+        const updated = [...prev]
+        const last = updated[updated.length - 1]
+        updated[updated.length - 1] = { ...last, content: last.content + emit }
+        return updated
+      })
+
+      rafId = requestAnimationFrame(flushTick)
+    }
+
+    rafId = requestAnimationFrame(flushTick)
+
+    function fail(message: string) {
+      streamDone = true
+      if (rafId !== null) cancelAnimationFrame(rafId)
+      setMessages((prev) => {
+        const updated = [...prev]
+        updated[updated.length - 1] = { role: 'assistant', content: message }
+        return updated
+      })
+      setLoading(false)
+    }
+
     try {
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
@@ -66,12 +160,7 @@ export default function TuiPanel({ initialThread }: { initialThread: ThreadMessa
           const data = await res.json()
           errorMsg = data.error || errorMsg
         } catch { /* not JSON */ }
-        setMessages((prev) => {
-          const updated = [...prev]
-          updated[updated.length - 1] = { role: 'assistant', content: `Error: ${errorMsg}` }
-          return updated
-        })
-        setLoading(false)
+        fail(`Error: ${errorMsg}`)
         return
       }
 
@@ -84,31 +173,35 @@ export default function TuiPanel({ initialThread }: { initialThread: ThreadMessa
         if (done) break
         const chunk = decoder.decode(value, { stream: true })
         if (chunk.includes('[[MUTATED]]')) didMutate = true
-        setMessages((prev) => {
-          const updated = [...prev]
-          const last = updated[updated.length - 1]
-          updated[updated.length - 1] = { ...last, content: last.content + chunk }
-          return updated
-        })
+        pending += chunk
+      }
+
+      streamDone = true
+      while (pending.length > 0) {
+        await new Promise((r) => setTimeout(r, 16))
       }
 
       // Only invalidate server data when Tui actually wrote something.
       if (didMutate) router.refresh()
     } catch {
-      setMessages((prev) => {
-        const updated = [...prev]
-        updated[updated.length - 1] = { role: 'assistant', content: 'Something went wrong there. Try again.' }
-        return updated
-      })
+      fail('Something went wrong there. Try again.')
+      return
     }
     setLoading(false)
   }
+
+  const containerStyle =
+    variant === 'page'
+      ? { height: '100%', width: '100%' }
+      : variant === 'overlay'
+        ? { height: 440, width: 360 }
+        : { height: 420 }
 
   return (
     <div
       className="flex flex-col rounded-xl overflow-hidden"
       style={{
-        height: 420,
+        ...containerStyle,
         background: 'var(--bg-surface)',
         border: '1px solid var(--bg-border)',
       }}
@@ -117,7 +210,7 @@ export default function TuiPanel({ initialThread }: { initialThread: ThreadMessa
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-2.5">
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full">
-            <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
+            <p className="text-sm text-center" style={{ color: 'var(--text-tertiary)' }}>
               Ask about jobs, clients, invoices. Same Tui as your Telegram.
             </p>
           </div>
