@@ -1,25 +1,26 @@
+import { Line, PageHeader } from '@/components/Skeleton'
+
+// Mirrors app/dashboard/documents/page.tsx: the header, then the generator
+// card with its paired fields. Every field is 60px, matching Field.
 export default function DocumentsLoading() {
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div className="skeleton" style={{ width: '240px', height: '28px' }} />
-        <div className="skeleton" style={{ width: '120px', height: '36px' }} />
-      </div>
+      <PageHeader subtitle actions={1} />
       <div className="card space-y-4">
-        <div className="skeleton" style={{ width: '100px', height: '14px' }} />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="skeleton" style={{ height: '42px' }} />
-          ))}
+        <div className="flex items-center justify-between gap-3">
+          <Line w={130} h={20} />
+          <Line w={160} h={60} r={22} />
         </div>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="card space-y-3">
-            <div className="skeleton" style={{ width: '60%', height: '14px' }} />
-            <div className="skeleton" style={{ width: '40%', height: '10px' }} />
-          </div>
-        ))}
+        <Line h={60} r={22} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => <Line key={i} h={60} r={22} />)}
+        </div>
+        <Line h={132} r={22} />
+        <div className="flex gap-3 flex-wrap">
+          <Line w={168} h={44} r={999} />
+          <Line w={168} h={44} r={999} />
+          <Line w={168} h={44} r={999} />
+        </div>
       </div>
     </div>
   )

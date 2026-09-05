@@ -1,12 +1,19 @@
+import { Line, PageHeader } from '@/components/Skeleton'
+
+// Mirrors app/dashboard/settings/page.tsx: header, the mobile section tiles,
+// then the stacked setting cards.
 export default function SettingsLoading() {
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="skeleton" style={{ width: '160px', height: '28px' }} />
+      <PageHeader />
+      <div className="settings-mobile-nav">
+        {Array.from({ length: 5 }).map((_, i) => <Line key={i} h={44} r={14} />)}
+      </div>
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="card space-y-3">
-          <div className="skeleton" style={{ width: '140px', height: '14px' }} />
-          <div className="skeleton" style={{ width: '100%', height: '40px' }} />
-          <div className="skeleton" style={{ width: '60%', height: '40px' }} />
+        <div key={i} className="card space-y-4">
+          <Line w={120} h={14} />
+          <Line h={60} r={22} />
+          <Line w="70%" h={60} r={22} />
         </div>
       ))}
     </div>
