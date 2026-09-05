@@ -45,78 +45,18 @@
 }
 
 /* ── Design Tokens ────────────────────────────────────────── */
-/* The palette is tuimedia.nz's, token for token (see the site's PALETTES.md).
-   The site is navy-only; the CRM keeps its light/dark switch, so the same
-   brand is expressed twice:
+/* The palette. tuimedia.nz's own values, verbatim.
+   Token NAMES are the CRM's existing ones, so no component references a
+   colour directly.
 
-     dark  — the site's own values, unchanged. Navy paper, blue accent.
-     light — the same hues inverted onto paper: a cool off-white ground with
-             navy ink, and the accent deepened just enough to hold contrast
-             on a light surface (#6E9BF7 is a dark-ground blue and fails as
-             text or a fill colour on white).
-
-   Token NAMES are the CRM's existing ones so no component has to change. */
-
-/* Default = light */
+   There is one theme. There was briefly a light one — the same hues inverted
+   onto paper — behind a Settings toggle, and it was removed along with the
+   toggle: this is a tool for one person who works in the dark, and a second
+   palette is a second surface to keep honest for no one's benefit. Its token
+   block outlived it here as unreachable overrides sitting under a hardcoded
+   `.dark` on <html>, which made every colour in the app look like it had two
+   answers. It has one. */
 :root {
-  --bg-base: #F4F6FA;        /* app canvas — cool paper, the navy inverted */
-  --bg-surface: #FFFFFF;     /* cards / panels */
-  --bg-elevated: #EDF0F7;    /* inset boxes, hover, active fills */
-  --bg-hover: #E4E9F3;       /* row / control hover */
-  --bg-border: #DBE1EC;      /* hairline borders */
-  --text-primary: #0A1428;   /* --accent-ink from the site: near-black navy */
-  --text-secondary: #5A6884;
-  --text-tertiary: #8996B2;  /* --muted, which reads as tertiary on paper */
-  --accent: #2F5FD0;         /* --accent deepened for a light ground (4.9:1) */
-  --accent-hover: #244CAE;
-  --accent-muted: rgba(47, 95, 208, 0.10);
-  --accent-soft: #4A7AE4;
-  --on-accent: #FFFFFF;
-  --success: #1B8F4F;
-  --warning: #B4690E;
-  --danger: #C4443F;
-  --sidebar-width: 248px;
-  --sidebar-inset: 12px;     /* gap around floating sidebar */
-
-  /* Liquid glass (translucent chrome) — light.
-     The site's nav pill is a translucent panel carried by blur and a drop
-     shadow with no border; these keep a hairline because CRM panels sit on
-     a busier ground than a marketing page. */
-  --glass-bg: rgba(255, 255, 255, 0.62);
-  --glass-border: rgba(10, 20, 40, 0.10);
-  --glass-hover: rgba(10, 20, 40, 0.05);
-  --glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 10px 34px rgba(10, 20, 40, 0.14);
-
-  /* Card glass — subtler than chrome glass so content stays legible */
-  --glass-card-bg: rgba(255, 255, 255, 0.72);
-  --glass-card-border: rgba(10, 20, 40, 0.08);
-  --glass-card-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.85);
-
-  /* Radii — the site's scale. 32px panels, 22px controls, pill for anything
-     interactive and small. */
-  --r-sm: 14px;
-  --r-md: 18px;
-  --r-lg: 22px;
-  --r-xl: 32px;
-  --r-pill: 999px;
-
-  /* Feature surfaces — the site's own navy, both themes, so a hero card
-     reads as a piece of the brand rather than "the dark one". */
-  --grad-hero: #0F1930;      /* --surface */
-  --grad-accent: #2F5FD0;
-
-  /* Shadows — soft and navy-tinted rather than neutral grey */
-  --shadow-soft: 0 1px 3px rgba(10, 20, 40, 0.06), 0 1px 2px rgba(10, 20, 40, 0.04);
-  --shadow-glow-accent: 0 8px 24px rgba(47, 95, 208, 0.16);
-  --shadow-glow-warm: 0 8px 24px rgba(10, 20, 40, 0.10);
-
-  /* Motion — the site's single easing curve */
-  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-/* ── Dark theme (Settings → Appearance, or the device default) ──
-   These are tuimedia.nz's values verbatim. */
-.dark {
   --bg-base: #060D1A;        /* --paper */
   --bg-surface: #0F1930;     /* --surface */
   --bg-elevated: #16223E;    /* insets sit a step ABOVE the card, not below */
@@ -134,24 +74,68 @@
   --warning: #F5C06B;
   --danger: #FF8A8A;         /* --error */
 
-  --grad-hero: #1B2E52;      /* lifted navy so a feature card is not just another card */
-  --grad-accent: #6E9BF7;
+  --sidebar-width: 248px;
+  --sidebar-inset: 12px;     /* gap around floating sidebar */
 
-  --shadow-soft: 0 10px 34px -10px rgba(0, 0, 0, 0.6);
-  --shadow-glow-accent: 0 12px 36px rgba(0, 0, 0, 0.55);
-  --shadow-glow-warm: 0 12px 36px rgba(0, 0, 0, 0.55);
+  /* Liquid glass (translucent chrome). --nav-bg on the site is a translucent
+     --surface, blurred and saturated; the same recipe here.
 
-  /* Liquid glass — dark. --nav-bg on the site is a translucent --surface,
-     blurred and saturated; the same recipe here. */
+     Anything new that uses these MUST write the standard backdrop-filter in
+     its own rule, separate from the -webkit- one. Lightning CSS dedupes the
+     pair within a single rule and keeps only the last, which silently turned
+     an entire pass of glass surfaces into flat opacity. */
   --glass-bg: rgba(15, 25, 48, 0.40);
   --glass-border: rgba(239, 242, 248, 0.13);
   --glass-hover: rgba(239, 242, 248, 0.08);
   --glass-shadow: inset 0 1px 0 rgba(239, 242, 248, 0.12), 0 10px 34px -10px rgba(0, 0, 0, 0.6);
 
-  /* Card glass — dark */
+  /* Card glass — subtler than chrome glass so content stays legible */
   --glass-card-bg: rgba(15, 25, 48, 0.72);
   --glass-card-border: rgba(239, 242, 248, 0.11);
   --glass-card-highlight: inset 0 1px 0 rgba(239, 242, 248, 0.07);
+
+  /* Radii — the site's scale. 32px panels, 22px controls, pill for anything
+     interactive and small. */
+  --r-sm: 14px;
+  --r-md: 18px;
+  --r-lg: 22px;
+  --r-xl: 32px;
+  --r-pill: 999px;
+
+  /* Feature surfaces — lifted navy, so a hero card reads as a piece of the
+     brand rather than just another card. */
+  --grad-hero: #1B2E52;
+  --grad-accent: #6E9BF7;
+
+  /* Shadows — soft and navy-tinted rather than neutral grey */
+  --shadow-soft: 0 10px 34px -10px rgba(0, 0, 0, 0.6);
+  --shadow-glow-accent: 0 12px 36px rgba(0, 0, 0, 0.55);
+  --shadow-glow-warm: 0 12px 36px rgba(0, 0, 0, 0.55);
+
+  /* ── Motion ────────────────────────────────────────────────
+     Transition timing was scattered across eight values — 80, 100, 120, 140,
+     150, 160, 200, 240, 300ms — most of them the same intent typed slightly
+     differently on different days. Two durations cover almost all of it, and
+     nothing moved by more than 40ms to get there:
+
+       fast  a state change you should barely notice (hover, focus, a tick)
+       base  something appearing or resizing in place
+
+     The panel pair is separate because it is shared with JS: the report panel
+     slides in CSS while the main area's margin animates from an inline style
+     in DashboardShell, and if those two disagree the page tears. One token
+     each is what keeps them honest.
+
+     Deliberately NOT tokenised: the entrance choreography on ConfirmSheet
+     (140ms scrim, 160ms dialog, 220ms sheet) is a tuned relationship between
+     three elements rather than three independent guesses, and the 420ms
+     arrow on .btn-arrow is a signature, not a transition. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+
+  --dur-panel: 240ms;
+  --ease-panel: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ── Reset ────────────────────────────────────────────────── */
@@ -233,7 +217,7 @@ input, textarea, select, button { font-family: inherit; }
   background: transparent;
   outline: none;
   box-shadow: none;
-  transition: border-color 200ms ease, box-shadow 200ms ease;
+  transition: border-color var(--dur-base) ease, box-shadow var(--dur-base) ease;
 }
 .field-input::placeholder { color: var(--text-tertiary); opacity: 0.7; }
 .field-input:focus {
@@ -274,7 +258,7 @@ input, textarea, select, button { font-family: inherit; }
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
-  transition: transform 140ms var(--ease-out), background 200ms ease, border-color 200ms ease;
+  transition: transform var(--dur-fast) var(--ease-out), background var(--dur-base) ease, border-color var(--dur-base) ease;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -300,7 +284,7 @@ input, textarea, select, button { font-family: inherit; }
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
-  transition: transform 140ms var(--ease-out), background 200ms ease, border-color 200ms ease;
+  transition: transform var(--dur-fast) var(--ease-out), background var(--dur-base) ease, border-color var(--dur-base) ease;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -320,7 +304,7 @@ input, textarea, select, button { font-family: inherit; }
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
-  transition: transform 140ms var(--ease-out), background 200ms ease, border-color 200ms ease;
+  transition: transform var(--dur-fast) var(--ease-out), background var(--dur-base) ease, border-color var(--dur-base) ease;
 }
 .btn-danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
 .btn-danger:active { transform: scale(0.975); }
@@ -338,7 +322,7 @@ input, textarea, select, button { font-family: inherit; }
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
-  transition: color 200ms ease, background 200ms ease, border-color 200ms ease;
+  transition: color var(--dur-base) ease, background var(--dur-base) ease, border-color var(--dur-base) ease;
   text-decoration: none;
 }
 .btn-ghost:hover {
@@ -376,7 +360,7 @@ input, textarea, select, button { font-family: inherit; }
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   text-decoration: none;
-  transition: transform 140ms var(--ease-out), background 200ms ease;
+  transition: transform var(--dur-fast) var(--ease-out), background var(--dur-base) ease;
 }
 .btn-hero-light:hover { background: rgba(239, 242, 248, 0.18); }
 .btn-hero-light:active { transform: scale(0.975); }
@@ -394,7 +378,7 @@ input, textarea, select, button { font-family: inherit; }
   color: #0A1428;
   border: 1px solid transparent;
   text-decoration: none;
-  transition: transform 140ms var(--ease-out), background 200ms ease;
+  transition: transform var(--dur-fast) var(--ease-out), background var(--dur-base) ease;
 }
 .btn-hero-solid:hover { background: #8FB2F9; }
 .btn-hero-solid:active { transform: scale(0.975); }
@@ -409,7 +393,7 @@ input, textarea, select, button { font-family: inherit; }
   border: none;
   border-radius: var(--r-pill);
   cursor: pointer;
-  transition: color 200ms ease, background 200ms ease;
+  transition: color var(--dur-base) ease, background var(--dur-base) ease;
 }
 .btn-icon:hover { background: var(--bg-elevated); color: var(--text-primary); }
 
@@ -472,7 +456,7 @@ input, textarea, select, button { font-family: inherit; }
   letter-spacing: -0.01em;
   color: var(--text-secondary);
   text-decoration: none;
-  transition: color 200ms ease, background 200ms ease;
+  transition: color var(--dur-base) ease, background var(--dur-base) ease;
   position: relative;
 }
 .nav-item:not(.active):hover {
@@ -492,7 +476,7 @@ input, textarea, select, button { font-family: inherit; }
   height: 16px;
   flex-shrink: 0;
   color: var(--text-tertiary);
-  transition: color 120ms ease;
+  transition: color var(--dur-fast) ease;
 }
 .nav-item:hover .nav-item-icon { color: var(--text-primary); }
 .nav-item.active .nav-item-icon { color: var(--accent); }
@@ -517,7 +501,7 @@ input, textarea, select, button { font-family: inherit; }
   border-radius: var(--r-pill);
   background: transparent;
   cursor: text;
-  transition: border-color 200ms ease, box-shadow 200ms ease;
+  transition: border-color var(--dur-base) ease, box-shadow var(--dur-base) ease;
 }
 .sidebar-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .sidebar-search input {
@@ -597,7 +581,7 @@ input, textarea, select, button { font-family: inherit; }
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   cursor: pointer;
-  transition: color 120ms ease, border-color 120ms ease;
+  transition: color var(--dur-fast) ease, border-color var(--dur-fast) ease;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -651,7 +635,7 @@ input, textarea, select, button { font-family: inherit; }
 }
 
 .table-row {
-  transition: background 80ms ease;
+  transition: background var(--dur-fast) ease;
   contain: content;
   border-bottom: 1px solid var(--bg-border);
 }
@@ -771,7 +755,7 @@ input, textarea, select, button { font-family: inherit; }
   font-weight: 500;
   color: var(--text-tertiary);
   cursor: pointer;
-  transition: color 120ms ease, background 120ms ease;
+  transition: color var(--dur-fast) ease, background var(--dur-fast) ease;
   border: none;
   background: transparent;
 }
@@ -807,7 +791,7 @@ input, textarea, select, button { font-family: inherit; }
   align-items: center;
   justify-content: center;
   z-index: 50;
-  animation: fadeIn 100ms ease;
+  animation: fadeIn var(--dur-fast) ease;
 }
 .modal-content {
   background: var(--bg-surface);
@@ -819,7 +803,7 @@ input, textarea, select, button { font-family: inherit; }
   max-height: 90dvh;
   overflow-y: auto;
   box-shadow: 0 24px 60px rgba(6, 13, 26, 0.22);
-  animation: slideUp 100ms ease;
+  animation: slideUp var(--dur-fast) ease;
   will-change: transform, opacity;
 }
 
@@ -836,7 +820,7 @@ input, textarea, select, button { font-family: inherit; }
   font-size: 14px;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 150ms ease;
+  transition: all var(--dur-fast) ease;
 }
 .upload-drop:hover { border-color: var(--accent); color: var(--accent); }
 
@@ -851,7 +835,7 @@ input, textarea, select, button { font-family: inherit; }
 }
 .pipeline-segment {
   height: 100%;
-  transition: width 300ms ease;
+  transition: width var(--dur-base) ease;
 }
 
 /* ── Tabs ─────────────────────────────────────────────────── */
@@ -864,7 +848,7 @@ input, textarea, select, button { font-family: inherit; }
   border: none;
   border-bottom: 2px solid transparent;
   cursor: pointer;
-  transition: all 150ms ease;
+  transition: all var(--dur-fast) ease;
 }
 .tab:hover { color: var(--text-primary); }
 .tab.active {
@@ -932,7 +916,7 @@ input, textarea, select, button { font-family: inherit; }
 }
 
 .animate-fade-in {
-  animation: fadeIn 120ms ease;
+  animation: fadeIn var(--dur-fast) ease;
 }
 .skeleton {
   background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-hover) 50%, var(--bg-elevated) 75%);
@@ -983,7 +967,7 @@ input, textarea, select, button { font-family: inherit; }
   background: transparent;
   cursor: pointer;
   text-align: left;
-  transition: border-color 200ms ease, box-shadow 200ms ease;
+  transition: border-color var(--dur-base) ease, box-shadow var(--dur-base) ease;
   font-family: inherit;
 }
 .custom-select-trigger:hover:not(:disabled) { border-color: var(--text-tertiary); }
@@ -1001,7 +985,7 @@ input, textarea, select, button { font-family: inherit; }
   box-shadow: 0 18px 40px rgba(6, 13, 26, 0.20), 0 2px 8px rgba(6, 13, 26, 0.08);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  animation: selectMenuIn 100ms ease;
+  animation: selectMenuIn var(--dur-fast) ease;
   transform-origin: top center;
 }
 
@@ -1044,7 +1028,7 @@ input, textarea, select, button { font-family: inherit; }
 .link-subtle {
   color: var(--text-secondary);
   text-decoration: none;
-  transition: color 100ms ease;
+  transition: color var(--dur-fast) ease;
 }
 .link-subtle:hover {
   color: var(--text-primary);
@@ -1062,7 +1046,7 @@ input, textarea, select, button { font-family: inherit; }
   color: var(--text-primary);
   background: transparent;
   outline: none;
-  transition: border-color 200ms ease, box-shadow 200ms ease;
+  transition: border-color var(--dur-base) ease, box-shadow var(--dur-base) ease;
 }
 .search-input::placeholder { color: var(--text-tertiary); opacity: 0.7; }
 .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
@@ -1087,7 +1071,7 @@ input, textarea, select, button { font-family: inherit; }
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 150ms ease;
+  transition: opacity var(--dur-fast) ease;
 }
 .tooltip:hover::after { opacity: 1; }
 
@@ -1128,7 +1112,7 @@ input, textarea, select, button { font-family: inherit; }
   background: var(--bg-surface);
   overflow: hidden;
   z-index: 60;
-  transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--dur-panel) var(--ease-panel);
 }
 
 /* Main content sits beside the pinned sidebar on desktop */
@@ -1231,7 +1215,7 @@ input, textarea, select, button { font-family: inherit; }
   letter-spacing: -0.01em;
   color: var(--text-primary);
   cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease;
+  transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease;
   font-family: inherit;
 }
 .pill-select:hover { background: var(--bg-elevated); border-color: var(--text-tertiary); }
@@ -1252,7 +1236,7 @@ input, textarea, select, button { font-family: inherit; }
   inset: 0;
   background: rgba(6, 13, 26, 0.55);
   z-index: 60;
-  animation: fadeIn 140ms ease;
+  animation: fadeIn var(--dur-fast) ease;
 }
 .drawer-panel {
   position: fixed;
@@ -1329,7 +1313,7 @@ input, textarea, select, button { font-family: inherit; }
   height: 13px;
   flex-shrink: 0;
   color: var(--text-tertiary);
-  transition: transform 150ms ease;
+  transition: transform var(--dur-fast) ease;
 }
 .navsec-head[data-collapsed="true"] .navsec-chevron {
   transform: rotate(-90deg);
@@ -1347,7 +1331,7 @@ input, textarea, select, button { font-family: inherit; }
   align-items: center;
   gap: 2px;
   opacity: 0;
-  transition: opacity 120ms ease;
+  transition: opacity var(--dur-fast) ease;
   color: var(--text-tertiary);
 }
 .navsec-head:hover .navsec-actions { opacity: 1; }
@@ -1411,7 +1395,7 @@ input, textarea, select, button { font-family: inherit; }
   background: var(--bg-surface);
   overflow: hidden;
   z-index: 40;
-  transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--dur-panel) var(--ease-panel);
 }
 .report-panel .drawer-section {
   border-top: 1px solid var(--bg-border);
@@ -1561,7 +1545,7 @@ input, textarea, select, button { font-family: inherit; }
     font-family: inherit;
     text-decoration: none;
     cursor: pointer;
-    transition: color 160ms ease;
+    transition: color var(--dur-fast) ease;
   }
   .mobile-tab.active { color: var(--accent); }
 
@@ -2017,7 +2001,7 @@ input, textarea, select, button { font-family: inherit; }
   background: rgba(6, 13, 26, 0.6);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  animation: confirmScrimIn 140ms ease;
+  animation: confirmScrimIn var(--dur-fast) ease;
 }
 
 .confirm-sheet {

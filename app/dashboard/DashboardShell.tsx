@@ -22,7 +22,6 @@ export function usePanelContext() {
 }
 
 const PANEL_W = 404 // 380px panel + 12px left margin + 12px right margin
-const EASE = 'cubic-bezier(0.4, 0, 0.2, 1)'
 
 export default function DashboardShell({ children }: { children: ReactNode }) {
   const [panelOpen, setPanelOpen] = useState(false)
@@ -69,7 +68,10 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
           className="main-area"
           style={{
             marginRight: panelOpen && isDesktop ? PANEL_W : 0,
-            transition: `margin-right 240ms ${EASE}`,
+            // The panel itself slides in CSS (.report-panel) while this margin
+            // animates here, so the two must run on identical timing or the
+            // page visibly tears mid-transition. Both read the same tokens.
+            transition: 'margin-right var(--dur-panel) var(--ease-panel)',
             display: 'flex',
             flexDirection: 'column',
             height: '100dvh',
