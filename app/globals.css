@@ -2448,3 +2448,92 @@ input, textarea, select, button { font-family: inherit; }
 }
 .money-table tr:last-child td { border-bottom: none; }
 .money-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ── Floating-label fields ────────────────────────────────────
+   The tuimedia.nz form treatment: the label sits INSIDE the control as its
+   resting state, then shrinks up to the top edge once the field is focused or
+   filled. One box per field instead of a label stacked above a box, which is
+   both tighter and stops a column of shouty uppercase labels competing with
+   the values.
+
+   Requires the input to carry placeholder=" " so :placeholder-shown can tell
+   empty from filled — an input with no placeholder attribute never matches it,
+   which would leave the label floated permanently over an empty box. The Field
+   component sets that; do not hand-roll one without it. */
+.field {
+  position: relative;
+  display: block;
+}
+
+.field > .field-input,
+.field .custom-select-trigger {
+  width: 100%;
+  padding-top: 22px;
+  padding-bottom: 8px;
+}
+
+.field textarea.field-input {
+  padding-top: 26px;
+}
+
+.field > .field-label {
+  position: absolute;
+  left: 19px;
+  top: 50%;
+  transform: translateY(-50%);
+  transform-origin: left center;
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  transition:
+    top var(--dur-fast) var(--ease-out),
+    font-size var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+/* A textarea's label belongs at the top of the box, not its middle. */
+.field:has(textarea.field-input) > .field-label {
+  top: 18px;
+  transform: none;
+}
+
+.field:has(.field-input:focus) > .field-label,
+.field:has(.field-input:not(:placeholder-shown)) > .field-label,
+.field:has(textarea.field-input:focus) > .field-label,
+.field:has(textarea.field-input:not(:placeholder-shown)) > .field-label,
+/* Pickers always show a value or a placeholder of their own, so their label
+   never has a resting centred state. */
+.field:has(.custom-select-trigger) > .field-label {
+  top: 9px;
+  transform: none;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+}
+
+/* The doubled .field is load-bearing. Lightning CSS merges the selector list
+   above into a single :is(...), and :is() takes the specificity of its MOST
+   specific argument — the textarea one — so the merged rule outranks a plain
+   .field:has(...) written after it and this colour never applied. Same family
+   of problem as the backdrop-filter dedupe: the authored CSS is correct and
+   the compiled CSS is not what you wrote. */
+.field.field:has(.field-input:focus) > .field-label {
+  color: var(--accent);
+}
+
+/* The placeholder is a spacer, not content — never show it. A real hint goes
+   in .field-hint underneath. */
+.field > .field-input::placeholder { color: transparent; }
+.field > .field-input:focus::placeholder { color: var(--text-tertiary); opacity: 0.6; }
+
+.field-hint {
+  margin: 6px 2px 0;
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+}

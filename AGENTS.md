@@ -55,6 +55,25 @@ Put the standard `backdrop-filter` in its **own separate rule** from the
 `-webkit-` one. Dedupe is within-rule, not cross-rule. Any new glass surface
 must follow that split or it will not blur.
 
+## Lightning CSS merges selector lists into :is()
+
+A comma-separated selector list gets compiled into a single `:is(...)` rule,
+and **`:is()` takes the specificity of its most specific argument**. So a group
+like
+
+```css
+.field:has(.field-input:focus) > .field-label,
+.field:has(textarea.field-input:not(:placeholder-shown)) > .field-label { ... }
+```
+
+outranks a plain `.field:has(.field-input:focus) > .field-label` written
+*after* it, because the `textarea` member dragged the whole group's specificity
+up. The later rule silently does nothing.
+
+Same family as the backdrop-filter dedupe: the authored CSS is right and the
+compiled CSS is not what you wrote. When a rule that should obviously win does
+not, read the compiled output before rewriting the source.
+
 ## CSS specificity ordering in globals.css
 
 The mobile overrides sit in a large `@media (max-width: 768px)` block partway

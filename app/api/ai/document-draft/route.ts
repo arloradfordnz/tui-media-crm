@@ -29,6 +29,50 @@ ${DRAFT_END}
 Do not write anything after the closing marker. Before the markers, you may write one short sentence like "Here's a draft — let me know what to change.".`
 }
 
+// One-shot drafting, for the AI button that sits on the Content field.
+//
+// The interview above is the right shape for a chat panel and the wrong shape
+// for a button: you press it because you want a draft, not a conversation.
+// Everything it would have asked is already on the form, so this reads the
+// form and writes.
+function oneShotPrompt(template: string, ctx: DraftContext): string {
+  const today = new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
+  const known = [
+    ctx.clientName && `Client: ${ctx.clientName}`,
+    ctx.contactPerson && `Key contact: ${ctx.contactPerson}`,
+    ctx.jobDescription && `Job: ${ctx.jobDescription}`,
+    ctx.location && `Location: ${ctx.location}`,
+    ctx.shootDate && `Shoot date: ${ctx.shootDate}`,
+    ctx.date && `Document date: ${ctx.date}`,
+  ].filter(Boolean).join('\n')
+
+  return `You are drafting the body of a ${template} for ${ctx.businessName || 'Tui Media'}, Arlo Radford's videography, photography and marketing business in Nelson, New Zealand.
+
+Today is ${today}.
+
+What is already known:
+${known || '(nothing beyond the document type — write a sensible general draft)'}
+
+Write the body now. Do not ask questions and do not preface it with anything.
+
+Rules:
+- Markdown, using "### Heading" for each section, one or two short paragraphs of plain prose under each.
+- Cover only what applies to a ${template}: parties, scope of services, timeline and delivery, payment terms, revisions, usage rights, cancellation.
+- NZ English. No emojis. No em dashes.
+- Where a real figure is genuinely needed and not supplied, leave a square-bracketed placeholder like [amount] rather than inventing one. A made-up price in a contract is worse than a blank.
+- Output the document body only. No preamble, no sign-off, no markers.`
+}
+
+type DraftContext = {
+  clientName?: string
+  businessName?: string
+  contactPerson?: string
+  jobDescription?: string
+  location?: string
+  date?: string
+  shootDate?: string
+}
+
 export async function POST(request: NextRequest) {
   if (!(await getAuthUser())) return unauthorizedResponse()
 
@@ -37,16 +81,25 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'ANTHROPIC_API_KEY is not configured.' }, { status: 500 })
   }
 
-  const { template, messages, clientName, businessName } = await request.json()
-  if (!template || !Array.isArray(messages)) {
-    return Response.json({ error: 'template and messages are required.' }, { status: 400 })
+  const body = await request.json()
+  const { template, messages, mode } = body
+  if (!template) {
+    return Response.json({ error: 'template is required.' }, { status: 400 })
+  }
+
+  const oneShot = mode === 'oneshot'
+  if (!oneShot && !Array.isArray(messages)) {
+    return Response.json({ error: 'messages are required unless mode is "oneshot".' }, { status: 400 })
   }
 
   const anthropic = new Anthropic({ apiKey })
-  const apiMessages: Anthropic.MessageParam[] = messages.map((m: { role: string; content: string }) => ({
-    role: m.role as 'user' | 'assistant',
-    content: m.content,
-  }))
+  const ctx: DraftContext = body
+  const apiMessages: Anthropic.MessageParam[] = oneShot
+    ? [{ role: 'user', content: `Write the ${template} body.` }]
+    : messages.map((m: { role: string; content: string }) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }))
 
   const encoder = new TextEncoder()
   const stream = new ReadableStream({
@@ -54,8 +107,8 @@ export async function POST(request: NextRequest) {
       try {
         const s = anthropic.messages.stream({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1500,
-          system: [{ type: 'text', text: systemPrompt(template, { clientName, businessName }), cache_control: { type: 'ephemeral' } }],
+          max_tokens: oneShot ? 2500 : 1500,
+          system: [{ type: 'text', text: oneShot ? oneShotPrompt(template, ctx) : systemPrompt(template, ctx), cache_control: { type: 'ephemeral' } }],
           messages: apiMessages,
         })
         s.on('text', (t) => controller.enqueue(encoder.encode(t)))
