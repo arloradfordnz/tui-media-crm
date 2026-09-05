@@ -27,8 +27,22 @@ handler keeps returning its old behaviour with no compile error.
 # 3. Start it again.
 ```
 
-Verify against a restarted server before concluding the code is wrong. Twice in
-one session a "bug" was this and nothing else.
+Verify against a restarted server before concluding the code is wrong. Three
+times in one session a "bug" was this and nothing else.
+
+**A restart is not always enough, and `touch` never is.** Turbopack keyed off
+content, so a CSS block appended to `app/globals.css` stayed absent from the
+served stylesheet through a full stop / cache-wipe / restart, and `touch` did
+not shake it loose either. Adding a throwaway rule (`.zz-sentinel { color: red }`)
+forced the rebuild, after which the real block appeared — and then removing the
+sentinel was itself a content change, so it stuck. If a style is missing from
+the compiled output, confirm it with
+
+```bash
+curl -s "http://localhost:3003$(curl -s http://localhost:3003/login   | grep -o '/_next/static/chunks/[^"]*\.css' | head -1)" | grep -c my-class
+```
+
+before touching the CSS itself — the source is usually fine.
 
 ## Lightning CSS dedupes backdrop-filter
 
