@@ -3,9 +3,7 @@ import { TOOLS, executeTool, CONFIRM_TOOLS, toolFingerprint } from '@/lib/ai-too
 import { recordPendingAction } from '@/lib/assistant-approvals'
 import { buildTelegramSystem } from '@/lib/assistant-persona'
 import { sendTelegramMessage } from '@/lib/telegram'
-import { fetchOutstandingInvoices, getValidXeroAccount } from '@/lib/xero'
-import { fetchUnreadEmails, checkMailConnection } from '@/lib/mail'
-import { getContentBacklog } from '@/lib/content-backlog'
+import { buildContext, tierForTrigger } from '@/lib/tui/context'
 
 // One place to change the model. Both the agent loop and the forced
 // send_message round must run the same one — thinking blocks are echoed back
@@ -37,141 +35,6 @@ const SEND_MESSAGE_TOOL: Anthropic.Tool = {
     required: ['body'],
   },
 }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function buildSnapshot(supabase: any): Promise<string> {
-  const now = new Date()
-  // NZ wall-clock, not UTC — matters both for correct date-boundary
-  // comparisons and so the model actually knows what time it is (it was
-  // previously working off a bare UTC date with no time-of-day at all,
-  // which is how it ended up saying "morning" in the evening).
-  const todayISO = now.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })
-  const nowNZ = now.toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland', weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true })
-  const staleThreshold = new Date(now.getTime() - 7 * 86400000).toISOString()
-
-  const staleLeadThreshold = new Date(now.getTime() - 5 * 86400000).toISOString()
-  const shootPrepWindow = new Date(now.getTime() + 5 * 86400000).toISOString()
-  const staleProposalThreshold = new Date(now.getTime() - 4 * 86400000).toISOString()
-  const dormantClientThreshold = new Date(now.getTime() - 90 * 86400000).toISOString()
-
-  const [overdueTasks, stalledJobs, overdueDeadlines, recentTicks, recentMessages, openTodos, outstandingInvoices, unreadEmails, contentBacklog, coldLeads, shootsNeedingPrep, staleProposals, dormantClients] = await Promise.all([
-    supabase.from('job_tasks')
-      .select('id, title, due_date, jobs(id, name, status, clients(name))')
-      .eq('completed', false)
-      .not('due_date', 'is', null)
-      .lte('due_date', todayISO)
-      .order('due_date')
-      .limit(20),
-    supabase.from('jobs')
-      .select('id, name, status, updated_at, clients(name)')
-      .in('status', ['editing', 'review'])
-      .lt('updated_at', staleThreshold)
-      .order('updated_at')
-      .limit(20),
-    supabase.from('events')
-      .select('id, title, date, jobs(name)')
-      .eq('event_type', 'deadline')
-      .lt('date', todayISO)
-      .order('date')
-      .limit(10),
-    supabase.from('agent_ticks')
-      .select('ran_at, reasoning, sms_sent, sms_body')
-      .order('ran_at', { ascending: false })
-      .limit(5),
-    supabase.from('sms_messages')
-      .select('direction, body, created_at')
-      .order('created_at', { ascending: false })
-      .limit(10),
-    // Open todos — general business items Arlo asked to be reminded about,
-    // not tied to a specific job. This is the mechanism behind "text me
-    // later about X": add a todo, it surfaces on the next scheduled tick.
-    supabase.from('todos')
-      .select('id, title, due_date')
-      .eq('completed', false)
-      .order('due_date', { ascending: true, nullsFirst: false })
-      .limit(10),
-    // Best-effort — Xero may not be connected, and a failure here shouldn't
-    // break the whole snapshot.
-    fetchOutstandingInvoices().catch(() => []),
-    // Best-effort — mail server hiccups shouldn't break the snapshot either.
-    fetchUnreadEmails(15).catch(() => []),
-    // Retainer content backlog — the honest measure of how far behind Arlo is,
-    // counted from portal uploads rather than job status. Best-effort too: a
-    // failure here should cost the backlog, not the whole snapshot.
-    getContentBacklog(supabase, now).catch(() => null),
-    // Pipeline leads that have gone quiet — nobody's touched them in 5+ days.
-    // Distinct from "problems": this is a growth signal, not a delivery one.
-    supabase.from('clients')
-      .select('id, name, pipeline_stage, updated_at')
-      .eq('status', 'lead')
-      .in('pipeline_stage', ['enquiry', 'discovery', 'proposal', 'negotiation'])
-      .lt('updated_at', staleLeadThreshold)
-      .order('updated_at')
-      .limit(10),
-    // Jobs with a shoot inside the next 5 days that haven't reached shoot-ready
-    // status yet — the "nothing's actually organised and the date is close" case.
-    supabase.from('jobs')
-      .select('id, name, shoot_date, status, clients(name)')
-      .not('shoot_date', 'is', null)
-      .gte('shoot_date', todayISO)
-      .lte('shoot_date', shootPrepWindow)
-      .in('status', ['enquiry', 'booked'])
-      .order('shoot_date')
-      .limit(10),
-    // Proposals sent 4+ days ago with no response — worth a nudge or a follow-up.
-    supabase.from('proposals')
-      .select('id, status, sent_at, total_value, jobs(name, clients(name))')
-      .eq('status', 'sent')
-      .lt('sent_at', staleProposalThreshold)
-      .is('responded_at', null)
-      .order('sent_at')
-      .limit(10),
-    // Past clients gone quiet for 90+ days — a reconnect/upsell opportunity,
-    // not a problem to fix.
-    supabase.from('clients')
-      .select('id, name, status, updated_at')
-      .eq('status', 'past')
-      .lt('updated_at', dormantClientThreshold)
-      .order('updated_at')
-      .limit(5),
-  ])
-
-  // Explicit connectivity checks — fetchOutstandingInvoices/fetchUnreadEmails
-  // return [] both when "nothing to report" and "integration is broken",
-  // which is exactly the ambiguity the heartbeat exists to resolve.
-  const [xeroAccount, mailConnected] = await Promise.all([
-    getValidXeroAccount().catch(() => null),
-    checkMailConnection().catch(() => false),
-  ])
-
-  const todayForCompare = todayISO
-  const overdueInvoices = outstandingInvoices
-    .filter((inv) => inv.Status === 'AUTHORISED' && inv.AmountDue > 0 && !!inv.DueDateString && inv.DueDateString.slice(0, 10) < todayForCompare)
-    .map((inv) => ({ number: inv.InvoiceNumber, amount_due: inv.AmountDue, due_date: inv.DueDateString?.slice(0, 10) }))
-
-  return JSON.stringify({
-    today: todayISO,
-    current_time_nz: nowNZ,
-    overdue_tasks: overdueTasks.data ?? [],
-    jobs_stalled_in_editing_or_review_7d_plus: stalledJobs.data ?? [],
-    overdue_deadline_events: overdueDeadlines.data ?? [],
-    open_todos: openTodos.data ?? [],
-    overdue_xero_invoices: overdueInvoices,
-    retainer_content_backlog: contentBacklog,
-    unread_emails: unreadEmails,
-    cold_pipeline_leads: coldLeads.data ?? [],
-    shoots_soon_without_prep: shootsNeedingPrep.data ?? [],
-    proposals_awaiting_response: staleProposals.data ?? [],
-    dormant_past_clients: dormantClients.data ?? [],
-    system_health: {
-      xero_connected: !!xeroAccount,
-      email_connected: mailConnected,
-    },
-    recent_brain_ticks: recentTicks.data ?? [],
-    recent_messages_last_10_oldest_first: (recentMessages.data ?? []).slice().reverse(),
-  })
-}
-
 export async function runAssistantTurn(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
@@ -188,7 +51,10 @@ export async function runAssistantTurn(
   }
 
   const anthropic = new Anthropic({ apiKey })
-  const snapshot = await buildSnapshot(supabase)
+  // Tier the context to the trigger. An inbound reply gets two queries and no
+  // third-party calls; only the daily heartbeat pays for Xero and IMAP.
+  const tier = tierForTrigger(opts.trigger)
+  const snapshot = await buildContext(supabase, tier)
 
   const userTurn = opts.trigger === 'inbound'
     ? `Arlo just messaged: "${opts.inboundBody}"\n\nCurrent CRM snapshot:\n${snapshot}`
