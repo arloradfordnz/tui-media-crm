@@ -15,7 +15,7 @@ export const metadata = { title: 'Money' }
 // The home screen's attention list has the same problem: it can say money is
 // owed, and its only honest action was to send you to Xero.
 //
-// Same split as Today and Insights. This page is the operational half: a list
+// This page is the operational half of money: a list
 // you work down. Finance stays the analytical half.
 
 function daysBetween(iso: string, today: string): number {

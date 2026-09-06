@@ -7,7 +7,7 @@ import RevenueChart from '../RevenueChart'
 type Point = { label: string; value: number }
 
 // The Finance chart, built on the same component the dashboard used before it
-// moved to Insights — smoothed line, gradient fill, hover crosshair with a
+// moved here — smoothed line, gradient fill, hover crosshair with a
 // value pill, month labels underneath.
 //
 // It carries two real series rather than a period comparison, so the second

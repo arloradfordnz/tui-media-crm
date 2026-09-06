@@ -2812,3 +2812,25 @@ input, textarea, select, button { font-family: inherit; }
   transition: color var(--dur-fast) ease, border-color var(--dur-fast) ease;
 }
 .suggestion-chip:hover { border-color: var(--accent); color: var(--text-primary); }
+
+/* ── Today split ──────────────────────────────────────────────
+   Tui on the left, Needs you on the right. The chat gets the wider column
+   because it is the thing you type into and its messages need the room; the
+   attention list is one short sentence and one button per row, which reads
+   fine narrow.
+
+   Collapses at 1100px rather than the usual 768: the sidebar takes 248px, so
+   below that the chat column would be under 400px, and a conversation in a
+   column that narrow wraps every sentence to three lines. */
+.today-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.today-split-main,
+.today-split-side { min-width: 0; }
+
+@media (max-width: 1100px) {
+  .today-split { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+}

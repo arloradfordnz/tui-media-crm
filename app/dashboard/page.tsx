@@ -1,7 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { getAttention, type AttentionItem } from '@/lib/attention'
 import { getTuiThread } from '@/lib/tui/thread'
-import { ArrowUpRight, Camera, CheckCircle2, Plus, UserPlus } from 'lucide-react'
+import { Camera, CheckCircle2, Plus, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import Greeting from './Greeting'
 import TuiThread from '@/components/TuiThread'
@@ -16,8 +16,8 @@ export const dynamic = 'force-dynamic'
 // cold-start-uncached Xero chain, so the page you open most often was gated on
 // the slowest thing in the app.
 //
-// Revenue is a monthly artefact. It now costs a click (/dashboard/insights)
-// instead of a scroll, and nothing on this page touches Xero at all.
+// Revenue lives on Finance, which is the page for it. Nothing here touches
+// Xero at all, which is why this page paints immediately.
 
 // Six is the cap on purpose: a list you can actually finish. Everything past
 // it lives on the surface that owns it.
@@ -50,9 +50,6 @@ export default async function DashboardPage() {
           <p className="page-subtitle" style={{ marginTop: 8 }}>{todayLabel}</p>
         </div>
         <div className="page-header-actions">
-          <Link href="/dashboard/insights" className="btn-ghost btn-ghost-accent">
-            Revenue <ArrowUpRight className="w-3.5 h-3.5" />
-          </Link>
           <Link href="/dashboard/clients/new" className="btn-secondary">
             <UserPlus className="w-4 h-4" /> New Client
           </Link>
@@ -62,6 +59,8 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      {/* Today spans both columns: it is one line most days and reads as a
+          banner rather than a panel. */}
       {/* ── Today ─────────────────────────────────────────────
           Time-ordered, or an honest empty state that points at the
           next most useful thing rather than saying "nothing". */}
@@ -98,46 +97,52 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      {/* ── Needs you ─────────────────────────────────────────
-          One sentence and one action per item. Same model the
-          assistant reads (lib/attention.ts). */}
-      <section>
-        <div className="flex items-center justify-between pb-1">
-          <h2 className="section-heading" style={{ marginBottom: 0 }}>Needs you</h2>
-          {remaining > 0 && (
+      {/* Two columns, and the conversation gets the left one.
+          Tui is the thing you actually type into, so it takes the side the eye
+          starts on and the taller half of the page; Needs you is a list you
+          scan and click, which reads fine in a narrower column. They collapse
+          to one below 1100px, where side by side would leave the chat too
+          narrow to hold a sentence. */}
+      <div className="today-split">
+        {/* Same thread as Telegram; picks up where the last text left off. */}
+        <section className="today-split-main">
+          <div className="flex items-center justify-between pb-1">
+            <h2 className="section-heading" style={{ marginBottom: 0 }}>Tui</h2>
             <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-              +{remaining} more
+              One thread with Telegram
             </span>
+          </div>
+          <TuiThread initialThread={tuiThread} variant="panel" />
+        </section>
+
+        {/* One sentence and one action per item. Same model the assistant
+            reads (lib/attention.ts). */}
+        <section className="today-split-side">
+          <div className="flex items-center justify-between pb-1">
+            <h2 className="section-heading" style={{ marginBottom: 0 }}>Needs you</h2>
+            {remaining > 0 && (
+              <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                +{remaining} more
+              </span>
+            )}
+          </div>
+
+          {shown.length === 0 ? (
+            <div className="today-empty">
+              <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--success)' }} />
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                Nothing overdue, stalled or waiting on a reply.
+              </p>
+            </div>
+          ) : (
+            <div className="card-flush">
+              {shown.map((item) => (
+                <AttentionRow key={item.id} item={item} />
+              ))}
+            </div>
           )}
-        </div>
-
-        {shown.length === 0 ? (
-          <div className="today-empty">
-            <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--success)' }} />
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              Nothing overdue, stalled or waiting on a reply.
-            </p>
-          </div>
-        ) : (
-          <div className="card-flush">
-            {shown.map((item) => (
-              <AttentionRow key={item.id} item={item} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* ── Tui ───────────────────────────────────────────────
-          Same thread as Telegram; picks up where the last text left off. */}
-      <section>
-        <div className="flex items-center justify-between pb-1">
-          <h2 className="section-heading" style={{ marginBottom: 0 }}>Tui</h2>
-          <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-            One thread with Telegram
-          </span>
-        </div>
-        <TuiThread initialThread={tuiThread} variant="panel" />
-      </section>
+        </section>
+      </div>
     </div>
   )
 }
