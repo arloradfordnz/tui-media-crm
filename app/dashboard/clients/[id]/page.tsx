@@ -10,13 +10,34 @@ export default async function ClientDetailPage({ params, searchParams }: { param
 
   const supabase = await createServerSupabaseClient()
 
-  type ClientRow = { id: string; name: string; contact_person: string | null; email: string | null; phone: string | null; location: string | null; lead_source: string | null; first_contact: string | null; pipeline_stage: string; status: string; client_category: string | null; lifetime_value: number; monthly_retainer: number | null; shoots_per_month: number | null; notes: string | null; tags: string | null; portal_token?: string | null; portal_invited_at?: string | null }
+  type ClientRow = { id: string; name: string; contact_person: string | null; email: string | null; phone: string | null; location: string | null; lead_source: string | null; first_contact: string | null; pipeline_stage: string; status: string; client_category: string | null; lifetime_value: number; monthly_retainer: number | null; shoots_per_month: number | null; notes: string | null; tags: string | null; portal_token?: string | null }
+
+  // Queried on its own, and tolerant of the column not being there.
+  //
+  // portal_invited_at arrives with migration_client_accounts.sql, which is run
+  // by hand in the Supabase SQL editor. Folded into the select above, a deploy
+  // that landed before that migration would fail the whole clients query and
+  // every client record page would read "not found" until the SQL was run.
+  // Split out, the worst case is that the setup button says "Send" instead of
+  // "Resend" for a few minutes.
+  const portalInvitedAt = await (async () => {
+    try {
+      const { data } = await supabase
+        .from('clients')
+        .select('portal_invited_at')
+        .eq('id', id)
+        .single()
+      return (data?.portal_invited_at as string | null) ?? null
+    } catch {
+      return null
+    }
+  })()
 
   // Fetch all data in parallel for speed
   const [clientResult, { data: jobs }, { data: activities }, { data: documents }, invoiceDayRaw] = await Promise.all([
     supabase
       .from('clients')
-      .select('id, name, contact_person, email, phone, location, lead_source, first_contact, pipeline_stage, status, client_category, lifetime_value, monthly_retainer, shoots_per_month, notes, tags, portal_token, portal_invited_at')
+      .select('id, name, contact_person, email, phone, location, lead_source, first_contact, pipeline_stage, status, client_category, lifetime_value, monthly_retainer, shoots_per_month, notes, tags, portal_token')
       .eq('id', id)
       .single(),
     supabase
@@ -64,7 +85,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
     notes: client.notes,
     tags: client.tags,
     portalToken: client.portal_token ?? null,
-    portalInvitedAt: client.portal_invited_at ?? null,
+    portalInvitedAt,
     documents: (documents ?? []).map((d) => ({
       id: d.id,
       name: d.name,
