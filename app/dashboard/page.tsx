@@ -1,9 +1,11 @@
+import { Suspense } from 'react'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { getAttention, type AttentionItem } from '@/lib/attention'
 import { getTuiThread } from '@/lib/tui/thread'
 import { Camera, CheckCircle2, Plus, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import Greeting from './Greeting'
+import InboxPanel, { InboxPanelSkeleton } from './InboxPanel'
 import TuiThread from '@/components/TuiThread'
 
 export const dynamic = 'force-dynamic'
@@ -141,6 +143,12 @@ export default async function DashboardPage() {
               ))}
             </div>
           )}
+
+          {/* Streamed, not awaited. An IMAP login takes a second or two and
+              nothing else on this page waits on anything remote. */}
+          <Suspense fallback={<InboxPanelSkeleton />}>
+            <InboxPanel />
+          </Suspense>
         </section>
       </div>
     </div>

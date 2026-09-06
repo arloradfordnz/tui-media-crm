@@ -2840,3 +2840,40 @@ input, textarea, select, button { font-family: inherit; }
 .revision-focused {
   box-shadow: 0 0 0 2px var(--accent);
 }
+
+/* ── Inbox rows (mail waiting on a reply) ─────────────────────
+   Same shape as an attention row so the right-hand column reads as one list
+   of things needing you, not two competing ones. */
+.inbox-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--bg-border);
+  text-decoration: none;
+  transition: background var(--dur-fast) ease;
+}
+.inbox-row:last-child { border-bottom: none; }
+.inbox-row:hover { background: var(--bg-elevated); }
+
+.inbox-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.inbox-subject {
+  font-size: var(--t-md);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inbox-meta {
+  font-size: var(--t-xs);
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
