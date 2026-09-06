@@ -10,7 +10,7 @@ daylight saving), so the offsets below are what actually matters.
 | `/api/business-health/refresh` | 20:00 | 8:00am | Cached business-health figures |
 | `/api/portal-reminders` | 22:00 | 10:00am | Nudges clients sitting on deliveries |
 | `/api/telegram/brain-tick` | 02:00 | 2:00pm | Afternoon safety net, silent unless something is due |
-| `/api/health/integrations` | every 30m | — | Xero/IMAP connectivity into `integration_status` |
+| `/api/health/integrations` | 19:15 | 7:15am | Xero/IMAP connectivity into `integration_status` |
 
 ## Why there used to be seven brain ticks a day
 
@@ -37,6 +37,22 @@ net are for, and `assistant_flags` means neither can repeat itself.
 
 `/api/business-health/refresh` also lost a duplicate: it was scheduled at both
 20:00 and 21:00 UTC, doing identical work an hour apart.
+
+## The Hobby plan only allows DAILY crons
+
+This is a hard deployment gate, not a soft limit. A schedule that would fire
+more than once a day — `*/30 * * * *`, `0 * * * *` — **fails the Vercel build**
+with "Hobby accounts are limited to daily cron jobs", and the whole deploy is
+rejected. Nothing ships, including the parts that have nothing to do with cron.
+
+That is how the health check was written first, at every thirty minutes, and it
+is why it now runs once a day at 19:15 UTC — a quarter hour ahead of the
+heartbeat, so the daily digest reads connectivity that was checked minutes
+before rather than a day before. That is the moment it actually matters.
+
+If something genuinely needs to run several times a day on this plan, list the
+same path more than once at different daily times. The config before this
+branch did exactly that for brain-tick, at 21:00, 01:00 and 04:00.
 
 ## Auth
 

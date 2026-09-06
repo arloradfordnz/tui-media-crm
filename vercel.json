@@ -23,7 +23,7 @@
     },
     {
       "path": "/api/health/integrations",
-      "schedule": "*/30 * * * *"
+      "schedule": "15 19 * * *"
     }
   ]
 }
