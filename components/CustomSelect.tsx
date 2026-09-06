@@ -189,7 +189,7 @@ export default function CustomSelect({
           )}
           <div style={{ maxHeight: 240, overflowY: 'auto', padding: '4px' }}>
             {filtered.length === 0 ? (
-              <div style={{ padding: '10px 12px', fontSize: 13, color: 'var(--text-tertiary)' }}>No matches</div>
+              <div style={{ padding: '10px 12px', fontSize: 'var(--t-sm)', color: 'var(--text-tertiary)' }}>No matches</div>
             ) : (
               filtered.map((opt, i) => {
                 const isSel = opt.value === value

@@ -41,7 +41,7 @@ function HealthScoreRing({ score }: { score: number | null }) {
         <span className="text-3xl font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
           {score == null ? '—' : score}
         </span>
-        <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--text-tertiary)' }}>Score</span>
+        <span className="text-2xs uppercase tracking-wider font-semibold" style={{ color: 'var(--text-tertiary)' }}>Score</span>
       </div>
     </div>
   )
@@ -51,7 +51,7 @@ function SignalChip({ label, value }: { label: string; value: string }) {
   return (
     <div className="box-inset">
       <div className="text-base font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{value}</div>
-      <div className="text-[10px] uppercase tracking-wider font-semibold mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{label}</div>
+      <div className="text-2xs uppercase tracking-wider font-semibold mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{label}</div>
     </div>
   )
 }
@@ -117,7 +117,7 @@ export default async function BusinessHealth() {
               <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                 {report.summary}
               </p>
-              <div className="flex items-center justify-center sm:justify-start gap-1.5 mt-3 text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+              <div className="flex items-center justify-center sm:justify-start gap-1.5 mt-3 text-2xs" style={{ color: 'var(--text-tertiary)' }}>
                 <Sparkles className="w-3 h-3" />
                 AI-generated daily at midnight from your CRM and connected sources.
               </div>

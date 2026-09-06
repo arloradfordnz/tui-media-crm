@@ -24,12 +24,12 @@ const fmtBig = (n: number) =>
 // behind ("nothing to compare against against last year").
 function Delta({ now, before, against, goodWhenUp = true }: { now: number; before: number; against: string; goodWhenUp?: boolean }) {
   if (before === 0) {
-    return <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>No {against} figure to compare against</span>
+    return <span style={{ fontSize: 'var(--t-xs)', color: 'var(--text-tertiary)' }}>No {against} figure to compare against</span>
   }
   const pct = Math.round(((now - before) / Math.abs(before)) * 100)
   const good = (pct > 0) === goodWhenUp
   return (
-    <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+    <span style={{ fontSize: 'var(--t-xs)', color: 'var(--text-tertiary)' }}>
       <span style={{ color: pct === 0 ? 'var(--text-tertiary)' : good ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
         {pct > 0 ? '↑' : pct < 0 ? '↓' : ''}{Math.abs(pct)}%
       </span>{' '}
@@ -46,7 +46,7 @@ function Delta({ now, before, against, goodWhenUp = true }: { now: number; befor
 // meant nothing. Runway is the question that cash actually answers.
 function CashAndRunway({ balance, burn, runway }: { balance: number | null; burn: number; runway: number | null }) {
   if (balance == null) {
-    return <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>No bank account connected in Xero.</p>
+    return <p style={{ fontSize: 'var(--t-sm)', color: 'var(--text-tertiary)' }}>No bank account connected in Xero.</p>
   }
 
   const tone = runway == null ? 'var(--text-primary)' : runway < 3 ? 'var(--danger)' : runway < 6 ? 'var(--warning)' : 'var(--success)'
@@ -55,10 +55,10 @@ function CashAndRunway({ balance, burn, runway }: { balance: number | null; burn
 
   return (
     <div>
-      <p style={{ fontSize: 32, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-primary)', margin: 0 }}>
+      <p style={{ fontSize: 'var(--t-figure)', fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-primary)', margin: 0 }}>
         {fmtBig(balance)}
       </p>
-      <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '6px 0 14px' }}>
+      <p style={{ fontSize: 'var(--t-sm)', color: 'var(--text-secondary)', margin: '6px 0 14px' }}>
         {burn > 0 && runway != null ? (
           <>
             At {fmtBig(Math.round(burn))} a month of spending, that is{' '}
@@ -90,7 +90,7 @@ function CashAndRunway({ balance, burn, runway }: { balance: number | null; burn
 // would spend the identity channel re-encoding what bar length already shows.
 function TopClients({ clients }: { clients: { name: string; total: number }[] }) {
   if (clients.length === 0) {
-    return <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>No paid invoices in this period.</p>
+    return <p style={{ fontSize: 'var(--t-sm)', color: 'var(--text-tertiary)' }}>No paid invoices in this period.</p>
   }
   const max = Math.max(...clients.map((c) => c.total))
 
@@ -99,10 +99,10 @@ function TopClients({ clients }: { clients: { name: string; total: number }[] })
       {clients.map((c) => (
         <div key={c.name}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 5 }}>
-            <span style={{ fontSize: 13, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 'var(--t-sm)', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {c.name}
             </span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+            <span style={{ fontSize: 'var(--t-sm)', fontWeight: 600, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
               {fmtBig(c.total)}
             </span>
           </div>
@@ -138,26 +138,26 @@ function TxTable({ txs }: { txs: XeroTransaction[] }) {
           <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-tertiary)', fontWeight: 500 }}>
             Transactions
           </span>
-          <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>({txs.length})</span>
+          <span style={{ fontSize: 'var(--t-2xs)', color: 'var(--text-tertiary)' }}>({txs.length})</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ fontSize: 11, color: 'var(--success)' }}>+{fmtShort(totalIn)}</span>
-          <span style={{ fontSize: 11, color: 'var(--danger)' }}>−{fmtShort(totalOut)}</span>
+          <span style={{ fontSize: 'var(--t-2xs)', color: 'var(--success)' }}>+{fmtShort(totalIn)}</span>
+          <span style={{ fontSize: 'var(--t-2xs)', color: 'var(--danger)' }}>−{fmtShort(totalOut)}</span>
         </div>
       </div>
       {txs.length === 0 ? (
-        <p style={{ fontSize: 13, color: 'var(--text-tertiary)', padding: '12px 0' }}>No transactions in this period.</p>
+        <p style={{ fontSize: 'var(--t-sm)', color: 'var(--text-tertiary)', padding: '12px 0' }}>No transactions in this period.</p>
       ) : (
         <>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--t-sm)' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
                   {['Date', 'Description', 'Ref', 'Status', 'Amount'].map((h) => (
                     <th key={h} style={{
                       padding: '5px 10px', textAlign: h === 'Amount' ? 'right' : 'left',
                       color: 'var(--text-tertiary)', fontWeight: 500,
-                      textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.05em', whiteSpace: 'nowrap',
+                      textTransform: 'uppercase', fontSize: 'var(--t-2xs)', letterSpacing: '0.05em', whiteSpace: 'nowrap',
                     }}>{h}</th>
                   ))}
                 </tr>
@@ -165,7 +165,7 @@ function TxTable({ txs }: { txs: XeroTransaction[] }) {
               <tbody>
                 {shown.map((tx, i) => (
                   <tr key={tx.id + i} style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                    <td style={{ padding: '8px 10px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap', fontSize: 12 }}>{fmtTxDate(tx.date)}</td>
+                    <td style={{ padding: '8px 10px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap', fontSize: 'var(--t-xs)' }}>{fmtTxDate(tx.date)}</td>
                     <td style={{ padding: '8px 10px', color: 'var(--text-primary)', maxWidth: 200 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         {tx.type === 'in'
@@ -174,10 +174,10 @@ function TxTable({ txs }: { txs: XeroTransaction[] }) {
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tx.description}</span>
                       </div>
                     </td>
-                    <td style={{ padding: '8px 10px', color: 'var(--text-tertiary)', fontSize: 11 }}>{tx.reference ?? '—'}</td>
+                    <td style={{ padding: '8px 10px', color: 'var(--text-tertiary)', fontSize: 'var(--t-2xs)' }}>{tx.reference ?? '—'}</td>
                     <td style={{ padding: '8px 10px' }}>
                       <span style={{
-                        fontSize: 10, padding: '2px 7px', borderRadius: 999, fontWeight: 500,
+                        fontSize: 'var(--t-2xs)', padding: '2px 7px', borderRadius: 999, fontWeight: 500,
                         textTransform: 'uppercase', letterSpacing: '0.04em',
                         background: tx.status === 'PAID' ? 'color-mix(in srgb, var(--success) 15%, transparent)' : 'color-mix(in srgb, var(--accent) 15%, transparent)',
                         color: tx.status === 'PAID' ? 'var(--success)' : 'var(--accent)',
@@ -196,7 +196,7 @@ function TxTable({ txs }: { txs: XeroTransaction[] }) {
             <div style={{ textAlign: 'center', marginTop: 14 }}>
               <button
                 className="btn-ghost"
-                style={{ fontSize: 12 }}
+                style={{ fontSize: 'var(--t-xs)' }}
                 onClick={() => setVisible((v) => v + TX_PAGE)}
               >
                 Load {Math.min(TX_PAGE, txs.length - visible)} more ({txs.length - visible} remaining)
@@ -315,7 +315,7 @@ export default function FinanceDashboard({
 
       {showRetainerReminder && (
         <div style={{ padding: '10px 16px', borderRadius: 10, background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: '1px solid var(--accent)' }}>
-          <p style={{ fontSize: 13, color: 'var(--text-primary)', margin: 0 }}>
+          <p style={{ fontSize: 'var(--t-sm)', color: 'var(--text-primary)', margin: 0 }}>
             Today is retainer invoice day — time to send retainer invoices from Xero.
           </p>
         </div>
@@ -336,7 +336,7 @@ export default function FinanceDashboard({
         <p className="finance-hero" style={{ color: losing ? 'var(--danger)' : 'var(--text-primary)' }}>
           {fmtBig(Math.round(current.net))}
         </p>
-        <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '10px 0 0' }}>
+        <p style={{ fontSize: 'var(--t-sm)', color: 'var(--text-secondary)', margin: '10px 0 0' }}>
           {/* All time has nothing before it, so it gets no comparison clause
               rather than "no figure to compare against", which is a sentence
               about an absence nobody asked about. */}
@@ -346,7 +346,7 @@ export default function FinanceDashboard({
           {months === 'all' && `${shown.length} months of trading`}
           {losing && ' · you are spending more than you are bringing in'}
         </p>
-        <p style={{ fontSize: 12, color: 'var(--text-tertiary)', margin: '4px 0 0' }}>
+        <p style={{ fontSize: 'var(--t-xs)', color: 'var(--text-tertiary)', margin: '4px 0 0' }}>
           Cash basis, straight from Xero&apos;s profit and loss. Invoices raised but not yet paid are on{' '}
           <Link href="/dashboard/money" style={{ color: 'var(--accent)' }}>Money</Link>.
         </p>

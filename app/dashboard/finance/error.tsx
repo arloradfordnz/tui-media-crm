@@ -39,7 +39,7 @@ export default function FinanceError({
           <p
             style={{
               marginTop: 18,
-              fontSize: 11,
+              fontSize: 'var(--t-2xs)',
               color: 'var(--text-tertiary)',
               fontFamily: 'ui-monospace, monospace',
             }}

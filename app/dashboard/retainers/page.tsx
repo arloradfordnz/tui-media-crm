@@ -84,7 +84,7 @@ export default async function RetainersPage() {
                           <p className="text-sm font-medium flex items-center gap-2 flex-wrap" style={{ color: 'var(--text-primary)' }}>
                             {c.clientName}
                             {c.videosOwed > 0 && (
-                              <span style={{ color: 'var(--danger)', fontWeight: 600, fontSize: 12 }}>
+                              <span style={{ color: 'var(--danger)', fontWeight: 600, fontSize: 'var(--t-xs)' }}>
                                 {c.videosOwed} owed
                               </span>
                             )}

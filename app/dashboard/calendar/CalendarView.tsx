@@ -137,11 +137,11 @@ export default function CalendarView({ events, jobs, month, year, feedToken }: {
                     <span className="text-sm font-medium" style={{ color: isToday ? 'var(--accent)' : 'var(--text-secondary)' }}>{day}</span>
                     <div className="mt-1 space-y-1">
                       {dayEvents.slice(0, 3).map((e) => (
-                        <div key={e.id} className="text-[10px] px-1.5 py-0.5 rounded truncate" style={{ background: EVENT_COLORS[e.eventType] || 'var(--bg-elevated)', color: 'var(--on-accent)' }}>
+                        <div key={e.id} className="text-2xs px-1.5 py-0.5 rounded truncate" style={{ background: EVENT_COLORS[e.eventType] || 'var(--bg-elevated)', color: 'var(--on-accent)' }}>
                           {e.title}
                         </div>
                       ))}
-                      {dayEvents.length > 3 && <p className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>+{dayEvents.length - 3} more</p>}
+                      {dayEvents.length > 3 && <p className="text-2xs" style={{ color: 'var(--text-tertiary)' }}>+{dayEvents.length - 3} more</p>}
                     </div>
                   </>
                 )}

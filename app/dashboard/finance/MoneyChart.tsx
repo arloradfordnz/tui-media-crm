@@ -124,7 +124,7 @@ export default function MoneyChart({
         </div>
       )}
 
-      <p className="text-[11px] mt-2" style={{ color: 'var(--text-tertiary)' }}>{caption}</p>
+      <p className="text-2xs mt-2" style={{ color: 'var(--text-tertiary)' }}>{caption}</p>
     </div>
   )
 }

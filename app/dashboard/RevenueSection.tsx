@@ -151,7 +151,7 @@ export default function RevenueSection({
           width={wrapWidth ?? undefined}
         />
       </div>
-      <p className="text-[11px] mt-2" style={{ color: 'var(--text-tertiary)' }}>
+      <p className="text-2xs mt-2" style={{ color: 'var(--text-tertiary)' }}>
         {reportData.source}
       </p>
     </div>

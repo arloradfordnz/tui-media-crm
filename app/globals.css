@@ -16,6 +16,32 @@
   --radius-3xl: 32px;
 
   --font-sans: 'Bricolage Grotesque', 'Helvetica Neue', Arial, sans-serif;
+
+  /* The type utilities are remapped onto the same scale the CSS uses, so
+     `text-sm` in markup and `font-size: var(--t-md)` in a rule are the same
+     14px rather than two parallel scales drifting apart. Tailwind's defaults
+     would otherwise smuggle 18px, 24px and 30px back in through text-lg,
+     text-2xl and text-3xl, which is three more sizes nobody chose.
+
+     text-2xs is added because the app genuinely needs an 11px step for badges
+     and table headers, and `text-[10px]` written inline five times is that
+     step asking to exist. */
+  --text-2xs: 11px;
+  --text-2xs--line-height: 1.4;
+  --text-xs: 12px;
+  --text-xs--line-height: 1.45;
+  --text-sm: 14px;
+  --text-sm--line-height: 1.5;
+  --text-base: 16px;
+  --text-base--line-height: 1.55;
+  --text-lg: 20px;
+  --text-lg--line-height: 1.3;
+  --text-xl: 20px;
+  --text-xl--line-height: 1.25;
+  --text-2xl: 28px;
+  --text-2xl--line-height: 1.15;
+  --text-3xl: 32px;
+  --text-3xl--line-height: 1.1;
 }
 
 
@@ -125,6 +151,29 @@
   --shadow-glow-accent: 0 12px 36px rgba(0, 0, 0, 0.55);
   --shadow-glow-warm: 0 12px 36px rgba(0, 0, 0, 0.55);
 
+  /* ── Type scale ────────────────────────────────────────────
+     Eight steps. There were twenty-two sizes in the app — 8, 9, 10, 10.5, 11,
+     11.5, 12, 12.5, 13, 13.5, 14, 15, 16, 17, 18, 20, 22, 28 — most of them
+     near-duplicates of each other. A half-pixel difference between two labels
+     is not a decision anyone made, it is drift, and it reads as the page being
+     slightly out of focus.
+
+     --t-control is the form-field size and is 16px for a reason that is not
+     aesthetic: iOS zooms the viewport when you focus an input under 16px.
+     Do not lower it. */
+  --t-2xs: 11px;      /* badges, table headers, tab labels, tiny meta */
+  --t-xs: 12px;       /* field labels, captions, hints, chips */
+  --t-sm: 13px;       /* supporting text in a row */
+  --t-md: 14px;       /* body */
+  --t-lg: 15px;       /* buttons, section headings */
+  --t-control: 16px;  /* form fields — the iOS floor */
+  --t-h3: 20px;       /* card and dialog titles */
+  --t-h1: 28px;       /* page title */
+  --t-figure: 32px;   /* a standalone number that leads a card */
+  /* The one hero figure a page is allowed to lead with. Fluid because at 56px
+     a six-figure number does not fit a 375px phone. */
+  --t-hero: clamp(38px, 7vw, 56px);
+
   /* ── Motion ────────────────────────────────────────────────
      Transition timing was scattered across eight values — 80, 100, 120, 140,
      150, 160, 200, 240, 300ms — most of them the same intent typed slightly
@@ -195,17 +244,17 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary);
   text-wrap: balance;
 }
-h1 { font-size: 28px; font-weight: 500; line-height: 1.05; }
-h2 { font-size: 20px; font-weight: 500; line-height: 1.1; }
-h3 { font-size: 16px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.15; }
-h4 { font-size: 14px; font-weight: 500; letter-spacing: -0.02em; }
-h5, h6 { font-size: 13px; font-weight: 500; letter-spacing: -0.02em; }
+h1 { font-size: var(--t-h1); font-weight: 500; line-height: 1.05; }
+h2 { font-size: var(--t-h3); font-weight: 500; line-height: 1.1; }
+h3 { font-size: var(--t-control); font-weight: 500; letter-spacing: -0.02em; line-height: 1.15; }
+h4 { font-size: var(--t-md); font-weight: 500; letter-spacing: -0.02em; }
+h5, h6 { font-size: var(--t-sm); font-weight: 500; letter-spacing: -0.02em; }
 
 /* The site's label recipe: small, heavy, and widely tracked, so a caption
    reads as a different kind of thing from body copy rather than just
    smaller body copy. */
 .label {
-  font-size: 11px;
+  font-size: var(--t-2xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.14em;
@@ -224,7 +273,7 @@ input, textarea, select, button { font-family: inherit; }
   padding: 12px 18px;
   border: 1px solid var(--bg-border);
   border-radius: var(--r-lg);
-  font-size: 14px;
+  font-size: var(--t-md);
   color: var(--text-primary);
   background: transparent;
   outline: none;
@@ -241,7 +290,7 @@ input, textarea, select, button { font-family: inherit; }
 
 .field-label {
   display: block;
-  font-size: 11px;
+  font-size: var(--t-2xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.14em;
@@ -266,7 +315,7 @@ input, textarea, select, button { font-family: inherit; }
   color: var(--on-accent);
   border: 1px solid transparent;
   border-radius: var(--r-pill);
-  font-size: 15px;
+  font-size: var(--t-lg);
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
@@ -292,7 +341,7 @@ input, textarea, select, button { font-family: inherit; }
   color: var(--text-primary);
   border: 1px solid var(--bg-border);
   border-radius: var(--r-pill);
-  font-size: 15px;
+  font-size: var(--t-lg);
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
@@ -314,7 +363,7 @@ input, textarea, select, button { font-family: inherit; }
   color: var(--danger);
   border: 1px solid color-mix(in srgb, var(--danger) 34%, transparent);
   border-radius: var(--r-pill);
-  font-size: 15px;
+  font-size: var(--t-lg);
   font-weight: 600;
   letter-spacing: -0.01em;
   cursor: pointer;
@@ -338,7 +387,7 @@ input, textarea, select, button { font-family: inherit; }
   color: var(--text-secondary);
   border: 1px solid var(--bg-border);
   border-radius: var(--r-pill);
-  font-size: 12px;
+  font-size: var(--t-xs);
   white-space: nowrap;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -359,13 +408,13 @@ input, textarea, select, button { font-family: inherit; }
 .btn-sm {
   height: 36px;
   padding: 8px 16px;
-  font-size: 13px;
+  font-size: var(--t-sm);
   gap: 0.55em;
 }
 .btn-xs {
   height: 30px;
   padding: 6px 13px;
-  font-size: 12px;
+  font-size: var(--t-xs);
   gap: 0.5em;
 }
 
@@ -407,7 +456,7 @@ input, textarea, select, button { font-family: inherit; }
   gap: 8px;
   padding: 10px 18px;
   border-radius: var(--r-pill);
-  font-size: 14px;
+  font-size: var(--t-md);
   font-weight: 600;
   letter-spacing: -0.01em;
   background: rgba(239, 242, 248, 0.10);
@@ -427,7 +476,7 @@ input, textarea, select, button { font-family: inherit; }
   gap: 8px;
   padding: 10px 18px;
   border-radius: var(--r-pill);
-  font-size: 14px;
+  font-size: var(--t-md);
   font-weight: 600;
   letter-spacing: -0.01em;
   background: #6E9BF7;
@@ -508,7 +557,7 @@ input, textarea, select, button { font-family: inherit; }
   padding: 8px 12px;
   margin: 1px 0;
   border-radius: var(--r-pill);
-  font-size: 13.5px;
+  font-size: var(--t-sm);
   font-weight: 500;
   letter-spacing: -0.01em;
   color: var(--text-secondary);
@@ -539,7 +588,7 @@ input, textarea, select, button { font-family: inherit; }
 .nav-item.active .nav-item-icon { color: var(--accent); }
 
 .nav-section-label {
-  font-size: 11px;
+  font-size: var(--t-2xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.14em;
@@ -565,7 +614,7 @@ input, textarea, select, button { font-family: inherit; }
   border: none;
   outline: none;
   background: transparent;
-  font-size: 13px;
+  font-size: var(--t-sm);
   color: var(--text-primary);
   width: 100%;
   font-family: inherit;
@@ -616,7 +665,7 @@ input, textarea, select, button { font-family: inherit; }
   flex: 1 1 auto;
 }
 .page-breadcrumb {
-  font-size: 12px;
+  font-size: var(--t-xs);
   color: var(--text-tertiary);
   margin-bottom: 4px;
 }
@@ -626,7 +675,7 @@ input, textarea, select, button { font-family: inherit; }
    (600 vs 500) with different tracking, so no two pages started at the same
    rhythm. Pair it with .page-subtitle, which owns the gap beneath. */
 .page-title {
-  font-size: 28px;
+  font-size: var(--t-h1);
   font-weight: 500;
   letter-spacing: -0.035em;
   color: var(--text-primary);
@@ -658,7 +707,7 @@ input, textarea, select, button { font-family: inherit; }
 .page-tabs::-webkit-scrollbar { display: none; }
 .page-tab {
   padding: 10px 14px;
-  font-size: 13.5px;
+  font-size: var(--t-sm);
   font-weight: 400;
   color: var(--text-tertiary);
   background: transparent;
@@ -692,7 +741,7 @@ input, textarea, select, button { font-family: inherit; }
 .page-tabs-scroll::-webkit-scrollbar { display: none; }
 
 .page-tab-count {
-  font-size: 11px;
+  font-size: var(--t-2xs);
   font-weight: 600;
   line-height: 1;
   padding: 3px 6px;
@@ -711,7 +760,7 @@ input, textarea, select, button { font-family: inherit; }
 
 /* ── Tables ───────────────────────────────────────────────── */
 .table-header {
-  font-size: 11px;
+  font-size: var(--t-2xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -733,14 +782,14 @@ input, textarea, select, button { font-family: inherit; }
   align-items: center;
   padding: 3px 10px;
   border-radius: var(--r-pill);
-  font-size: 12px;
+  font-size: var(--t-xs);
   font-weight: 600;
   letter-spacing: -0.005em;
   white-space: nowrap;
 }
-.badge-sm { padding: 2px 8px; font-size: 10px; border-radius: var(--r-pill); }
-.badge-md { padding: 3px 10px; font-size: 12px; border-radius: var(--r-pill); }
-.badge-lg { padding: 4px 12px; font-size: 13px; border-radius: var(--r-pill); }
+.badge-sm { padding: 2px 8px; font-size: var(--t-2xs); border-radius: var(--r-pill); }
+.badge-md { padding: 3px 10px; font-size: var(--t-xs); border-radius: var(--r-pill); }
+.badge-lg { padding: 4px 12px; font-size: var(--t-sm); border-radius: var(--r-pill); }
 .badge-success { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success); }
 .badge-warning { background: color-mix(in srgb, var(--warning) 14%, transparent); color: var(--warning); }
 .badge-danger { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
@@ -762,7 +811,7 @@ input, textarea, select, button { font-family: inherit; }
   gap: 10px;
   padding: 12px 16px;
   border-radius: var(--r-lg);
-  font-size: 14px;
+  font-size: var(--t-md);
   line-height: 1.5;
 }
 .alert-danger {
@@ -788,7 +837,7 @@ input, textarea, select, button { font-family: inherit; }
   padding: 1.5rem;
 }
 .stat-card .stat-value {
-  font-size: 36px;
+  font-size: var(--t-figure);
   font-weight: 500;
   letter-spacing: -0.035em;
   font-variant-numeric: tabular-nums;
@@ -796,7 +845,7 @@ input, textarea, select, button { font-family: inherit; }
   line-height: 1.1;
 }
 .stat-card .stat-label {
-  font-size: 11px;
+  font-size: var(--t-2xs);
   font-weight: 700;
   color: var(--text-tertiary);
   margin-top: 8px;
@@ -807,7 +856,7 @@ input, textarea, select, button { font-family: inherit; }
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--t-xs);
   font-weight: 600;
   padding: 3px 8px;
   border-radius: 999px;
@@ -834,7 +883,7 @@ input, textarea, select, button { font-family: inherit; }
 .tab-pill {
   padding: 5px 12px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: var(--t-xs);
   font-weight: 500;
   color: var(--text-tertiary);
   cursor: pointer;
@@ -900,7 +949,7 @@ input, textarea, select, button { font-family: inherit; }
   padding: 24px;
   border: 2px dashed var(--bg-border);
   border-radius: var(--r-lg);
-  font-size: 14px;
+  font-size: var(--t-md);
   color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--dur-fast) ease;
@@ -924,7 +973,7 @@ input, textarea, select, button { font-family: inherit; }
 /* ── Tabs ─────────────────────────────────────────────────── */
 .tab {
   padding: 10px 16px;
-  font-size: 14px;
+  font-size: var(--t-md);
   font-weight: 400;
   color: var(--text-secondary);
   background: transparent;
@@ -954,13 +1003,13 @@ input, textarea, select, button { font-family: inherit; }
   margin-bottom: 16px;
 }
 .empty-state .empty-title {
-  font-size: 16px;
+  font-size: var(--t-control);
   font-weight: 500;
   color: var(--text-secondary);
   margin-bottom: 8px;
 }
 .empty-state .empty-description {
-  font-size: 14px;
+  font-size: var(--t-md);
   color: var(--text-tertiary);
   max-width: 320px;
 }
@@ -976,9 +1025,9 @@ input, textarea, select, button { font-family: inherit; }
   color: var(--accent);
   flex-shrink: 0;
 }
-.avatar-sm { width: 32px; height: 32px; font-size: 12px; }
-.avatar-md { width: 40px; height: 40px; font-size: 14px; }
-.avatar-lg { width: 48px; height: 48px; font-size: 16px; }
+.avatar-sm { width: 32px; height: 32px; font-size: var(--t-xs); }
+.avatar-md { width: 40px; height: 40px; font-size: var(--t-md); }
+.avatar-lg { width: 48px; height: 48px; font-size: var(--t-control); }
 
 /* ── Animations ───────────────────────────────────────────── */
 @keyframes fadeIn {
@@ -1045,7 +1094,7 @@ input, textarea, select, button { font-family: inherit; }
   padding: 10px 12px 10px 14px;
   border: 1px solid var(--bg-border);
   border-radius: var(--r-lg);
-  font-size: 14px;
+  font-size: var(--t-md);
   color: var(--text-primary);
   background: transparent;
   cursor: pointer;
@@ -1084,7 +1133,7 @@ input, textarea, select, button { font-family: inherit; }
   border-radius: var(--r-sm);
   background: var(--bg-elevated);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: var(--t-sm);
   outline: none;
 }
 .custom-select-search:focus { border-color: var(--accent); }
@@ -1098,7 +1147,7 @@ input, textarea, select, button { font-family: inherit; }
   border: none;
   background: transparent;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--t-md);
   border-radius: var(--r-sm);
   cursor: pointer;
   font-family: inherit;
@@ -1125,7 +1174,7 @@ input, textarea, select, button { font-family: inherit; }
   padding: 12px 18px 12px 42px;
   border: 1px solid var(--bg-border);
   border-radius: var(--r-pill);
-  font-size: 14px;
+  font-size: var(--t-md);
   color: var(--text-primary);
   background: transparent;
   outline: none;
@@ -1149,7 +1198,7 @@ input, textarea, select, button { font-family: inherit; }
   background: var(--bg-elevated);
   border: 1px solid var(--bg-border);
   border-radius: var(--r-sm);
-  font-size: 12px;
+  font-size: var(--t-xs);
   color: var(--text-primary);
   white-space: nowrap;
   opacity: 0;
@@ -1247,7 +1296,7 @@ input, textarea, select, button { font-family: inherit; }
   gap: 12px;
 }
 .kpi-card .kpi-label {
-  font-size: 12.5px;
+  font-size: var(--t-xs);
   color: var(--text-secondary);
   font-weight: 400;
 }
@@ -1258,7 +1307,7 @@ input, textarea, select, button { font-family: inherit; }
   flex-wrap: wrap;
 }
 .kpi-card .kpi-value {
-  font-size: 28px;
+  font-size: var(--t-h1);
   font-weight: 500;
   letter-spacing: -0.035em;
   color: var(--text-primary);
@@ -1266,7 +1315,7 @@ input, textarea, select, button { font-family: inherit; }
   font-variant-numeric: tabular-nums;
 }
 .kpi-card .kpi-sub {
-  font-size: 12px;
+  font-size: var(--t-xs);
   color: var(--text-tertiary);
 }
 
@@ -1277,7 +1326,7 @@ input, textarea, select, button { font-family: inherit; }
   gap: 3px;
   padding: 3px 8px;
   border-radius: var(--r-pill);
-  font-size: 12px;
+  font-size: var(--t-xs);
   font-weight: 600;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -1295,7 +1344,7 @@ input, textarea, select, button { font-family: inherit; }
   border: 1px solid var(--bg-border);
   border-radius: var(--r-pill);
   background: transparent;
-  font-size: 13px;
+  font-size: var(--t-sm);
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text-primary);
@@ -1405,7 +1454,7 @@ input, textarea, select, button { font-family: inherit; }
   transform: rotate(-90deg);
 }
 .navsec-title {
-  font-size: 11px;
+  font-size: var(--t-2xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.14em;
@@ -1562,7 +1611,7 @@ input, textarea, select, button { font-family: inherit; }
   .sidebar-search input,
   .custom-select-search,
   .custom-select-trigger {
-    font-size: 16px;
+    font-size: var(--t-control);
   }
 
   main.p-6,
@@ -1657,7 +1706,7 @@ input, textarea, select, button { font-family: inherit; }
   .mobile-tab.active { color: var(--accent); }
 
   .mobile-tab-icon { width: 20px; height: 20px; stroke-width: 1.75px; }
-  .mobile-tab-label { font-size: 10.5px; font-weight: 500; letter-spacing: -0.01em; }
+  .mobile-tab-label { font-size: var(--t-2xs); font-weight: 500; letter-spacing: -0.01em; }
 
   /* Tui is the centre tab and the fastest path to an answer, so it reads as
      an action rather than a peer destination — accent-filled, label dropped. */
@@ -1802,7 +1851,7 @@ input, textarea, select, button { font-family: inherit; }
     order: 4;
     flex: 0 0 auto;
     margin-top: 6px;
-    font-size: 12.5px;
+    font-size: var(--t-xs);
     line-height: 1.4;
     color: var(--text-tertiary);
   }
@@ -1849,13 +1898,13 @@ input, textarea, select, button { font-family: inherit; }
     border-bottom: 1px solid var(--bg-border);
   }
   .agenda-day-num {
-    font-size: 15px;
+    font-size: var(--t-lg);
     font-weight: 600;
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;
   }
   .agenda-day-name {
-    font-size: 12px;
+    font-size: var(--t-xs);
     color: var(--text-tertiary);
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -1863,7 +1912,7 @@ input, textarea, select, button { font-family: inherit; }
   .agenda-day-today .agenda-day-num { color: var(--accent); }
   .agenda-today-pill {
     margin-left: auto;
-    font-size: 10.5px;
+    font-size: var(--t-2xs);
     font-weight: 600;
     color: var(--on-accent);
     background: var(--accent);
@@ -1891,7 +1940,7 @@ input, textarea, select, button { font-family: inherit; }
      regardless of digit widths. */
   .agenda-time {
     flex: 0 0 46px;
-    font-size: 13px;
+    font-size: var(--t-sm);
     color: var(--text-secondary);
     font-variant-numeric: tabular-nums;
   }
@@ -1903,14 +1952,14 @@ input, textarea, select, button { font-family: inherit; }
   }
   .agenda-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .agenda-title {
-    font-size: 14px;
+    font-size: var(--t-md);
     font-weight: 500;
     color: var(--text-primary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .agenda-job { font-size: 12px; color: var(--accent); }
+  .agenda-job { font-size: var(--t-xs); color: var(--accent); }
 }
 
 /* ── Deliverable upload ───────────────────────────────────────
@@ -1933,7 +1982,7 @@ input, textarea, select, button { font-family: inherit; }
 /* ── Page subtitle ────────────────────────────────────────── */
 .page-subtitle {
   margin-top: 6px;
-  font-size: 13.5px;
+  font-size: var(--t-sm);
   color: var(--text-secondary);
   max-width: 60ch;
 }
@@ -1949,7 +1998,7 @@ input, textarea, select, button { font-family: inherit; }
   align-items: center;
   padding: 3px 9px;
   border-radius: var(--r-pill);
-  font-size: 11.5px;
+  font-size: var(--t-2xs);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1976,7 +2025,7 @@ input, textarea, select, button { font-family: inherit; }
 
 /* ── Today / Needs you ────────────────────────────────────── */
 .section-heading {
-  font-size: 15px;
+  font-size: var(--t-lg);
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text-primary);
@@ -2004,13 +2053,13 @@ input, textarea, select, button { font-family: inherit; }
 /* Fixed width + tabular figures so start times form a straight column. */
 .today-time {
   flex: 0 0 96px;
-  font-size: 13px;
+  font-size: var(--t-sm);
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
 .today-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.today-title { font-size: 14px; font-weight: 500; color: var(--text-primary); }
-.today-job { font-size: 12px; color: var(--accent); text-decoration: none; }
+.today-title { font-size: var(--t-md); font-weight: 500; color: var(--text-primary); }
+.today-job { font-size: var(--t-xs); color: var(--accent); text-decoration: none; }
 .today-job:hover { text-decoration: underline; }
 
 /* One sentence, one action. The dot carries severity so the sentence
@@ -2035,8 +2084,8 @@ input, textarea, select, button { font-family: inherit; }
 .attention-watch  { background: var(--text-tertiary); }
 
 .attention-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
-.attention-sentence { font-size: 14px; color: var(--text-primary); }
-.attention-meta { font-size: 12px; color: var(--text-tertiary); }
+.attention-sentence { font-size: var(--t-md); color: var(--text-primary); }
+.attention-meta { font-size: var(--t-xs); color: var(--text-tertiary); }
 .attention-action { flex: 0 0 auto; }
 
 @media (max-width: 768px) {
@@ -2132,7 +2181,7 @@ input, textarea, select, button { font-family: inherit; }
 }
 
 .confirm-title {
-  font-size: 17px;
+  font-size: var(--t-control);
   font-weight: 600;
   letter-spacing: -0.015em;
   color: var(--text-primary);
@@ -2140,7 +2189,7 @@ input, textarea, select, button { font-family: inherit; }
 
 .confirm-body {
   margin-top: 6px;
-  font-size: 14px;
+  font-size: var(--t-md);
   line-height: 1.5;
   color: var(--text-secondary);
 }
@@ -2189,7 +2238,7 @@ input, textarea, select, button { font-family: inherit; }
 }
 
 .signature-name {
-  font-size: 22px;
+  font-size: var(--t-h3);
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text-primary);
@@ -2201,7 +2250,7 @@ input, textarea, select, button { font-family: inherit; }
 
 .signature-rule-label {
   margin-top: 6px;
-  font-size: 10.5px;
+  font-size: var(--t-2xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-tertiary);
@@ -2267,7 +2316,7 @@ input, textarea, select, button { font-family: inherit; }
     background: var(--bg-surface);
     border: 1px solid var(--bg-border);
     color: var(--text-primary);
-    font-size: 14px;
+    font-size: var(--t-md);
     font-weight: 500;
     text-decoration: none;
   }
@@ -2314,7 +2363,7 @@ input, textarea, select, button { font-family: inherit; }
    largest thing on the page at any width without overflowing a phone. */
 .finance-hero {
   margin: 0;
-  font-size: clamp(38px, 7vw, 56px);
+  font-size: var(--t-hero);
   font-weight: 600;
   line-height: 1.02;
   letter-spacing: -0.035em;
@@ -2347,7 +2396,7 @@ input, textarea, select, button { font-family: inherit; }
   align-items: center;
   gap: 8px;
   margin: 0 0 6px;
-  font-size: 13px;
+  font-size: var(--t-sm);
   color: var(--text-secondary);
 }
 .flow-key {
@@ -2361,14 +2410,14 @@ input, textarea, select, button { font-family: inherit; }
   align-items: center;
   gap: 10px;
   margin: 0;
-  font-size: clamp(28px, 4.4vw, 40px);
+  font-size: var(--t-figure);
   font-weight: 600;
   line-height: 1.05;
   letter-spacing: -0.03em;
   color: var(--text-primary);
 }
 .flow-delta-pill {
-  font-size: 12px;
+  font-size: var(--t-xs);
   font-weight: 600;
   letter-spacing: 0;
   padding: 3px 8px;
@@ -2398,7 +2447,7 @@ input, textarea, select, button { font-family: inherit; }
   position: absolute;
   pointer-events: none;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--t-2xs);
   font-variant-numeric: tabular-nums;
 }
 .flow-axis-y {
@@ -2434,7 +2483,7 @@ input, textarea, select, button { font-family: inherit; }
 
 .flow-caption {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--t-xs);
   color: var(--text-tertiary);
 }
 
@@ -2452,12 +2501,12 @@ input, textarea, select, button { font-family: inherit; }
 .money-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--t-sm);
 }
 .money-table th {
   padding: 6px 10px;
   text-align: left;
-  font-size: 10px;
+  font-size: var(--t-2xs);
   font-weight: 500;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -2497,7 +2546,7 @@ input, textarea, select, button { font-family: inherit; }
 .field > .field-input,
 .field .custom-select-trigger {
   width: 100%;
-  font-size: 1rem;
+  font-size: var(--t-control);
   padding-top: 1.5rem;
   padding-bottom: 0.55rem;
 }
@@ -2517,7 +2566,7 @@ input, textarea, select, button { font-family: inherit; }
   top: 1.05rem;
   margin: 0;
   padding: 0;
-  font-size: 1rem;
+  font-size: var(--t-control);
   font-weight: 400;
   letter-spacing: normal;
   text-transform: none;
@@ -2594,7 +2643,7 @@ input, textarea, select, button { font-family: inherit; }
 
 .field-hint {
   margin: 6px 2px 0;
-  font-size: 12px;
+  font-size: var(--t-xs);
   color: var(--text-tertiary);
 }
 
@@ -2638,12 +2687,12 @@ input, textarea, select, button { font-family: inherit; }
 .stat-row-item { min-width: 0; }
 .stat-row-label {
   margin: 0 0 6px;
-  font-size: 12.5px;
+  font-size: var(--t-xs);
   color: var(--text-secondary);
 }
 .stat-row-value {
   margin: 0;
-  font-size: clamp(24px, 3vw, 30px);
+  font-size: var(--t-figure);
   font-weight: 600;
   line-height: 1.05;
   letter-spacing: -0.03em;
@@ -2651,7 +2700,7 @@ input, textarea, select, button { font-family: inherit; }
 }
 .stat-row-sub {
   margin: 5px 0 0;
-  font-size: 12px;
+  font-size: var(--t-xs);
   color: var(--text-tertiary);
 }
 
@@ -2720,8 +2769,8 @@ input, textarea, select, button { font-family: inherit; }
 .toast-error { border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
 
 .toast-body { flex: 1; min-width: 0; }
-.toast-title { margin: 0; font-size: 13.5px; font-weight: 500; color: var(--text-primary); }
-.toast-detail { margin: 3px 0 0; font-size: 12px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.toast-title { margin: 0; font-size: var(--t-sm); font-weight: 500; color: var(--text-primary); }
+.toast-detail { margin: 3px 0 0; font-size: var(--t-xs); color: var(--text-secondary); overflow-wrap: anywhere; }
 
 .toast-close {
   flex: none;
@@ -2755,7 +2804,7 @@ input, textarea, select, button { font-family: inherit; }
 .suggestion-chip {
   padding: 7px 12px;
   border-radius: var(--r-pill);
-  font-size: 12px;
+  font-size: var(--t-xs);
   background: var(--bg-elevated);
   color: var(--text-secondary);
   border: 1px solid var(--bg-border);

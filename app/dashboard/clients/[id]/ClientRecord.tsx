@@ -357,7 +357,7 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
               {PIPELINE_STAGES.map((s, i) => (
                 <div key={s} className="flex-1">
                   <div className="h-2 rounded-full" style={{ background: i <= pipelineIndex ? 'var(--accent)' : 'var(--bg-elevated)' }} />
-                  <p className="text-[10px] mt-1 text-center" style={{ color: i <= pipelineIndex ? 'var(--accent)' : 'var(--text-tertiary)' }}>
+                  <p className="text-2xs mt-1 text-center" style={{ color: i <= pipelineIndex ? 'var(--accent)' : 'var(--text-tertiary)' }}>
                     {statusLabel(s)}
                   </p>
                 </div>

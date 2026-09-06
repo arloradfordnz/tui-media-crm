@@ -153,7 +153,7 @@ export default function DatePicker({
             <button type="button" onClick={prevMonth} style={{ padding: '4px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 4, display: 'flex', alignItems: 'center' }}>
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+            <span style={{ fontSize: 'var(--t-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>
               {MONTHS[viewMonth]} {viewYear}
             </span>
             <button type="button" onClick={nextMonth} style={{ padding: '4px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 4, display: 'flex', alignItems: 'center' }}>
@@ -162,7 +162,7 @@ export default function DatePicker({
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: '8px 8px 4px', gap: 2 }}>
             {DAYS.map(d => (
-              <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', padding: '2px 0' }}>{d}</div>
+              <div key={d} style={{ textAlign: 'center', fontSize: 'var(--t-2xs)', fontWeight: 600, color: 'var(--text-tertiary)', padding: '2px 0' }}>{d}</div>
             ))}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: '0 8px 8px', gap: 2 }}>
@@ -178,7 +178,7 @@ export default function DatePicker({
                   onClick={() => select(viewYear, viewMonth, day)}
                   style={{
                     textAlign: 'center',
-                    fontSize: 13,
+                    fontSize: 'var(--t-sm)',
                     padding: '6px 2px',
                     borderRadius: 6,
                     border: 'none',
