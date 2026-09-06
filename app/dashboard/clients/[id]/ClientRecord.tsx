@@ -11,6 +11,7 @@ import { ArrowLeft, Trash2, Briefcase, MessageSquare, StickyNote, UserCircle, Co
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
 import Field from '@/components/Field'
+import PortalAccountButton from './PortalAccountButton'
 
 const PIPELINE_STAGES = ['enquiry', 'discovery', 'proposal', 'negotiation', 'won']
 const LEAD_SOURCES = ['Referral', 'Website', 'Social Media', 'Google', 'Word of Mouth', 'Other']
@@ -34,6 +35,7 @@ type ClientData = {
   notes: string | null
   tags: string | null
   portalToken: string | null
+  portalInvitedAt: string | null
   documents: { id: string; name: string; docType: string; updatedAt: string }[]
   jobs: { id: string; name: string; jobType: string | null; status: string; quoteValue: number | null; shootDate: string | null }[]
   activities: { id: string; action: string; details: string | null; createdAt: string; job: { name: string } | null }[]
@@ -238,6 +240,11 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
               {copied ? 'Copied!' : 'Copy Client Portal Link'}
             </button>
           )}
+          <PortalAccountButton
+            clientId={client.id}
+            invitedAt={client.portalInvitedAt}
+            hasEmail={!!client.email}
+          />
           <span className={`badge ${statusBadgeClass(client.status)}`}>{statusLabel(client.status)}</span>
         </div>
       </div>

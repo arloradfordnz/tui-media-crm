@@ -777,3 +777,37 @@ export async function sendProposalAcceptedEmail(to: string, clientName: string, 
     `),
   })
 }
+
+export async function sendClientAccountSetupEmail({
+  to,
+  clientName,
+  setupUrl,
+  clientId,
+}: {
+  to: string
+  clientName: string
+  setupUrl: string
+  clientId?: string
+}) {
+  await send({
+    to,
+    subject: 'Set up your Tui Media account',
+    type: 'account_setup',
+    clientId,
+    rethrow: true,
+    html: wrap(
+      `
+      ${buildGreeting(clientName)}
+      <p style="color:#B8C3DA;font-size:15px;line-height:1.6;margin:0 0 16px;">You now have your own login for the Tui Media portal — the place where your footage, photos and paperwork live. Everything that used to arrive as a one-off link is in one spot, and it stays there.</p>
+      <p style="color:#B8C3DA;font-size:15px;line-height:1.6;margin:0 0 8px;">Choose a password to finish setting it up:</p>
+      <div style="text-align:left;margin:28px 0;">
+        <a href="${setupUrl}" style="display:inline-block;background:#6E9BF7;color:#0A1428;padding:11px 24px;border-radius:999px;text-decoration:none;font-weight:500;font-size:13px;">Choose a password</a>
+      </div>
+      <p style="color:#8996B2;font-size:13px;line-height:1.5;margin:0 0 16px;">This link is single-use and expires in 24 hours. If it has run out by the time you get to it, just reply and I'll send a fresh one.</p>
+      <p style="color:#8996B2;font-size:13px;margin:0;">If the button doesn't work, copy this link: <a href="${setupUrl}" style="color:#EFF2F8;text-decoration:underline;">${setupUrl}</a></p>
+    `,
+      SIGNOFF,
+      'Choose a password to finish setting up your portal.'
+    ),
+  })
+}

@@ -1,12 +1,8 @@
-import { createBrowserClient, createServerClient } from '@supabase/ssr'
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-export function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-}
+// Server-only: this module imports next/headers. The browser client lives in
+// lib/supabase-browser.ts.
 
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies()

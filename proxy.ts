@@ -33,14 +33,34 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Redirect logged-in users away from login
+  // Client portal accounts share this Supabase project with Arlo's admin
+  // login, so "is anyone signed in" no longer decides where they may go.
+  //
+  // This claim is read from the cookie, which is fine for *routing* — the
+  // worst a tampered cookie achieves is landing on a page it isn't entitled
+  // to. It does not decide access: the dashboard layout re-checks against the
+  // auth server, getAuthUser() denies clients on every API route, and RLS
+  // denies them at the database. This is signposting, not the lock.
+  const isClient = user?.app_metadata?.role === 'client'
+
+  // Send each kind of account to its own front door.
   if (pathname === '/login' && user) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return NextResponse.redirect(new URL(isClient ? '/portal/me' : '/dashboard', request.url))
+  }
+  if (pathname === '/portal/login' && user) {
+    return NextResponse.redirect(new URL(isClient ? '/portal/me' : '/dashboard', request.url))
   }
 
   // Protect /dashboard routes
-  if (pathname.startsWith('/dashboard') && !user) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  if (pathname.startsWith('/dashboard')) {
+    if (!user) return NextResponse.redirect(new URL('/login', request.url))
+    if (isClient) return NextResponse.redirect(new URL('/portal/me', request.url))
+  }
+
+  // /portal/me is the signed-in portal; the token links under
+  // /portal/client/... stay public, as do login and the setup callback.
+  if (pathname.startsWith('/portal/me') && !user) {
+    return NextResponse.redirect(new URL('/portal/login', request.url))
   }
 
   return supabaseResponse

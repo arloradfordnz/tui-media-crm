@@ -174,3 +174,41 @@ defensible rather than decorative.
 | Videos owed | Files uploaded to the portal | Job status |
 | Runway | Bank balance ÷ average of the last six whole months | Including the part-month you are in |
 | Revenue on Insights | Xero, falling back to delivered jobs in the CRM | — |
+
+## Client portal accounts
+
+Clients now have two ways in, and both still work:
+
+- **The emailed link** — `/portal/client/<token>`. The unguessable token in the
+  URL is the auth. Every delivery email ever sent carries one of these, so it
+  is not going anywhere.
+- **An account** — `/portal/login`, then `/portal/me`. Email and password.
+
+To give a client an account, open their record and press **Send account
+setup**. That creates the account, emails them a link to choose a password,
+and records the date. Pressing it again re-sends — it does not make a second
+account, so it is also the fix when someone lets the 24-hour link lapse. The
+button only appears once the client has an email address on file.
+
+There is no public sign-up. An account exists only because Arlo made one.
+
+### Why the security model changed
+
+Client accounts live in the same Supabase Auth project as Arlo's admin login,
+so `authenticated` stopped meaning "Arlo". Three things enforce the split, and
+they are deliberately independent of each other:
+
+1. **The database.** Every RLS policy now carries `public.is_admin()`, which is
+   false for any user whose `app_metadata.role` is `client`. `app_metadata` is
+   writable only by the service role. This is the real lock — a client who got
+   past everything else would still read nothing.
+2. **The API.** `getAuthUser()` returns `null` for client accounts, so every
+   route that guards on it treats a client as signed out.
+3. **The routing.** Middleware sends each kind of account to its own front
+   door, and `app/dashboard/layout.tsx` re-checks the role against the auth
+   server rather than the cookie.
+
+The portal resolves *which* client someone may see from the `client_users`
+table, never from a claim in their token.
+
+Run `supabase/migration_client_accounts.sql` before any of this works.
