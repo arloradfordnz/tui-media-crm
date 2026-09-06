@@ -6,11 +6,41 @@ daylight saving), so the offsets below are what actually matters.
 | Route | UTC | NZ | What it is |
 |---|---|---|---|
 | `/api/morning-briefing` | 19:00 | 7:00am | Email briefing |
-| `/api/telegram/heartbeat` | 19:30 | 7:30am | **The daily digest.** Full sweep, always sends |
 | `/api/business-health/refresh` | 20:00 | 8:00am | Cached business-health figures |
 | `/api/portal-reminders` | 22:00 | 10:00am | Nudges clients sitting on deliveries |
-| `/api/telegram/brain-tick` | 02:00 | 2:00pm | Afternoon safety net, silent unless something is due |
-| `/api/health/integrations` | 19:15 | 7:15am | Xero/IMAP connectivity into `integration_status` |
+| `/api/health/integrations` | 19:15 | 7:15am | Xero/IMAP connectivity, and the only thing that texts unprompted |
+
+**Nothing on this list texts you on a schedule.** `/api/health/integrations`
+writes `integration_status` every day, but only sends a message when an
+integration *changes* state — working to broken, or back again. A month of
+everything being fine is a month of silence.
+
+## Why the daily Telegram digest is gone
+
+There were two proactive Telegram crons: `heartbeat`, which always sent
+something, and `brain-tick`, which sent when a flag was due. Between them, one
+week in August looked like this:
+
+    Aug 19  all three retainers have no August content
+    Aug 20  one week since this was flagged and nothing's moved
+    Aug 22  August's two thirds gone, still zero jobs, 9 videos
+    Aug 23  Still no August job for Johnson, Bainbridge or Framers
+    Aug 24  Same story as last week... I'll stop repeating myself
+    Aug 25  still no August job for Johnson, Bainbridge or Framers
+
+Three separate faults. The dedup marked a flag notified, but the flag re-fired
+because the condition was still true — "still true" is not "still news". There
+was no way for Arlo to say "I know, drop it", so it chased August content into
+September. And it kept naming a client who had been dropped a month earlier.
+
+Arlo never replied to any of it. In a month there is not one inbound Telegram
+turn. A channel that talks every day whether or not it has news gets muted, and
+then it cannot deliver the message that mattered.
+
+So Telegram now speaks for exactly two reasons: he messaged it, or a client did
+something in the portal (`/api/telegram/event`, fired by `emitAssistantEvent`).
+Outage detection, which was the honest half of the heartbeat, moved to the
+health cron as an edge trigger.
 
 ## Why there used to be seven brain ticks a day
 

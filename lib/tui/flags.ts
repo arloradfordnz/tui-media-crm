@@ -26,9 +26,6 @@ export type FlagKind =
   | 'unprepped_shoot'
   | 'content_backlog'
   | 'overdue_invoice'
-  | 'cold_lead'
-  | 'stale_proposal'
-  | 'dormant_client'
 
 export type DerivedFlag = {
   key: string
@@ -173,35 +170,11 @@ export function deriveFlags(ctx: Ctx, now: Date = new Date()): DerivedFlag[] {
     })
   }
 
-  for (const c of arr<{ id: string; name: string; pipeline_stage: string; updated_at: string }>(ctx, 'cold_pipeline_leads')) {
-    flags.push({
-      key: `cold_lead:${c.id}`,
-      kind: 'cold_lead',
-      subject: `${c.name} has been quiet in ${c.pipeline_stage} for ${daysSince(c.updated_at, now) ?? '5+'} days`,
-      severity: 'low',
-      detail: { client_id: c.id, stage: c.pipeline_stage },
-    })
-  }
-
-  for (const p of arr<{ id: string; sent_at: string; total_value: number | null; jobs?: ({ name?: string | null; clients?: Named }) | null }>(ctx, 'proposals_awaiting_response')) {
-    flags.push({
-      key: `stale_proposal:${p.id}`,
-      kind: 'stale_proposal',
-      subject: `Proposal${p.jobs?.name ? ` for ${p.jobs.name}` : ''}${p.jobs?.clients?.name ? ` (${p.jobs.clients.name})` : ''} sent ${p.sent_at?.slice(0, 10)} with no reply`,
-      severity: 'normal',
-      detail: { proposal_id: p.id, value: p.total_value },
-    })
-  }
-
-  for (const c of arr<{ id: string; name: string; updated_at: string }>(ctx, 'dormant_past_clients')) {
-    flags.push({
-      key: `dormant_client:${c.id}`,
-      kind: 'dormant_client',
-      subject: `${c.name} has been quiet for ${daysSince(c.updated_at, now) ?? '90+'} days and could be worth a nudge`,
-      severity: 'low',
-      detail: { client_id: c.id },
-    })
-  }
+  // cold_lead, stale_proposal and dormant_client were derived here too. They
+  // only ever came from the sweep context that fed the daily digest, and both
+  // are gone — so they could never be derived again, while the reconciler
+  // below would have gone on treating every existing one as "resolved" and
+  // offering it up as good news. Removed rather than left to rot.
 
   return flags
 }

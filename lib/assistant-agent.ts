@@ -12,9 +12,16 @@ import { syncFlags, markNotified } from '@/lib/tui/flags'
 const MODEL = 'claude-sonnet-5'
 
 // The Telegram "brain" — same tool-using agent as the dashboard chat, reused
-// for two triggers: a scheduled proactive check-in (brain-tick cron) and a
-// reactive reply to an inbound message. Both paths share this one loop so
-// the assistant behaves consistently regardless of how the turn started.
+// for the two triggers that remain: a reply to a message Arlo sent, and a
+// client doing something in the portal. Both paths share this one loop so the
+// assistant behaves consistently regardless of how the turn started.
+//
+// It used to have two more: a proactive sweep every few hours and a guaranteed
+// daily check-in. Both are gone. Between them they sent the same message six
+// times in a week, kept chasing August content well into September, and named
+// a client who had been dropped a month earlier — and Arlo never once replied
+// to any of it. A channel that talks every day whether or not it has news gets
+// ignored, which costs you the one message that mattered.
 //
 // Messages are logged in the sms_messages table (predates the Telegram
 // switch — direction/body/job_id still apply, twilio_sid now holds the
@@ -46,7 +53,7 @@ const SEND_MESSAGE_TOOL: Anthropic.Tool = {
 export async function runAssistantTurn(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
-  opts: { trigger: 'tick' | 'inbound' | 'heartbeat' | 'event'; inboundBody?: string; eventSubject?: string; approvals?: string[] }
+  opts: { trigger: 'inbound' | 'event'; inboundBody?: string; eventSubject?: string; approvals?: string[] }
 ): Promise<{ messageSent: boolean; messageBody?: string; reasoning: string }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   const chatId = process.env.OWNER_TELEGRAM_CHAT_ID
@@ -60,7 +67,7 @@ export async function runAssistantTurn(
 
   const anthropic = new Anthropic({ apiKey })
   // Tier the context to the trigger. An inbound reply gets two queries and no
-  // third-party calls; only the daily heartbeat pays for Xero and IMAP.
+  // third-party calls; a client action gets the delivery signals too.
   const tier = tierForTrigger(opts.trigger)
   const context = await buildContext(supabase, tier)
 
@@ -79,11 +86,7 @@ export async function runAssistantTurn(
 
   const userTurn = opts.trigger === 'inbound'
     ? `Arlo just messaged: "${opts.inboundBody}"\n\nCurrent CRM snapshot:\n${snapshot}`
-    : opts.trigger === 'event'
-    ? `Something just happened: ${opts.eventSubject ?? 'a client acted in the portal'}\n\nThis is the reason you woke up, so it's what the message should be about. Check the snapshot for the surrounding detail (which job, which client, where it now stands) and text him one short line. If flags_worth_raising has something else genuinely urgent you can fold it in, but don't turn this into a summary of everything.\n\n${snapshot}`
-    : opts.trigger === 'heartbeat'
-    ? `[Internal note, not for Arlo: this is the once-daily trigger you must always reply to.] Send Arlo a short, ordinary-sounding text — just what's going on today (active jobs, anything worth flagging, system_health if anything's disconnected) — like you'd send any other time. Don't mention that this is a scheduled or automatic message.\n\n${snapshot}`
-    : `Scheduled check-in — review the CRM snapshot below and decide if anything needs a message right now.\n\n${snapshot}`
+    : `Something just happened: ${opts.eventSubject ?? 'a client acted in the portal'}\n\nThis is the reason you woke up, so it's what the message should be about. Check the snapshot for the surrounding detail (which job, which client, where it now stands) and text him one short line. Do not fold in anything else — no backlog summary, no other flags, no "also worth noting". He gets a text because a client did something, and that thing is the whole message.\n\n${snapshot}`
 
   const messages: Anthropic.MessageParam[] = [{ role: 'user', content: userTurn }]
   // Cache breakpoints on the system prompt and the end of the tool list — the
@@ -189,10 +192,10 @@ export async function runAssistantTurn(
   }
 
   // Safety net: the model sometimes reasons through an answer as plain text
-  // without actually calling send_message. That's fine for a proactive tick
-  // (silence is the intended outcome), but for an inbound reply or the daily
-  // heartbeat it means Arlo was owed a message and didn't get one. Force it.
-  const mustRespond = opts.trigger === 'inbound' || opts.trigger === 'heartbeat' || opts.trigger === 'event'
+  // without actually calling send_message. Both remaining triggers are ones
+  // Arlo is owed an answer to — he asked a question, or a client did something
+  // — so a silent turn is always a bug here. Force it.
+  const mustRespond = true
   if (mustRespond && !messageSent) {
     // One forced round: send_message is the only tool on offer and tool_choice
     // requires it, so this returns a written message or nothing.

@@ -10,7 +10,9 @@ been the app confidently showing a figure it had made up.
 
 **What it is.** One assistant with one memory, reachable in three places:
 
-- **Telegram** — it texts you, and you can text it back.
+- **Telegram** — you can text it, and it texts you when a client does
+  something or an integration breaks. It no longer sends anything on a
+  schedule; see CRONS.md for why.
 - **The Today screen** — the panel at the bottom of the home page.
 - **`/dashboard/tui`** — the centre tab on your phone, or ⌘K on a desktop.
 

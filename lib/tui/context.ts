@@ -12,23 +12,26 @@
 //
 //   micro     inbound replies. Time, recent thread, open todos. Two queries,
 //             no third-party calls, no joins.
-//   standard  proactive nudges. Adds the delivery signals — overdue tasks,
-//             stalled jobs, missed deadlines, shoots with no prep, backlog.
-//   sweep     the daily digest only. Adds Xero, email, and the slow-moving
-//             growth signals (cold leads, stale proposals, dormant clients).
+//   standard  a client just did something. Adds the delivery signals — overdue
+//             tasks, stalled jobs, missed deadlines, shoots with no prep,
+//             backlog — plus cached connectivity.
+//
+// There used to be a third tier, `sweep`, which pulled Xero, unread mail and
+// slow-moving growth signals (cold leads, stale proposals, dormant clients)
+// for the daily digest. The digest is gone — it sent the same nag six times in
+// a week — and with it the only caller of that tier, so the queries went too
+// rather than sitting unreachable behind a branch nothing takes.
 //
 // Connectivity is read from integration_status, written by a health cron,
 // rather than probed on the request path. Whether Xero is reachable is a
 // property of the last few minutes, not of this turn, and finding out cost a
 // token refresh and an IMAP login every single time.
 
-import { fetchOutstandingInvoices } from '@/lib/xero'
-import { fetchUnreadEmails } from '@/lib/mail'
 import { getContentBacklog } from '@/lib/content-backlog'
 
-export type ContextTier = 'micro' | 'standard' | 'sweep'
+export type ContextTier = 'micro' | 'standard'
 
-export type AssistantTrigger = 'tick' | 'inbound' | 'heartbeat' | 'event'
+export type AssistantTrigger = 'inbound' | 'event'
 
 /**
  * An inbound reply is a conversation, not an audit. The daily digest is the
@@ -42,9 +45,7 @@ export type AssistantTrigger = 'tick' | 'inbound' | 'heartbeat' | 'event'
 export function tierForTrigger(trigger: AssistantTrigger): ContextTier {
   switch (trigger) {
     case 'inbound': return 'micro'
-    case 'heartbeat': return 'sweep'
     case 'event': return 'standard'
-    case 'tick': return 'standard'
   }
 }
 
@@ -146,59 +147,9 @@ export async function buildContext(
     recent_brain_ticks: recentTicks?.data ?? [],
   })
 
-  if (tier === 'standard') return base
-
-  // ── sweep: third-party + slow-moving growth signals ─────────
-  const staleLead5d = new Date(now.getTime() - 5 * 86400000).toISOString()
-  const staleProposal4d = new Date(now.getTime() - 4 * 86400000).toISOString()
-  const dormant90d = new Date(now.getTime() - 90 * 86400000).toISOString()
-
-  const [coldLeads, staleProposals, dormantClients, outstandingInvoices, unreadEmails, integrations] =
-    await Promise.all([
-      supabase
-        .from('clients')
-        .select('id, name, pipeline_stage, updated_at')
-        .eq('status', 'lead')
-        .in('pipeline_stage', ['enquiry', 'discovery', 'proposal', 'negotiation'])
-        .lt('updated_at', staleLead5d)
-        .order('updated_at')
-        .limit(10),
-      supabase
-        .from('proposals')
-        .select('id, status, sent_at, total_value, jobs(name, clients(name))')
-        .eq('status', 'sent')
-        .lt('sent_at', staleProposal4d)
-        .is('responded_at', null)
-        .order('sent_at')
-        .limit(10),
-      supabase
-        .from('clients')
-        .select('id, name, status, updated_at')
-        .eq('status', 'past')
-        .lt('updated_at', dormant90d)
-        .order('updated_at')
-        .limit(5),
-      // Best-effort: a Xero or mail outage should cost those sections, not
-      // the digest.
-      fetchOutstandingInvoices().catch(() => []),
-      fetchUnreadEmails(15).catch(() => []),
-      readIntegrationStatus(supabase),
-    ])
-
-  const overdueInvoices = (outstandingInvoices as {
-    Status: string; AmountDue: number; DueDateString?: string; InvoiceNumber: string
-  }[])
-    .filter((inv) => inv.Status === 'AUTHORISED' && inv.AmountDue > 0 && !!inv.DueDateString && inv.DueDateString.slice(0, 10) < todayISO)
-    .map((inv) => ({ number: inv.InvoiceNumber, amount_due: inv.AmountDue, due_date: inv.DueDateString?.slice(0, 10) }))
-
-  Object.assign(base, {
-    overdue_xero_invoices: overdueInvoices,
-    unread_emails: unreadEmails,
-    cold_pipeline_leads: coldLeads?.data ?? [],
-    proposals_awaiting_response: staleProposals?.data ?? [],
-    dormant_past_clients: dormantClients?.data ?? [],
-    system_health: integrations,
-  })
+  // Connectivity comes last and costs one indexed read of a table a cron keeps
+  // warm — no Xero token refresh, no IMAP login on the request path.
+  Object.assign(base, { system_health: await readIntegrationStatus(supabase) })
 
   return base
 }
