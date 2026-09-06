@@ -1,4 +1,5 @@
 import { AlertCircle, Plug } from 'lucide-react'
+import Image from 'next/image'
 import { fetchXeroSummaryCached, fetchXeroTransactionsCached, fetchMonthlyPnlCached, type XeroSummary, type XeroTransaction, type MonthlyPnl } from '@/lib/xero'
 import FinanceDashboard from './FinanceDashboard'
 import { getAppSetting } from '@/app/actions/settings'
@@ -10,7 +11,7 @@ type SearchParams = Promise<{ xero?: string; xero_error?: string }>
 function NotConnected({ error }: { error?: string }) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
-      <img src="/Xero_software_logo.svg.png" alt="Xero" width={120} height={120} className="mb-6" style={{ objectFit: 'contain' }} />
+      <Image src="/Xero_software_logo.svg.png" alt="Xero" width={120} height={120} className="mb-6" style={{ objectFit: 'contain' }} />
       <h1 className="page-title mb-2">
         Financial Dashboard
       </h1>

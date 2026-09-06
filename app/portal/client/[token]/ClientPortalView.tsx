@@ -344,6 +344,12 @@ function FileCard({ file, jobId, portalToken, onApprove }: { file: DeliveryFile;
       )}
       {file.fileUrl && kind === 'image' && (
         <a href={file.fileUrl} target="_blank" rel="noreferrer" className="media-band">
+          {/* Deliberately a plain <img>, not next/image. This is the client's
+              delivered file on R2: routing it through the image optimiser
+              would re-encode the very thing they came to look at, and spend a
+              transform from the plan's quota, for a photo that is already
+              sized and already on a CDN. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={file.fileUrl} alt={file.originalName} className="w-full" style={{ maxHeight: '70vh', objectFit: 'contain', background: '#060D1A', display: 'block' }} />
         </a>
       )}
