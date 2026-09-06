@@ -1,10 +1,11 @@
 'use client'
 
-import { useActionState, useState, useOptimistic, useTransition, useRef } from 'react'
+import { useActionState, useState, useOptimistic, useTransition, useRef, useEffect } from 'react'
 import { updateJob, updateJobStatus, deleteJob, toggleTask, addRevision, respondToRevision } from '@/app/actions/jobs'
 import { createProposal } from '@/app/actions/proposals'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo, stripJobPrefix } from '@/lib/format'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as ActivityIcon, MapPin, Calendar, FileText, Upload, Download, FileVideo, Plus, Pencil, X, CheckCheck, MessageSquare } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import RecordTabs, { RecordPanel } from '@/components/RecordTabs'
@@ -56,7 +57,12 @@ type JobData = {
 type Tab = 'work' | 'deliverables' | 'money' | 'activity'
 
 export default function JobRecord({ job }: { job: JobData }) {
-  const [tab, setTab] = useState<Tab>('work')
+  // The revision email links to ?revision=<id>. Land on the tab that holds it
+  // rather than on Work, so answering a revision request is one click from the
+  // inbox instead of a hunt through tabs.
+  const searchParams = useSearchParams()
+  const focusRevision = searchParams.get('revision')
+  const [tab, setTab] = useState<Tab>(focusRevision ? 'deliverables' : 'work')
   const [state, action, pending] = useActionState(updateJob, undefined)
   const [, revAction, revPending] = useActionState(addRevision, undefined)
   const [, startTransition] = useTransition()
@@ -503,7 +509,7 @@ export default function JobRecord({ job }: { job: JobData }) {
             </div>
           </div>
           {job.revisions.map((r) => (
-            <RevisionItem key={r.id} revision={r} jobId={job.id} />
+            <RevisionItem key={r.id} revision={r} jobId={job.id} focused={r.id === focusRevision} />
           ))}
           {job.revisionsUsed < revisionLimit && (
             <form action={revAction} className="mt-4 flex gap-3">
@@ -592,7 +598,16 @@ export default function JobRecord({ job }: { job: JobData }) {
 
 type RevisionData = { id: string; round: number; request: string; status: string; reply: string | null; createdAt: string }
 
-function RevisionItem({ revision, jobId }: { revision: RevisionData; jobId: string }) {
+function RevisionItem({ revision, jobId, focused = false }: { revision: RevisionData; jobId: string; focused?: boolean }) {
+  const rowRef = useRef<HTMLDivElement>(null)
+
+  // Scroll the linked revision into view and ring it, so arriving from the
+  // email you are looking straight at the thing you came to answer.
+  useEffect(() => {
+    if (!focused) return
+    rowRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [focused])
+
   const [status, setStatus] = useState(revision.status)
   const [reply, setReply] = useState(revision.reply)
   const [replyOpen, setReplyOpen] = useState(false)
@@ -620,7 +635,11 @@ function RevisionItem({ revision, jobId }: { revision: RevisionData; jobId: stri
   }
 
   return (
-    <div className="py-3 rounded-lg px-3" style={{ background: 'var(--bg-elevated)', marginBottom: '4px', opacity: status === 'done' ? 0.55 : 1 }}>
+    <div
+      ref={rowRef}
+      className={`py-3 rounded-lg px-3${focused ? ' revision-focused' : ''}`}
+      style={{ background: 'var(--bg-elevated)', marginBottom: '4px', opacity: status === 'done' ? 0.55 : 1 }}
+    >
       <div className="flex items-center gap-2 mb-1 flex-wrap">
         {status === 'accepted' || status === 'done'
           ? <CheckCheck className="w-3.5 h-3.5" style={{ color: 'var(--success)' }} />

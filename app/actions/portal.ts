@@ -107,8 +107,11 @@ export async function requestChanges(prevState: { error?: string; success?: bool
   const round = job.revisions_used + 1
   const clientRel = job.clients as unknown as { name: string; email: string | null }
 
+  // Inserted on its own so the id is available for the email's deep link.
+  const { data: newRevision } = await admin
+    .from('revisions').insert({ job_id: jobId, round, request }).select('id').single()
+
   await Promise.all([
-    admin.from('revisions').insert({ job_id: jobId, round, request }),
     admin.from('jobs').update({ revisions_used: round, status: 'editing' }).eq('id', jobId),
     admin.from('activities').insert({ action: 'revision_requested', details: `Client requested revision round ${round}`, job_id: jobId, client_id: job.client_id }),
     admin.from('notifications').insert({ title: 'Revision Requested', message: `Client requested changes for "${job.name}" (round ${round})`, type: 'revision_request', job_id: jobId, client_id: job.client_id }),
@@ -118,7 +121,7 @@ export async function requestChanges(prevState: { error?: string; success?: bool
   if (!adminViewing) {
     await Promise.all([
       clientRel.email ? sendRevisionRequestEmail(clientRel.email, clientRel.name, job.name, round) : Promise.resolve(),
-      sendAdminRevisionRequestedEmail(clientRel.name, job.name, round, request, jobId, job.client_id),
+      sendAdminRevisionRequestedEmail(clientRel.name, job.name, round, request, jobId, job.client_id, newRevision?.id),
     ])
   }
 
@@ -168,8 +171,10 @@ export async function requestDeliverableRevision(prevState: { error?: string; su
   const round = used + 1
   const clientRel = job.clients as unknown as { name: string; email: string | null }
 
+  const { data: newRevision } = await admin
+    .from('revisions').insert({ job_id: job.id, deliverable_id: deliverableId, round, request }).select('id').single()
+
   await Promise.all([
-    admin.from('revisions').insert({ job_id: job.id, deliverable_id: deliverableId, round, request }),
     admin.from('deliverables').update({ revisions_used: round }).eq('id', deliverableId),
     admin.from('jobs').update({ status: 'editing' }).eq('id', job.id),
     admin.from('activities').insert({
@@ -191,7 +196,7 @@ export async function requestDeliverableRevision(prevState: { error?: string; su
   if (!adminViewing) {
     await Promise.all([
       clientRel?.email ? sendRevisionRequestEmail(clientRel.email, clientRel.name, job.name, round) : Promise.resolve(),
-      sendAdminRevisionRequestedEmail(clientRel?.name || 'Your client', `${job.name} — ${deliverable.title}`, round, request, job.id, job.client_id),
+      sendAdminRevisionRequestedEmail(clientRel?.name || 'Your client', `${job.name} — ${deliverable.title}`, round, request, job.id, job.client_id, newRevision?.id),
     ])
   }
 

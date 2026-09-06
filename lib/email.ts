@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
 const FROM = process.env.EMAIL_FROM || 'Tui Media <noreply@dashboard.tuimedia.nz>'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
 
 // Use service-level Supabase client for logging (works in any context, no cookies needed)
 function getLogClient() {
@@ -626,8 +627,14 @@ export async function sendAdminDeliveryApprovedEmail(clientName: string, jobName
   await send({ to: ADMIN_INBOX, subject, html, type: 'admin_delivery_approved', clientId, jobId })
 }
 
-export async function sendAdminRevisionRequestedEmail(clientName: string, jobName: string, round: number, request: string, jobId?: string, clientId?: string) {
+export async function sendAdminRevisionRequestedEmail(clientName: string, jobName: string, round: number, request: string, jobId?: string, clientId?: string, revisionId?: string) {
   const subject = `Revision requested — ${jobName} (round ${round})`
+  // Straight to the revision, not to the jobs list. The point of this email is
+  // that you can answer it, and "Open dashboard" made you find the job, open
+  // the right tab and scroll before you could.
+  const revisionLink = jobId
+    ? `${APP_URL}/dashboard/jobs/${jobId}?revision=${revisionId ?? ''}`
+    : `${APP_URL}/dashboard/jobs`
   const html = wrap(`
     <h2 style="margin:0 0 20px;font-size:22px;color:#EFF2F8;font-weight:600;">Kia ora Arlo,</h2>
     <p style="color:#8996B2;font-size:15px;line-height:1.7;margin:0 0 16px;"><span style="color:#EFF2F8;font-weight:600;">${clientName}</span> has requested changes on <span style="color:#EFF2F8;">${jobName}</span> (round ${round}).</p>
@@ -635,7 +642,7 @@ export async function sendAdminRevisionRequestedEmail(clientName: string, jobNam
       <p style="color:#B8C3DA;font-size:14px;line-height:1.6;margin:0;white-space:pre-wrap;">${request.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
     </div>
     <div style="text-align:left;margin:24px 0;">
-      <a href="https://dashboard.tuimedia.nz/dashboard/jobs" style="display:inline-block;background:#6E9BF7;color:#0A1428;padding:11px 24px;border-radius:999px;text-decoration:none;font-weight:500;font-size:13px;">Open dashboard</a>
+      <a href="${revisionLink}" style="display:inline-block;background:#6E9BF7;color:#0A1428;padding:11px 24px;border-radius:999px;text-decoration:none;font-weight:500;font-size:13px;">Open and respond</a>
     </div>
   `)
   await send({ to: ADMIN_INBOX, subject, html, type: 'admin_revision_requested', clientId, jobId })

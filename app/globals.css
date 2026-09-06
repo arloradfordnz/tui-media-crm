@@ -2834,3 +2834,9 @@ input, textarea, select, button { font-family: inherit; }
 @media (max-width: 1100px) {
   .today-split { grid-template-columns: minmax(0, 1fr); gap: 40px; }
 }
+
+/* The revision you arrived from an email to answer. Ringed rather than
+   recoloured, so it stands out without changing what its status badge says. */
+.revision-focused {
+  box-shadow: 0 0 0 2px var(--accent);
+}
