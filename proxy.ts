@@ -29,9 +29,29 @@ export async function proxy(request: NextRequest) {
   // access, which the page-level Supabase client still does. Routing decisions
   // can rely on the signed cookie.
   const { data: { session } } = await supabase.auth.getSession()
-  const user = session?.user ?? null
+  let user = session?.user ?? null
 
   const { pathname } = request.nextUrl
+
+  // ── Repair a token that predates the account's admin role ────────────────
+  // is_admin() reads app_metadata.role out of the JWT, so a session that was
+  // signed in BEFORE the role was granted keeps presenting a roleless token
+  // and is denied by every RLS policy — an empty CRM that looks exactly like
+  // deleted data. See lib/client-auth.ts for the incident.
+  //
+  // This has to happen HERE and nowhere else. Refreshing rotates the refresh
+  // token and invalidates the old one, so the caller must be able to persist
+  // the new pair. Middleware can — setAll above writes to supabaseResponse.
+  // A Server Component cannot, and doing it there burns the browser's token
+  // and signs the user out on the next request.
+  //
+  // Bounded to one attempt per request, and only for a signed-in non-client
+  // that is missing the claim, so the normal path costs nothing.
+  const role = user?.app_metadata?.role
+  if (user && role !== 'client' && role !== 'admin') {
+    const { data: refreshed } = await supabase.auth.refreshSession()
+    if (refreshed.user) user = refreshed.user
+  }
 
   // Client portal accounts share this Supabase project with Arlo's admin
   // login, so "is anyone signed in" no longer decides where they may go.
