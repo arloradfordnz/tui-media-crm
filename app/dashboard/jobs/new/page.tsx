@@ -3,7 +3,7 @@
 import { useActionState, useState, useEffect } from 'react'
 import { createJob } from '@/app/actions/jobs'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, Check, Film, Heart, Building2, PartyPopper, Home, Palette, Video, AlertTriangle, Megaphone } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Film, Video, AlertTriangle, Megaphone } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
 import { statusLabel } from '@/lib/format'
@@ -12,19 +12,14 @@ import Field from '@/components/Field'
 type Client = { id: string; name: string; email: string | null }
 type TemplateDeliverable = { title: string; description: string | null }
 
-// Video ads first, and first for a reason: it is what Tui Media now sells, and
-// picking it seeds the strategise → script → film → edit → launch → handover
-// checklist. The rest are kept because old jobs still reference their templates
-// and the occasional one still gets booked — they are not the default any more.
+// What's actually booked now: video ad projects (the offer) and social media
+// (the retainer clients still on the books). The photography-era types —
+// wedding, anniversary, corporate, event, real estate — are gone from this
+// list, though their templates stay in the DB since old jobs still reference
+// them; picking one for a NEW job just isn't a real option any more.
 const JOB_TYPES = [
   { value: 'video_ads', label: 'Video Ad Project', icon: Megaphone },
-  { value: 'corporate', label: 'Corporate', icon: Building2 },
-  { value: 'social_media', label: 'Social Media', icon: Video },
-  { value: 'event', label: 'Event', icon: PartyPopper },
-  { value: 'realestate', label: 'Real Estate', icon: Home },
-  { value: 'wedding', label: 'Wedding', icon: Heart },
-  { value: 'anniversary', label: 'Anniversary & Couples', icon: Heart },
-  { value: 'custom', label: 'Custom', icon: Palette },
+  { value: 'social_media', label: 'Social Media (Retainer)', icon: Video },
 ]
 
 export default function NewJobPage() {
@@ -210,8 +205,12 @@ export default function NewJobPage() {
         </form>
       )}
 
-      {/* Navigation */}
-      <div className="flex justify-between">
+      {/* Navigation. mt-8 to match the step indicator's mb-8 above the
+          steps — without it this row sat flush against the card/grid above
+          with no gap at all, while everywhere else in the app a button row
+          is spaced by the form's own space-y. This is the only step wizard
+          in the app, so it's the only place that pattern was missing. */}
+      <div className="flex justify-between mt-8">
         <button onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0} className="btn-secondary" style={step === 0 ? { opacity: 0.3 } : {}}>
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
