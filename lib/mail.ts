@@ -24,7 +24,15 @@ export type EmailSummary = {
   flagged: boolean
   /** True when the message carries a header only bulk senders set. See BULK_HEADERS. */
   bulk: boolean
+  /** Recipients (to + cc), lowercased. Only used to cross-reference the sent
+   *  folder in fetchMailAwaitingReply — irrelevant for an inbox message. */
+  to: string[]
 }
+
+/** Where sent mail actually lives on this account — see the folder probe run
+ *  6 September 2026 (`imapflow`'s `list()`): a manually-organised mailbox with
+ *  its own naming, not one of the auto-detected \\Sent special-use folders. */
+const SENT_MAILBOX = 'INBOX.Sent Messages'
 
 async function withClient<T>(fn: (client: ImapFlow) => Promise<T>): Promise<T | null> {
   const host = process.env.EMAIL_IMAP_HOST
@@ -55,41 +63,47 @@ async function withClient<T>(fn: (client: ImapFlow) => Promise<T>): Promise<T | 
   }
 }
 
+/** Envelope + flags for the most recent `limit` messages in one mailbox,
+ *  newest first. The shared body behind fetchRecentEmails and the sent-folder
+ *  read fetchMailAwaitingReply does — same four headers, same guarantee that
+ *  nothing here can mark a message \\Seen, because the lock is read-only and
+ *  headers are not a body fetch. */
+async function fetchMailboxEnvelopes(client: ImapFlow, mailbox: string, limit: number): Promise<EmailSummary[]> {
+  const lock = await client.getMailboxLock(mailbox, { readOnly: true })
+  try {
+    const status = await client.status(mailbox, { messages: true })
+    const total = status.messages ?? 0
+    if (total === 0) return []
+
+    const start = Math.max(1, total - limit + 1)
+    const summaries: EmailSummary[] = []
+    for await (const msg of client.fetch(`${start}:${total}`, {
+      envelope: true,
+      flags: true,
+      headers: BULK_HEADERS,
+    })) {
+      const raw = msg.headers?.toString('utf8').toLowerCase() ?? ''
+      summaries.push({
+        subject: msg.envelope?.subject ?? '(no subject)',
+        from: msg.envelope?.from?.[0]?.address ?? msg.envelope?.from?.[0]?.name ?? 'unknown',
+        date: msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : null,
+        unread: !msg.flags?.has('\\Seen'),
+        flagged: !!msg.flags?.has('\\Flagged'),
+        bulk: BULK_HEADERS.some((h) => raw.includes(`${h}:`)),
+        to: [...(msg.envelope?.to ?? []), ...(msg.envelope?.cc ?? [])]
+          .map((a) => a.address?.toLowerCase())
+          .filter((a): a is string => !!a),
+      })
+    }
+    return summaries.reverse()
+  } finally {
+    lock.release()
+  }
+}
+
 /** Most recent messages in the inbox, newest first. Envelope only — never marks as read. */
 export async function fetchRecentEmails(limit = 15): Promise<EmailSummary[]> {
-  const result = await withClient(async (client) => {
-    const lock = await client.getMailboxLock('INBOX', { readOnly: true })
-    try {
-      const status = await client.status('INBOX', { messages: true })
-      const total = status.messages ?? 0
-      if (total === 0) return []
-
-      const start = Math.max(1, total - limit + 1)
-      const summaries: EmailSummary[] = []
-      // Four headers, not the body. Still nothing that can mark a message
-      // \\Seen — the mailbox is opened read-only above and headers are not a
-      // body fetch.
-      for await (const msg of client.fetch(`${start}:${total}`, {
-        envelope: true,
-        flags: true,
-        headers: BULK_HEADERS,
-      })) {
-        const raw = msg.headers?.toString('utf8').toLowerCase() ?? ''
-        summaries.push({
-          subject: msg.envelope?.subject ?? '(no subject)',
-          from: msg.envelope?.from?.[0]?.address ?? msg.envelope?.from?.[0]?.name ?? 'unknown',
-          date: msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : null,
-          unread: !msg.flags?.has('\\Seen'),
-          flagged: !!msg.flags?.has('\\Flagged'),
-          bulk: BULK_HEADERS.some((h) => raw.includes(`${h}:`)),
-        })
-      }
-      return summaries.reverse()
-    } finally {
-      lock.release()
-    }
-  })
-
+  const result = await withClient((client) => fetchMailboxEnvelopes(client, 'INBOX', limit))
   return result ?? []
 }
 
@@ -102,9 +116,18 @@ export async function fetchUnreadEmails(limit = 15): Promise<EmailSummary[]> {
 // ── Mail that is probably waiting on you ────────────────────────────────────
 //
 // A heuristic, and worth being honest about what it can and cannot see. This
-// module reads envelopes only — subject, sender, date, flags — never bodies,
-// so "needs a reply" is inferred from who sent it and whether it has been
-// opened, not from what it says.
+// module reads envelopes only — subject, sender, date, flags, recipients —
+// never bodies, so "needs a reply" is inferred from who sent it, who it was
+// sent to, and whether a later message answered it, not from what it says.
+//
+// This used to be "unread, from a human" — which meant reading a message
+// without replying, closing the laptop, and coming back a week later found it
+// gone from the list, because "unread" is a click, not an answer. A message
+// read at 11pm and never actioned is exactly the case worth surfacing, and it
+// looked identical to one that had genuinely been dealt with. The real
+// question is whether anything was SENT back, so this now cross-references
+// the sent folder: a message counts as answered only once a later message went
+// to that same address, regardless of its own read state.
 //
 // What it filters out is the traffic that is never a conversation, using the
 // headers bulk senders are obliged to set rather than a list of domains.
@@ -125,21 +148,52 @@ function isSelf(address: string): boolean {
 export type WaitingEmail = EmailSummary & { ageDays: number }
 
 /**
- * Unread mail from a human, oldest first — the order you would want to answer
- * them in, since the one that has been sitting longest is the one someone is
- * most likely wondering about.
+ * Mail from a human that nothing has been sent back to since, oldest first —
+ * the order you would want to answer them in, since the one that has been
+ * sitting longest is the one someone is most likely wondering about.
+ *
+ * A message is flagged (starred in Apple Mail) surfaces unconditionally,
+ * bulk/self/never-a-reply included — flagging something is Arlo saying "I
+ * need to come back to this" with his own hand, which outranks any heuristic
+ * here.
  */
 export async function fetchMailAwaitingReply(limit = 6): Promise<WaitingEmail[]> {
-  const unread = await fetchUnreadEmails(40)
+  const result = await withClient(async (client) => {
+    const inbox = await fetchMailboxEnvelopes(client, 'INBOX', 60)
+    // How far back the sent folder needs to reach depends on the inbox
+    // messages it has to cross-reference. Same window as the inbox read is
+    // the simplest correct bound: nothing older than the oldest inbox
+    // candidate needs an answer to be checked against.
+    const sent = await fetchMailboxEnvelopes(client, SENT_MAILBOX, 150).catch(() => [] as EmailSummary[])
+    return { inbox, sent }
+  })
+  if (!result) return []
+
+  // Latest time anything was sent TO each address, so "answered after this
+  // one arrived" is a single lookup rather than a scan per candidate.
+  const lastReplyTo = new Map<string, number>()
+  for (const s of result.sent) {
+    if (!s.date) continue
+    const sentAt = Date.parse(s.date)
+    for (const addr of s.to) {
+      const prev = lastReplyTo.get(addr)
+      if (prev === undefined || prev < sentAt) lastReplyTo.set(addr, sentAt)
+    }
+  }
+
   const now = Date.now()
 
-  return unread
+  return result.inbox
     .filter((e) => {
-      if (e.bulk) return false
       const from = e.from.toLowerCase()
       if (isSelf(from)) return false
+      if (e.flagged) return true
+      if (e.bulk) return false
       // A backstop for the few senders that skip the headers entirely.
-      return !NEVER_A_REPLY.some((pattern) => from.includes(pattern))
+      if (NEVER_A_REPLY.some((pattern) => from.includes(pattern))) return false
+      if (!e.date) return true // no date to compare — err toward showing it
+      const repliedAt = lastReplyTo.get(from)
+      return repliedAt === undefined || repliedAt < Date.parse(e.date)
     })
     .map((e) => ({
       ...e,

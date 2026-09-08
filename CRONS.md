@@ -5,10 +5,34 @@ daylight saving), so the offsets below are what actually matters.
 
 | Route | UTC | NZ | What it is |
 |---|---|---|---|
-| `/api/morning-briefing` | 19:00 | 7:00am | Email briefing |
-| `/api/business-health/refresh` | 20:00 | 8:00am | Cached business-health figures |
-| `/api/portal-reminders` | 22:00 | 10:00am | Nudges clients sitting on deliveries |
-| `/api/health/integrations` | 19:15 | 7:15am | Xero/IMAP connectivity, and the only thing that texts unprompted |
+| `/api/weekly-briefing` | Sun 19:00 | **Mon 7:00am** | The week's email briefing |
+| `/api/business-health/refresh` | 20:00 daily | 8:00am | Cached business-health figures |
+| `/api/portal-reminders` | 22:00 daily | 10:00am | Nudges clients sitting on deliveries |
+| `/api/health/integrations` | 19:15 daily | 7:15am | Xero/IMAP connectivity, and the only thing that texts unprompted |
+
+## Why the briefing is weekly, on a Monday
+
+It used to arrive every morning at 7, as `/api/morning-briefing`. Seven of
+those a week is six more than there is news for. The money figures move
+monthly, the retainer calendar is fixed weeks in advance, and a revision that
+is waiting on Monday is still waiting on Tuesday — so six mornings out of seven
+the mail was the same mail with a different date on it.
+
+That is exactly the failure that killed the daily Telegram digest, one section
+down: a channel that speaks every day whether or not it has news gets filtered,
+and then it cannot deliver the one that mattered.
+
+So it goes out **Sunday 19:00 UTC, which is Monday 7am in Nelson** (8am while
+daylight saving is on, still a Monday morning), and it is written to set the
+week up rather than report the morning. Concretely, against the old daily:
+
+- The focus line is asked for the week's priority and what has to be done by
+  Friday, not for today.
+- The shoot calendar is the seven days of this week, not a rolling fortnight.
+  Anything past Sunday is named in one line underneath as next week's.
+- **"One to know" is gone.** A Hacker News headline picked by Haiku was the one
+  part of the mail with no bearing on the business, and a week-old tech story
+  in a Monday planning email is worse than none.
 
 **Nothing on this list texts you on a schedule.** `/api/health/integrations`
 writes `integration_status` every day, but only sends a message when an

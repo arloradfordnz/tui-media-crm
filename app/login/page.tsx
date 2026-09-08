@@ -1,9 +1,25 @@
 'use client'
 
-import { useActionState } from 'react'
+import { Suspense, useActionState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { login } from '@/app/actions/auth'
 import Image from 'next/image'
 import Field from '@/components/Field'
+
+// Why the dashboard sent you here, when it was not simply "you are signed out".
+// 'stale' is the one case worth naming: the session was valid but its token
+// predated the admin role, so the CRM would have rendered empty rather than
+// refused. Saying so beats letting it look like the data went missing.
+const REASONS: Record<string, string> = {
+  stale: 'Your session was signed in before your permissions were updated, so it could no longer read the CRM. Signing in again fixes it. Nothing has been lost.',
+}
+
+function LoginNotice() {
+  const reason = useSearchParams().get('reason')
+  const message = reason ? REASONS[reason] : null
+  if (!message) return null
+  return <div className="alert alert-warning mb-6">{message}</div>
+}
 
 export default function LoginPage() {
   const [state, action, pending] = useActionState(login, undefined)
@@ -39,6 +55,12 @@ export default function LoginPage() {
         <p className="text-sm mb-8" style={{ color: 'var(--text-secondary)' }}>
           Enter your details to access the dashboard.
         </p>
+
+        {/* useSearchParams needs a Suspense boundary or the whole route opts
+            out of static rendering. */}
+        <Suspense fallback={null}>
+          <LoginNotice />
+        </Suspense>
 
         {/* Form */}
         <form action={action} className="space-y-5">

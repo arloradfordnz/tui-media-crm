@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowUp, ExternalLink, Check, Loader2, AlertTriangle, ShieldAlert } from 'lucide-react'
+import Image from 'next/image'
 import Link from 'next/link'
 import type { ThreadMessage } from '@/lib/tui/thread'
 import { decodeEvents } from '@/lib/tui/receipts'
@@ -14,10 +15,17 @@ import { renderMarkdown } from './chat-markup'
 // differently depending on which box you typed into, and anything you asked
 // via ⌘K was invisible to Telegram and to the next page load.
 //
-// There is now one component with three mounts: the Today panel, the
-// /dashboard/tui page, and the ⌘K overlay. All three read and write
-// sms_messages, the same table the Telegram brain uses, so it is genuinely one
-// conversation.
+// There is now one component with three mounts, and two behaviours:
+//
+//  - **/dashboard/tui and the ⌘K overlay** read and write sms_messages, the
+//    same table the Telegram brain uses, so those two and Telegram are
+//    genuinely one continuous conversation.
+//  - **The Today panel is a scratch pad.** It opens empty on every load and
+//    nothing said in it is written to the shared thread. It is the box you
+//    use to ask a quick question while looking at the dashboard, and a quick
+//    question does not belong in the middle of a Telegram conversation. The
+//    trade is real and deliberate: Telegram will not know what was asked
+//    here, so anything worth remembering should be asked on the Tui AI page.
 
 type Receipt = { id: string; label: string; state: 'running' | 'done' | 'failed'; detail?: string }
 type LinkOut = { path: string; label: string }
@@ -54,11 +62,18 @@ function toMessages(thread: ThreadMessage[]): Message[] {
 export default function TuiThread({
   initialThread,
   variant = 'panel',
+  ephemeral = false,
 }: {
   // Server-rendered mounts pass the thread straight in. The overlay has no
   // server parent, so it passes nothing and fetches it on mount instead.
   initialThread?: ThreadMessage[]
   variant?: TuiVariant
+  /**
+   * Keep this conversation out of the shared Telegram thread entirely: start
+   * empty, and tell the server not to log either side of it. Used by the
+   * dashboard panel.
+   */
+  ephemeral?: boolean
 }) {
   const [messages, setMessages] = useState<Message[]>(() => toMessages(initialThread ?? []))
   const [input, setInput] = useState('')
@@ -68,7 +83,8 @@ export default function TuiThread({
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
-  const seeded = initialThread !== undefined
+  // An ephemeral mount is seeded by definition — with nothing.
+  const seeded = ephemeral || initialThread !== undefined
 
   // Overlay-only: pull the shared thread once so ⌘K opens mid-conversation
   // rather than on a blank slate.
@@ -147,7 +163,7 @@ export default function TuiThread({
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history, approvals }),
+        body: JSON.stringify({ messages: history, approvals, persist: !ephemeral }),
       })
 
       if (!res.ok) {
@@ -263,19 +279,36 @@ export default function TuiThread({
 
   return (
     <div
-      className="flex flex-col rounded-xl overflow-hidden"
+      className="tui-shell"
       style={{
         ...containerStyle,
-        background: 'var(--bg-surface)',
-        border: '1px solid var(--bg-border)',
+        /* The overlay floats over the page, so it keeps a hairline to separate
+           it from whatever is behind. The panel and the page do not float and
+           follow the card rules: surface fill, no border, no shadow. */
+        ...(variant === 'overlay' ? { border: '1px solid var(--glass-card-border)' } : null),
       }}
     >
       {/* Thread */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-2.5">
         {messages.length === 0 && (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-sm text-center" style={{ color: 'var(--text-tertiary)' }}>
-              Ask about jobs, clients, invoices. Same Tui as your Telegram.
+          /* The mark alone. An empty chat is the one place in the app with
+             room for it, and it says whose assistant this is faster than a
+             sentence does. Dimmed well back so it reads as a watermark behind
+             the composer rather than as content waiting to be clicked. */
+          <div className="tui-empty">
+            <Image
+              src="/Logomark_White.svg"
+              alt=""
+              width={44}
+              height={74}
+              className="tui-empty-mark"
+              aria-hidden="true"
+              priority={false}
+            />
+            <p className="tui-empty-text">
+              {ephemeral
+                ? 'Ask about jobs, clients or invoices. This one starts fresh each time.'
+                : 'Ask about jobs, clients or invoices. Same thread as your Telegram.'}
             </p>
           </div>
         )}
@@ -383,21 +416,27 @@ export default function TuiThread({
         </div>
       )}
 
-      {/* Input */}
-      <div className="px-4 py-3" style={{ borderTop: '1px solid var(--bg-border)' }}>
-        <form onSubmit={(e) => { e.preventDefault(); sendMessage(input) }} className="flex gap-2">
+      {/* Composer.
+          The send button is sized off the field rather than off the button
+          scale. btn-sm is 36px and .field-input is 12px of padding around a
+          16px line, so the two never lined up: a round 36px button sat inside
+          a 46px field with 5px of dead space above and below it. Both now read
+          their height from one variable, so they are the same control height
+          by construction. */}
+      <div className="tui-composer">
+        <form onSubmit={(e) => { e.preventDefault(); sendMessage(input) }} className="tui-composer-row">
           <input
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Message Tui..."
-            className="field-input flex-1 text-sm"
+            placeholder="Message Tui AI..."
+            className="field-input tui-composer-input"
             disabled={loading}
           />
           <button
             type="submit"
             disabled={!input.trim() || loading}
-            className="btn-primary btn-sm btn-round"
+            className="btn-primary tui-composer-send"
             aria-label="Send"
           >
             <ArrowUp className="w-4 h-4" />

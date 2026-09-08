@@ -54,3 +54,40 @@ export async function isClientAccount(): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser()
   return user?.app_metadata?.role === 'client'
 }
+
+/**
+ * Whether the current session's token carries an admin claim.
+ *
+ * ── Why this exists ────────────────────────────────────────────────────────
+ * `public.is_admin()` reads `app_metadata.role` out of the **JWT**, not out of
+ * auth.users. A JWT is a snapshot taken when the token was minted, so an
+ * account whose role is added *after* it signed in keeps presenting a token
+ * with no role until that token is refreshed.
+ *
+ * On 6 September 2026 that combination locked the owner out of his own CRM.
+ * `role: 'admin'` was stamped on his account the day after his browser had
+ * last signed in, and `is_admin()` was then flipped from a deny-list to an
+ * allow-list. His stored session was still presenting the older, roleless
+ * token, so every policy denied it: every list rendered empty and every insert
+ * came back "new row violates row-level security policy". A CRM showing zero
+ * clients is indistinguishable from one that has lost them, which is the worst
+ * failure mode this app has.
+ *
+ * ── This function does NOT repair it ───────────────────────────────────────
+ * The repair is a token refresh, and a refresh MUST happen in proxy.ts. Token
+ * rotation issues a new refresh token and invalidates the old one, so whoever
+ * calls refreshSession() has to be able to write the result back to cookies.
+ * A Server Component cannot: `setAll` in lib/supabase.ts is wrapped in a
+ * try/catch that silently discards the write. Calling it from the dashboard
+ * layout therefore burns the browser's refresh token and hands back nothing,
+ * signing the user out on their very next request — which is exactly what the
+ * first version of this fix did.
+ *
+ * So: proxy.ts repairs, this reports, and the layout redirects on a genuine
+ * failure.
+ */
+export async function hasAdminClaim(): Promise<boolean> {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  return user?.app_metadata?.role === 'admin'
+}

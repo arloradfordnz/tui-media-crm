@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { isClientAccount } from '@/lib/client-auth'
+import { hasAdminClaim, isClientAccount } from '@/lib/client-auth'
 import DashboardShell from './DashboardShell'
 
 export const metadata: Metadata = {
@@ -24,5 +24,17 @@ export const metadata: Metadata = {
 // at an empty dashboard.
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   if (await isClientAccount()) redirect('/portal/me')
+
+  // The admin claim has to be in the TOKEN, not just on the account, because
+  // that is where is_admin() reads it from. A token minted before the role was
+  // added passes every check in this file and then reads nothing at all
+  // through RLS — an empty CRM that looks exactly like deleted data.
+  //
+  // proxy.ts has already tried to repair that by refreshing, which is the only
+  // place a refresh can safely happen (see lib/client-auth.ts). Reaching here
+  // without the claim means the refresh could not fix it, and signing in again
+  // is the honest answer — far better than rendering an empty CRM.
+  if (!(await hasAdminClaim())) redirect('/login?reason=stale')
+
   return <DashboardShell>{children}</DashboardShell>
 }

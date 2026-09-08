@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
-import { sendMorningBriefingEmail } from '@/lib/email'
+import { sendWeeklyBriefingEmail } from '@/lib/email'
 import { fetchXeroSummary } from '@/lib/xero'
 import { syncClientLifetimeValues } from '@/lib/lifetime-value'
 
@@ -45,6 +45,9 @@ export async function GET(req: NextRequest) {
   const nzDate = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })
   const todayISO = nzDate(now)
   const weekAgoISO = nzDate(new Date(now.getTime() - 7 * 86400000))
+  // The calendar card draws seven days and names anything in the following
+  // week under it, so the shoot window is a fortnight even though the unit is
+  // a week. Beyond that belongs to a later Monday's mail.
   const twoWeeksAheadISO = nzDate(new Date(now.getTime() + 14 * 86400000))
 
   const [
@@ -74,15 +77,15 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(10),
     fetchXeroSummary().catch((err) => {
-      console.error('[morning brief] Xero fetch failed:', err)
+      console.error('[weekly brief] Xero fetch failed:', err)
       return null
     }),
   ])
 
-  // Daily lifetime-value sync — attribute paid Xero invoices to clients.
+  // Weekly lifetime-value sync — attribute paid Xero invoices to clients.
   // Best-effort: never fail the briefing over it.
   await syncClientLifetimeValues(supabase).catch((err) => {
-    console.error('[morning brief] lifetime value sync failed:', err)
+    console.error('[weekly brief] lifetime value sync failed:', err)
   })
 
   const raw = weatherRes.ok ? await weatherRes.json() : null
@@ -138,7 +141,7 @@ export async function GET(req: NextRequest) {
     try {
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
       const snapshot = {
-        date: todayISO,
+        week_beginning: todayISO,
         events_today: (todayEventsRes.data ?? []).length,
         upcoming_shoots: upcomingShoots.length,
         next_shoot: upcomingShoots[0] ? { title: upcomingShoots[0].title, date: upcomingShoots[0].date } : null,
@@ -157,8 +160,8 @@ export async function GET(req: NextRequest) {
       }
       const message = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 120,
-        system: `You are Arlo's morning advisor for Tui Media (videography/photography/marketing, sole operator, Nelson NZ). Give 1-2 punchy sentences on what to focus on today. Prioritise pending client revisions, overdue invoices, and prepping upcoming shoots. NZ tone, no fluff, no markdown, no greeting, no em dashes.`,
+        max_tokens: 200,
+        system: `You are Arlo's advisor for Tui Media (videography/photography/marketing, sole operator, Nelson NZ). It is Monday morning and this is his one briefing for the whole week. Give 2-3 punchy sentences setting the week up: what to lead with, and what has to be done by Friday. Prioritise pending client revisions, overdue invoices, and prepping the shoots that are booked this week. Talk about the week, not today. NZ tone, no fluff, no markdown, no greeting, no em dashes.`,
         messages: [
           { role: 'user', content: JSON.stringify(snapshot) },
         ],
@@ -169,56 +172,15 @@ export async function GET(req: NextRequest) {
         .join('')
         .trim() || null
     } catch (err) {
-      console.error('[morning brief AI summary failed]', err)
+      console.error('[weekly brief AI summary failed]', err)
     }
   }
 
-  // ── One news story — top AI / creative-tech item from Hacker News, summarised. ─
-  // Best-effort: a null result simply hides the section.
-  let news: { headline: string; summary: string } | null = null
-  if (process.env.ANTHROPIC_API_KEY) {
-    try {
-      const topRes = await fetch('https://hacker-news.firebaseio.com/v0/topstories.json')
-      const ids: number[] = topRes.ok ? ((await topRes.json()) as number[]).slice(0, 20) : []
-      const items = await Promise.all(
-        ids.map((id) =>
-          fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then((r) => r.json()).catch(() => null)),
-      )
-      const stories = items
-        .filter((s): s is { type: string; title: string } => !!s && s.type === 'story' && !!s.title)
-        .map((s) => ({ title: s.title }))
-      if (stories.length) {
-        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-        const msg = await anthropic.messages.create({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 200,
-          system: `Arlo is a 16-year-old founder in Nelson NZ running a video/photo/marketing company and building AI products. From these Hacker News headlines, pick the SINGLE most relevant story for someone at the intersection of AI and creative media. Reply as strict JSON only, no code fences: {"headline":"<max 9 words>","summary":"<one punchy sentence on what it is and why it matters to him>"}. NZ tone, no fluff, no markdown, no em dashes.`,
-          messages: [{ role: 'user', content: JSON.stringify(stories) }],
-        })
-        const text = msg.content
-          .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-          .map((b) => b.text)
-          .join('')
-          .trim()
-        const match = text.match(/\{[\s\S]*\}/)
-        if (match) {
-          const parsed = JSON.parse(match[0])
-          if (parsed.headline && parsed.summary) {
-            news = { headline: String(parsed.headline), summary: String(parsed.summary) }
-          }
-        }
-      }
-    } catch (err) {
-      console.error('[morning brief news failed]', err)
-    }
-  }
-
-  await sendMorningBriefingEmail({
+  await sendWeeklyBriefingEmail({
     date: now,
     weather,
     xero: xeroSummary,
     upcomingShoots,
-    news,
     pendingRevisions: pendingRevisions.map((r) => ({
       round: r.round,
       request: r.request,

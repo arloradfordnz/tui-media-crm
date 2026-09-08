@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { House, Clapperboard, Sparkles, Repeat2, Settings } from 'lucide-react'
 
-// The five thumb-reachable destinations. Tui sits in the centre because it is
+// The five thumb-reachable destinations. Tui AI sits in the centre because it is
 // the fastest path to any answer — the rest of the app is where you go when you
 // already know what you're looking for.
 //
@@ -14,7 +14,7 @@ import { House, Clapperboard, Sparkles, Repeat2, Settings } from 'lucide-react'
 const TABS = [
   { href: '/dashboard', label: 'Today', icon: House, exact: true },
   { href: '/dashboard/jobs', label: 'Jobs', icon: Clapperboard },
-  { href: '/dashboard/tui', label: 'Tui', icon: Sparkles, centre: true },
+  { href: '/dashboard/tui', label: 'Tui AI', icon: Sparkles, centre: true },
   { href: '/dashboard/retainers', label: 'Retainers', icon: Repeat2 },
   // Settings is a real destination, so it's a Link like the rest rather than
   // a button that opens the desktop sidebar as a drawer. Clients, Calendar,

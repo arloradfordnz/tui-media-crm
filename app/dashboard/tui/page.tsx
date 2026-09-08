@@ -4,14 +4,15 @@ import TuiThread from '@/components/TuiThread'
 
 export const dynamic = 'force-dynamic'
 
-export const metadata = { title: 'Tui' }
+export const metadata = { title: 'Tui AI' }
 
 // Tui as a destination rather than a keyboard shortcut. Before this route it
 // was reachable only via ⌘K, which does not exist on a phone — so the single
 // fastest way to get an answer was the one surface the phone could not open.
 //
 // The centre tab in MobileTabBar points here. ⌘K still works on desktop, and
-// all three surfaces now share one thread.
+// this page and that overlay share one thread with Telegram. The dashboard
+// panel deliberately does not — see components/TuiThread.tsx.
 export default async function TuiPage() {
   const supabase = await createServerSupabaseClient()
   const thread = await getTuiThread(supabase, 40)

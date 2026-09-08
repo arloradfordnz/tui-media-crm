@@ -133,6 +133,12 @@ export async function getContentBacklog(
     .from('clients')
     .select('id, name, monthly_retainer, shoots_per_month')
     .eq('client_category', 'retainer')
+    // Archiving a client is supposed to take it off every list that chases
+    // ongoing work. This one was missing the check every other retainer query
+    // already has (see /api/weekly-briefing) — so archiving Nelson City
+    // Framers didn't move it, it just kept accruing "videos owed" against a
+    // client that isn't being billed any more.
+    .neq('status', 'archived')
 
   const clients = (clientRows ?? []) as RawClient[]
   if (clients.length === 0) {

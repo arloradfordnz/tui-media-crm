@@ -11,9 +11,15 @@ import { encodeEvent, toolLabel, summariseResult, type TuiEvent } from '@/lib/tu
 // the Telegram brain (lib/assistant-agent.ts) — this route just swaps the
 // delivery: streamed text into the chat panel instead of send_message.
 //
-// Every exchange here is logged into sms_messages, the same table the
-// Telegram loop reads and writes, so the dashboard panel and the Telegram
-// thread are one continuous conversation.
+// By default both sides of an exchange are logged into sms_messages, the same
+// table the Telegram loop reads and writes, so the Tui AI page, the ⌘K
+// overlay and Telegram are one continuous conversation.
+//
+// `persist: false` opts out of that, and the Today panel sends it. A question
+// asked in passing while looking at the dashboard should not land in the
+// middle of a Telegram thread, and should not be there waiting the next time
+// the dashboard is opened. Nothing else changes: the same tools run, and the
+// same reads happen. It is only the logging that is skipped.
 
 // Static system prompt — stable across turns, cached with a cache_control
 // breakpoint and reused on every request.
@@ -113,7 +119,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'ANTHROPIC_API_KEY is not configured.' }, { status: 500 })
   }
 
-  const { messages, approvals } = await request.json()
+  const { messages, approvals, persist: persistFlag } = await request.json()
   if (!messages || !Array.isArray(messages)) {
     return Response.json({ error: 'Messages array is required.' }, { status: 400 })
   }
@@ -125,6 +131,10 @@ export async function POST(request: NextRequest) {
   const approvedFingerprints: string[] = Array.isArray(approvals)
     ? approvals.filter((a: unknown): a is string => typeof a === 'string')
     : []
+
+  // Default true: only a caller that explicitly opts out is ephemeral, so a
+  // malformed or older client still gets the shared-thread behaviour.
+  const persist = persistFlag !== false
 
   const anthropic = new Anthropic({ apiKey })
   const supabase = await createServerSupabaseClient()
@@ -141,7 +151,7 @@ export async function POST(request: NextRequest) {
 
   const [dynamicContext] = await Promise.all([
     getDynamicContext(supabase),
-    inboundBody && !inboundBody.startsWith('[Project context:')
+    persist && inboundBody && !inboundBody.startsWith('[Project context:')
       ? supabase.from('sms_messages').insert({ direction: 'inbound', body: inboundBody })
       : Promise.resolve(),
   ])
@@ -196,7 +206,7 @@ export async function POST(request: NextRequest) {
             if (mutated) send({ t: 'mutated' })
             // Log the reply into the shared thread so the Telegram brain knows
             // what was already discussed here and doesn't re-flag it.
-            if (finalText.trim()) {
+            if (persist && finalText.trim()) {
               await supabase.from('sms_messages').insert({ direction: 'outbound', body: finalText.trim() })
             }
             send({ t: 'done' })

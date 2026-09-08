@@ -3,36 +3,51 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { syncLifetimeValues } from '@/app/actions/clients'
+import { useToast } from '@/components/Toast'
 import { RefreshCw } from 'lucide-react'
 
 // Pulls paid-invoice totals from Xero into each client's lifetime value.
+//
+// The result used to render as a bare <span> next to the button and then stay
+// there — through a router.refresh(), through navigating away and back — until
+// the page was hard-reloaded. A one-off confirmation that outlives the action
+// it describes stops being a confirmation and becomes furniture, so it goes
+// through the toast stack instead: bottom right, a few seconds, gone. Failures
+// still use the error tone, which does not auto-dismiss, because a sync that
+// did not happen is something you need to have seen.
 export default function SyncLifetimeButton() {
   const router = useRouter()
+  const toast = useToast()
   const [busy, setBusy] = useState(false)
-  const [note, setNote] = useState<string | null>(null)
 
   async function handleSync() {
     setBusy(true)
-    setNote(null)
     const res = await syncLifetimeValues()
     setBusy(false)
+
     if ('error' in res && res.error) {
-      setNote(res.error)
+      toast({ tone: 'error', title: 'Could not sync from Xero', detail: res.error })
       return
     }
+
     if ('matched' in res) {
-      const extra = res.unmatched.length > 0 ? ` · ${res.unmatched.length} Xero contact${res.unmatched.length !== 1 ? 's' : ''} with no matching client` : ''
-      setNote(`${res.matched} client${res.matched !== 1 ? 's' : ''} matched, ${res.updated} updated${extra}`)
+      const unmatched = res.unmatched.length
+      toast({
+        tone: 'success',
+        title: `${res.updated} client${res.updated !== 1 ? 's' : ''} updated`,
+        detail:
+          `${res.matched} matched in Xero` +
+          (unmatched > 0
+            ? ` · ${unmatched} Xero contact${unmatched !== 1 ? 's' : ''} with no matching client`
+            : ''),
+      })
       router.refresh()
     }
   }
 
   return (
-    <div className="flex items-center gap-2">
-      {note && <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{note}</span>}
-      <button onClick={handleSync} disabled={busy} className="btn-secondary" title="Update lifetime values from paid Xero invoices">
-        <RefreshCw className={`w-4 h-4${busy ? ' animate-spin' : ''}`} /> {busy ? 'Syncing...' : 'Sync Value'}
-      </button>
-    </div>
+    <button onClick={handleSync} disabled={busy} className="btn-secondary" title="Update lifetime values from paid Xero invoices">
+      <RefreshCw className={`w-4 h-4${busy ? ' animate-spin' : ''}`} /> {busy ? 'Syncing...' : 'Sync Value'}
+    </button>
   )
 }

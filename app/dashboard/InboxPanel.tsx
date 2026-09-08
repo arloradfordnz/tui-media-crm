@@ -1,5 +1,5 @@
 import { fetchMailAwaitingReply } from '@/lib/mail'
-import { Mail } from 'lucide-react'
+import { CheckCircle2, Mail } from 'lucide-react'
 
 // Mail from hello@tuimedia.nz that looks like it is waiting on a reply.
 //
@@ -13,15 +13,26 @@ import { Mail } from 'lucide-react'
 export default async function InboxPanel() {
   const waiting = await fetchMailAwaitingReply(5)
 
-  if (waiting.length === 0) return null
-
+  // An empty result used to `return null`, which meant the skeleton drew for a
+  // second or two and then the whole section vanished, leaving a gap where
+  // something had visibly been loading. That reads as a failure, and it is the
+  // most common outcome — an inbox with nothing awaiting a reply is the normal
+  // state, not an error. Say so instead of disappearing.
   return (
     <section style={{ marginTop: 32 }}>
-      <div className="flex items-center justify-between pb-1">
-        <h2 className="section-heading" style={{ marginBottom: 0 }}>Waiting on a reply</h2>
-        <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>hello@tuimedia.nz</span>
+      <div className="section-head">
+        <h2 className="section-heading">Waiting on a reply</h2>
+        <span className="section-head-meta">hello@tuimedia.nz</span>
       </div>
 
+      {waiting.length === 0 ? (
+        <div className="today-empty">
+          <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: 'var(--success)' }} />
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            Nothing in the inbox is waiting on you.
+          </p>
+        </div>
+      ) : (
       <div className="card-flush">
         {waiting.map((m, i) => (
           <a
@@ -45,14 +56,20 @@ export default async function InboxPanel() {
           </a>
         ))}
       </div>
+      )}
     </section>
   )
 }
 
+// Shaped like the real thing, including its heading, so the section does not
+// change size or position when the mail arrives.
 export function InboxPanelSkeleton() {
   return (
     <section style={{ marginTop: 32 }}>
-      <div className="pb-1"><div className="skeleton" style={{ width: 150, height: 13, borderRadius: 6 }} /></div>
+      <div className="section-head">
+        <h2 className="section-heading">Waiting on a reply</h2>
+        <span className="section-head-meta">hello@tuimedia.nz</span>
+      </div>
       <div className="card-flush">
         {[0, 1].map((i) => (
           <div key={i} className="inbox-row" style={{ pointerEvents: 'none' }}>

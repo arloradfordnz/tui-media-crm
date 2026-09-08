@@ -1,7 +1,6 @@
 import { Suspense } from 'react'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { getAttention, type AttentionItem } from '@/lib/attention'
-import { getTuiThread } from '@/lib/tui/thread'
 import { Camera, CheckCircle2, Plus, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import Greeting from './Greeting'
@@ -30,14 +29,23 @@ function timeLabel(start: string | null, end: string | null): string {
   return end ? `${start} – ${end}` : start
 }
 
+// e.date is already the NZ calendar day as YYYY-MM-DD (see lib/attention.ts),
+// so this anchors it at UTC midnight and reads the weekday back out in UTC —
+// the same trick the weekly briefing's own calendar strip uses in lib/email.ts.
+// It never touches a real timezone conversion, so there is nothing for a
+// server/browser offset to get wrong.
+function weekdayShort(dateISO: string): string {
+  const [y, m, d] = dateISO.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-NZ', { timeZone: 'UTC', weekday: 'short' })
+}
+
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient()
-  const [attention, tuiThread] = await Promise.all([
-    getAttention(supabase, new Date()),
-    getTuiThread(supabase),
-  ])
+  // The Tui panel below is deliberately not seeded from the shared thread, so
+  // there is nothing else to fetch here.
+  const attention = await getAttention(supabase, new Date())
 
-  const { todayLabel, todayEvents, items } = attention
+  const { todayISO, todayLabel, weekEvents, items } = attention
   const shown = items.slice(0, MAX_ITEMS)
   const remaining = items.length - shown.length
 
@@ -61,26 +69,31 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Today spans both columns: it is one line most days and reads as a
-          banner rather than a panel. */}
-      {/* ── Today ─────────────────────────────────────────────
-          Time-ordered, or an honest empty state that points at the
-          next most useful thing rather than saying "nothing". */}
+      {/* This week spans both columns.
+          It used to show only today, which meant a booking-free today with a
+          shoot booked for Thursday read as a completely empty banner — the
+          single most common shape of a real week said nothing about it. */}
+      {/* ── This week ─────────────────────────────────────────
+          Time-ordered across the next 7 days, or an honest empty state that
+          points at the next most useful thing rather than saying "nothing". */}
       <section>
-        <h2 className="section-heading">Today</h2>
-        {todayEvents.length === 0 ? (
+        <h2 className="section-heading">This week</h2>
+        {weekEvents.length === 0 ? (
           <div className="today-empty">
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
               {items.length === 0
-                ? 'Nothing booked, and nothing needs you. Genuinely clear.'
-                : `No shoot today — ${items.length} thing${items.length === 1 ? '' : 's'} below need${items.length === 1 ? 's' : ''} you.`}
+                ? 'Nothing booked this week, and nothing needs you. Genuinely clear.'
+                : `Nothing booked this week — ${items.length} thing${items.length === 1 ? '' : 's'} below need${items.length === 1 ? 's' : ''} you.`}
             </p>
           </div>
         ) : (
           <div className="card-flush">
-            {todayEvents.map((e) => (
+            {weekEvents.map((e) => (
               <div key={e.id} className="today-row">
-                <span className="today-time">{timeLabel(e.startTime, e.endTime)}</span>
+                <span className="today-time">
+                  <span className="today-day">{e.date === todayISO ? 'Today' : weekdayShort(e.date)}</span>
+                  <span>{timeLabel(e.startTime, e.endTime)}</span>
+                </span>
                 <Camera
                   className="w-4 h-4 shrink-0"
                   style={{ color: e.eventType === 'shoot' ? 'var(--accent)' : 'var(--text-tertiary)' }}
@@ -106,26 +119,27 @@ export default async function DashboardPage() {
           to one below 1100px, where side by side would leave the chat too
           narrow to hold a sentence. */}
       <div className="today-split">
-        {/* Same thread as Telegram; picks up where the last text left off. */}
+        {/* A scratch pad, not the Telegram thread.
+            It used to open on the last twelve Telegram messages, which meant
+            the dashboard's most prominent panel was usually showing the middle
+            of a conversation from some other day, and anything typed here
+            landed in Telegram. It now starts empty on every load and writes
+            nothing to the shared thread — the continuous conversation lives on
+            the Tui AI page and in ⌘K. */}
         <section className="today-split-main">
-          <div className="flex items-center justify-between pb-1">
-            <h2 className="section-heading" style={{ marginBottom: 0 }}>Tui</h2>
-            <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-              One thread with Telegram
-            </span>
+          <div className="section-head">
+            <h2 className="section-heading">Tui AI</h2>
           </div>
-          <TuiThread initialThread={tuiThread} variant="panel" />
+          <TuiThread variant="panel" ephemeral />
         </section>
 
         {/* One sentence and one action per item. Same model the assistant
             reads (lib/attention.ts). */}
         <section className="today-split-side">
-          <div className="flex items-center justify-between pb-1">
-            <h2 className="section-heading" style={{ marginBottom: 0 }}>Needs you</h2>
+          <div className="section-head">
+            <h2 className="section-heading">Needs you</h2>
             {remaining > 0 && (
-              <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                +{remaining} more
-              </span>
+              <span className="section-head-meta">+{remaining} more</span>
             )}
           </div>
 
