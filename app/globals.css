@@ -507,17 +507,23 @@ input, textarea, select, button { font-family: inherit; }
    tuimedia.nz. A card is a lift in the background, nothing more. The hairline
    plus shadow that used to sit on every one of these drew a box around every
    idea on the page and made a dashboard read as a grid of equally important
-   containers. Separation is the surface step and the gap between cards. */
+   containers. Separation is the surface step and the gap between cards.
+
+   Fill and radius are the rebrand site's card exactly: a SOLID --surface
+   (#0F1930) on --paper, cornered at --radius (32px). They used to be
+   rgba(15, 25, 48, .72), which over the paper resolves to roughly #0C1527 —
+   a card that reads a shade muddier than the same card on tuimedia.nz, for
+   a translucency with nothing behind it to show through. */
 .card {
   background: var(--bg-surface);
-  border-radius: var(--r-lg);
+  border-radius: var(--r-xl);
   padding: 1.5rem;
   contain: layout style;
 }
 
 .card-flush {
   background: var(--bg-surface);
-  border-radius: var(--r-lg);
+  border-radius: var(--r-xl);
   overflow-x: auto;
   overflow-y: hidden;
   contain: layout style;
@@ -532,7 +538,6 @@ input, textarea, select, button { font-family: inherit; }
   color: #EFF2F8;
   background: var(--grad-hero);
   overflow: hidden;
-  box-shadow: var(--shadow-soft);
   isolation: isolate;
 }
 .card-hero > * { position: relative; z-index: 1; }
@@ -629,7 +634,6 @@ input, textarea, select, button { font-family: inherit; }
   margin: 10px 10px 10px 0;
   min-height: calc(100dvh - 20px);
   overflow: hidden;
-  box-shadow: var(--shadow-soft);
   display: flex;
   flex-direction: column;
 }
@@ -658,7 +662,10 @@ input, textarea, select, button { font-family: inherit; }
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  margin-bottom: 32px;
+  /* A 28px title needs more than a line of air under it. At 32px the first
+     card read as though it were attached to the heading rather than being the
+     next thing down the page. */
+  margin-bottom: 40px;
 }
 .page-header-left {
   min-width: min(100%, 260px);
@@ -669,6 +676,18 @@ input, textarea, select, button { font-family: inherit; }
   color: var(--text-tertiary);
   margin-bottom: 4px;
 }
+/* The "Back to ..." link that sits above a record or form title. */
+.page-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: var(--t-sm);
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color var(--dur-fast) ease;
+}
+.page-back:hover { color: var(--text-primary); }
 /* The page heading. This is the ONLY way to set a page title — several pages
    used to hand-roll `text-2xl font-semibold` with an inline letter-spacing
    instead, which is a different size (24px vs 28px) at a different weight
@@ -829,11 +848,20 @@ input, textarea, select, button { font-family: inherit; }
   border: 1px solid color-mix(in srgb, var(--warning) 30%, transparent);
   color: var(--warning);
 }
+/* Neutral standing information — a campaign that is simply running to plan.
+   Deliberately not warning-coloured: on a video ad project the managed month
+   is in one of these states the whole time it exists, and an amber banner for
+   four straight weeks teaches you to stop reading the banner. */
+.alert-info {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--accent);
+}
 
 /* ── Stat Card ────────────────────────────────────────────── */
 .stat-card {
   background: var(--bg-surface);
-  border-radius: var(--r-lg);
+  border-radius: var(--r-xl);
   padding: 1.5rem;
 }
 .stat-card .stat-value {
@@ -1210,9 +1238,7 @@ input, textarea, select, button { font-family: inherit; }
 /* ── Floating Sidebar ─────────────────────────────────────── */
 .sidebar-island {
   background: var(--bg-surface);
-  border: 1px solid var(--bg-border);
   border-radius: var(--r-xl);
-  box-shadow: var(--shadow-soft);
 }
 
 /* ── Mobile Responsive ────────────────────────────────────── */
@@ -1289,7 +1315,7 @@ input, textarea, select, button { font-family: inherit; }
    around them. */
 .kpi-card {
   background: var(--bg-surface);
-  border-radius: var(--r-lg);
+  border-radius: var(--r-xl);
   padding: 22px 24px;
   display: flex;
   flex-direction: column;
@@ -1472,18 +1498,13 @@ input, textarea, select, button { font-family: inherit; }
 .navsec-head:hover .navsec-actions { opacity: 1; }
 .navsec-actions svg { width: 14px; height: 14px; }
 
-/* ── Dashboard gray canvas (floating white cards) ─────────── */
-/* Scoped to the Overview route: the content area drops to the
-   warm gray base so cards/widgets read as white panels floating
-   on top — borderless, lifted by a soft shadow. */
+/* ── Dashboard canvas ─────────────────────────────────────── */
+/* Scoped to the Overview route: the content area drops to the paper base so
+   the cards on it read as the surface step above it. It changes the ground
+   and nothing else — the shadow that used to be added here lifted those four
+   surfaces off the page and made Overview the one screen whose cards did not
+   match the rest of the app, or the rebrand site. */
 .page-shell-inner.canvas-gray { background: var(--bg-base); }
-.canvas-gray .card,
-.canvas-gray .card-flush,
-.canvas-gray .kpi-card,
-.canvas-gray .stat-card {
-  border-color: transparent;
-  box-shadow: 0 1px 2px rgba(6, 13, 26, 0.04), 0 6px 20px rgba(6, 13, 26, 0.07);
-}
 
 /* ── Icon weight ──────────────────────────────────────────────
    One weight, everywhere. This used to name seven places — nav, buttons,
@@ -1550,25 +1571,20 @@ input, textarea, select, button { font-family: inherit; }
   border-top: 1px solid var(--bg-border);
 }
 
-/* ── Liquid glass cards (site-wide) ─────────────────────────── */
-/* Every surface picks up the glass treatment: translucent fill,
-   hairline border, inner top highlight. Kept last in the file so it
-   wins over earlier per-context card overrides.
+/* ── Liquid glass (floating surfaces only) ─────────────────────
+   Translucent fill, hairline border, inner top highlight and blur. Kept last
+   in the file so it wins over earlier per-context overrides.
 
-   Blur is only added below for surfaces that actually float over other
-   content (modals, dropdowns, drawers/panels, the mobile sidebar
-   overlay) — that's where translucency has anything to show through.
-   .card/.stat-card/.kpi-card sit in normal flow on the flat
-   .page-shell background, so blurring them cost a compositor layer
-   per card for a visual result identical to an opaque fill. */
-/* The glass pass gives surfaces their translucency. It must NOT reintroduce
-   the border or the drop shadow the base rules above deliberately drop. */
-.card,
-.card-flush,
-.stat-card,
-.kpi-card {
-  background: var(--glass-card-bg);
-}
+   Only surfaces that actually float over other content are named: modals,
+   dropdowns, drawers and panels, the mobile sidebar. That is the only place
+   translucency has anything to show through, and blur costs a compositor
+   layer for it.
+
+   Cards are deliberately NOT in this list. They sit in normal flow on the
+   flat page ground, so a 0.72 fill over that ground just resolves to a
+   darker card — which is exactly what made every card in the app read a
+   shade off from the same card on tuimedia.nz. They keep the solid
+   --surface the base rules give them. */
 .modal-content,
 .custom-select-menu,
 .drawer-panel,
@@ -1580,14 +1596,9 @@ input, textarea, select, button { font-family: inherit; }
   -webkit-backdrop-filter: blur(20px) saturate(160%);
   box-shadow: var(--glass-card-highlight), var(--shadow-soft);
 }
-/* Deliberately no border or shadow here either — this rule used to put both
-   back on the very surfaces the base rules strip them from. */
-.canvas-gray .card,
-.canvas-gray .card-flush,
-.canvas-gray .kpi-card,
-.canvas-gray .stat-card {
-  background: var(--glass-card-bg);
-}
+/* Deliberately no border, no shadow and no glass fill here either — this rule
+   used to put all three back on the very surfaces the base rules strip them
+   from. The gray canvas changes the ground, not the cards on it. */
 
 /* ── Invisible scrollbar (scroll still works) ───────────────── */
 .scroll-invisible {
@@ -2029,7 +2040,28 @@ input, textarea, select, button { font-family: inherit; }
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text-primary);
-  margin-bottom: 10px;
+  /* 10px was tighter than the leading inside the panel below it, so the
+     heading visually joined the panel instead of labelling it. */
+  margin-bottom: 14px;
+}
+
+/* A section heading with something opposite it — a count, a source, a link.
+   This pattern was hand-rolled as `flex items-center justify-between pb-1`
+   with an inline `marginBottom: 0` on the heading at four call sites, which
+   overrode the heading's own spacing and left 4px between the label and the
+   panel it belongs to. One class, and the gap matches a plain heading. */
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.section-head .section-heading { margin-bottom: 0; }
+.section-head-meta {
+  font-size: var(--t-xs);
+  color: var(--text-tertiary);
+  flex: none;
 }
 
 .today-empty {
@@ -2050,12 +2082,24 @@ input, textarea, select, button { font-family: inherit; }
 }
 .today-row:last-child { border-bottom: none; }
 
-/* Fixed width + tabular figures so start times form a straight column. */
+/* Fixed width + tabular figures so start times form a straight column.
+   Two lines now that a row can be any of the next 7 days, not just today: the
+   day sits above the time it used to show alone. */
 .today-time {
   flex: 0 0 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   font-size: var(--t-sm);
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
+}
+.today-day {
+  font-size: var(--t-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
 }
 .today-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .today-title { font-size: var(--t-md); font-weight: 500; color: var(--text-primary); }
@@ -2309,12 +2353,16 @@ input, textarea, select, button { font-family: inherit; }
   .settings-nav-tile {
     display: flex;
     align-items: center;
+    /* Missing on this one — every other icon+label pill in the app centers
+       its content, but this grid cell is wider than the icon and label
+       together, so without it the pair sat pinned to the left edge with a
+       visible gap of dead space on the right of every tile. */
+    justify-content: center;
     gap: 10px;
     min-height: 56px;
     padding: 0 16px;
     border-radius: var(--r-lg);
     background: var(--bg-surface);
-    border: 1px solid var(--bg-border);
     color: var(--text-primary);
     font-size: var(--t-md);
     font-weight: 500;
@@ -2549,6 +2597,14 @@ input, textarea, select, button { font-family: inherit; }
   font-size: var(--t-control);
   padding-top: 1.5rem;
   padding-bottom: 0.55rem;
+  /* .field-input's own left padding is 18px, matching where the label sits
+     below. .custom-select-trigger (CustomSelect and DatePicker both render
+     one as their button) is a shorter 14px on its own — fine standalone, but
+     next to a text field in the same form it read as the value sitting
+     noticeably further left than everything around it. Pinning it to the
+     same 18px here, inside .field, leaves the standalone control untouched
+     anywhere it's used outside a labelled field. */
+  padding-left: 18px;
 }
 
 .field > textarea.field-input {
@@ -2876,4 +2932,80 @@ input, textarea, select, button { font-family: inherit; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ── Tui AI chat ──────────────────────────────────────────────
+   The assistant's own surface, in all three of its mounts: the Today panel,
+   the /dashboard/tui page and the ⌘K overlay. */
+
+.tui-shell {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-surface);
+  border-radius: var(--r-xl);
+}
+
+/* The empty state. The bird mark, then one line under it, both centred in the
+   space the conversation will fill. */
+.tui-empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 0 24px;
+}
+.tui-empty-mark {
+  width: 36px;
+  height: auto;
+}
+.tui-empty-text {
+  font-size: var(--t-sm);
+  line-height: 1.55;
+  text-align: center;
+  text-wrap: balance;
+  max-width: 34ch;
+  color: var(--text-tertiary);
+}
+
+/* ── Composer ────────────────────────────────────────────────
+   One variable drives the field height and the send button, so the two cannot
+   drift apart. They previously came from different scales — .field-input is
+   padding plus line-height (~46px) and .btn-sm.btn-round is a fixed 36px — so
+   the button floated with 5px of dead space above and below it inside a taller
+   field. */
+.tui-composer {
+  --tui-control-h: 46px;
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--bg-border);
+}
+.tui-composer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tui-composer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--tui-control-h);
+  padding-block: 0;
+  border-radius: var(--r-pill);
+  font-size: var(--t-md);
+}
+.tui-composer-send {
+  flex: none;
+  width: var(--tui-control-h);
+  height: var(--tui-control-h);
+  min-height: 0;
+  padding: 0;
+  gap: 0;
+  border-radius: var(--r-pill);
+}
+
+/* The composer is a touch target on a phone, where 46px is under the 44pt
+   floor once the border is counted. */
+@media (max-width: 768px) {
+  .tui-composer { --tui-control-h: 48px; }
 }

@@ -30,6 +30,8 @@ export async function createClient(prevState: { error?: string } | undefined, fo
   const tagsRaw = formData.get('tags') as string
   const monthlyRetainerRaw = formData.get('monthlyRetainer') as string
   const shootsPerMonthRaw = formData.get('shootsPerMonth') as string
+  const industry = formData.get('industry') as string
+  const brand = formData.get('brand') as string
 
   if (!name) return { error: 'Client / business name is required.' }
 
@@ -49,6 +51,8 @@ export async function createClient(prevState: { error?: string } | undefined, fo
     pipeline_stage: pipelineStage || 'enquiry',
     status: status || 'lead',
     client_category: clientCategory || null,
+    industry: industry || null,
+    brand: brand || 'tui_media',
     notes: notes || null,
     tags,
     monthly_retainer: monthlyRetainer,
@@ -81,6 +85,14 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
   const tagsRaw = formData.get('tags') as string
   const monthlyRetainerRaw = formData.get('monthlyRetainer') as string
   const shootsPerMonthRaw = formData.get('shootsPerMonth') as string
+  const industry = formData.get('industry') as string
+  const brand = formData.get('brand') as string
+  const sells = formData.get('sells') as string
+  const customerValueRaw = formData.get('customerValue') as string
+  const adSpendBudgetRaw = formData.get('adSpendBudget') as string
+  const decisionMaker = formData.get('decisionMaker') as string
+  const capacity = formData.get('capacity') as string
+  const timeline = formData.get('timeline') as string
 
   if (!name) return { error: 'Client / business name is required.' }
 
@@ -100,6 +112,16 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
     pipeline_stage: pipelineStage || 'enquiry',
     status: status || 'lead',
     client_category: clientCategory || null,
+    industry: industry || null,
+    brand: brand || 'tui_media',
+    // The application answers. Editable rather than read-only because plenty of
+    // these arrive over the phone rather than through the form on the site.
+    sells: sells || null,
+    customer_value: customerValueRaw ? parseFloat(customerValueRaw) : null,
+    ad_spend_budget: adSpendBudgetRaw ? parseFloat(adSpendBudgetRaw) : null,
+    decision_maker: decisionMaker || null,
+    capacity: capacity || null,
+    timeline: timeline || null,
     notes: notes || null,
     tags,
     monthly_retainer: monthlyRetainer,
@@ -125,7 +147,10 @@ export async function updateClientStatus(clientId: string, status: string) {
 }
 
 export async function updateClientCategory(clientId: string, category: string | null) {
-  const allowed = ['retainer', 'marketing', 'one_off', null]
+  // 'video_ads' is the post-rebrand offer; the rest stay for the retainer
+  // clients still on the books. Leaving it off this list silently rejected
+  // every attempt to categorise a new client from the list view.
+  const allowed = ['video_ads', 'retainer', 'marketing', 'one_off', null]
   if (!allowed.includes(category)) return { error: 'Invalid category.' }
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.from('clients').update({ client_category: category }).eq('id', clientId)

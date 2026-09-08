@@ -18,7 +18,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   ] = await Promise.all([
     supabase
       .from('jobs')
-      .select('id, name, job_type, status, shoot_date, shoot_location, quote_value, expected_amount, expected_payment_date, revision_limit, revisions_used, hourly_rate, estimated_hours, notes, client_id, clients(id, name)')
+      .select('id, name, job_type, status, shoot_date, shoot_location, quote_value, expected_amount, expected_payment_date, revision_limit, revisions_used, hourly_rate, estimated_hours, notes, ad_platform, ad_account_ref, ad_spend_budget, campaign_launched_at, campaign_ends_at, handover_at, client_id, clients(id, name)')
       .eq('id', id)
       .single(),
     supabase.from('job_tasks').select('id, phase, title, completed').eq('job_id', id).order('sort_order', { ascending: true }),
@@ -31,7 +31,9 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     supabase.from('time_entries').select('id, description, category, started_at, ended_at, duration_seconds, billable, hourly_rate').eq('job_id', id).order('started_at', { ascending: false }),
   ])
 
-  // Fallback if time-tracking columns don't exist yet (migration not run on legacy DBs)
+  // Fallback if time-tracking or campaign columns don't exist yet (migration
+  // not run on legacy DBs). A missing column fails the whole select, so the
+  // retry asks only for what schema.sql guarantees and fills the rest in.
   let job = jobRes.data
   if (!job) {
     const res = await supabase
@@ -39,7 +41,14 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
       .select('id, name, job_type, status, shoot_date, shoot_location, quote_value, revision_limit, revisions_used, notes, client_id, clients(id, name)')
       .eq('id', id)
       .single()
-    job = res.data ? { ...res.data, hourly_rate: 0, estimated_hours: 0, expected_amount: null, expected_payment_date: null } : null
+    job = res.data
+      ? {
+          ...res.data,
+          hourly_rate: 0, estimated_hours: 0, expected_amount: null, expected_payment_date: null,
+          ad_platform: null, ad_account_ref: null, ad_spend_budget: null,
+          campaign_launched_at: null, campaign_ends_at: null, handover_at: null,
+        }
+      : null
   }
 
   if (!job) notFound()
@@ -62,6 +71,12 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     hourlyRate: Number(job.hourly_rate ?? 0),
     estimatedHours: Number(job.estimated_hours ?? 0),
     notes: job.notes,
+    adPlatform: (job.ad_platform as string | null) ?? null,
+    adAccountRef: (job.ad_account_ref as string | null) ?? null,
+    adSpendBudget: job.ad_spend_budget !== null && job.ad_spend_budget !== undefined ? Number(job.ad_spend_budget) : null,
+    campaignLaunchedAt: (job.campaign_launched_at as string | null) ?? null,
+    campaignEndsAt: (job.campaign_ends_at as string | null) ?? null,
+    handoverAt: (job.handover_at as string | null) ?? null,
     client,
     tasks: (tasks ?? []).map((t) => ({
       id: t.id,

@@ -8,29 +8,36 @@ import { ArrowLeft } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
 import Field from '@/components/Field'
+import { CLIENT_CATEGORIES, INDUSTRIES, BRANDS } from '@/lib/client-fields'
 
-const LEAD_SOURCES = ['Referral', 'Website', 'Social Media', 'Google', 'Word of Mouth', 'Other']
+const LEAD_SOURCES = ['Referral', 'Website Application', 'Website', 'Social Media', 'Google', 'Word of Mouth', 'Other']
 const PIPELINE_STAGES = ['enquiry', 'discovery', 'proposal', 'negotiation', 'won']
 const STATUSES = ['lead', 'active', 'past', 'archived']
-const CATEGORIES = [
-  { value: '', label: 'Select...' },
-  { value: 'one_off', label: 'One-off' },
-  { value: 'retainer', label: 'Retainer' },
-  { value: 'marketing', label: 'Marketing' },
-]
 
 export default function NewClientPage() {
   const [state, action, pending] = useActionState(createClient, undefined)
 
   return (
-    <div className="space-y-6">
-      <Link href="/dashboard/clients" className="inline-flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-        <ArrowLeft className="w-4 h-4" /> Back to Clients
-      </Link>
-
-      <h1 className="page-title">New Client</h1>
+    <div>
+      {/* The standard page header, not a hand-rolled one. These two pages
+          stacked the back link, the title and the form in a `space-y-6`, so
+          the title had 24px under it against the 40px every other page gives
+          its heading, and the form card read as if it were welded to it. */}
+      <div className="page-header">
+        <div className="page-header-left">
+          <Link href="/dashboard/clients" className="page-back">
+            <ArrowLeft className="w-4 h-4" /> Back to Clients
+          </Link>
+          <h1 className="page-title">New Client</h1>
+        </div>
+      </div>
 
       <form action={action} className="card space-y-5">
+        {/* Not nested in the Industry Field: Field takes a single child, and a
+            datalist is referenced by id from anywhere in the document. */}
+        <datalist id="industry-options">
+          {INDUSTRIES.map((i) => <option key={i} value={i} />)}
+        </datalist>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Client / Business Name *">
             <input name="name" required className="field-input" placeholder="Acme Co. or full name" />
@@ -74,8 +81,20 @@ export default function NewClientPage() {
           <Field label="Client Type">
             <CustomSelect
               name="clientCategory"
-              defaultValue=""
-              options={CATEGORIES}
+              defaultValue="video_ads"
+              options={[{ value: '', label: 'Select...' }, ...CLIENT_CATEGORIES.map((c) => ({ value: c.value, label: c.label }))]}
+            />
+      </Field>
+          {/* Free text with suggestions — see INDUSTRIES in lib/client-fields.ts
+              for why this isn't a locked-down select. */}
+          <Field label="Industry">
+            <input name="industry" list="industry-options" className="field-input" placeholder="Construction, marine, tourism..." />
+      </Field>
+          <Field label="Brand">
+            <CustomSelect
+              name="brand"
+              defaultValue="tui_media"
+              options={BRANDS.map((b) => ({ value: b.value, label: b.label }))}
             />
       </Field>
           <Field label="Monthly Retainer">

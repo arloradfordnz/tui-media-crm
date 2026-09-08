@@ -124,6 +124,12 @@ export async function updateJob(prevState: { error?: string } | undefined, formD
   const estimatedHours = formData.get('estimatedHours') as string
   const notes = formData.get('notes') as string
   const status = formData.get('status') as string
+  const adPlatform = formData.get('adPlatform') as string | null
+  const adAccountRef = formData.get('adAccountRef') as string | null
+  const adSpendBudget = formData.get('adSpendBudget') as string | null
+  const campaignLaunchedAt = formData.get('campaignLaunchedAt') as string | null
+  const campaignEndsAt = formData.get('campaignEndsAt') as string | null
+  const handoverAt = formData.get('handoverAt') as string | null
 
   if (!name) return { error: 'Job name is required.' }
 
@@ -143,6 +149,24 @@ export async function updateJob(prevState: { error?: string } | undefined, formD
     estimated_hours: estimatedHours ? parseFloat(estimatedHours) : 0,
     notes: notes || null,
     ...(status ? { status } : {}),
+    // The campaign block only renders on video ad projects, so on every other
+    // job these keys are absent from the FormData entirely. Keying off
+    // `has()` rather than the parsed value is what keeps a save on a wedding
+    // from writing six nulls over columns it was never shown — and, more to
+    // the point, keeps a *cleared* date on a video ad project (present but
+    // empty, which must write null) distinguishable from a field that was
+    // never on the form at all.
+    ...(formData.has('adPlatform')
+      ? {
+          ad_platform: adPlatform || null,
+          ad_account_ref: adAccountRef || null,
+          ad_spend_budget: adSpendBudget ? parseFloat(adSpendBudget) : null,
+          campaign_launched_at: campaignLaunchedAt ? new Date(campaignLaunchedAt).toISOString() : null,
+          // Left blank, the DB trigger sets this to a month after launch.
+          campaign_ends_at: campaignEndsAt ? new Date(campaignEndsAt).toISOString() : null,
+          handover_at: handoverAt ? new Date(handoverAt).toISOString() : null,
+        }
+      : {}),
     // Stamp delivery once, on the transition — revenue is bucketed by this,
     // so it must not drift when the job is edited later.
     ...(statusChanged && status === 'delivered' ? { delivered_at: new Date().toISOString() } : {}),

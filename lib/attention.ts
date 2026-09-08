@@ -33,10 +33,12 @@ export type AttentionItem = {
   meta?: string
 }
 
-export type TodayEvent = {
+export type WeekEvent = {
   id: string
   title: string
   eventType: string
+  /** YYYY-MM-DD, NZ calendar day — needed once a row can be any of seven days. */
+  date: string
   startTime: string | null
   endTime: string | null
   job: { id: string; name: string } | null
@@ -45,8 +47,12 @@ export type TodayEvent = {
 export type Attention = {
   todayISO: string
   todayLabel: string
-  todayEvents: TodayEvent[]
-  hasShootToday: boolean
+  /** The next 7 days, today included — see the home screen's "This week"
+      section. Widened from a single day: a banner that only ever spoke about
+      today had nothing to say on the far more common case of a clear today
+      with a shoot booked for Thursday. */
+  weekEvents: WeekEvent[]
+  hasShootThisWeek: boolean
   /** Ranked: urgent, then due, then watch. Renderers slice this. */
   items: AttentionItem[]
   backlog: ContentBacklog | null
@@ -87,27 +93,30 @@ export async function getAttention(
   })
 
   const dayStart = new Date(nzNow.getFullYear(), nzNow.getMonth(), nzNow.getDate()).toISOString()
-  const dayEnd = new Date(nzNow.getFullYear(), nzNow.getMonth(), nzNow.getDate() + 1).toISOString()
+  const weekEnd = new Date(nzNow.getFullYear(), nzNow.getMonth(), nzNow.getDate() + 7).toISOString()
   const stale7d = new Date(now.getTime() - 7 * 86400000).toISOString()
   const staleLead5d = new Date(now.getTime() - 5 * 86400000).toISOString()
   const shootWindow5d = new Date(now.getTime() + 5 * 86400000).toISOString().slice(0, 10)
   const staleProposal4d = new Date(now.getTime() - 4 * 86400000).toISOString()
+  const handoverWindow7d = new Date(now.getTime() + 7 * 86400000).toISOString()
 
   const [
-    todayEventsRes,
+    weekEventsRes,
     overdueTasksRes,
     stalledJobsRes,
     overdueDeadlinesRes,
     shootsNeedingPrepRes,
     staleProposalsRes,
     coldLeadsRes,
+    handoversDueRes,
     backlog,
   ] = await Promise.all([
     supabase
       .from('events')
-      .select('id, title, event_type, start_time, end_time, job_id, jobs(id, name)')
+      .select('id, title, event_type, date, start_time, end_time, job_id, jobs(id, name)')
       .gte('date', dayStart)
-      .lt('date', dayEnd)
+      .lt('date', weekEnd)
+      .order('date', { ascending: true })
       .order('start_time', { ascending: true }),
     supabase
       .from('job_tasks')
@@ -155,6 +164,25 @@ export async function getAttention(
       .in('pipeline_stage', ['enquiry', 'discovery', 'proposal', 'negotiation'])
       .lt('updated_at', staleLead5d)
       .order('updated_at')
+      .limit(10),
+    // Campaigns at the end of their managed month.
+    //
+    // This is the deadline on a video ad project that costs money to miss: the
+    // fee bought one month of managing the ads, and every day past
+    // campaign_ends_at without a handover is work being done for free. Nothing
+    // else in this file catches it — the job is neither stalled (it's being
+    // worked on) nor overdue by task (the launch tasks are ticked).
+    //
+    // Returns { data: null } rather than throwing if migration_video_ads.sql
+    // hasn't been run, which the `?? []` below absorbs.
+    supabase
+      .from('jobs')
+      .select('id, name, campaign_ends_at, clients(name)')
+      .not('campaign_ends_at', 'is', null)
+      .is('handover_at', null)
+      .lte('campaign_ends_at', handoverWindow7d)
+      .not('status', 'in', '("archived")')
+      .order('campaign_ends_at')
       .limit(10),
     // Best-effort: the backlog costs two nested queries, and losing it should
     // cost the backlog line, not the whole page.
@@ -204,6 +232,26 @@ export async function getAttention(
       severity: 'urgent',
       sentence: `${j.clients?.name ?? j.name} shoots ${days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${plural(days, 'day')}`} but is still ${j.status}`,
       action: { label: 'Open job', href: `/dashboard/jobs/${j.id}` },
+    })
+  }
+
+  // ── Managed month up, nothing handed over ───────────────────
+  for (const j of (handoversDueRes?.data ?? []) as {
+    id: string; name: string; campaign_ends_at: string; clients: { name: string } | null
+  }[]) {
+    const late = daysAgo(j.campaign_ends_at, todayISO)
+    const who = j.clients?.name ?? j.name
+    items.push({
+      id: `handover:${j.id}`,
+      kind: 'handover_due',
+      // Past the end date this is urgent and stays urgent — unpaid work is
+      // being done for as long as it goes unnoticed.
+      severity: late > 0 ? 'urgent' : 'due',
+      sentence: late > 0
+        ? `${who}'s managed month is up — hand over the ad account, footage and cuts`
+        : `${who}'s managed month ends ${late === 0 ? 'today' : `in ${plural(-late, 'day')}`}`,
+      action: { label: 'Open job', href: `/dashboard/jobs/${j.id}` },
+      meta: late > 0 ? `${plural(late, 'day')} over` : undefined,
     })
   }
 
@@ -269,14 +317,15 @@ export async function getAttention(
 
   items.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity])
 
-  const todayEvents = ((todayEventsRes?.data ?? []) as {
-    id: string; title: string; event_type: string
+  const weekEvents = ((weekEventsRes?.data ?? []) as {
+    id: string; title: string; event_type: string; date: string
     start_time: string | null; end_time: string | null
     jobs: { id: string; name: string } | null
   }[]).map((e) => ({
     id: e.id,
     title: e.title,
     eventType: e.event_type,
+    date: e.date.slice(0, 10),
     startTime: e.start_time,
     endTime: e.end_time,
     job: e.jobs ?? null,
@@ -285,8 +334,8 @@ export async function getAttention(
   return {
     todayISO,
     todayLabel,
-    todayEvents,
-    hasShootToday: todayEvents.some((e) => e.eventType === 'shoot'),
+    weekEvents,
+    hasShootThisWeek: weekEvents.some((e) => e.eventType === 'shoot'),
     items,
     backlog,
   }

@@ -7,14 +7,15 @@ import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
 import { useToast } from '@/components/Toast'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo, stripJobPrefix } from '@/lib/format'
 import Link from 'next/link'
-import { ArrowLeft, Trash2, Briefcase, MessageSquare, StickyNote, UserCircle, Copy, Check, FileText, ExternalLink, Camera, Receipt } from 'lucide-react'
+import { ArrowLeft, Trash2, Briefcase, MessageSquare, StickyNote, UserCircle, Copy, Check, FileText, ExternalLink, Camera, Receipt, ClipboardList } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
 import Field from '@/components/Field'
 import PortalAccountButton from './PortalAccountButton'
+import { CLIENT_CATEGORIES, INDUSTRIES, BRANDS } from '@/lib/client-fields'
 
 const PIPELINE_STAGES = ['enquiry', 'discovery', 'proposal', 'negotiation', 'won']
-const LEAD_SOURCES = ['Referral', 'Website', 'Social Media', 'Google', 'Word of Mouth', 'Other']
+const LEAD_SOURCES = ['Referral', 'Website Application', 'Website', 'Social Media', 'Google', 'Word of Mouth', 'Other']
 
 type ClientData = {
   id: string
@@ -32,6 +33,15 @@ type ClientData = {
   monthlyRetainer: number | null
   shootsPerMonth: number | null
   invoiceDay: number | null
+  industry: string | null
+  brand: string | null
+  // The application answers, from the form on the site or taken over the phone.
+  sells: string | null
+  customerValue: number | null
+  adSpendBudget: number | null
+  decisionMaker: string | null
+  capacity: string | null
+  timeline: string | null
   notes: string | null
   tags: string | null
   portalToken: string | null
@@ -139,11 +149,9 @@ function RetainerSchedule({
   )
 }
 
-const CLIENT_CATEGORIES = [
+const CATEGORY_OPTIONS = [
   { value: '', label: 'None' },
-  { value: 'one_off', label: 'One-off' },
-  { value: 'retainer', label: 'Retainer' },
-  { value: 'marketing', label: 'Marketing' },
+  ...CLIENT_CATEGORIES.map((c) => ({ value: c.value as string, label: c.label as string })),
 ]
 
 const TABS = [
@@ -284,6 +292,11 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
       {/* Tab content */}
       {tab === 'details' && (
         <form action={action} className="card space-y-5">
+          {/* Not nested in the Industry Field: Field takes a single child, and
+              a datalist is referenced by id from anywhere in the document. */}
+          <datalist id="industry-options">
+            {INDUSTRIES.map((i) => <option key={i} value={i} />)}
+          </datalist>
           <input type="hidden" name="clientId" value={client.id} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Client / Business Name *">
@@ -330,7 +343,19 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
               <CustomSelect
                 name="clientCategory"
                 defaultValue={client.clientCategory || ''}
-                options={CLIENT_CATEGORIES}
+                options={CATEGORY_OPTIONS}
+              />
+      </Field>
+            {/* Free text with suggestions, not a locked list — see INDUSTRIES
+                in lib/client-fields.ts. */}
+            <Field label="Industry">
+              <input name="industry" list="industry-options" defaultValue={client.industry || ''} className="field-input" placeholder="Construction, marine, tourism..." />
+      </Field>
+            <Field label="Brand">
+              <CustomSelect
+                name="brand"
+                defaultValue={client.brand || 'tui_media'}
+                options={BRANDS.map((b) => ({ value: b.value as string, label: b.label as string }))}
               />
       </Field>
             <Field label="Monthly Retainer">
@@ -355,6 +380,43 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
                 placeholder="1–4 — retainer clients only"
               />
             </Field>
+          </div>
+
+          {/* The application.
+              These are the answers the site's form asks for before a call gets
+              booked, and they were only ever landing in an inbox. Whether the
+              lead is worth a call is decided on what's in here — what a
+              customer is worth against what they'll spend, whether the person
+              you're talking to can actually sign, and whether they could handle
+              the work if it lands. */}
+          <div className="pt-5" style={{ borderTop: '1px solid var(--bg-border)' }}>
+            <div className="flex items-center gap-2 mb-1">
+              <ClipboardList className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Application</h3>
+            </div>
+            <p className="text-xs mb-4" style={{ color: 'var(--text-tertiary)' }}>
+              From the form on the site, or filled in by hand after a call.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="What do they sell?">
+                <input name="sells" defaultValue={client.sells || ''} className="field-input" placeholder="Roofing, boat servicing, tractors..." />
+        </Field>
+              <Field label="Who signs it off?">
+                <input name="decisionMaker" defaultValue={client.decisionMaker || ''} className="field-input" placeholder="Them, or someone else?" />
+        </Field>
+              <Field label="What's a customer worth? (NZD)" hint="One customer, to them">
+                <input name="customerValue" type="number" min="0" step="0.01" defaultValue={client.customerValue ?? ''} className="field-input" placeholder="e.g. 4500" />
+        </Field>
+              <Field label="Monthly ad spend (NZD)" hint="Their budget, paid direct to the platform">
+                <input name="adSpendBudget" type="number" min="0" step="0.01" defaultValue={client.adSpendBudget ?? ''} className="field-input" placeholder="e.g. 1500" />
+        </Field>
+              <Field label="When do they want ads live?">
+                <input name="timeline" defaultValue={client.timeline || ''} className="field-input" placeholder="ASAP, next month, just looking..." />
+        </Field>
+              <Field label="Could they handle more work?">
+                <input name="capacity" defaultValue={client.capacity || ''} className="field-input" placeholder="Yes / at capacity / hiring" />
+        </Field>
+            </div>
           </div>
 
           {/* Pipeline Progress */}

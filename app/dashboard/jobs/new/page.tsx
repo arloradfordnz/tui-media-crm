@@ -3,7 +3,7 @@
 import { useActionState, useState, useEffect } from 'react'
 import { createJob } from '@/app/actions/jobs'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, Check, Film, Heart, Building2, PartyPopper, Home, Palette, Video, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Film, Heart, Building2, PartyPopper, Home, Palette, Video, AlertTriangle, Megaphone } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
 import { statusLabel } from '@/lib/format'
@@ -12,13 +12,18 @@ import Field from '@/components/Field'
 type Client = { id: string; name: string; email: string | null }
 type TemplateDeliverable = { title: string; description: string | null }
 
+// Video ads first, and first for a reason: it is what Tui Media now sells, and
+// picking it seeds the strategise → script → film → edit → launch → handover
+// checklist. The rest are kept because old jobs still reference their templates
+// and the occasional one still gets booked — they are not the default any more.
 const JOB_TYPES = [
-  { value: 'wedding', label: 'Wedding', icon: Heart },
-  { value: 'anniversary', label: 'Anniversary & Couples', icon: Heart },
+  { value: 'video_ads', label: 'Video Ad Project', icon: Megaphone },
   { value: 'corporate', label: 'Corporate', icon: Building2 },
+  { value: 'social_media', label: 'Social Media', icon: Video },
   { value: 'event', label: 'Event', icon: PartyPopper },
   { value: 'realestate', label: 'Real Estate', icon: Home },
-  { value: 'social_media', label: 'Social Media', icon: Video },
+  { value: 'wedding', label: 'Wedding', icon: Heart },
+  { value: 'anniversary', label: 'Anniversary & Couples', icon: Heart },
   { value: 'custom', label: 'Custom', icon: Palette },
 ]
 
@@ -56,12 +61,19 @@ export default function NewJobPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <Link href="/dashboard/jobs" className="inline-flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-        <ArrowLeft className="w-4 h-4" /> Back to Jobs
-      </Link>
-
-      <h1 className="page-title">New Job</h1>
+    <div>
+      {/* The standard page header, not a hand-rolled one. These two pages
+          stacked the back link, the title and the form in a `space-y-6`, so
+          the title had 24px under it against the 40px every other page gives
+          its heading, and the form card read as if it were welded to it. */}
+      <div className="page-header">
+        <div className="page-header-left">
+          <Link href="/dashboard/jobs" className="page-back">
+            <ArrowLeft className="w-4 h-4" /> Back to Jobs
+          </Link>
+          <h1 className="page-title">New Job</h1>
+        </div>
+      </div>
 
       {/* Step indicator */}
       <div className="flex gap-2 mb-8">

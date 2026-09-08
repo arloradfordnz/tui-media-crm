@@ -62,6 +62,7 @@ export function statusLabel(status: string): string {
     retainer: 'Retainer',
     marketing: 'Marketing',
     one_off: 'One-off',
+    video_ads: 'Video Ads',
     available: 'Available',
     out_on_shoot: 'Out on Shoot',
     in_service: 'In Service',
@@ -83,6 +84,17 @@ export function statusLabel(status: string): string {
     preshoot: 'Pre-shoot',
     postproduction: 'Post-production',
     delivery: 'Delivery',
+    // The video ad project: strategise → script → film → edit → launch, then
+    // the handover that ends it. `live` and `handed_over` are job statuses;
+    // a campaign that is running is neither "approved" nor "delivered".
+    strategise: 'Strategise',
+    script: 'Script',
+    film: 'Film',
+    edit: 'Edit',
+    launch: 'Launch & Manage',
+    handover: 'Handover',
+    live: 'Live',
+    handed_over: 'Handed Over',
     shoot: 'Shoot',
     call: 'Call',
     deadline: 'Deadline',
@@ -102,10 +114,10 @@ export function statusLabel(status: string): string {
  * Get badge CSS class for a status
  */
 export function statusBadgeClass(status: string): string {
-  const success = ['active', 'approved', 'delivered', 'completed', 'available', 'booked', 'accepted', 'won', 'retainer', 'marketing', 'one_off']
+  const success = ['active', 'approved', 'delivered', 'completed', 'available', 'booked', 'accepted', 'won', 'retainer', 'marketing', 'one_off', 'video_ads', 'handed_over']
   const warning = ['review', 'pending', 'in_service', 'editing', 'preproduction', 'discovery', 'proposal', 'draft', 'negotiation']
   const danger = ['overdue', 'rejected', 'archived', 'retired', 'past', 'declined', 'lost']
-  const accent = ['enquiry', 'lead', 'shootday', 'out_on_shoot', 'contract', 'sent']
+  const accent = ['enquiry', 'lead', 'shootday', 'out_on_shoot', 'contract', 'sent', 'live']
 
   if (success.includes(status)) return 'badge-success'
   if (warning.includes(status)) return 'badge-warning'

@@ -6,7 +6,7 @@ import { createProposal } from '@/app/actions/proposals'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo, stripJobPrefix } from '@/lib/format'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as ActivityIcon, MapPin, Calendar, FileText, Upload, Download, FileVideo, Plus, Pencil, X, CheckCheck, MessageSquare } from 'lucide-react'
+import { ArrowLeft, Trash2, CheckCircle2, Circle, Film, RotateCcw, Activity as ActivityIcon, MapPin, Calendar, FileText, Upload, Download, FileVideo, Plus, Pencil, X, CheckCheck, MessageSquare, Megaphone } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import RecordTabs, { RecordPanel } from '@/components/RecordTabs'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
@@ -16,9 +16,70 @@ import JobTimeTracker, { type TimeEntry } from './JobTimeTracker'
 import { useMediaQuery } from '@/lib/useMediaQuery'
 import Field from '@/components/Field'
 
-const JOB_STATUSES = ['enquiry', 'booked', 'editing', 'review', 'delivered', 'archived']
-const PHASES = ['preshoot', 'shootday', 'postproduction', 'delivery']
-const PHASE_LABELS: Record<string, string> = { preshoot: 'Pre-shoot', shootday: 'Shoot Day', postproduction: 'Post-production', delivery: 'Delivery' }
+const JOB_STATUSES = ['enquiry', 'booked', 'editing', 'review', 'live', 'delivered', 'handed_over', 'archived']
+
+// Two generations of job live in this table, so the checklist can't render a
+// fixed list of phases any more. A wedding shot in 2024 has preshoot/shootday/
+// postproduction/delivery tasks; a video ad project has strategise/script/film/
+// edit/launch/handover. Hardcoding either set renders the other job's tasks
+// nowhere at all — silently, since the render already skips empty phases.
+//
+// So: order by this list where a phase is known, and fall through to the task's
+// own order for anything that isn't (a hand-written phase, or a phase added to
+// a template later without touching this file).
+const PHASE_ORDER = [
+  'strategise', 'script', 'film', 'edit', 'launch', 'handover',
+  'preshoot', 'shootday', 'postproduction', 'delivery',
+]
+
+// The whole offer is "one month of managed ads, then you get everything". The
+// date that month ends is the one deadline on a video ad project that costs
+// money to miss — past it, work is being done for free — so it is stated in
+// words on the record rather than left as a date the reader has to subtract
+// today from.
+function campaignStatus(
+  launchedAt: string | null,
+  endsAt: string | null,
+  handoverAt: string | null
+): { message: string; tone: string } | null {
+  if (handoverAt) {
+    return { message: `Handed over ${formatDate(handoverAt)}. Nothing left to run.`, tone: 'alert-success' }
+  }
+  if (!launchedAt) {
+    return { message: 'Not launched yet. The managed month starts the day it goes live.', tone: 'alert-info' }
+  }
+  if (!endsAt) return null
+
+  // Whole days, computed off calendar dates rather than timestamps, so a
+  // campaign launched at 9am and one launched at 5pm agree on "3 days left".
+  const startOfDay = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+  const days = Math.round((startOfDay(new Date(endsAt)) - startOfDay(new Date())) / 86_400_000)
+
+  if (days < 0) {
+    return {
+      message: `The managed month ended ${formatDate(endsAt)} — ${Math.abs(days)} ${Math.abs(days) === 1 ? 'day' : 'days'} ago. Hand over the ad account, footage and cuts.`,
+      tone: 'alert-danger',
+    }
+  }
+  if (days === 0) return { message: 'The managed month ends today. Time to hand over.', tone: 'alert-warning' }
+  if (days <= 7) {
+    return { message: `${days} ${days === 1 ? 'day' : 'days'} left of the managed month — ends ${formatDate(endsAt)}.`, tone: 'alert-warning' }
+  }
+  return { message: `Live. Managed until ${formatDate(endsAt)} (${days} days).`, tone: 'alert-info' }
+}
+
+function phasesPresent(tasks: Task[]): string[] {
+  const seen: string[] = []
+  for (const t of tasks) if (!seen.includes(t.phase)) seen.push(t.phase)
+  return seen.sort((a, b) => {
+    const ai = PHASE_ORDER.indexOf(a)
+    const bi = PHASE_ORDER.indexOf(b)
+    if (ai === -1 && bi === -1) return 0
+    if (ai === -1) return 1
+    if (bi === -1) return -1
+    return ai - bi
+  })
+}
 
 type Task = { id: string; phase: string; title: string; completed: boolean }
 
@@ -37,6 +98,12 @@ type JobData = {
   hourlyRate: number
   estimatedHours: number
   notes: string | null
+  adPlatform: string | null
+  adAccountRef: string | null
+  adSpendBudget: number | null
+  campaignLaunchedAt: string | null
+  campaignEndsAt: string | null
+  handoverAt: string | null
   client: { id: string; name: string }
   tasks: Task[]
   deliverables: { id: string; title: string; description: string | null; completed: boolean; deliveryFiles: { id: string; originalName: string; versionLabel: string; deliveryStatus: string; createdAt: string; fileUrl: string; personalNote: string | null }[] }[]
@@ -64,6 +131,7 @@ export default function JobRecord({ job }: { job: JobData }) {
   const focusRevision = searchParams.get('revision')
   const [tab, setTab] = useState<Tab>(focusRevision ? 'deliverables' : 'work')
   const [state, action, pending] = useActionState(updateJob, undefined)
+  const campaignWindow = campaignStatus(job.campaignLaunchedAt, job.campaignEndsAt, job.handoverAt)
   const [, revAction, revPending] = useActionState(addRevision, undefined)
   const [, startTransition] = useTransition()
   const [deleting, setDeleting] = useState(false)
@@ -333,6 +401,63 @@ export default function JobRecord({ job }: { job: JobData }) {
               <input name="estimatedHours" type="number" step="0.5" min={0} defaultValue={job.estimatedHours || ''} className="field-input" placeholder="e.g. 20" />
       </Field>
           </div>
+
+          {/* The managed month.
+              Only on video ad projects — a wedding has no ad account, and
+              showing six empty campaign fields on every legacy job would bury
+              the ones that matter. The fields still submit as part of this same
+              form, so there is one Save for the whole tab. */}
+          {job.jobType === 'video_ads' && (
+            <div className="pt-4" style={{ borderTop: '1px solid var(--bg-border)' }}>
+              <div className="flex items-center gap-2 mb-4">
+                <Megaphone className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Campaign</h3>
+              </div>
+
+              {campaignWindow && (
+                <div className={`alert ${campaignWindow.tone} mb-4`}>
+                  <span>{campaignWindow.message}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Ad Platform">
+                  <CustomSelect
+                    name="adPlatform"
+                    defaultValue={job.adPlatform || ''}
+                    options={[
+                      { value: '', label: 'Select...' },
+                      { value: 'meta', label: 'Meta (Facebook / Instagram)' },
+                      { value: 'google', label: 'Google' },
+                      { value: 'both', label: 'Meta + Google' },
+                    ]}
+                  />
+          </Field>
+                <Field label="Ad Account">
+                  <input name="adAccountRef" defaultValue={job.adAccountRef || ''} className="field-input" placeholder="Account name or ID — this gets handed over" />
+          </Field>
+                {/* Their spend, not our revenue. Kept out of quote_value and
+                    lifetime_value on purpose: media spend is paid direct to the
+                    platform and counting it would inflate every finance figure. */}
+                <Field label="Their Monthly Ad Spend (NZD)">
+                  <input name="adSpendBudget" type="number" step="0.01" min={0} defaultValue={job.adSpendBudget ?? ''} className="field-input" placeholder="Paid direct to the platform" />
+          </Field>
+                <Field label="Campaign Launched">
+                  <DatePicker name="campaignLaunchedAt" defaultValue={job.campaignLaunchedAt?.split('T')[0] || ''} className="field-input" />
+          </Field>
+                <Field label="Managed Until">
+                  <DatePicker name="campaignEndsAt" defaultValue={job.campaignEndsAt?.split('T')[0] || ''} className="field-input" />
+          </Field>
+                <Field label="Handed Over">
+                  <DatePicker name="handoverAt" defaultValue={job.handoverAt?.split('T')[0] || ''} className="field-input" />
+          </Field>
+              </div>
+              <p className="text-xs mt-3" style={{ color: 'var(--text-tertiary)' }}>
+                Leave <em>Managed until</em> blank and it&apos;s set to one month after launch.
+              </p>
+            </div>
+          )}
+
           <Field label="Notes">
             <textarea name="notes" rows={3} defaultValue={job.notes || ''} className="field-input" />
       </Field>
@@ -346,14 +471,14 @@ export default function JobRecord({ job }: { job: JobData }) {
           {optimisticTasks.length === 0 ? (
             <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No tasks for this job.</p>
           ) : (
-            PHASES.map((phase) => {
+            phasesPresent(optimisticTasks).map((phase) => {
               const phaseTasks = optimisticTasks.filter((t) => t.phase === phase)
               if (phaseTasks.length === 0) return null
               const done = phaseTasks.filter((t) => t.completed).length
               return (
                 <div key={phase} className="mb-5">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="label">{PHASE_LABELS[phase]}</span>
+                    <span className="label">{statusLabel(phase)}</span>
                     <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{done}/{phaseTasks.length}</span>
                   </div>
                   {phaseTasks.map((t) => (

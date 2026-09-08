@@ -33,6 +33,30 @@ export default async function ClientDetailPage({ params, searchParams }: { param
     }
   })()
 
+  // Same treatment, same reason: the rebrand columns (industry, brand, and the
+  // application answers) arrive with migration_video_ads.sql, run by hand in
+  // the Supabase SQL editor. Folded into the main select, a deploy that landed
+  // before that migration ran would fail the whole clients query and every
+  // client record would read "not found". Split out, the worst case is that the
+  // application block is empty until the SQL is run.
+  const rebrandFields = await (async () => {
+    const empty = {
+      industry: null, brand: null, sells: null, customer_value: null,
+      ad_spend_budget: null, decision_maker: null, capacity: null, timeline: null,
+    }
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('industry, brand, sells, customer_value, ad_spend_budget, decision_maker, capacity, timeline')
+        .eq('id', id)
+        .single()
+      if (error || !data) return empty
+      return data
+    } catch {
+      return empty
+    }
+  })()
+
   // Fetch all data in parallel for speed
   const [clientResult, { data: jobs }, { data: activities }, { data: documents }, invoiceDayRaw] = await Promise.all([
     supabase
@@ -82,6 +106,14 @@ export default async function ClientDetailPage({ params, searchParams }: { param
     monthlyRetainer: client.monthly_retainer,
     shootsPerMonth: client.shoots_per_month,
     invoiceDay: invoiceDayRaw ? parseInt(invoiceDayRaw, 10) : null,
+    industry: (rebrandFields.industry as string | null) ?? null,
+    brand: (rebrandFields.brand as string | null) ?? 'tui_media',
+    sells: (rebrandFields.sells as string | null) ?? null,
+    customerValue: rebrandFields.customer_value !== null && rebrandFields.customer_value !== undefined ? Number(rebrandFields.customer_value) : null,
+    adSpendBudget: rebrandFields.ad_spend_budget !== null && rebrandFields.ad_spend_budget !== undefined ? Number(rebrandFields.ad_spend_budget) : null,
+    decisionMaker: (rebrandFields.decision_maker as string | null) ?? null,
+    capacity: (rebrandFields.capacity as string | null) ?? null,
+    timeline: (rebrandFields.timeline as string | null) ?? null,
     notes: client.notes,
     tags: client.tags,
     portalToken: client.portal_token ?? null,
