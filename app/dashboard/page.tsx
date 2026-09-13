@@ -111,8 +111,12 @@ export default async function DashboardPage() {
               they are still distinguishable at a glance from something that
               has gone wrong. */}
           <section>
+            {/* "Needs you" was accurate when the panel held only problems.
+                It now leads with this week's bookings, and a shoot that is
+                simply booked does not "need you" — it is just what is
+                happening. "Your week" covers both without overstating either. */}
             <div className="section-head">
-              <h2 className="section-heading">Needs you</h2>
+              <h2 className="section-heading">Your week</h2>
               {remaining > 0 && (
                 <span className="section-head-meta">+{remaining} more</span>
               )}

@@ -250,14 +250,21 @@ h3 { font-size: var(--t-control); font-weight: 500; letter-spacing: -0.02em; lin
 h4 { font-size: var(--t-md); font-weight: 500; letter-spacing: -0.02em; }
 h5, h6 { font-size: var(--t-sm); font-weight: 500; letter-spacing: -0.02em; }
 
-/* The site's label recipe: small, heavy, and widely tracked, so a caption
-   reads as a different kind of thing from body copy rather than just
-   smaller body copy. */
+/* The site's label recipe.
+   It used to be 11px, weight 700, uppercase, tracked out to 0.14em — five
+   things all shouting at once on a caption that is, by definition, the least
+   important text in its group. At this size caps also cost legibility rather
+   than buying it: every word becomes a rectangle, so "SHOOTS THIS MONTH" is
+   read letter by letter where "Shoots this month" is read as a phrase.
+
+   A label now separates itself from body copy by SIZE and COLOUR only. The
+   font-size goes UP a step (11 to 12px) because lowercase needs the height
+   that caps did not, and the tracking goes back to normal — wide tracking
+   exists to make caps readable and does nothing but scatter lowercase. */
 .label {
-  font-size: var(--t-2xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
+  font-size: var(--t-xs);
+  font-weight: 500;
+  letter-spacing: normal;
   color: var(--text-secondary);
 }
 
@@ -290,10 +297,9 @@ input, textarea, select, button { font-family: inherit; }
 
 .field-label {
   display: block;
-  font-size: var(--t-2xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
+  font-size: var(--t-xs);
+  font-weight: 500;
+  letter-spacing: normal;
   color: var(--text-secondary);
   margin-bottom: 8px;
 }
@@ -593,10 +599,9 @@ input, textarea, select, button { font-family: inherit; }
 .nav-item.active .nav-item-icon { color: var(--accent); }
 
 .nav-section-label {
-  font-size: var(--t-2xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
+  font-size: var(--t-xs);
+  font-weight: 500;
+  letter-spacing: normal;
   color: var(--text-tertiary);
   padding: 18px 12px 6px;
 }
@@ -779,10 +784,9 @@ input, textarea, select, button { font-family: inherit; }
 
 /* ── Tables ───────────────────────────────────────────────── */
 .table-header {
-  font-size: var(--t-2xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  font-size: var(--t-xs);
+  font-weight: 500;
+  letter-spacing: normal;
   color: var(--text-tertiary);
   padding: 12px 16px;
 }
@@ -873,12 +877,11 @@ input, textarea, select, button { font-family: inherit; }
   line-height: 1.1;
 }
 .stat-card .stat-label {
-  font-size: var(--t-2xs);
-  font-weight: 700;
+  font-size: var(--t-xs);
+  font-weight: 500;
   color: var(--text-tertiary);
   margin-top: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: normal;
 }
 .stat-change {
   display: inline-flex;
@@ -1480,10 +1483,9 @@ input, textarea, select, button { font-family: inherit; }
   transform: rotate(-90deg);
 }
 .navsec-title {
-  font-size: var(--t-2xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
+  font-size: var(--t-xs);
+  font-weight: 500;
+  letter-spacing: normal;
   color: var(--text-tertiary);
 }
 .navsec-actions {
@@ -1937,11 +1939,13 @@ input, textarea, select, button { font-family: inherit; }
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;
   }
+  /* Day abbreviations in the phone agenda. Caps here is a calendar
+     convention rather than a shouting label, but the rule is the rule —
+     nothing in the app is set in caps any more. */
   .agenda-day-name {
     font-size: var(--t-xs);
     color: var(--text-tertiary);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: normal;
   }
   .agenda-day-today .agenda-day-num { color: var(--accent); }
   .agenda-today-pill {
@@ -2096,38 +2100,9 @@ input, textarea, select, button { font-family: inherit; }
   border-radius: var(--r-lg);
 }
 
-.today-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--bg-border);
-}
-.today-row:last-child { border-bottom: none; }
+/* .today-row and its parts are gone with the panel they styled: This week
+   merged into Needs you and the bookings now render as .attention-row. */
 
-/* Fixed width + tabular figures so start times form a straight column.
-   Two lines now that a row can be any of the next 7 days, not just today: the
-   day sits above the time it used to show alone. */
-.today-time {
-  flex: 0 0 96px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: var(--t-sm);
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-.today-day {
-  font-size: var(--t-2xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-tertiary);
-}
-.today-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.today-title { font-size: var(--t-md); font-weight: 500; color: var(--text-primary); }
-.today-job { font-size: var(--t-xs); color: var(--accent); text-decoration: none; }
-.today-job:hover { text-decoration: underline; }
 
 /* One sentence, one action. The dot carries severity so the sentence
    doesn't have to spend words on it. */
@@ -2317,9 +2292,8 @@ input, textarea, select, button { font-family: inherit; }
 
 .signature-rule-label {
   margin-top: 6px;
-  font-size: var(--t-2xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: var(--t-xs);
+  letter-spacing: normal;
   color: var(--text-tertiary);
 }
 
@@ -2577,10 +2551,9 @@ input, textarea, select, button { font-family: inherit; }
 .money-table th {
   padding: 6px 10px;
   text-align: left;
-  font-size: var(--t-2xs);
+  font-size: var(--t-xs);
   font-weight: 500;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  letter-spacing: normal;
   color: var(--text-tertiary);
   border-bottom: 1px solid var(--bg-border);
 }
@@ -2950,12 +2923,22 @@ input, textarea, select, button { font-family: inherit; }
   gap: 40px;
 }
 
-/* Three figures on one line above the chart, wrapping rather than shrinking. */
+/* Three figures on one line above the chart, wrapping rather than shrinking.
+   In and Out are .flow-figure buttons, which carry a -6px/-10px negative
+   margin so their hover padding does not push the row out; the gap is sized
+   against that, and the static Net figure gets the same padding so all three
+   sit on one baseline. */
 .money-mini-figures {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px 28px;
+  align-items: flex-start;
+  gap: 12px 22px;
   margin-bottom: 16px;
+}
+.money-mini-figure-static {
+  padding: 6px 10px;
+  margin: -6px -10px;
+  border: 1px solid transparent;
 }
 
 /* The revision you arrived from an email to answer. Ringed rather than

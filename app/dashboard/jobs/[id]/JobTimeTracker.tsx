@@ -300,7 +300,7 @@ export default function JobTimeTracker({
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: 'var(--accent)' }} />
-                <span className="text-xs uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Running</span>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Running</span>
                 <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--bg)', color: 'var(--text-secondary)' }}>
                   {CATEGORY_LABELS[running.category] || running.category}
                 </span>
@@ -393,7 +393,7 @@ export default function JobTimeTracker({
             return (
               <div key={day}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-tertiary)' }}>{formatDate(day)}</span>
+                  <span className="text-xs font-medium" style={{ color: 'var(--text-tertiary)' }}>{formatDate(day)}</span>
                   <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{formatDuration(daySeconds)}</span>
                 </div>
                 <div className="space-y-1">

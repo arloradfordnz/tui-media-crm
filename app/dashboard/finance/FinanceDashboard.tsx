@@ -135,7 +135,7 @@ function TxTable({ txs }: { txs: XeroTransaction[] }) {
     <div className="card" style={{ padding: '18px 20px 16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-tertiary)', fontWeight: 500 }}>
+          <span style={{ fontSize: 'var(--t-xs)', color: 'var(--text-tertiary)', fontWeight: 500 }}>
             Transactions
           </span>
           <span style={{ fontSize: 'var(--t-2xs)', color: 'var(--text-tertiary)' }}>({txs.length})</span>
@@ -157,7 +157,7 @@ function TxTable({ txs }: { txs: XeroTransaction[] }) {
                     <th key={h} style={{
                       padding: '5px 10px', textAlign: h === 'Amount' ? 'right' : 'left',
                       color: 'var(--text-tertiary)', fontWeight: 500,
-                      textTransform: 'uppercase', fontSize: 'var(--t-2xs)', letterSpacing: '0.05em', whiteSpace: 'nowrap',
+                      fontSize: 'var(--t-xs)', whiteSpace: 'nowrap',
                     }}>{h}</th>
                   ))}
                 </tr>
@@ -178,7 +178,8 @@ function TxTable({ txs }: { txs: XeroTransaction[] }) {
                     <td style={{ padding: '8px 10px' }}>
                       <span style={{
                         fontSize: 'var(--t-2xs)', padding: '2px 7px', borderRadius: 999, fontWeight: 500,
-                        textTransform: 'uppercase', letterSpacing: '0.04em',
+                        /* The value is lower-cased in the JSX below; a badge is
+                           small enough already without caps on top. */
                         background: tx.status === 'PAID' ? 'color-mix(in srgb, var(--success) 15%, transparent)' : 'color-mix(in srgb, var(--accent) 15%, transparent)',
                         color: tx.status === 'PAID' ? 'var(--success)' : 'var(--accent)',
                       }}>{tx.status.toLowerCase()}</span>

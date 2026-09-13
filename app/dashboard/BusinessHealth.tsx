@@ -41,7 +41,7 @@ function HealthScoreRing({ score }: { score: number | null }) {
         <span className="text-3xl font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
           {score == null ? '—' : score}
         </span>
-        <span className="text-2xs uppercase tracking-wider font-semibold" style={{ color: 'var(--text-tertiary)' }}>Score</span>
+        <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Score</span>
       </div>
     </div>
   )
@@ -51,7 +51,7 @@ function SignalChip({ label, value }: { label: string; value: string }) {
   return (
     <div className="box-inset">
       <div className="text-base font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{value}</div>
-      <div className="text-2xs uppercase tracking-wider font-semibold mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{label}</div>
+      <div className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{label}</div>
     </div>
   )
 }

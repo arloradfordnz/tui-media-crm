@@ -53,3 +53,4 @@ start-dev.sh
 # local artifacts
 /tmp/
 /dev.db
+.env*

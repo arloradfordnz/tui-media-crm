@@ -157,7 +157,7 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
       <div className="max-w-3xl mx-auto px-6 py-6 space-y-6 animate-fade-in">
         {/* Hero greeting */}
         <div className="py-2">
-          <p className="text-xs uppercase tracking-wider font-semibold mb-2" style={{ color: 'var(--text-tertiary)' }}>Client Portal</p>
+          <p className="text-xs mb-2" style={{ color: 'var(--text-tertiary)' }}>Client Portal</p>
           <h1 className="text-3xl md:text-4xl font-semibold" style={{ letterSpacing: '-0.03em', lineHeight: 1.1, color: 'var(--text-primary)' }}>
             Kia ora, {firstName(data.client.contactPerson) || data.client.name}
           </h1>
