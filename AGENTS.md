@@ -56,6 +56,31 @@ InitPlan (`20260914_0002`), both of which are correct and worth having as the
 data grows — but neither is why anything got faster. Do not let a green
 EXPLAIN convince you the slow thing is the database.
 
+## A Supabase call costs ~130ms even now, so COUNT the sequential ones
+
+Co-locating compute with the database did not make queries free. supabase-js
+talks HTTPS to PostgREST; it is not a socket to Postgres. Measured from sin1,
+one call is still on the order of 130ms, while the query itself runs in under a
+millisecond on tables this size.
+
+The practical rule that falls out of that: **what costs time is the number of
+things you await one after another**, not the number of queries and definitely
+not how much they return. Ten queries in one `Promise.all` cost about one
+round trip. Two queries awaited in sequence cost two. Prefer, in order:
+
+  1. one query with PostgREST embeds, where real foreign keys exist
+     (lib/content-backlog.ts went 3 waves -> 1 that way)
+  2. everything else concurrent in a Promise.all
+  3. <Suspense>, when something genuinely cannot join the wave
+
+You can run the data layer end-to-end without a browser or a session, which is
+the fastest way to check a change of this kind:
+
+```bash
+npx tsx ./scratch.ts   # import getAttention/getContentBacklog, pass a
+                       # service-role client, print the result
+```
+
 ## getUser() is a network call, so it happens once per request
 
 `lib/supabase.ts` exports `getVerifiedUser()`, wrapped in React's `cache()`.
