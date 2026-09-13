@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createServerSupabaseClient } from '@/lib/supabase'
+import { createServerSupabaseClient, getVerifiedUser } from '@/lib/supabase'
 
 export async function changePassword(prevState: { error?: string; success?: boolean } | undefined, formData: FormData) {
   const currentPassword = formData.get('currentPassword') as string
@@ -14,8 +14,10 @@ export async function changePassword(prevState: { error?: string; success?: bool
 
   const supabase = await createServerSupabaseClient()
 
-  // Re-authenticate to verify current password
-  const { data: { user } } = await supabase.auth.getUser()
+  // Re-authenticate to verify current password. Only the address is read
+  // here, so the request-cached identity is the right one to use — the
+  // signInWithPassword below is what actually proves the old password.
+  const user = await getVerifiedUser()
   if (!user?.email) return { error: 'Not authenticated.' }
 
   const { error: signInError } = await supabase.auth.signInWithPassword({ email: user.email, password: currentPassword })
@@ -29,8 +31,7 @@ export async function changePassword(prevState: { error?: string; success?: bool
 
 export async function saveAppSetting(key: string, value: string) {
   const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated.' }
+  if (!(await getVerifiedUser())) return { error: 'Not authenticated.' }
 
   const { error } = await supabase
     .from('app_settings')
@@ -62,9 +63,7 @@ export async function saveEmailTemplate(prevState: { error?: string; success?: b
   if (!type || !subject || !body) return { error: 'All fields are required.' }
 
   const supabase = await createServerSupabaseClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated.' }
+  if (!(await getVerifiedUser())) return { error: 'Not authenticated.' }
 
   const { error } = await supabase
     .from('email_templates')

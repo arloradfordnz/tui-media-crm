@@ -1,5 +1,5 @@
 import { headers } from 'next/headers'
-import { createServerSupabaseClient } from '@/lib/supabase'
+import { getVerifiedUser } from '@/lib/supabase'
 import { createAdminClient } from '@/lib/supabase-admin'
 
 /**
@@ -49,8 +49,7 @@ export async function getAdminIps(): Promise<string[]> {
 
 async function hasAdminSession(): Promise<boolean> {
   try {
-    const supabase = await createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getVerifiedUser()
     if (!user) return false
     const role = (user.app_metadata as { role?: string } | null)?.role
     // Anyone signed in as a *client* is a real client, not Arlo checking.

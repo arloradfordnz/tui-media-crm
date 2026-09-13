@@ -1,5 +1,6 @@
+import { cache } from 'react'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { createServerSupabaseClient } from '@/lib/supabase'
+import { getVerifiedUser } from '@/lib/supabase'
 
 /**
  * Service-role Supabase client — bypasses RLS entirely.
@@ -13,12 +14,12 @@ import { createServerSupabaseClient } from '@/lib/supabase'
  * Never let unverified request input decide *which rows* this client
  * touches without scoping the query to the verified token/client first.
  */
-export function createAdminClient(): SupabaseClient | null {
+export const createAdminClient = cache((): SupabaseClient | null => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) return null
   return createClient(url, key, { auth: { persistSession: false } })
-}
+})
 
 /**
  * Returns the logged-in *admin* user for the current request, or null.
@@ -34,8 +35,7 @@ export function createAdminClient(): SupabaseClient | null {
  * request's cookie, so the claim cannot be forged from the browser.
  */
 export async function getAuthUser() {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getVerifiedUser()
   if (!user) return null
   if (user.app_metadata?.role === 'client') return null
   return user

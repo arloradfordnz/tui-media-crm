@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase'
+import { createServerSupabaseClient, getVerifiedUser } from '@/lib/supabase'
 import SettingsForm from './SettingsForm'
 import EmailTemplatesForm from './EmailTemplatesForm'
 import RetainerInvoiceSettings from './RetainerInvoiceSettings'
@@ -11,9 +11,11 @@ import { Users, CalendarDays, Wallet, FileText, TrendingUp } from 'lucide-react'
 
 export default async function SettingsPage() {
   const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  const [templates, retainerInvoiceDay, adminIps, requestIp] = await Promise.all([
+  // The identity joins the Promise.all rather than gating it: the dashboard
+  // layout has already resolved it for this request, so it costs nothing here.
+  const [user, templates, retainerInvoiceDay, adminIps, requestIp] = await Promise.all([
+    getVerifiedUser(),
     supabase.from('email_templates').select('id, type, subject, body, updated_at').order('type'),
     getAppSetting('retainer_invoice_day'),
     getAdminIps(),

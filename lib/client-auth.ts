@@ -1,4 +1,5 @@
-import { createServerSupabaseClient } from '@/lib/supabase'
+import { cache } from 'react'
+import { getVerifiedUser, getVerifiedRole } from '@/lib/supabase'
 import { createAdminClient } from '@/lib/supabase-admin'
 
 /**
@@ -20,10 +21,14 @@ import { createAdminClient } from '@/lib/supabase-admin'
 
 export type ClientSession = { userId: string; clientId: string; email: string }
 
-/** The signed-in client, or null. Verified against the auth server. */
-export async function getClientSession(): Promise<ClientSession | null> {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
+/** The signed-in client, or null. Verified against the auth server.
+ *
+ *  cache()d because the portal reads it from both the page and the actions it
+ *  renders, and the client_users lookup below is a second round trip on top of
+ *  the identity one. Per-request only — see getVerifiedUser in lib/supabase.ts.
+ */
+export const getClientSession = cache(async (): Promise<ClientSession | null> => {
+  const user = await getVerifiedUser()
   if (!user) return null
 
   const admin = createAdminClient()
@@ -37,7 +42,7 @@ export async function getClientSession(): Promise<ClientSession | null> {
 
   if (!data) return null
   return { userId: user.id, clientId: data.client_id as string, email: user.email ?? '' }
-}
+})
 
 /**
  * True when the verified user is a client account.
@@ -50,9 +55,7 @@ export async function getClientSession(): Promise<ClientSession | null> {
  * absence of evidence.
  */
 export async function isClientAccount(): Promise<boolean> {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  return user?.app_metadata?.role === 'client'
+  return (await getVerifiedRole()) === 'client'
 }
 
 /**
@@ -87,7 +90,5 @@ export async function isClientAccount(): Promise<boolean> {
  * failure.
  */
 export async function hasAdminClaim(): Promise<boolean> {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  return user?.app_metadata?.role === 'admin'
+  return (await getVerifiedRole()) === 'admin'
 }

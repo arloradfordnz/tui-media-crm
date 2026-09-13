@@ -15,8 +15,13 @@ export const metadata: Metadata = {
 // layout for latency. It was the right call to drop it when the only account
 // in the project was Arlo's and the check was pure repetition; it stopped
 // being repetition once clients could sign in, because the middleware reads
-// the role from a cookie and this reads it from Supabase. The cost is mostly
-// hidden anyway — the layout renders concurrently with the page's own queries.
+// the role from a cookie and this reads it from Supabase.
+//
+// The two checks below look like two round trips and are one: both read the
+// request-cached identity from getVerifiedUser() (lib/supabase.ts), which asks
+// the auth server once per request however many callers want the answer. They
+// used to be two separate getUser() calls awaited one after the other, so
+// every dashboard navigation paid for both before it rendered a byte.
 //
 // RLS is still the real lock (see migration_client_accounts.sql): a client who
 // somehow reached this shell would find every query beneath it returning
