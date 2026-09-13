@@ -53,4 +53,8 @@ start-dev.sh
 # local artifacts
 /tmp/
 /dev.db
-.env*
+
+# Added by `vercel link`. Narrowed from `.env*` so the tracked .env.example
+# is not swept up with the real ones.
+.env.local
+.env.*.local
