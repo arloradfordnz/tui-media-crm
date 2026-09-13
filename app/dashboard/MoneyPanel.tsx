@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { ArrowUpRight } from 'lucide-react'
 import { fetchMonthlyPnlCached } from '@/lib/xero'
-import RevenueChart from './RevenueChart'
+import MoneyMiniChart from './MoneyMiniChart'
 
 /**
  * The home screen's money graph: six months of in against out, and nothing
@@ -61,9 +61,10 @@ export default async function MoneyPanel() {
           tone={net < 0 ? 'var(--danger)' : undefined}
         />
       </div>
-      <RevenueChart data={inData} comparisonData={outData} comparisonColor="var(--chart-out)" />
+      <MoneyMiniChart inData={inData} outData={outData} />
       <p className="text-2xs mt-2" style={{ color: 'var(--text-tertiary)' }}>
-        Last {rows.length} months, from Xero.
+        Up to the last {rows.length} months, from Xero. The chart drops the
+        oldest months when the column is too narrow to label them all.
       </p>
     </Shell>
   )

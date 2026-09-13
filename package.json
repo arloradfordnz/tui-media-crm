@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "migrate": "node scripts/migrate.mjs",
+    "migrate:setup": "node scripts/setup-db-url.mjs",
     "migrate:status": "node scripts/migrate.mjs --status",
     "migrate:new": "node scripts/new-migration.mjs",
     "vercel-build": "node scripts/migrate.mjs && next build"

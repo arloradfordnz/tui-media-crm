@@ -15,10 +15,21 @@ migration runs first, and a migration that fails fails the build.
 
 ## The one-time setup
 
-`DATABASE_URL` must be set, locally in `.env` and in **Vercel → Settings →
-Environment Variables** (all three environments). Get it from **Supabase →
-Project Settings → Database → Connection string → URI**, using the **session
-pooler** (port 5432), and put the database password in it.
+```bash
+npm run migrate:setup
+```
+
+It walks you through it: you paste the connection string, it checks the
+connection actually works, writes it to `.env` (gitignored, and the paste is
+not echoed to the terminal), and prints what to add in Vercel.
+
+You still have to add the same `DATABASE_URL` in **Vercel → Settings →
+Environment Variables** for all three environments — that is what makes deploys
+migrate themselves, and nothing local can do it for you.
+
+Where the string comes from: **Supabase → Project Settings → Database →
+Connection string → URI**, the **session pooler** tab (port 5432), with
+`[YOUR-PASSWORD]` replaced by the database password.
 
 Without it the runner prints a loud warning and skips — a deploy still ships,
 it just does not migrate. That is deliberate: a database it cannot reach

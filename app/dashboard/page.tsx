@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { createServerSupabaseClient } from '@/lib/supabase'
-import { getAttention, type AttentionItem } from '@/lib/attention'
-import { Camera, CheckCircle2, Plus, UserPlus } from 'lucide-react'
+import { getAttention, type AttentionItem, type WeekEvent } from '@/lib/attention'
+import { CheckCircle2, Plus, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import Greeting from './Greeting'
 import MoneyPanel, { MoneyPanelSkeleton } from './MoneyPanel'
@@ -99,50 +99,17 @@ export default async function DashboardPage() {
         </section>
 
         <div className="today-split-side dash-stack">
-          {/* This week: time-ordered across the next 7 days, or an honest
-              empty state that points at the next most useful thing rather
-              than saying "nothing". It used to show only today, which meant a
-              booking-free today with a shoot booked for Thursday read as a
-              completely empty banner — the single most common shape of a real
-              week said nothing about it. */}
-          <section>
-            <h2 className="section-heading">This week</h2>
-            {weekEvents.length === 0 ? (
-              <div className="today-empty">
-                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  {items.length === 0
-                    ? 'Nothing booked this week, and nothing needs you. Genuinely clear.'
-                    : `Nothing booked this week — ${items.length} thing${items.length === 1 ? '' : 's'} below need${items.length === 1 ? 's' : ''} you.`}
-                </p>
-              </div>
-            ) : (
-              <div className="card-flush">
-                {weekEvents.map((e) => (
-                  <div key={e.id} className="today-row">
-                    <span className="today-time">
-                      <span className="today-day">{e.date === todayISO ? 'Today' : weekdayShort(e.date)}</span>
-                      <span>{timeLabel(e.startTime, e.endTime)}</span>
-                    </span>
-                    <Camera
-                      className="w-4 h-4 shrink-0"
-                      style={{ color: e.eventType === 'shoot' ? 'var(--accent)' : 'var(--text-tertiary)' }}
-                    />
-                    <div className="today-body">
-                      <span className="today-title">{e.title}</span>
-                      {e.job && (
-                        <Link href={`/dashboard/jobs/${e.job.id}`} className="today-job">
-                          {e.job.name}
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+          {/* One list, not two.
+              "This week" and "Needs you" were two panels answering the same
+              question — what is on you — in two different visual languages,
+              and a week with one shoot and one overdue invoice meant reading
+              two near-empty cards to learn two facts. They are now one list in
+              the Needs you treatment: what is booked first, because it is
+              fixed and dated, then everything that needs a decision.
 
-          {/* One sentence and one action per item. Same model the assistant
-              reads (lib/attention.ts). */}
+              The bookings keep the accent dot the calendar gives a shoot, so
+              they are still distinguishable at a glance from something that
+              has gone wrong. */}
           <section>
             <div className="section-head">
               <h2 className="section-heading">Needs you</h2>
@@ -151,15 +118,18 @@ export default async function DashboardPage() {
               )}
             </div>
 
-            {shown.length === 0 ? (
+            {weekEvents.length === 0 && shown.length === 0 ? (
               <div className="today-empty">
                 <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--success)' }} />
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  Nothing overdue, stalled or waiting on a reply.
+                  Nothing booked this week, and nothing overdue or stalled. Genuinely clear.
                 </p>
               </div>
             ) : (
               <div className="card-flush">
+                {weekEvents.map((e) => (
+                  <EventRow key={e.id} event={e} today={e.date === todayISO} />
+                ))}
                 {shown.map((item) => (
                   <AttentionRow key={item.id} item={item} />
                 ))}
@@ -169,12 +139,38 @@ export default async function DashboardPage() {
 
           {/* Streamed, not awaited — see MoneyPanel. Last in the column
               because it is the slowest thing here and the least urgent: the
-              two panels above it are already painted by the time it lands. */}
+              list above it is already painted by the time it lands. */}
           <Suspense fallback={<MoneyPanelSkeleton />}>
             <MoneyPanel />
           </Suspense>
         </div>
       </div>
+    </div>
+  )
+}
+
+// A booking, rendered as an attention row so the merged list reads as one
+// thing. Deliberately the same markup as AttentionRow rather than a variant of
+// the old today-row: sharing the class names is what makes the two kinds of
+// item line up on the same grid instead of merely sitting in the same card.
+function EventRow({ event, today }: { event: WeekEvent; today: boolean }) {
+  const when = `${today ? 'Today' : weekdayShort(event.date)}${event.startTime ? `, ${timeLabel(event.startTime, event.endTime)}` : ''}`
+  return (
+    <div className="attention-row">
+      {/* A shoot is the one booking worth picking out of the list by colour;
+          anything else on the calendar takes the muted dot. */}
+      <span
+        className="attention-dot"
+        style={{ background: event.eventType === 'shoot' ? 'var(--accent)' : 'var(--text-tertiary)' }}
+        aria-hidden="true"
+      />
+      <div className="attention-body">
+        <span className="attention-sentence">{event.title}</span>
+        <span className="attention-meta">{event.job ? `${when} · ${event.job.name}` : when}</span>
+      </div>
+      <Link href={event.job ? `/dashboard/jobs/${event.job.id}` : '/dashboard/calendar'} className="btn-ghost attention-action">
+        {event.job ? 'Open job' : 'Calendar'}
+      </Link>
     </div>
   )
 }
