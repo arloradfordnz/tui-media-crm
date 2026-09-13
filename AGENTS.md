@@ -16,6 +16,74 @@ setup is `npm run migrate:setup`.
 The older `supabase/migration_*.sql` files are history and are never executed
 by the runner. Do not add to them.
 
+# Where the latency actually was (14 September 2026)
+
+Read this before "optimising" anything here, and before changing `vercel.json`.
+
+## The functions run in Singapore ON PURPOSE
+
+`vercel.json` pins `"regions": ["sin1"]`. That line is worth more than every
+other performance change in this repo combined, and removing it undoes all of
+them.
+
+The Supabase database is in **AWS ap-southeast-1 (Singapore)** — read it off
+`DATABASE_URL`, the host is `aws-1-ap-southeast-1.pooler.supabase.com`. Vercel's
+default function region is `iad1` (Washington DC). With no `regions` key, every
+query this app made went Washington → Singapore → Washington: roughly **240ms of
+pure network per query**, on a database where the queries themselves take about
+a millisecond because the biggest table has a few hundred rows.
+
+Measured on the live site before the change (`x-vercel-id: syd1::iad1::…`, the
+second field is the compute region):
+
+    /login              (static, edge)     ~70ms
+    any serverless function               ~300-420ms before doing any work
+
+Compute belongs next to the data, not next to the user, because a page render
+makes many database round trips and only one trip to the browser. Singapore is
+also closer to New Zealand than Washington is, so there is no trade here.
+
+**If a page feels slow, check `x-vercel-id` on the response before you touch
+the query.** Two regions in that header that are not `syd1::sin1` means the
+pinning was lost, and no amount of query tuning will make up for it.
+
+## Indexes and RLS were not the problem, and cannot be
+
+This database is tiny. Adding indexes to a 19-row `jobs` table changes nothing
+measurable, and it is the wrong instinct to reach for first here. There ARE
+indexes now (`20260914_0004`) and the RLS policies do hoist `is_admin()` into an
+InitPlan (`20260914_0002`), both of which are correct and worth having as the
+data grows — but neither is why anything got faster. Do not let a green
+EXPLAIN convince you the slow thing is the database.
+
+## getUser() is a network call, so it happens once per request
+
+`lib/supabase.ts` exports `getVerifiedUser()`, wrapped in React's `cache()`.
+Everything that needs to know who is signed in goes through it —
+`isClientAccount`, `hasAdminClaim`, `getAuthUser`, `getClientSession`.
+
+`supabase.auth.getUser()` asks the auth server, which is the entire point of
+using it over `getSession()` (see lib/client-auth.ts). It is not a cookie read.
+The dashboard layout used to call it twice, sequentially, before rendering a
+byte. **Do not add a bare `supabase.auth.getUser()` call** — use
+`getVerifiedUser()` and get the same verified answer for free.
+
+The same applies to any row two things in one request need: `generateMetadata`
+and the page body both run per request, and the portal and proposal pages each
+used to fetch their row twice until a `cache()` wrapper was put around the
+lookup.
+
+## The Xero cache has two tiers because one of them was imaginary
+
+`swrCached` in `lib/xero.ts` was a `Map` in module scope — a cache per lambda
+instance, on a platform that discards instances constantly. In production most
+requests found it empty and took the seconds-long "block on Xero" path. It now
+falls back to a `kv_cache` row (`20260914_0001`), which every instance shares.
+
+Background refreshes go through `after()` from `next/server`, not a floating
+promise: a bare `void refresh()` is liable to be frozen the moment the response
+flushes, so the "revalidate" half of stale-while-revalidate never happened.
+
 # Traps in this repo
 
 Each of these has already cost a debugging session. They all present as a code
