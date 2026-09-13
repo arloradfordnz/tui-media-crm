@@ -12,6 +12,7 @@
  * Refresh tokens rotate on every use — we always upsert the new pair.
  */
 
+import { after } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 // Xero apps registered after 2 March 2026 can only request the new granular
@@ -264,6 +265,23 @@ async function xeroPost<T>(
 // Xero round trips take seconds; pages should never block on them twice.
 // Fresh (< TTL): serve cached. Stale: serve cached instantly, refresh in the
 // background. Empty: block once. Errors never evict a previous good result.
+//
+// ── Two tiers, because one of them barely existed in production ────────────
+// This was a Map in module scope and nothing else, which is a cache per lambda
+// INSTANCE. Vercel starts instances, freezes them between requests and throws
+// them away constantly, so in production most requests arrived at an empty Map
+// and took the "cold: block once" path — the seconds-long one this cache is
+// here to avoid. It worked beautifully in local dev, where there is one
+// long-lived process, and hardly ever where it mattered.
+//
+// L1 is still that Map: free, and the right answer for repeat reads inside a
+// single request. L2 is a row in kv_cache, which every instance can see and
+// which survives instance recycling and deploys. A cold instance now finds a
+// warm value instead of nothing.
+//
+// L2 is strictly best-effort. Every path through it is wrapped so that a
+// missing table, a revoked key or a down database degrades to exactly the old
+// behaviour rather than taking the page down with it.
 
 const SWR_TTL = 2 * 60 * 1000
 
@@ -271,16 +289,58 @@ type SwrEntry<T> = { at: number; data: T }
 const swrStore = new Map<string, SwrEntry<unknown>>()
 const swrInflight = new Map<string, Promise<unknown>>()
 
-async function swrCached<T>(key: string, fn: () => Promise<T | null>): Promise<T | null> {
-  const entry = swrStore.get(key) as SwrEntry<T> | undefined
-  const age = entry ? Date.now() - entry.at : Infinity
-  if (entry && age < SWR_TTL) return entry.data
+const L2_PREFIX = 'xero:'
 
+async function l2Read<T>(key: string): Promise<SwrEntry<T> | null> {
+  try {
+    const { data, error } = await serviceClient()
+      .from('kv_cache')
+      .select('value, updated_at')
+      .eq('key', L2_PREFIX + key)
+      .maybeSingle()
+    if (error || !data?.value) return null
+    return { at: Date.parse(data.updated_at as string), data: data.value as T }
+  } catch {
+    return null
+  }
+}
+
+async function l2Write<T>(key: string, data: T): Promise<void> {
+  try {
+    await serviceClient()
+      .from('kv_cache')
+      .upsert(
+        { key: L2_PREFIX + key, value: data as unknown, updated_at: new Date().toISOString() },
+        { onConflict: 'key' },
+      )
+  } catch {
+    // A cache that cannot be written is still a cache that can be read.
+  }
+}
+
+// Hand background work to the runtime rather than letting the instance freeze
+// mid-promise. `after` keeps the function alive until the callback settles, so
+// "revalidate in the background" actually revalidates; a bare floating promise
+// was liable to be suspended the moment the response flushed. Outside a
+// request scope (a script, a test) `after` throws, and the floating promise is
+// the right fallback there.
+function runAfterResponse(work: () => Promise<unknown>): void {
+  try {
+    after(work)
+  } catch {
+    void work()
+  }
+}
+
+async function swrCached<T>(key: string, fn: () => Promise<T | null>): Promise<T | null> {
   const refresh = () => {
     if (!swrInflight.has(key)) {
       const p = fn()
-        .then((data) => {
-          if (data != null) swrStore.set(key, { at: Date.now(), data })
+        .then(async (data) => {
+          if (data != null) {
+            swrStore.set(key, { at: Date.now(), data })
+            await l2Write(key, data)
+          }
           return data
         })
         .catch((err) => {
@@ -293,11 +353,27 @@ async function swrCached<T>(key: string, fn: () => Promise<T | null>): Promise<T
     return swrInflight.get(key) as Promise<T | null>
   }
 
-  if (entry) {
-    void refresh() // serve stale, revalidate in background
-    return entry.data
+  // L1 — this instance's own memory.
+  const hot = swrStore.get(key) as SwrEntry<T> | undefined
+  if (hot && Date.now() - hot.at < SWR_TTL) return hot.data
+
+  // L2 — shared, and the tier a cold instance actually hits.
+  const warm = await l2Read<T>(key)
+  if (warm && Number.isFinite(warm.at)) {
+    swrStore.set(key, warm)
+    if (Date.now() - warm.at < SWR_TTL) return warm.data
+    runAfterResponse(refresh)
+    return warm.data
   }
-  return refresh() // cold: block once
+
+  // L1 stale and L2 had nothing: still better to serve the stale value than to
+  // make someone wait on Xero for it.
+  if (hot) {
+    runAfterResponse(refresh)
+    return hot.data
+  }
+
+  return refresh() // genuinely cold: block once
 }
 
 export type XeroSummary = {
