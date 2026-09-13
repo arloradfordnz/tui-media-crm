@@ -15,6 +15,15 @@ export async function createEvent(prevState: { error?: string } | undefined, for
   if (!title || !date) return { error: 'Title and date are required.' }
 
   const supabase = await createServerSupabaseClient()
+
+  // A shoot only counts toward a retainer month if the event knows whose it
+  // is, and the job is the only place that answer exists on this form.
+  let clientId: string | null = null
+  if (jobId) {
+    const { data: job } = await supabase.from('jobs').select('client_id').eq('id', jobId).maybeSingle()
+    clientId = job?.client_id ?? null
+  }
+
   await supabase.from('events').insert({
     title,
     event_type: eventType || 'personal',
@@ -23,6 +32,7 @@ export async function createEvent(prevState: { error?: string } | undefined, for
     end_time: endTime || null,
     notes: notes || null,
     job_id: jobId || null,
+    client_id: clientId,
   })
 
   revalidatePath('/dashboard/calendar')

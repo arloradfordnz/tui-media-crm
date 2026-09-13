@@ -9,6 +9,31 @@ daylight saving), so the offsets below are what actually matters.
 | `/api/business-health/refresh` | 20:00 daily | 8:00am | Cached business-health figures |
 | `/api/portal-reminders` | 22:00 daily | 10:00am | Nudges clients sitting on deliveries |
 | `/api/health/integrations` | 19:15 daily | 7:15am | Xero/IMAP connectivity, and the only thing that texts unprompted |
+| `/api/storage/retention` | 14:30 daily | 2:30am | Deletes old delivered files from R2 so the free 10 GB never fills |
+
+## Why storage retention exists
+
+R2's free tier is 10 GB and a single 4K interview is around 250 MB. Deliveries
+accumulate and nothing ever removed them, so the bucket was going to hit the
+cap and start billing for files every client had already downloaded weeks
+earlier — the master copies live on Arlo's drives, never here.
+
+`/api/storage/retention` deletes the R2 object once a delivery is old enough
+and stamps `archived_at` on the row. The row survives: the client still sees
+what was delivered, when, and their approval on it. What disappears is the
+player and the download button, replaced by a line saying the file was archived
+and to ask for it again.
+
+Two windows, because the only expensive mistake here is pulling a file out from
+under a client mid-revision:
+
+- **60 days** once `approved_at` is set. The client has said they are finished.
+- **120 days** otherwise, so a delivery nobody ever dealt with cannot pin
+  storage open forever.
+
+It runs at 2:30am NZ, when nobody is in the portal, and it only sends a Telegram
+message on a run that actually deleted something. `?dryRun=1` lists what would
+go without touching R2 — worth running after any change to those windows.
 
 ## Why the briefing is weekly, on a Monday
 

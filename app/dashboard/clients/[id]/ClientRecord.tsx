@@ -32,6 +32,7 @@ type ClientData = {
   lifetimeValue: number
   monthlyRetainer: number | null
   shootsPerMonth: number | null
+  videosPerMonth: number | null
   invoiceDay: number | null
   industry: string | null
   brand: string | null
@@ -378,6 +379,16 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
                 defaultValue={client.shootsPerMonth ?? ''}
                 className="field-input"
                 placeholder="1–4 — retainer clients only"
+              />
+            </Field>
+            <Field label="Videos per month" hint="The retainer target — drives the content backlog on the Retainers page">
+              <input
+                name="videosPerMonth"
+                type="number"
+                min="1"
+                defaultValue={client.videosPerMonth ?? ''}
+                className="field-input"
+                placeholder="e.g. 4 — retainer clients only"
               />
             </Field>
           </div>

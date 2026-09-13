@@ -2,7 +2,7 @@ import { createHash } from 'crypto'
 import Anthropic from '@anthropic-ai/sdk'
 import { fetchXeroContacts, createXeroInvoice, fetchOutstandingInvoices, approveXeroInvoice, voidXeroInvoice, deleteXeroInvoice, updateXeroInvoice, getXeroInvoice, deleteXeroPayment } from '@/lib/xero'
 import { fetchRecentEmails, fetchUnreadEmails } from '@/lib/mail'
-import { getContentBacklog } from '@/lib/content-backlog'
+import { getContentBacklog, parseJobMonth } from '@/lib/content-backlog'
 import { findDuplicateJobName } from '@/lib/job-naming'
 import { syncShootEvent, removeShootEvent } from '@/lib/job-calendar'
 
@@ -304,6 +304,19 @@ export const TOOLS: Anthropic.Tool[] = [
         job_id: { type: 'string', description: 'Optional job ID to link this event to' },
       },
       required: ['title', 'date'],
+    },
+  },
+  {
+    name: 'log_shoot',
+    description: 'Record that a shoot has happened. Use this whenever Arlo says he filmed, shot, or was out with a client ("did a shoot for Bainbridge today", "filmed Framers this morning", "shot the Johnson stuff on Tuesday"). Matches the client by name, dates it today unless told otherwise, links it to that month\'s job when one exists, and returns the client\'s running month tally so you can tell him where that leaves him. Do not use create_event for a shoot that has already happened.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        client_name: { type: 'string', description: 'Client name or part of it, e.g. "Bainbridge".' },
+        date: { type: 'string', description: 'ISO date (YYYY-MM-DD) the shoot happened. Defaults to today in NZ.' },
+        notes: { type: 'string', description: 'What was filmed, or where. Optional but worth capturing if he said it.' },
+      },
+      required: ['client_name'],
     },
   },
   {
@@ -816,6 +829,16 @@ export async function executeTool(
     }
 
     case 'create_event': {
+      // Carry the client through from the job when there is one, so a shoot
+      // booked ahead of time counts toward that client's month the same way a
+      // shoot logged after the fact does.
+      const eventJobId = (input.job_id as string) || null
+      let eventClientId: string | null = null
+      if (eventJobId) {
+        const { data: parentJob } = await supabase.from('jobs').select('client_id').eq('id', eventJobId).maybeSingle()
+        eventClientId = (parentJob as { client_id: string | null } | null)?.client_id ?? null
+      }
+
       const { data, error } = await supabase.from('events').insert({
         title: input.title as string,
         event_type: (input.event_type as string) || 'personal',
@@ -823,10 +846,99 @@ export async function executeTool(
         start_time: (input.start_time as string) || null,
         end_time: (input.end_time as string) || null,
         notes: (input.notes as string) || null,
-        job_id: (input.job_id as string) || null,
+        job_id: eventJobId,
+        client_id: eventClientId,
       }).select('id, title, date').single()
       if (error) return JSON.stringify({ error: error.message })
       return JSON.stringify({ success: true, event: data })
+    }
+
+    // Logging a shoot after the fact, which is the only way a second shoot in
+    // one month gets recorded at all: jobs.shoot_date holds exactly one date,
+    // so a month job cannot represent two filming days. The event carries the
+    // client directly for that reason.
+    case 'log_shoot': {
+      const query = (input.client_name as string).trim()
+      const { data: matches, error: clientError } = await supabase
+        .from('clients')
+        .select('id, name, shoots_per_month')
+        .ilike('name', `%${query}%`)
+        .neq('status', 'archived')
+        .limit(5)
+
+      if (clientError) return JSON.stringify({ error: clientError.message })
+      if (!matches || matches.length === 0) {
+        return JSON.stringify({ error: `No client matching "${query}".` })
+      }
+      // Ambiguity is Arlo's to resolve, not something to guess at — logging a
+      // shoot against the wrong client silently corrupts that client's month.
+      if (matches.length > 1) {
+        return JSON.stringify({
+          error: `"${query}" matches ${matches.length} clients: ${matches.map((c: { name: string }) => c.name).join(', ')}. Ask which one before logging.`,
+        })
+      }
+
+      const client = matches[0] as { id: string; name: string; shoots_per_month: number | null }
+      const todayNZ = new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })
+      const shootDate = (input.date as string | undefined)?.trim() || todayNZ
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(shootDate)) {
+        return JSON.stringify({ error: `date must be YYYY-MM-DD, got "${shootDate}".` })
+      }
+      const monthKeyForShoot = shootDate.slice(0, 7)
+
+      // Link it to that month's job when there is one, so the shoot shows on
+      // the job record too. No job is not an error: the shoot still happened,
+      // and it still counts toward the month.
+      const { data: clientJobs } = await supabase
+        .from('jobs')
+        .select('id, name, created_at')
+        .eq('client_id', client.id)
+
+      const monthJob = ((clientJobs ?? []) as { id: string; name: string; created_at: string | null }[])
+        .find((j) => {
+          const parsed = parseJobMonth(j.name, j.created_at)
+          if (!parsed) return false
+          return `${parsed.year}-${String(parsed.monthIdx + 1).padStart(2, '0')}` === monthKeyForShoot
+        }) ?? null
+
+      const { data: event, error: eventError } = await supabase.from('events').insert({
+        client_id: client.id,
+        job_id: monthJob?.id ?? null,
+        title: monthJob ? `${client.name} — ${monthJob.name}` : `${client.name} — shoot`,
+        event_type: 'shoot',
+        date: new Date(`${shootDate}T00:00:00+12:00`).toISOString(),
+        notes: (input.notes as string) || null,
+      }).select('id, title, date').single()
+
+      if (eventError) {
+        // The most likely cause by far is migration_shoot_log.sql not having
+        // been run, and "column does not exist" means nothing to Arlo.
+        const hint = /client_id/.test(eventError.message)
+          ? ' Looks like supabase/migration_shoot_log.sql has not been run yet — tell Arlo that is what is blocking it.'
+          : ''
+        return JSON.stringify({ error: eventError.message + hint })
+      }
+
+      // Hand back the month's real state so the reply can be specific about
+      // where this leaves him rather than just confirming the write.
+      const backlog = await getContentBacklog(supabase).catch(() => null)
+      const entry = backlog?.clients.find((c) => c.clientId === client.id) ?? null
+      const month = entry?.months.find((m) => m.month === monthKeyForShoot) ?? null
+
+      return JSON.stringify({
+        success: true,
+        logged: { client: client.name, date: shootDate, linked_job: monthJob?.name ?? null, event_id: event.id },
+        month_now: month
+          ? {
+              month: month.label,
+              shoots_logged: month.shoots,
+              shoots_target: client.shoots_per_month,
+              videos_uploaded: month.uploaded,
+              videos_expected: month.expected,
+              job_exists: month.jobExists,
+            }
+          : { month: monthKeyForShoot, note: 'No retainer month tracked for this client, so the shoot is logged but not counted against a quota.' },
+      })
     }
 
     case 'delete_event': {

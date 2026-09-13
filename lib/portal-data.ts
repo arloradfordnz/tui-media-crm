@@ -11,7 +11,7 @@ import { signedDownloadUrl, signedDownloadUrlAttachment } from '@/lib/r2'
  * function is scoped to that one client_id and nothing else.
  */
 
-type RawDeliveryFile = { id: string; file_name: string; original_name: string; file_url: string | null; mime_type: string | null; version_label: string; delivery_status: string; download_enabled: boolean; personal_note: string | null; created_at: string }
+type RawDeliveryFile = { id: string; file_name: string; original_name: string; file_url: string | null; mime_type: string | null; version_label: string; delivery_status: string; download_enabled: boolean; personal_note: string | null; created_at: string; archived_at: string | null }
 type RawRevision = { id: string; round: number; request: string; status: string; reply: string | null; created_at: string }
 type RawDeliverable = { id: string; title: string; description: string | null; completed: boolean; revision_limit: number | null; revisions_used: number | null; delivery_files: RawDeliveryFile[]; revisions: RawRevision[] | null }
 type RawJob = { id: string; name: string; status: string; job_type: string | null; shoot_date: string | null; deliverables: RawDeliverable[] }
@@ -30,7 +30,7 @@ export async function loadPortalData(client: PortalClient) {
         id, name, status, job_type, shoot_date,
         deliverables(
           id, title, description, completed, revision_limit, revisions_used,
-          delivery_files(id, file_name, original_name, file_url, mime_type, version_label, delivery_status, download_enabled, personal_note, created_at),
+          delivery_files(id, file_name, original_name, file_url, mime_type, version_label, delivery_status, download_enabled, personal_note, created_at, archived_at),
           revisions(*)
         )
       `)
@@ -88,14 +88,18 @@ export async function loadPortalData(client: PortalClient) {
           .map(async (f) => ({
             id: f.id,
             originalName: f.original_name,
-            fileUrl: await resolveFileUrl(f.file_name, f.file_url),
-            downloadUrl: await resolveDownloadUrl(f.file_name, f.file_url, f.original_name),
+            // An archived file's object is gone from R2, so signing a URL for
+            // it would only produce a player that fails and a download button
+            // that 404s. Both stay null and the card explains itself instead.
+            fileUrl: f.archived_at ? null : await resolveFileUrl(f.file_name, f.file_url),
+            downloadUrl: f.archived_at ? null : await resolveDownloadUrl(f.file_name, f.file_url, f.original_name),
             mimeType: f.mime_type,
             versionLabel: f.version_label,
             deliveryStatus: f.delivery_status,
             downloadEnabled: f.download_enabled,
             personalNote: f.personal_note,
             createdAt: f.created_at,
+            archivedAt: f.archived_at,
           }))),
       }))),
     }))

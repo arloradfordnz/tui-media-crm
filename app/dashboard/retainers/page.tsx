@@ -62,7 +62,7 @@ export default async function RetainersPage() {
               <tr>
                 <th className="table-header text-left">Client</th>
                 <th className="table-header text-left">Recent months</th>
-                <th className="table-header text-right">Status</th>
+                <th className="table-header text-right">Shoots this month</th>
                 <th className="table-header text-right">Action</th>
               </tr>
             </thead>
@@ -89,8 +89,18 @@ export default async function RetainersPage() {
                               </span>
                             )}
                           </p>
-                          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                            ~{c.typicalVideosPerMonth}/month
+                          {/* Videos and shoots are different measures and the
+                              page has to keep them apart: one shoot can carry
+                              a whole month of videos, so "2 shoots" is not
+                              progress toward "4 videos" and must never read
+                              like it is. */}
+                          <p
+                            className="text-xs"
+                            style={{ color: 'var(--text-tertiary)' }}
+                            title={c.videosPerMonth ? undefined : 'No videos-per-month target set, so this is inferred from the last month that was set up. Set it on the client record.'}
+                          >
+                            {c.videosPerMonth ? '' : '~'}{c.typicalVideosPerMonth}/month
+                            {c.shootsPerMonth ? ` · ${c.shootsPerMonth} shoot${c.shootsPerMonth === 1 ? '' : 's'}/month` : ''}
                           </p>
                         </div>
                       </Link>
@@ -102,7 +112,7 @@ export default async function RetainersPage() {
                           <span
                             key={m.month}
                             className={chipClass(m)}
-                            title={`${m.label} — ${m.uploaded}/${m.expected} uploaded${m.jobExists ? '' : ', job never created'}`}
+                            title={`${m.label} — ${m.uploaded}/${m.expected} uploaded, ${m.shoots} shoot${m.shoots === 1 ? '' : 's'} logged${m.jobExists ? '' : ', job never created'}`}
                           >
                             {m.label.slice(0, 3)} {m.uploaded}/{m.expected}
                           </span>
@@ -110,9 +120,23 @@ export default async function RetainersPage() {
                       </div>
                     </td>
 
+                    {/* Filming days logged this month, which is the half of a
+                        retainer the page could not see at all before: a month
+                        can be fully shot and show 0/4 videos, and that is a
+                        completely different situation from one where nothing
+                        has happened yet. A zero here means nothing has been
+                        logged, not that nothing was filmed, so it stays quiet
+                        rather than reading as an alarm. */}
                     <td className="px-4 py-4 text-sm text-right" data-role="secondary">
+                      <span
+                        style={{ color: c.shootsThisMonth > 0 ? 'var(--text-primary)' : 'var(--text-tertiary)' }}
+                        title={c.shootsThisMonth === 0 ? 'No shoots logged this month. Tell Tui when you have done one.' : undefined}
+                      >
+                        {c.shootsThisMonth}
+                        {c.shootsPerMonth ? ` / ${c.shootsPerMonth}` : ''}
+                      </span>
                       {c.videosOwed === 0 && (
-                        <span style={{ color: 'var(--text-tertiary)' }}>up to date</span>
+                        <span className="block text-xs" style={{ color: 'var(--text-tertiary)' }}>up to date</span>
                       )}
                     </td>
 

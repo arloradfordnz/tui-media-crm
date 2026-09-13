@@ -27,7 +27,7 @@ export async function syncShootEvent(supabase: Supa, jobId: string): Promise<voi
   try {
     const { data: job } = await supabase
       .from('jobs')
-      .select('id, name, shoot_date, shoot_location, clients(name)')
+      .select('id, name, client_id, shoot_date, shoot_location, clients(name)')
       .eq('id', jobId)
       .single()
 
@@ -57,6 +57,10 @@ export async function syncShootEvent(supabase: Supa, jobId: string): Promise<voi
         .from('events')
         .update({
           title,
+          // Kept in step with the job so a shoot that moves client (or one
+          // mirrored before events carried a client at all) still counts
+          // toward the right retainer month.
+          client_id: job.client_id ?? null,
           date: job.shoot_date,
           // start_time and end_time are deliberately untouched. They are only
           // ever set by hand on the calendar, and the job has no idea what
@@ -70,6 +74,7 @@ export async function syncShootEvent(supabase: Supa, jobId: string): Promise<voi
 
     await supabase.from('events').insert({
       job_id: jobId,
+      client_id: job.client_id ?? null,
       title,
       event_type: SHOOT_EVENT_TYPE,
       date: job.shoot_date,

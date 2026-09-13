@@ -27,6 +27,7 @@ export type MonthStatus = {
   expected: number
   uploaded: number
   missing: number
+  shoots: number         // shoot events logged against this client that month
   jobExists: boolean
   isCurrentMonth: boolean
 }
@@ -36,6 +37,17 @@ export type ClientBacklog = {
   clientName: string
   monthlyRetainer: number | null
   typicalVideosPerMonth: number
+  /**
+   * The stored retainer target, or null when nobody has set one and
+   * typicalVideosPerMonth is therefore still a guess from job history. The
+   * difference matters to anything that repeats the number back: "4 a month"
+   * and "looks like about 4 a month" are not the same claim.
+   */
+  videosPerMonth: number | null
+  /** The shoot target from the client record. Null when nothing is set. */
+  shootsPerMonth: number | null
+  /** Shoots logged this calendar month, however many videos came out of them. */
+  shootsThisMonth: number
   months: MonthStatus[]
   overdueMonths: number          // whole months past that still owe videos
   videosOwed: number             // videos owed across those past months
@@ -110,6 +122,7 @@ type RawClient = {
   name: string
   monthly_retainer: number | null
   shoots_per_month: number | null
+  videos_per_month: number | null
 }
 
 /**
@@ -131,7 +144,7 @@ export async function getContentBacklog(
 
   const { data: clientRows } = await supabase
     .from('clients')
-    .select('id, name, monthly_retainer, shoots_per_month')
+    .select('id, name, monthly_retainer, shoots_per_month, videos_per_month')
     .eq('client_category', 'retainer')
     // Archiving a client is supposed to take it off every list that chases
     // ongoing work. This one was missing the check every other retainer query
@@ -161,6 +174,42 @@ export async function getContentBacklog(
 
   const jobs = (jobRows ?? []) as RawJob[]
 
+  // Shoots, bucketed by the NZ calendar month they happened in.
+  //
+  // Deliberately keyed off the event's own client_id rather than its job: a
+  // retainer month job holds one shoot_date, so a month with two shoots in it
+  // could never be represented through the job. Logging the shoot directly
+  // against the client is the only way the second one exists at all.
+  //
+  // Tolerant of the column being absent, because supabase/migration_shoot_log.sql
+  // is run by hand. Without the guard, a deploy that lands before the SQL does
+  // takes down the Retainers page and the assistant's whole context with it,
+  // rather than just showing no shoot counts for a few minutes.
+  const shootsByClientMonth = new Map<string, Map<string, number>>()
+  try {
+    const { data: shootRows, error: shootError } = await supabase
+      .from('events')
+      .select('client_id, date')
+      .eq('event_type', 'shoot')
+      .in('client_id', clients.map((c) => c.id))
+
+    if (shootError) throw new Error(shootError.message)
+
+    for (const row of (shootRows ?? []) as { client_id: string | null; date: string }[]) {
+      if (!row.client_id || !row.date) continue
+      // NZ local month, matching how every other date in this file is read.
+      const key = new Date(row.date).toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' }).slice(0, 7)
+      const forClient = shootsByClientMonth.get(row.client_id) ?? new Map<string, number>()
+      forClient.set(key, (forClient.get(key) ?? 0) + 1)
+      shootsByClientMonth.set(row.client_id, forClient)
+    }
+  } catch (err) {
+    console.warn('[content-backlog] shoot counts unavailable, continuing without them:', err)
+  }
+
+  const shootsFor = (clientId: string, month: string) =>
+    shootsByClientMonth.get(clientId)?.get(month) ?? 0
+
   const result: ClientBacklog[] = []
 
   for (const client of clients) {
@@ -188,13 +237,22 @@ export async function getContentBacklog(
       return { expected: deliverables.length, uploaded }
     }
 
-    // Typical monthly volume — the most recent month that was actually set up
-    // with deliverables. Used to size months that were never created at all.
+    // Typical monthly volume, used to size months that were never created at
+    // all (no job means no deliverables to count).
+    //
+    // `videos_per_month` is the authoritative retainer target when it's set —
+    // ask Arlo, don't guess. Falling back to "the most recent month that had
+    // deliverables" used to be the only source, and it broke the moment one
+    // month shipped light: a July scoped to three videos (one combined into
+    // another, say) silently became the new "typical" for August and every
+    // month after, with nothing to correct it back to the real number.
     const sortedKeys = [...byMonth.keys()].sort()
-    let typical = 0
-    for (const key of [...sortedKeys].reverse()) {
-      const { expected } = countFor(byMonth.get(key)!)
-      if (expected > 0) { typical = expected; break }
+    let typical = client.videos_per_month ?? 0
+    if (typical === 0) {
+      for (const key of [...sortedKeys].reverse()) {
+        const { expected } = countFor(byMonth.get(key)!)
+        if (expected > 0) { typical = expected; break }
+      }
     }
     if (typical === 0) typical = client.shoots_per_month ?? 0
     if (typical === 0) continue
@@ -221,6 +279,7 @@ export async function getContentBacklog(
         expected: effectiveExpected,
         uploaded,
         missing: Math.max(0, effectiveExpected - uploaded),
+        shoots: shootsFor(client.id, key),
         jobExists: !!entry,
         isCurrentMonth: key === currentKey,
       })
@@ -245,6 +304,9 @@ export async function getContentBacklog(
       clientName: client.name,
       monthlyRetainer: client.monthly_retainer,
       typicalVideosPerMonth: typical,
+      videosPerMonth: client.videos_per_month ?? null,
+      shootsPerMonth: client.shoots_per_month ?? null,
+      shootsThisMonth: shootsFor(client.id, currentKey),
       months,
       overdueMonths: behindMonths.length,
       videosOwed: behindMonths.reduce((sum, m) => sum + m.missing, 0),
@@ -286,6 +348,7 @@ export function summariseBacklog(backlog: ContentBacklog): string {
     if (!m.jobExists) flags.push('job never created')
     if (m.missing > 0) flags.push(`${m.missing} owed`)
     else flags.push('delivered')
+    flags.push(`${m.shoots} shoot${m.shoots === 1 ? '' : 's'}`)
     return `${m.label} ${m.uploaded}/${m.expected} (${flags.join(', ')})`
   }
 
@@ -297,11 +360,19 @@ export function summariseBacklog(backlog: ContentBacklog): string {
 
     const pastText = past.length > 0 ? ` Past months: ${past.map(pastPart).join('; ')}.` : ''
     const cur = c.currentMonth
+    const shootTarget = c.shootsPerMonth ? ` of ${c.shootsPerMonth}` : ''
     const curText = cur
-      ? ` Current month ${cur.label}: ${cur.uploaded}/${cur.expected} uploaded so far${cur.jobExists ? '' : ', job not created yet'}.`
+      ? ` Current month ${cur.label}: ${cur.uploaded}/${cur.expected} uploaded so far${cur.jobExists ? '' : ', job not created yet'}, ${cur.shoots}${shootTarget} shoot${cur.shoots === 1 && !shootTarget ? '' : 's'} logged.`
       : ''
 
-    return `${c.clientName} [$${c.monthlyRetainer ?? 0}/mo, ~${c.typicalVideosPerMonth} videos/month]: ${headline}.${pastText}${curText}`
+    const cadence = c.shootsPerMonth ? `, ${c.shootsPerMonth} shoots/month` : ''
+    // "~" only where the number is still inferred from job history. Where the
+    // target is actually stored, say it flat, because hedging a figure Arlo
+    // himself set reads as though the CRM does not trust its own record.
+    const volume = c.videosPerMonth
+      ? `${c.videosPerMonth} videos/month`
+      : `~${c.typicalVideosPerMonth} videos/month (inferred, no target set)`
+    return `${c.clientName} [$${c.monthlyRetainer ?? 0}/mo, ${volume}${cadence}]: ${headline}.${pastText}${curText}`
   })
 
   return [
@@ -309,6 +380,7 @@ export function summariseBacklog(backlog: ContentBacklog): string {
     `AUTHORITATIVE TOTAL OWED: ${backlog.totals.videos_owed} video${backlog.totals.videos_owed === 1 ? '' : 's'} across ${backlog.totals.clients_behind} client${backlog.totals.clients_behind === 1 ? '' : 's'}. Use this number as given, and never recompute it.`,
     'Past months and the current month are two different categories and must never be added together into any combined figure, in any framing ("total videos to sort out", "across both months", "that need jobs and uploads", or similar). Only past months are behind. The current month is upcoming work still in progress, expected but not yet due, so its expected count is never debt and never joins a total with what is actually owed. If you want to mention both, say them as two separate sentences with two separate numbers, never summed.',
     'Every figure below is uploaded/expected, so quote them directly rather than estimating.',
+    'Shoot counts are filming days logged against the client, which is a separate thing from videos delivered: one shoot often yields several videos, and a month can be fully shot with nothing edited yet. A month showing 0 shoots usually means Arlo has not told you about them rather than that no filming happened, so treat a zero as a prompt to ask, never as proof nothing was shot. Use log_shoot when he says he has done one.',
     ...lines.map((l) => `  ${l}`),
   ].join('\n')
 }

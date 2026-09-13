@@ -100,6 +100,9 @@ export default function NewClientPage() {
           <Field label="Monthly Retainer">
             <input name="monthlyRetainer" type="number" min="0" step="0.01" className="field-input" placeholder="e.g. 480 — leave blank if not a retainer" />
       </Field>
+          <Field label="Videos per month" hint="The retainer target — drives the content backlog on the Retainers page">
+            <input name="videosPerMonth" type="number" min="1" className="field-input" placeholder="e.g. 4 — retainer clients only" />
+      </Field>
         </div>
 
         <Field label="Tags">
