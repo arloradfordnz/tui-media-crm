@@ -4,6 +4,18 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
+# Schema changes
+
+Migrations are automatic. Write one with `npm run migrate:new -- <name>`, which
+puts a correctly ordered file in `supabase/migrations/`, and it is applied on
+the next deploy (`vercel-build` runs the migrator before `next build`). Never
+edit a migration that has already run — the runner checksums them and will
+refuse. `supabase/migrations/README.md` has the rest, including the one-time
+`DATABASE_URL` setup.
+
+The older `supabase/migration_*.sql` files are history and are never executed
+by the runner. Do not add to them.
+
 # Traps in this repo
 
 Each of these has already cost a debugging session. They all present as a code

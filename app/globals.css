@@ -2914,25 +2914,40 @@ input, textarea, select, button { font-family: inherit; }
   .today-split { grid-template-columns: minmax(0, 1fr); gap: 40px; }
 }
 
-/* ── Home: the week beside the money ──────────────────────────
-   The two questions the home screen opens on — what is booked, and how the
-   money is going — read as a pair, so they sit side by side above the
-   conversation rather than stacked with one of them below the fold. The chart
-   needs the wider half; the week is a short time-ordered list and reads fine
-   in the narrower one.
+/* ── Home: a column you type into, a column you read ──────────
+   The chat runs the full height of the viewport and stays put while the right
+   column scrolls past it. A composer that stops 420px down the page reads as a
+   widget you glance at; one that reaches the bottom of the screen reads as the
+   thing the page is for.
 
-   Collapses at the same 1100px as .today-split, so the page only ever has one
-   breakpoint to think about. */
-.dash-top {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
-  gap: 24px;
-  align-items: start;
+   Sticky is relative to .scroll-invisible in DashboardShell, which is the real
+   scroll container — so `top: 0` sticks to the top of the content area, not to
+   the window. The height leaves room for the page header above it.
+
+   Both of these only apply at the size where .today-split is actually two
+   columns; below 1100px it is one column and a sticky full-height chat would
+   mean scrolling past a screenful of it to reach anything else. */
+@media (min-width: 1101px) {
+  .today-split-main {
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: calc(100vh - 190px);
+    min-height: 460px;
+  }
+  /* min-height:0 is what lets the shell shrink inside the flex column instead
+     of overflowing it — without it the thread's own scroll area never gets a
+     bounded height and the whole panel grows past the viewport. */
+  .today-split-main .tui-shell { flex: 1; min-height: 0; }
 }
-.dash-top > * { min-width: 0; }
 
-@media (max-width: 1100px) {
-  .dash-top { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+/* The read-only column: three stacked sections, spaced like the page's own
+   section rhythm rather than the tighter card gap. */
+.dash-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
 }
 
 /* Three figures on one line above the chart, wrapping rather than shrinking. */

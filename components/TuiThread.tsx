@@ -63,6 +63,7 @@ export default function TuiThread({
   initialThread,
   variant = 'panel',
   ephemeral = false,
+  fill = false,
 }: {
   // Server-rendered mounts pass the thread straight in. The overlay has no
   // server parent, so it passes nothing and fetches it on mount instead.
@@ -74,6 +75,13 @@ export default function TuiThread({
    * dashboard panel.
    */
   ephemeral?: boolean
+  /**
+   * Stretch to whatever the parent gives it instead of the panel's default
+   * 420px. The dashboard uses this to run the chat down the full height of
+   * its column — a composer that stops halfway down the screen reads as a
+   * widget you glance at rather than something you type into.
+   */
+  fill?: boolean
 }) {
   const [messages, setMessages] = useState<Message[]>(() => toMessages(initialThread ?? []))
   const [input, setInput] = useState('')
@@ -275,7 +283,9 @@ export default function TuiThread({
       ? { height: '100%', width: '100%' }
       : variant === 'overlay'
         ? { height: 440, width: 360 }
-        : { height: 420 }
+        : fill
+          ? { height: '100%', minHeight: 0 }
+          : { height: 420 }
 
   return (
     <div

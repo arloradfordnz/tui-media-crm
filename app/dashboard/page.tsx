@@ -73,67 +73,16 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* ── This week, beside the money ───────────────────────
-          The week is time-ordered across the next 7 days, or an honest empty
-          state that points at the next most useful thing rather than saying
-          "nothing". It used to show only today, which meant a booking-free
-          today with a shoot booked for Thursday read as a completely empty
-          banner — the single most common shape of a real week said nothing
-          about it.
+      {/* ── One column you type into, one column you read ─────
+          Tui is the only thing on this page you put a cursor into, so it gets
+          the whole left side and the full height of the screen — a chat panel
+          that ends halfway down the page is a chat panel you stop using.
 
-          The money graph sits next to it rather than under everything else:
-          these are the two things worth knowing before you start, and one of
-          them being below three other panels is the same as it not being on
-          the page. */}
-      <div className="dash-top">
-        <section>
-          <h2 className="section-heading">This week</h2>
-          {weekEvents.length === 0 ? (
-            <div className="today-empty">
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                {items.length === 0
-                  ? 'Nothing booked this week, and nothing needs you. Genuinely clear.'
-                  : `Nothing booked this week — ${items.length} thing${items.length === 1 ? '' : 's'} below need${items.length === 1 ? 's' : ''} you.`}
-              </p>
-            </div>
-          ) : (
-            <div className="card-flush">
-              {weekEvents.map((e) => (
-                <div key={e.id} className="today-row">
-                  <span className="today-time">
-                    <span className="today-day">{e.date === todayISO ? 'Today' : weekdayShort(e.date)}</span>
-                    <span>{timeLabel(e.startTime, e.endTime)}</span>
-                  </span>
-                  <Camera
-                    className="w-4 h-4 shrink-0"
-                    style={{ color: e.eventType === 'shoot' ? 'var(--accent)' : 'var(--text-tertiary)' }}
-                  />
-                  <div className="today-body">
-                    <span className="today-title">{e.title}</span>
-                    {e.job && (
-                      <Link href={`/dashboard/jobs/${e.job.id}`} className="today-job">
-                        {e.job.name}
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Streamed, not awaited — see MoneyPanel. */}
-        <Suspense fallback={<MoneyPanelSkeleton />}>
-          <MoneyPanel />
-        </Suspense>
-      </div>
-
-      {/* Two columns, and the conversation gets the left one.
-          Tui is the thing you actually type into, so it takes the side the eye
-          starts on and the taller half of the page; Needs you is a list you
-          scan and click, which reads fine in a narrower column. They collapse
-          to one below 1100px, where side by side would leave the chat too
-          narrow to hold a sentence. */}
+          Everything on the right is read-only and ordered by how soon it
+          changes what you do: what is booked this week, what is waiting on
+          you, then the money, which moves monthly and is the thing you check
+          rather than act on. They collapse to one column below 1100px, where
+          side by side would leave the chat too narrow to hold a sentence. */}
       <div className="today-split">
         {/* A scratch pad, not the Telegram thread.
             It used to open on the last twelve Telegram messages, which meant
@@ -146,34 +95,85 @@ export default async function DashboardPage() {
           <div className="section-head">
             <h2 className="section-heading">Tui AI</h2>
           </div>
-          <TuiThread variant="panel" ephemeral />
+          <TuiThread variant="panel" ephemeral fill />
         </section>
 
-        {/* One sentence and one action per item. Same model the assistant
-            reads (lib/attention.ts). */}
-        <section className="today-split-side">
-          <div className="section-head">
-            <h2 className="section-heading">Needs you</h2>
-            {remaining > 0 && (
-              <span className="section-head-meta">+{remaining} more</span>
+        <div className="today-split-side dash-stack">
+          {/* This week: time-ordered across the next 7 days, or an honest
+              empty state that points at the next most useful thing rather
+              than saying "nothing". It used to show only today, which meant a
+              booking-free today with a shoot booked for Thursday read as a
+              completely empty banner — the single most common shape of a real
+              week said nothing about it. */}
+          <section>
+            <h2 className="section-heading">This week</h2>
+            {weekEvents.length === 0 ? (
+              <div className="today-empty">
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  {items.length === 0
+                    ? 'Nothing booked this week, and nothing needs you. Genuinely clear.'
+                    : `Nothing booked this week — ${items.length} thing${items.length === 1 ? '' : 's'} below need${items.length === 1 ? 's' : ''} you.`}
+                </p>
+              </div>
+            ) : (
+              <div className="card-flush">
+                {weekEvents.map((e) => (
+                  <div key={e.id} className="today-row">
+                    <span className="today-time">
+                      <span className="today-day">{e.date === todayISO ? 'Today' : weekdayShort(e.date)}</span>
+                      <span>{timeLabel(e.startTime, e.endTime)}</span>
+                    </span>
+                    <Camera
+                      className="w-4 h-4 shrink-0"
+                      style={{ color: e.eventType === 'shoot' ? 'var(--accent)' : 'var(--text-tertiary)' }}
+                    />
+                    <div className="today-body">
+                      <span className="today-title">{e.title}</span>
+                      {e.job && (
+                        <Link href={`/dashboard/jobs/${e.job.id}`} className="today-job">
+                          {e.job.name}
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
-          </div>
+          </section>
 
-          {shown.length === 0 ? (
-            <div className="today-empty">
-              <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--success)' }} />
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                Nothing overdue, stalled or waiting on a reply.
-              </p>
+          {/* One sentence and one action per item. Same model the assistant
+              reads (lib/attention.ts). */}
+          <section>
+            <div className="section-head">
+              <h2 className="section-heading">Needs you</h2>
+              {remaining > 0 && (
+                <span className="section-head-meta">+{remaining} more</span>
+              )}
             </div>
-          ) : (
-            <div className="card-flush">
-              {shown.map((item) => (
-                <AttentionRow key={item.id} item={item} />
-              ))}
-            </div>
-          )}
-        </section>
+
+            {shown.length === 0 ? (
+              <div className="today-empty">
+                <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--success)' }} />
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  Nothing overdue, stalled or waiting on a reply.
+                </p>
+              </div>
+            ) : (
+              <div className="card-flush">
+                {shown.map((item) => (
+                  <AttentionRow key={item.id} item={item} />
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Streamed, not awaited — see MoneyPanel. Last in the column
+              because it is the slowest thing here and the least urgent: the
+              two panels above it are already painted by the time it lands. */}
+          <Suspense fallback={<MoneyPanelSkeleton />}>
+            <MoneyPanel />
+          </Suspense>
+        </div>
       </div>
     </div>
   )
