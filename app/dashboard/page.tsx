@@ -4,7 +4,7 @@ import { getAttention, type AttentionItem } from '@/lib/attention'
 import { Camera, CheckCircle2, Plus, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import Greeting from './Greeting'
-import InboxPanel, { InboxPanelSkeleton } from './InboxPanel'
+import MoneyPanel, { MoneyPanelSkeleton } from './MoneyPanel'
 import TuiThread from '@/components/TuiThread'
 
 export const dynamic = 'force-dynamic'
@@ -17,8 +17,12 @@ export const dynamic = 'force-dynamic'
 // cold-start-uncached Xero chain, so the page you open most often was gated on
 // the slowest thing in the app.
 //
-// Revenue lives on Finance, which is the page for it. Nothing here touches
-// Xero at all, which is why this page paints immediately.
+// Revenue still lives on Finance, which is the page that owns it — the range
+// control, the focus toggle, the table, the transactions. What comes back here
+// is a read-only six-month graph of in against out, and it is STREAMED inside
+// a <Suspense> rather than awaited, so the Xero chain can be as slow as it
+// likes without the page waiting on it. Nothing above the chart touches Xero,
+// which is why this page still paints immediately.
 
 // Six is the cap on purpose: a list you can actually finish. Everything past
 // it lives on the surface that owns it.
@@ -69,48 +73,60 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* This week spans both columns.
-          It used to show only today, which meant a booking-free today with a
-          shoot booked for Thursday read as a completely empty banner — the
-          single most common shape of a real week said nothing about it. */}
-      {/* ── This week ─────────────────────────────────────────
-          Time-ordered across the next 7 days, or an honest empty state that
-          points at the next most useful thing rather than saying "nothing". */}
-      <section>
-        <h2 className="section-heading">This week</h2>
-        {weekEvents.length === 0 ? (
-          <div className="today-empty">
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              {items.length === 0
-                ? 'Nothing booked this week, and nothing needs you. Genuinely clear.'
-                : `Nothing booked this week — ${items.length} thing${items.length === 1 ? '' : 's'} below need${items.length === 1 ? 's' : ''} you.`}
-            </p>
-          </div>
-        ) : (
-          <div className="card-flush">
-            {weekEvents.map((e) => (
-              <div key={e.id} className="today-row">
-                <span className="today-time">
-                  <span className="today-day">{e.date === todayISO ? 'Today' : weekdayShort(e.date)}</span>
-                  <span>{timeLabel(e.startTime, e.endTime)}</span>
-                </span>
-                <Camera
-                  className="w-4 h-4 shrink-0"
-                  style={{ color: e.eventType === 'shoot' ? 'var(--accent)' : 'var(--text-tertiary)' }}
-                />
-                <div className="today-body">
-                  <span className="today-title">{e.title}</span>
-                  {e.job && (
-                    <Link href={`/dashboard/jobs/${e.job.id}`} className="today-job">
-                      {e.job.name}
-                    </Link>
-                  )}
+      {/* ── This week, beside the money ───────────────────────
+          The week is time-ordered across the next 7 days, or an honest empty
+          state that points at the next most useful thing rather than saying
+          "nothing". It used to show only today, which meant a booking-free
+          today with a shoot booked for Thursday read as a completely empty
+          banner — the single most common shape of a real week said nothing
+          about it.
+
+          The money graph sits next to it rather than under everything else:
+          these are the two things worth knowing before you start, and one of
+          them being below three other panels is the same as it not being on
+          the page. */}
+      <div className="dash-top">
+        <section>
+          <h2 className="section-heading">This week</h2>
+          {weekEvents.length === 0 ? (
+            <div className="today-empty">
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                {items.length === 0
+                  ? 'Nothing booked this week, and nothing needs you. Genuinely clear.'
+                  : `Nothing booked this week — ${items.length} thing${items.length === 1 ? '' : 's'} below need${items.length === 1 ? 's' : ''} you.`}
+              </p>
+            </div>
+          ) : (
+            <div className="card-flush">
+              {weekEvents.map((e) => (
+                <div key={e.id} className="today-row">
+                  <span className="today-time">
+                    <span className="today-day">{e.date === todayISO ? 'Today' : weekdayShort(e.date)}</span>
+                    <span>{timeLabel(e.startTime, e.endTime)}</span>
+                  </span>
+                  <Camera
+                    className="w-4 h-4 shrink-0"
+                    style={{ color: e.eventType === 'shoot' ? 'var(--accent)' : 'var(--text-tertiary)' }}
+                  />
+                  <div className="today-body">
+                    <span className="today-title">{e.title}</span>
+                    {e.job && (
+                      <Link href={`/dashboard/jobs/${e.job.id}`} className="today-job">
+                        {e.job.name}
+                      </Link>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Streamed, not awaited — see MoneyPanel. */}
+        <Suspense fallback={<MoneyPanelSkeleton />}>
+          <MoneyPanel />
+        </Suspense>
+      </div>
 
       {/* Two columns, and the conversation gets the left one.
           Tui is the thing you actually type into, so it takes the side the eye
@@ -157,12 +173,6 @@ export default async function DashboardPage() {
               ))}
             </div>
           )}
-
-          {/* Streamed, not awaited. An IMAP login takes a second or two and
-              nothing else on this page waits on anything remote. */}
-          <Suspense fallback={<InboxPanelSkeleton />}>
-            <InboxPanel />
-          </Suspense>
         </section>
       </div>
     </div>

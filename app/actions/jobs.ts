@@ -22,6 +22,21 @@ export async function createJob(
   const tasksJson = formData.get('tasks') as string
   const deliverablesJson = formData.get('deliverables') as string
   const confirmDuplicate = formData.get('confirmDuplicate') === 'true'
+  // The answers to the type-specific step. Everything with a column of its own
+  // goes to that column; the rest arrives already formatted as `notes`.
+  const notes = formData.get('notes') as string
+  const adPlatform = formData.get('adPlatform') as string | null
+  const adAccountRef = formData.get('adAccountRef') as string | null
+  const adSpendBudget = formData.get('adSpendBudget') as string | null
+  const campaignLaunchedAt = formData.get('campaignLaunchedAt') as string | null
+  // Retainer terms and lead economics belong to the CLIENT, not to one month
+  // of work — the wizard asks them here because this is when they come up, and
+  // they are written back to the client record so the next month's job, the
+  // content backlog and the assistant all read the same numbers.
+  const clientMonthlyRetainer = formData.get('clientMonthlyRetainer') as string | null
+  const clientVideosPerMonth = formData.get('clientVideosPerMonth') as string | null
+  const clientShootsPerMonth = formData.get('clientShootsPerMonth') as string | null
+  const clientCustomerValue = formData.get('clientCustomerValue') as string | null
 
   if (!name || !clientId) return { error: 'Job name and client are required.' }
 
@@ -57,6 +72,18 @@ export async function createJob(
     quote_value: quoteValue ? parseFloat(quoteValue) : null,
     expected_amount: expectedAmount ? parseFloat(expectedAmount) : null,
     expected_payment_date: expectedPaymentDate || null,
+    notes: notes || null,
+    // Only sent on a video ad project, so a retainer never writes nulls over
+    // columns its form never showed. Leaving campaign_ends_at unset lets the
+    // DB trigger derive it as a month after launch.
+    ...(formData.has('adPlatform')
+      ? {
+          ad_platform: adPlatform || null,
+          ad_account_ref: adAccountRef || null,
+          ad_spend_budget: adSpendBudget ? parseFloat(adSpendBudget) : null,
+          campaign_launched_at: campaignLaunchedAt ? new Date(campaignLaunchedAt).toISOString() : null,
+        }
+      : {}),
   }).select('id').single()
 
   if (error || !job) return { error: error?.message || 'Failed to create job.' }
@@ -83,7 +110,10 @@ export async function createJob(
               templateTasks.map((t) => ({ job_id: job.id, phase: t.phase, title: t.title, sort_order: t.sort_order }))
             ).then(() => null)
           : Promise.resolve(null),
-        templateDeliverables?.length
+        // Skipped when the wizard already built the list — a retainer month's
+        // deliverables are its own answers (n videos across the chosen
+        // platforms), not the template's.
+        templateDeliverables?.length && !parsedDeliverables?.length
           ? supabase.from('deliverables').insert(
               templateDeliverables.map((d) => ({ job_id: job.id, title: d.title, description: d.description }))
             ).then(() => null)
@@ -98,14 +128,30 @@ export async function createJob(
     )
   }
 
-  await supabase.from('activities').insert({
-    action: 'job_created',
-    details: `Job "${name}" created`,
-    job_id: job.id,
-    client_id: clientId,
-  })
+  // Write the client-level answers back, skipping any the form left blank so a
+  // half-filled wizard can't erase a figure that was already on the record.
+  const clientPatch: Record<string, number> = {}
+  if (clientMonthlyRetainer) clientPatch.monthly_retainer = parseFloat(clientMonthlyRetainer)
+  if (clientVideosPerMonth) clientPatch.videos_per_month = parseInt(clientVideosPerMonth, 10)
+  if (clientShootsPerMonth) clientPatch.shoots_per_month = parseInt(clientShootsPerMonth, 10)
+  if (clientCustomerValue) clientPatch.customer_value = parseFloat(clientCustomerValue)
 
-  await syncShootEvent(supabase, job.id)
+  // None of these three depends on the others, and every one of them is a
+  // round trip the browser is sitting on: `redirect()` from a server action
+  // makes the caller wait for the destination to render, so the action's own
+  // latency is felt directly as "the new job took a while to show up".
+  await Promise.all([
+    supabase.from('activities').insert({
+      action: 'job_created',
+      details: `Job "${name}" created`,
+      job_id: job.id,
+      client_id: clientId,
+    }),
+    Object.keys(clientPatch).length > 0
+      ? supabase.from('clients').update(clientPatch).eq('id', clientId)
+      : Promise.resolve(),
+    syncShootEvent(supabase, job.id),
+  ])
 
   revalidatePath('/dashboard/jobs')
   revalidatePath('/dashboard/calendar')

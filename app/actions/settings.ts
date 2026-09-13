@@ -74,3 +74,20 @@ export async function saveEmailTemplate(prevState: { error?: string; success?: b
 
   return { success: true }
 }
+
+// ── Portal self-view ─────────────────────────────────────────────────────────
+// Which IPs count as "Arlo, not a client" when someone opens a portal link.
+// See lib/admin-ip.ts — this is the allow-list it reads, and it lives in the
+// database rather than only in ADMIN_IPS so it can be changed without a deploy.
+export async function saveAdminIps(prevState: { error?: string; success?: boolean } | undefined, formData: FormData) {
+  const raw = (formData.get('adminIps') as string) || ''
+  const ips = [...new Set(
+    raw.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean)
+  )]
+  // Deliberately permissive: IPv6, IPv4 and CGNAT addresses all show up here
+  // and a strict pattern would reject a real one. An address that never
+  // matches simply never suppresses anything.
+  const bad = ips.find((ip) => ip.length > 45 || /[^0-9a-fA-F:.]/.test(ip))
+  if (bad) return { error: `"${bad}" doesn't look like an IP address.` }
+  return saveAppSetting('admin_ips', ips.join(','))
+}

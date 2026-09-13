@@ -83,6 +83,23 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/portal/login', request.url))
   }
 
+  // ── Mark a self-view of a client portal ──────────────────────────────────
+  // Opening a client's portal link to check how it looks used to fire the
+  // same "your client viewed this" email a real client fires. The portal is
+  // public by design, so the only thing that can tell the two apart is who is
+  // holding the browser — and the dashboard session cookie is right here.
+  //
+  // The cookie outlives the session check so the next visit still counts even
+  // from a phone on mobile data, where the IP allow-list would miss.
+  if (pathname.startsWith('/portal/client/') && user?.app_metadata?.role === 'admin') {
+    supabaseResponse.cookies.set('tui_self_view', '1', {
+      maxAge: 60 * 60 * 24 * 365,
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+    })
+  }
+
   return supabaseResponse
 }
 

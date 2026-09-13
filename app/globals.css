@@ -1791,13 +1791,36 @@ input, textarea, select, button { font-family: inherit; }
 
   /* Identity gets the room; the rest share what is left. */
   .record-table th:first-child,
-  .record-table td:first-child { width: 26%; }
+  .record-table td:first-child { width: 30%; }
 
   .record-table td[data-role="secondary"],
   .record-table th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* The primary cell stacks a name over tags or a subtitle, so it wraps. */
   .record-table td[data-role="primary"] { white-space: normal; }
+}
+
+/* ── Job row identity ─────────────────────────────────────────
+   Client over job, with the avatar as the row's visual anchor. The two lines
+   are deliberately different weights AND different colours: the client is the
+   thing you scan for, the job name is the thing you read once you've stopped.
+   Same size for both would make the pair a single grey block again, which is
+   what the old two-column arrangement effectively was. */
+.job-identity { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.job-identity-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.job-identity-client {
+  font-size: var(--t-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.job-identity-job {
+  font-size: var(--t-xs);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── Reflowing record rows ────────────────────────────────────
@@ -2889,6 +2912,35 @@ input, textarea, select, button { font-family: inherit; }
 
 @media (max-width: 1100px) {
   .today-split { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+}
+
+/* ── Home: the week beside the money ──────────────────────────
+   The two questions the home screen opens on — what is booked, and how the
+   money is going — read as a pair, so they sit side by side above the
+   conversation rather than stacked with one of them below the fold. The chart
+   needs the wider half; the week is a short time-ordered list and reads fine
+   in the narrower one.
+
+   Collapses at the same 1100px as .today-split, so the page only ever has one
+   breakpoint to think about. */
+.dash-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 24px;
+  align-items: start;
+}
+.dash-top > * { min-width: 0; }
+
+@media (max-width: 1100px) {
+  .dash-top { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+}
+
+/* Three figures on one line above the chart, wrapping rather than shrinking. */
+.money-mini-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+  margin-bottom: 16px;
 }
 
 /* The revision you arrived from an email to answer. Ringed rather than

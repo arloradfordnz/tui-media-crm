@@ -150,3 +150,21 @@ export function timeAgo(date: Date | string): string {
   if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`
   return formatDate(d)
 }
+
+/**
+ * The name you'd actually say out loud.
+ *
+ * `contact_person` is stored as a full name, so greeting someone with it read
+ * as "Kia ora, Sarah Bainbridge" — correct, and colder than a form letter.
+ * A company name is left whole, since "Kia ora, Team" is worse than "Kia ora,
+ * Team Bainbridge": only a value that looks like a person's name is shortened.
+ */
+export function firstName(name: string | null | undefined): string {
+  const trimmed = (name ?? '').trim()
+  if (!trimmed) return ''
+  const first = trimmed.split(/\s+/)[0]
+  // An initial ("J. Smith") is not a name to greet someone by, and a one-word
+  // value is already as short as it gets.
+  if (first.length <= 2 && trimmed.includes(' ')) return trimmed
+  return first
+}

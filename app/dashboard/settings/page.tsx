@@ -2,8 +2,10 @@ import { createServerSupabaseClient } from '@/lib/supabase'
 import SettingsForm from './SettingsForm'
 import EmailTemplatesForm from './EmailTemplatesForm'
 import RetainerInvoiceSettings from './RetainerInvoiceSettings'
+import PortalNotificationSettings from './PortalNotificationSettings'
 import { APP_VERSION } from '@/lib/version'
 import { getAppSetting } from '@/app/actions/settings'
+import { getAdminIps, getRequestIp } from '@/lib/admin-ip'
 import Link from 'next/link'
 import { Users, CalendarDays, Wallet, FileText, TrendingUp } from 'lucide-react'
 
@@ -11,9 +13,11 @@ export default async function SettingsPage() {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [templates, retainerInvoiceDay] = await Promise.all([
+  const [templates, retainerInvoiceDay, adminIps, requestIp] = await Promise.all([
     supabase.from('email_templates').select('id, type, subject, body, updated_at').order('type'),
     getAppSetting('retainer_invoice_day'),
+    getAdminIps(),
+    getRequestIp(),
   ])
 
   return (
@@ -65,6 +69,9 @@ export default async function SettingsPage() {
 
       {/* Retainer Invoice Day */}
       <RetainerInvoiceSettings currentDay={retainerInvoiceDay ? parseInt(retainerInvoiceDay, 10) : 1} />
+
+      {/* Portal self-view */}
+      <PortalNotificationSettings currentIps={adminIps} requestIp={requestIp} />
 
       {/* Email Templates */}
       <EmailTemplatesForm templates={templates.data || []} />

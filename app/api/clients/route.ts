@@ -7,7 +7,10 @@ export async function GET() {
   const supabase = await createServerSupabaseClient()
   const { data: clients } = await supabase
     .from('clients')
-    .select('id, name, email')
+    // The New Job wizard pre-fills the retainer and campaign steps from what
+    // the client record already knows, so the type-specific step is mostly a
+    // confirmation rather than re-entry.
+    .select('id, name, email, monthly_retainer, videos_per_month, shoots_per_month, ad_spend_budget, customer_value')
     .eq('status', 'active')
     .order('name', { ascending: true })
   return NextResponse.json(clients ?? [])

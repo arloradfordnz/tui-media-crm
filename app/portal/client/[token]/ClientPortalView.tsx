@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation'
 import { approveDelivery, markViewed, markDownloaded, requestDeliverableRevision } from '@/app/actions/portal'
 import { signDocumentByClient, submitDocumentFeedback } from '@/app/actions/documents'
 import { renderDocBody } from '@/lib/markdown'
-import { statusLabel, statusBadgeClass, formatDate } from '@/lib/format'
+import { statusLabel, statusBadgeClass, formatDate, firstName } from '@/lib/format'
 import Image from 'next/image'
-import { Briefcase, FileText, Film, Image as ImageIcon, File, Music, Download, ChevronDown, ChevronRight, Check, MessageSquare, PenLine } from 'lucide-react'
+import { Briefcase, FileText, Film, Image as ImageIcon, File, Music, Download, ChevronDown, ChevronRight, Check, MessageSquare, PenLine, Archive } from 'lucide-react'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
 
 type DeliveryFile = {
@@ -21,6 +21,7 @@ type DeliveryFile = {
   downloadEnabled: boolean
   personalNote: string | null
   createdAt: string
+  archivedAt: string | null
 }
 
 type Revision = {
@@ -158,7 +159,7 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
         <div className="py-2">
           <p className="text-xs uppercase tracking-wider font-semibold mb-2" style={{ color: 'var(--text-tertiary)' }}>Client Portal</p>
           <h1 className="text-3xl md:text-4xl font-semibold" style={{ letterSpacing: '-0.03em', lineHeight: 1.1, color: 'var(--text-primary)' }}>
-            Kia ora, {data.client.contactPerson || data.client.name}
+            Kia ora, {firstName(data.client.contactPerson) || data.client.name}
           </h1>
           <p className="text-sm md:text-base mt-2 max-w-md" style={{ color: 'var(--text-secondary)' }}>
             View your projects, deliverables, and documents below.
@@ -309,6 +310,19 @@ function FileCard({ file, jobId, portalToken, onApprove }: { file: DeliveryFile;
         <span className={`badge ${statusBadgeClass(file.deliveryStatus)}`}>{statusLabel(file.deliveryStatus)}</span>
         <span className="text-xs ml-auto" style={{ color: 'var(--text-tertiary)' }}>{formatDate(file.createdAt)}</span>
       </div>
+
+      {/* Archived — the R2 object was swept by /api/storage/retention, so
+          there is nothing to play or download. Say so plainly rather than
+          rendering a player that spins on a dead URL. */}
+      {file.archivedAt && (
+        <div className="rounded-lg p-4 mb-3 flex items-center gap-3" style={{ background: 'var(--bg-surface)' }}>
+          <Archive className="w-6 h-6 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+          <div className="flex-1">
+            <p className="text-sm" style={{ color: 'var(--text-primary)' }}>This file has been archived</p>
+            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Delivered files stay available for two months. Get in touch and we&apos;ll send it again.</p>
+          </div>
+        </div>
+      )}
 
       {/* Preview */}
       {file.fileUrl && kind === 'vimeo' && (
