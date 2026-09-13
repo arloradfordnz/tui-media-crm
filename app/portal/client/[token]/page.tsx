@@ -1,7 +1,23 @@
+import { cache } from 'react'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { loadPortalData, type PortalClient } from '@/lib/portal-data'
 import ClientPortalView from './ClientPortalView'
 import type { Metadata } from 'next'
+
+// generateMetadata and the page body both need this row, and Next runs them as
+// part of the same request — so without cache() every portal visit looked the
+// client up twice over the network to render one page. The select is the
+// superset of what either caller wants; the title takes `name` out of it.
+const clientByToken = cache(async (token: string) => {
+  const supabase = createAdminClient()
+  if (!supabase) return null
+  const { data } = await supabase
+    .from('clients')
+    .select('id, name, email, contact_person, portal_token')
+    .eq('portal_token', token)
+    .single()
+  return data ?? null
+})
 
 // A shared portal link previews as "Tui Media" generically today — every
 // client's link looks identical in a Slack/iMessage preview. This scopes the
@@ -10,16 +26,8 @@ import type { Metadata } from 'next'
 // error, so a bad link reveals nothing about which tokens are real.
 export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
   const { token } = await params
-  const supabase = createAdminClient()
   const fallback: Metadata = { title: 'Tui Media — Client Portal' }
-  if (!supabase) return fallback
-
-  const { data: client } = await supabase
-    .from('clients')
-    .select('name')
-    .eq('portal_token', token)
-    .single()
-
+  const client = await clientByToken(token)
   if (!client) return fallback
   return { title: `${client.name} — Tui Media` }
 }
@@ -39,11 +47,7 @@ export default async function ClientPortalPage({ params }: { params: Promise<{ t
     )
   }
 
-  const { data: client } = await supabase
-    .from('clients')
-    .select('id, name, email, contact_person, portal_token')
-    .eq('portal_token', token)
-    .single()
+  const client = await clientByToken(token)
 
   if (!client) {
     return (

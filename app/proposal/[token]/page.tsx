@@ -1,21 +1,29 @@
+import { cache } from 'react'
 import { createAdminClient } from '@/lib/supabase-admin'
 import ProposalView from './ProposalView'
 import type { Metadata } from 'next'
+
+// One lookup per request, shared by generateMetadata and the page body. Both
+// run in the same request, so fetching this separately meant every proposal a
+// client opened was read from the database twice to render one page.
+const proposalByToken = cache(async (token: string) => {
+  const supabase = createAdminClient()
+  if (!supabase) return null
+  const { data } = await supabase
+    .from('proposals')
+    .select('id, job_id, token, status, cover_note, services, inclusions, payment_terms, total_value, sent_at, responded_at, created_at, jobs(name, job_type, shoot_date, shoot_location, clients(name))')
+    .eq('token', token)
+    .single()
+  return data ?? null
+})
 
 // Same reasoning as the portal page: previews should name the client, and an
 // invalid token must fall back to the generic title rather than surface
 // whether a token exists.
 export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
   const { token } = await params
-  const supabase = createAdminClient()
   const fallback: Metadata = { title: 'Tui Media — Proposal' }
-  if (!supabase) return fallback
-
-  const { data: proposal } = await supabase
-    .from('proposals')
-    .select('jobs(clients(name))')
-    .eq('token', token)
-    .single()
+  const proposal = await proposalByToken(token)
 
   const clientName = (proposal?.jobs as unknown as { clients: { name: string } | null } | null)?.clients?.name
   if (!clientName) return fallback
@@ -36,11 +44,7 @@ export default async function PublicProposalPage({ params }: { params: Promise<{
     )
   }
 
-  const { data: proposal } = await supabase
-    .from('proposals')
-    .select('id, job_id, token, status, cover_note, services, inclusions, payment_terms, total_value, sent_at, responded_at, created_at, jobs(name, job_type, shoot_date, shoot_location, clients(name))')
-    .eq('token', token)
-    .single()
+  const proposal = await proposalByToken(token)
 
   if (!proposal || proposal.status === 'draft') {
     return (

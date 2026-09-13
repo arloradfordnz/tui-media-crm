@@ -20,7 +20,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
   // every client record page would read "not found" until the SQL was run.
   // Split out, the worst case is that the setup button says "Send" instead of
   // "Resend" for a few minutes.
-  const portalInvitedAt = await (async () => {
+  const portalInvitedAtPromise = (async () => {
     try {
       const { data } = await supabase
         .from('clients')
@@ -39,7 +39,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
   // before that migration ran would fail the whole clients query and every
   // client record would read "not found". Split out, the worst case is that the
   // application block is empty until the SQL is run.
-  const rebrandFields = await (async () => {
+  const rebrandFieldsPromise = (async () => {
     const empty = {
       industry: null, brand: null, sells: null, customer_value: null,
       ad_spend_budget: null, decision_maker: null, capacity: null, timeline: null,
@@ -57,8 +57,23 @@ export default async function ClientDetailPage({ params, searchParams }: { param
     }
   })()
 
-  // Fetch all data in parallel for speed
-  const [clientResult, { data: jobs }, { data: activities }, { data: documents }, invoiceDayRaw] = await Promise.all([
+  // Everything this page needs, in ONE round of round trips.
+  //
+  // The two tolerant lookups above are started, not awaited — they used to be
+  // two `await`s in a row ahead of this block, which meant the page made three
+  // sequential trips for three different column sets of THE SAME clients row
+  // before it asked for anything else. They stay separate queries (each has to
+  // be able to fail on its own when its migration has not run; see the
+  // comments above), but separate is not the same as sequential.
+  const [
+    clientResult,
+    { data: jobs },
+    { data: activities },
+    { data: documents },
+    invoiceDayRaw,
+    portalInvitedAt,
+    rebrandFields,
+  ] = await Promise.all([
     supabase
       .from('clients')
       .select('id, name, contact_person, email, phone, location, lead_source, first_contact, pipeline_stage, status, client_category, lifetime_value, monthly_retainer, shoots_per_month, videos_per_month, notes, tags, portal_token')
@@ -81,6 +96,8 @@ export default async function ClientDetailPage({ params, searchParams }: { param
       .eq('client_id', id)
       .order('updated_at', { ascending: false }),
     getAppSetting('retainer_invoice_day'),
+    portalInvitedAtPromise,
+    rebrandFieldsPromise,
   ])
 
   const client = clientResult.data as ClientRow | null
