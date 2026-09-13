@@ -164,47 +164,61 @@ export async function getContentBacklog(
     }
   }
 
-  // One query for every retainer job and its uploads. Archived jobs are
-  // included on purpose: an archived month still shipped its videos, and
-  // dropping it would invent a hole in the history.
-  const { data: jobRows } = await supabase
-    .from('jobs')
-    .select('id, name, created_at, client_id, deliverables(id, delivery_files(id, created_at))')
-    .in('client_id', clients.map((c) => c.id))
+  // Jobs and shoots both key off the client ids above, and neither needs the
+  // other — so they go together. They used to be awaited one after the other,
+  // which made this function three round trips deep. It is called from
+  // getAttention's Promise.all, so the home screen waited on the longest chain
+  // in that group, and this was it.
+  const clientIds = clients.map((c) => c.id)
 
-  const jobs = (jobRows ?? []) as RawJob[]
+  const [jobsRes, shootRows] = await Promise.all([
+    // One query for every retainer job and its uploads. Archived jobs are
+    // included on purpose: an archived month still shipped its videos, and
+    // dropping it would invent a hole in the history.
+    supabase
+      .from('jobs')
+      .select('id, name, created_at, client_id, deliverables(id, delivery_files(id, created_at))')
+      .in('client_id', clientIds),
 
-  // Shoots, bucketed by the NZ calendar month they happened in.
-  //
-  // Deliberately keyed off the event's own client_id rather than its job: a
-  // retainer month job holds one shoot_date, so a month with two shoots in it
-  // could never be represented through the job. Logging the shoot directly
-  // against the client is the only way the second one exists at all.
-  //
-  // Tolerant of the column being absent, because supabase/migration_shoot_log.sql
-  // is run by hand. Without the guard, a deploy that lands before the SQL does
-  // takes down the Retainers page and the assistant's whole context with it,
-  // rather than just showing no shoot counts for a few minutes.
+    // Shoots, bucketed below by the NZ calendar month they happened in.
+    //
+    // Deliberately keyed off the event's own client_id rather than its job: a
+    // retainer month job holds one shoot_date, so a month with two shoots in
+    // it could never be represented through the job. Logging the shoot
+    // directly against the client is the only way the second one exists.
+    //
+    // Tolerant of the column being absent, because
+    // supabase/migration_shoot_log.sql is run by hand. Without the guard, a
+    // deploy that lands before the SQL does takes down the Retainers page and
+    // the assistant's whole context with it, rather than just showing no shoot
+    // counts for a few minutes. Resolving to null keeps that contained here
+    // instead of rejecting the Promise.all and taking the jobs query with it.
+    (async (): Promise<{ client_id: string | null; date: string }[] | null> => {
+      try {
+        const { data, error } = await supabase
+          .from('events')
+          .select('client_id, date')
+          .eq('event_type', 'shoot')
+          .in('client_id', clientIds)
+        if (error) throw new Error(error.message)
+        return (data ?? []) as { client_id: string | null; date: string }[]
+      } catch (err) {
+        console.warn('[content-backlog] shoot counts unavailable, continuing without them:', err)
+        return null
+      }
+    })(),
+  ])
+
+  const jobs = (jobsRes.data ?? []) as RawJob[]
+
   const shootsByClientMonth = new Map<string, Map<string, number>>()
-  try {
-    const { data: shootRows, error: shootError } = await supabase
-      .from('events')
-      .select('client_id, date')
-      .eq('event_type', 'shoot')
-      .in('client_id', clients.map((c) => c.id))
-
-    if (shootError) throw new Error(shootError.message)
-
-    for (const row of (shootRows ?? []) as { client_id: string | null; date: string }[]) {
-      if (!row.client_id || !row.date) continue
-      // NZ local month, matching how every other date in this file is read.
-      const key = new Date(row.date).toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' }).slice(0, 7)
-      const forClient = shootsByClientMonth.get(row.client_id) ?? new Map<string, number>()
-      forClient.set(key, (forClient.get(key) ?? 0) + 1)
-      shootsByClientMonth.set(row.client_id, forClient)
-    }
-  } catch (err) {
-    console.warn('[content-backlog] shoot counts unavailable, continuing without them:', err)
+  for (const row of shootRows ?? []) {
+    if (!row.client_id || !row.date) continue
+    // NZ local month, matching how every other date in this file is read.
+    const key = new Date(row.date).toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' }).slice(0, 7)
+    const forClient = shootsByClientMonth.get(row.client_id) ?? new Map<string, number>()
+    forClient.set(key, (forClient.get(key) ?? 0) + 1)
+    shootsByClientMonth.set(row.client_id, forClient)
   }
 
   const shootsFor = (clientId: string, month: string) =>

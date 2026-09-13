@@ -97,7 +97,7 @@ export async function buildContext(
   const stale7d = new Date(now.getTime() - 7 * 86400000).toISOString()
   const shootWindow5d = new Date(now.getTime() + 5 * 86400000).toISOString().slice(0, 10)
 
-  const [overdueTasks, stalledJobs, overdueDeadlines, shootsNeedingPrep, recentTicks, backlog] =
+  const [overdueTasks, stalledJobs, overdueDeadlines, shootsNeedingPrep, recentTicks, backlog, systemHealth] =
     await Promise.all([
       supabase
         .from('job_tasks')
@@ -136,6 +136,12 @@ export async function buildContext(
         .order('ran_at', { ascending: false })
         .limit(5),
       getContentBacklog(supabase, now).catch(() => null),
+      // Connectivity costs one indexed read of a table a cron keeps warm — no
+      // Xero token refresh, no IMAP login on the request path. It used to be
+      // awaited after this block purely because it is the least interesting
+      // thing here, which bought the assistant an extra round trip on every
+      // message for no reason: it depends on nothing above it.
+      readIntegrationStatus(supabase),
     ])
 
   Object.assign(base, {
@@ -147,9 +153,7 @@ export async function buildContext(
     recent_brain_ticks: recentTicks?.data ?? [],
   })
 
-  // Connectivity comes last and costs one indexed read of a table a cron keeps
-  // warm — no Xero token refresh, no IMAP login on the request path.
-  Object.assign(base, { system_health: await readIntegrationStatus(supabase) })
+  Object.assign(base, { system_health: systemHealth })
 
   return base
 }
