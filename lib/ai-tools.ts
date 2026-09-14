@@ -453,7 +453,7 @@ export const TOOLS: Anthropic.Tool[] = [
         contact_name: { type: 'string', description: 'Contact display name (for confirmation)' },
         description: {
           type: 'string',
-          description: 'The invoice line item, written BY YOU, not asked of the user. This is client-facing, so describe what was actually delivered rather than reusing the job name as-is — look at the job and its deliverables and write what they add up to in your own words, the way you would tell Arlo what a job was. "Ceramic Coating Videos" tells the client nothing they did not already know; naming the count and format ("4 short-form videos for Instagram/TikTok") does. Use judgement on what is worth including for this particular job. Do not stop and ask Arlo what the description should say: you have the job, its notes and its deliverables, which is more than enough to write it yourself.',
+          description: 'Client-facing invoice line, written by you from the job and its deliverables — not the job name, and never asked of Arlo. See the invoicing rules in the system prompt.',
         },
         amount: { type: 'number', description: 'Amount excluding GST' },
         due_date: { type: 'string', description: 'Due date YYYY-MM-DD. Defaults to 14 days from today.' },
@@ -632,7 +632,8 @@ export async function executeTool(
         fingerprint,
         action: describeAction(name, input),
         instruction:
-          'NOT executed. Tell Arlo exactly what you are about to do and ask him to confirm. Do not retry this tool until he has.',
+          'NOT executed. Tell Arlo exactly what you are about to do and ask him to confirm. Do not retry this tool until he has. ' +
+          'Once he does confirm (he taps Confirm, or says yes), you MUST call this exact tool again with these exact arguments — that second call is the only thing that actually performs the action. Approving does not run it for you, and answering "sending it now" without making the call means nothing happens at all.',
       })
     }
   }

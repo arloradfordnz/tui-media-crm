@@ -1,10 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { NextRequest } from 'next/server'
+import { NextRequest, after } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { getAuthUser, unauthorizedResponse } from '@/lib/supabase-admin'
 import { TOOLS, MUTATING_TOOLS, executeTool } from '@/lib/ai-tools'
 import { buildDashboardSystem } from '@/lib/assistant-persona'
 import { getContentBacklog, summariseBacklog } from '@/lib/content-backlog'
+import { fetchOutstandingInvoicesCached } from '@/lib/xero'
 import { encodeEvent, toolLabel, summariseResult, type TuiEvent } from '@/lib/tui/receipts'
 import { tidyPunctuation } from '@/lib/tui/text'
 
@@ -36,8 +37,23 @@ async function getDynamicContext(supabase: ReturnType<typeof createServerSupabas
   const staleThreshold = new Date(now.getTime() - 7 * 86400000).toISOString()
 
   // All parallel — one round-trip's worth of latency for the whole context.
-  // Xero and IMAP are deliberately absent: third-party calls would slow every
-  // single message, and the model can reach for those via tools when asked.
+  //
+  // What goes in here is a latency trade, and the exchange rate is brutally in
+  // favour of loading more: every tool round costs a full model call, measured
+  // at ~1.4s, while one more query inside this existing parallel wave costs
+  // nothing (they all finish together) and a few hundred uncached tokens.
+  //
+  // So the client roster and the outstanding invoices are here rather than
+  // behind search_clients / list_xero_invoices. Those two were the most common
+  // first round of a turn by a long way — "invoice Sky", "who owes me money"
+  // both used to spend 1.4s on a lookup before any real work started, and now
+  // answer from context with zero rounds.
+  //
+  // IMAP is still deliberately absent, and Xero is only here through its
+  // stale-while-revalidate cache (lib/xero.ts), which is a kv_cache row, not a
+  // Xero round trip. A live Xero call takes seconds and would land on every
+  // single message — that is the thing the original comment here was right to
+  // refuse, and it still is.
   const [
     { data: weekEvents },
     { data: activeJobs },
@@ -46,6 +62,8 @@ async function getDynamicContext(supabase: ReturnType<typeof createServerSupabas
     { data: stalledJobs },
     { data: recentThread },
     backlog,
+    { data: clientRoster },
+    outstandingInvoices,
   ] = await Promise.all([
     supabase.from('events').select('title, event_type, date, start_time').gte('date', todayISO).lte('date', weekFromNow).order('date').order('start_time').limit(7),
     supabase.from('jobs').select('name, status, clients(name)').not('status', 'in', '("delivered","archived")').order('created_at', { ascending: false }).limit(8),
@@ -54,6 +72,19 @@ async function getDynamicContext(supabase: ReturnType<typeof createServerSupabas
     supabase.from('jobs').select('name, status, updated_at, clients(name)').in('status', ['editing', 'review']).lt('updated_at', staleThreshold).order('updated_at').limit(10),
     supabase.from('sms_messages').select('direction, body, created_at').order('created_at', { ascending: false }).limit(8),
     getContentBacklog(supabase, now).catch(() => null),
+    supabase.from('clients').select('id, name').order('name').limit(60),
+    // Timeboxed, because the ONE path through this cache that is slow is the
+    // genuinely-cold one: with no kv_cache row at all, swrCached blocks on a
+    // real Xero call, measured at 1.7s against 0.4s for the rest of this wave.
+    // That would make the cold turn slower than it was before this was added,
+    // which defeats the point. Warm (the normal case) it returns in a few ms;
+    // cold, the turn proceeds without invoices in context and the model can
+    // still call list_xero_invoices if it actually needs them. The refresh it
+    // kicked off lands in kv_cache for the next message either way.
+    Promise.race([
+      fetchOutstandingInvoicesCached().catch(() => []),
+      new Promise<[]>((resolve) => setTimeout(() => resolve([]), 400)),
+    ]),
   ])
 
   const clientName = (j: { clients: unknown }) => (j.clients as { name: string } | null)?.name
@@ -74,6 +105,15 @@ async function getDynamicContext(supabase: ReturnType<typeof createServerSupabas
 
   const backlogText = backlog ? summariseBacklog(backlog) : ''
   if (backlogText) lines.push(backlogText)
+
+  // The roster is here so "invoice Sky" resolves to a real client_id without a
+  // search_clients round. IDs included deliberately: a name alone would still
+  // force the lookup it is here to save.
+  if ((clientRoster ?? []).length > 0)
+    lines.push(`Clients (id — name, use these IDs directly instead of calling search_clients): ${(clientRoster ?? []).map(c => `${c.id} — ${c.name}`).join(' | ')}`)
+
+  if ((outstandingInvoices ?? []).length > 0)
+    lines.push(`Outstanding Xero invoices (cached, use instead of list_xero_invoices unless he asks for a refresh): ${(outstandingInvoices ?? []).map(i => `${i.InvoiceNumber} ${i.Contact?.Name ?? ''} $${i.AmountDue} [${i.Status}] due ${i.DueDateString?.slice(0, 10) ?? '?'} id=${i.InvoiceID}`).join(' | ')}`)
 
   if ((recentThread ?? []).length > 0)
     lines.push(`Recent thread with Arlo (oldest first, spans Telegram and this panel): ${(recentThread ?? []).slice().reverse().map(m => `${m.direction === 'inbound' ? 'Arlo' : 'You'}: ${m.body}`).join(' | ')}`)
@@ -206,8 +246,19 @@ export async function POST(request: NextRequest) {
           if (toolUseBlocks.length === 0) {
             // Log the reply into the shared thread so the Telegram brain knows
             // what was already discussed here and doesn't re-flag it.
+            //
+            // after(), not await: this insert is a full Supabase round trip
+            // (~130ms) that used to sit between the last word of the reply and
+            // the 'done' event, with the composer disabled for all of it. The
+            // Telegram brain does not need the row before Arlo can type his
+            // next message, so it goes out after the response flushes. A bare
+            // floating promise would be frozen at flush on Vercel (see
+            // AGENTS.md on the Xero cache) — after() is the one that survives.
             if (persist && finalText.trim()) {
-              await supabase.from('sms_messages').insert({ direction: 'outbound', body: tidyPunctuation(finalText.trim()) })
+              const body = tidyPunctuation(finalText.trim())
+              after(async () => {
+                await supabase.from('sms_messages').insert({ direction: 'outbound', body })
+              })
             }
             send({ t: 'done' })
             controller.close()
