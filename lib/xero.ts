@@ -1081,6 +1081,9 @@ export type XeroCreatedInvoice = {
   InvoiceNumber: string
   Status: string
   Total: number
+  /** Pre-tax total. Present on reads — used to preserve the line amount when
+   *  an edit only touches the description. */
+  SubTotal?: number
   AmountDue: number
   DateString?: string
   DueDateString?: string
@@ -1169,7 +1172,7 @@ export async function approveXeroInvoice(invoiceId: string): Promise<XeroWriteRe
   try {
     const res = await xeroPost<{ Invoices?: XeroCreatedInvoice[] }>(
       `/Invoices/${invoiceId}`,
-      { InvoiceID: invoiceId, Status: 'AUTHORISED' },
+      { Status: 'AUTHORISED' },
       account.access_token,
       account.account_id,
       'POST',
@@ -1232,7 +1235,7 @@ export async function voidXeroInvoice(invoiceId: string): Promise<XeroWriteResul
   try {
     await xeroPost(
       `/Invoices/${invoiceId}`,
-      { InvoiceID: invoiceId, Status: 'VOIDED' },
+      { Status: 'VOIDED' },
       account.access_token,
       account.account_id,
       'POST',
@@ -1255,7 +1258,7 @@ export async function deleteXeroInvoice(invoiceId: string): Promise<XeroWriteRes
   try {
     await xeroPost(
       `/Invoices/${invoiceId}`,
-      { InvoiceID: invoiceId, Status: 'DELETED' },
+      { Status: 'DELETED' },
       account.access_token,
       account.account_id,
       'POST',
@@ -1328,14 +1331,29 @@ export async function updateXeroInvoice(invoiceId: string, updates: {
     // outright on a non-GST-registered org.
     const tax = await getXeroTaxProfile()
 
-    const payload: Record<string, unknown> = { InvoiceID: invoiceId }
+    // No InvoiceID in the body — the URL already identifies the invoice, and
+    // this function is routinely called with the human InvoiceNumber
+    // ("INV-0170") rather than the GUID, which the URL path accepts but the
+    // body's InvoiceID field does not: Xero rejected it with "Error
+    // converting value \"INV-0170\" to type 'System.Guid'".
+    const payload: Record<string, unknown> = {}
     if (updates.dueDate) payload.DueDate = updates.dueDate
     if (updates.reference !== undefined) payload.Reference = updates.reference
     if (updates.description !== undefined || updates.amount !== undefined) {
+      // A PUT to Invoices/{id} replaces the whole LineItems array, not just
+      // the fields named — so editing only the description with no amount in
+      // `updates` dropped UnitAmount from the payload entirely (undefined is
+      // not serialised) and Xero refused it as mandatory-but-missing. Read the
+      // invoice's current line back when the amount isn't part of this edit,
+      // so "just change the description" doesn't also have to know the price.
+      const currentAmount = updates.amount ?? await (async () => {
+        const existing = await getXeroInvoice(invoiceId)
+        return existing?.SubTotal ?? existing?.Total ?? 0
+      })()
       payload.LineAmountTypes = tax.lineAmountTypes
       payload.LineItems = [{
         Description: updates.description ?? 'Services',
-        UnitAmount: updates.amount,
+        UnitAmount: currentAmount,
         Quantity: 1,
         AccountCode: '200',
         TaxType: tax.salesTaxType,
