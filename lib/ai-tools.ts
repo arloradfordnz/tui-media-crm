@@ -424,19 +424,22 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'create_xero_invoice',
-    description: 'Create a sales invoice in Xero for a contact. Use list_xero_contacts first to get the ContactID. Creates as DRAFT unless approve is true. Creating never emails anything — send_xero_invoice does that.',
+    description: "Create a sales invoice in Xero for a contact. Use list_xero_contacts first to get the ContactID. Look up the job (get_job, list_deliverables) before writing the line item — the invoice is what the client reads and it should say what they actually got, not the job's internal name. Creates as DRAFT unless approve is true. Creating never emails anything — send_xero_invoice does that.",
     input_schema: {
       type: 'object' as const,
       properties: {
         contact_id: { type: 'string', description: 'Xero ContactID (from list_xero_contacts)' },
         contact_name: { type: 'string', description: 'Contact display name (for confirmation)' },
-        description: { type: 'string', description: 'Invoice line item description' },
+        description: {
+          type: 'string',
+          description: 'The invoice line item. This is client-facing, so describe what was actually delivered, in enough detail that the client recognises the work without asking — count, format, platform, and the period or job it covers. "Ceramic Coating Videos" is not enough; "4 short-form videos (Reels/TikTok) for the ceramic coating range, filmed and edited September 2026" is the bar. Pull the specifics from the job and its deliverables rather than reusing the job name as-is.',
+        },
         amount: { type: 'number', description: 'Amount excluding GST' },
         due_date: { type: 'string', description: 'Due date YYYY-MM-DD. Defaults to 14 days from today.' },
         reference: { type: 'string', description: 'Optional invoice reference/PO number' },
         approve: { type: 'boolean', description: 'If true, creates it already approved (status AUTHORISED) instead of DRAFT. This does NOT email it — use send_xero_invoice for that. Default false.' },
       },
-      required: ['contact_id', 'contact_name', 'amount'],
+      required: ['contact_id', 'contact_name', 'description', 'amount'],
     },
   },
   {
@@ -521,7 +524,7 @@ export const TOOLS: Anthropic.Tool[] = [
       type: 'object' as const,
       properties: {
         invoice_id: { type: 'string', description: 'Xero InvoiceID' },
-        description: { type: 'string', description: 'New line item description' },
+        description: { type: 'string', description: 'New line item description. Same bar as on create_xero_invoice: specific and client-facing (count, format, platform, period), not the job name.' },
         amount: { type: 'number', description: 'New amount excluding GST' },
         due_date: { type: 'string', description: 'New due date YYYY-MM-DD' },
         reference: { type: 'string', description: 'New invoice reference/PO number' },
