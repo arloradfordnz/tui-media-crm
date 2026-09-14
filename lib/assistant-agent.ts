@@ -5,6 +5,7 @@ import { buildTelegramSystem } from '@/lib/assistant-persona'
 import { sendTelegramMessage } from '@/lib/telegram'
 import { buildContext, tierForTrigger } from '@/lib/tui/context'
 import { syncFlags, markNotified } from '@/lib/tui/flags'
+import { tidyPunctuation } from '@/lib/tui/text'
 
 // One place to change the model. Both the agent loop and the forced
 // send_message round must run the same one — thinking blocks are echoed back
@@ -141,7 +142,9 @@ export async function runAssistantTurn(
       toolUseBlocks.map(async (block): Promise<Anthropic.ToolResultBlockParam> => {
         if (block.name === 'send_message') {
           const input = block.input as { body: string; raised_flag_keys?: unknown }
-          const body = input.body
+          // Same repair the chat panel applies on render: the missing space
+          // after a full stop is the model's habit, not a channel's.
+          const body = tidyPunctuation(input.body)
           const messageId = await sendTelegramMessage(body)
           messageSent = messageId != null
           messageBody = body

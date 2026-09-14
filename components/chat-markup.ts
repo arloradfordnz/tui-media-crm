@@ -5,8 +5,10 @@
 // [[LINK:…]]) are gone — /api/ai/chat now speaks NDJSON, so control data
 // travels as typed events instead of being spliced into the prose. See
 // lib/tui/receipts.ts.
+import { tidyPunctuation } from '@/lib/tui/text'
+
 export function renderMarkdown(text: string): string {
-  const escaped = text
+  const escaped = tidyPunctuation(text)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

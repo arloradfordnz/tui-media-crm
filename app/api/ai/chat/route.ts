@@ -6,6 +6,7 @@ import { TOOLS, MUTATING_TOOLS, executeTool } from '@/lib/ai-tools'
 import { buildDashboardSystem } from '@/lib/assistant-persona'
 import { getContentBacklog, summariseBacklog } from '@/lib/content-backlog'
 import { encodeEvent, toolLabel, summariseResult, type TuiEvent } from '@/lib/tui/receipts'
+import { tidyPunctuation } from '@/lib/tui/text'
 
 // Dashboard surface of the Tui assistant. Same persona and same tool set as
 // the Telegram brain (lib/assistant-agent.ts) — this route just swaps the
@@ -203,11 +204,10 @@ export async function POST(request: NextRequest) {
           )
 
           if (toolUseBlocks.length === 0) {
-            if (mutated) send({ t: 'mutated' })
             // Log the reply into the shared thread so the Telegram brain knows
             // what was already discussed here and doesn't re-flag it.
             if (persist && finalText.trim()) {
-              await supabase.from('sms_messages').insert({ direction: 'outbound', body: finalText.trim() })
+              await supabase.from('sms_messages').insert({ direction: 'outbound', body: tidyPunctuation(finalText.trim()) })
             }
             send({ t: 'done' })
             controller.close()
@@ -248,9 +248,20 @@ export async function POST(request: NextRequest) {
             const { block, result } = entry
             toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
 
-            if (MUTATING_TOOLS.has(block.name)) mutated = true
-
             const { ok, detail } = summariseResult(result)
+
+            // Tell the page the moment a write lands, not at the end of the
+            // turn. The model often writes in round one and then spends
+            // another round or two reading things back before it says
+            // anything, so a single `mutated` at the end meant the job board
+            // behind the chat sat stale for seconds after the work was
+            // already done. Emitting per write makes the dashboard move while
+            // Tui is still talking.
+            if (MUTATING_TOOLS.has(block.name) && ok) {
+              mutated = true
+              send({ t: 'mutated' })
+            }
+
             send({ t: 'tool_done', id: block.id, ok, detail })
 
             try {
@@ -274,6 +285,7 @@ export async function POST(request: NextRequest) {
         }
 
         send({ t: 'text', v: '\n\n(Reached maximum tool rounds.)' })
+        if (mutated) send({ t: 'mutated' })
         send({ t: 'done' })
         controller.close()
       } catch (err) {

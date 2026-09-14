@@ -1,6 +1,6 @@
 import { createHash } from 'crypto'
 import Anthropic from '@anthropic-ai/sdk'
-import { fetchXeroContacts, createXeroInvoice, fetchOutstandingInvoices, approveXeroInvoice, voidXeroInvoice, deleteXeroInvoice, updateXeroInvoice, getXeroInvoice, deleteXeroPayment } from '@/lib/xero'
+import { fetchXeroContacts, createXeroInvoice, fetchOutstandingInvoices, approveXeroInvoice, emailXeroInvoice, voidXeroInvoice, deleteXeroInvoice, updateXeroInvoice, getXeroInvoice, deleteXeroPayment } from '@/lib/xero'
 import { fetchRecentEmails, fetchUnreadEmails } from '@/lib/mail'
 import { getContentBacklog, parseJobMonth } from '@/lib/content-backlog'
 import { findDuplicateJobName } from '@/lib/job-naming'
@@ -20,7 +20,8 @@ export const MUTATING_TOOLS = new Set([
   'create_document', 'delete_document',
   'create_deliverable',
   'create_todo', 'complete_todo',
-  'create_xero_invoice', 'approve_xero_invoice', 'void_xero_invoice', 'delete_xero_invoice', 'update_xero_invoice', 'remove_xero_payment',
+  'create_xero_invoice', 'approve_xero_invoice', 'send_xero_invoice', 'void_xero_invoice', 'delete_xero_invoice', 'update_xero_invoice', 'remove_xero_payment',
+  'log_shoot',
   'snooze_flag', 'resolve_flag',
 ])
 
@@ -35,6 +36,11 @@ export const MUTATING_TOOLS = new Set([
 // lose the data. This gate lives at the executor, below the model, so no
 // wording in any prompt can route around it.
 export const CONFIRM_TOOLS = new Set([
+  // Emailing an invoice leaves the building. It is not destructive, but it is
+  // the one write here that a client sees, and an invoice sent to the wrong
+  // contact or for the wrong amount costs more to walk back than a deleted
+  // row does. Arlo presses the button, not the model.
+  'send_xero_invoice',
   'delete_job',
   'delete_event',
   'delete_document',
@@ -58,6 +64,7 @@ export function toolFingerprint(name: string, input: Record<string, unknown>): s
 function describeAction(name: string, input: Record<string, unknown>): string {
   const id = (k: string) => String(input[k] ?? '')
   switch (name) {
+    case 'send_xero_invoice': return `Email Xero invoice ${id('invoice_id')} to the client. This approves it first if it is still a draft.`
     case 'delete_job': return `Permanently delete job ${id('job_id')}, including its tasks and deliverables.`
     case 'delete_event': return `Permanently delete calendar event ${id('event_id')}.`
     case 'delete_document': return `Permanently delete document ${id('document_id')}.`
@@ -417,7 +424,7 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'create_xero_invoice',
-    description: 'Create a sales invoice in Xero for a contact. Use list_xero_contacts first to get the ContactID. Creates as DRAFT unless send_now is true.',
+    description: 'Create a sales invoice in Xero for a contact. Use list_xero_contacts first to get the ContactID. Creates as DRAFT unless approve is true. Creating never emails anything — send_xero_invoice does that.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -427,7 +434,7 @@ export const TOOLS: Anthropic.Tool[] = [
         amount: { type: 'number', description: 'Amount excluding GST' },
         due_date: { type: 'string', description: 'Due date YYYY-MM-DD. Defaults to 14 days from today.' },
         reference: { type: 'string', description: 'Optional invoice reference/PO number' },
-        send_now: { type: 'boolean', description: 'If true, approves the invoice immediately (status AUTHORISED). Default false (DRAFT).' },
+        approve: { type: 'boolean', description: 'If true, creates it already approved (status AUTHORISED) instead of DRAFT. This does NOT email it — use send_xero_invoice for that. Default false.' },
       },
       required: ['contact_id', 'contact_name', 'amount'],
     },
@@ -446,6 +453,17 @@ export const TOOLS: Anthropic.Tool[] = [
     description: 'Approve (authorise) a Xero invoice so it can be sent to the client. Use after create_xero_invoice if the user wants to send it.',
     input_schema: {
       type: 'object' as const,
+      properties: {
+        invoice_id: { type: 'string', description: 'Xero InvoiceID' },
+      },
+      required: ['invoice_id'],
+    },
+  },
+  {
+    name: 'send_xero_invoice',
+    description: "Email an invoice to the client from Xero, using the org's own invoice template. Approves the invoice first if it is still a draft, so this is the one call needed to go from draft to sent. Arlo is asked to confirm before it actually sends. Fails with a reason if the Xero contact has no email address.",
+    input_schema: {
+      type: 'object',
       properties: {
         invoice_id: { type: 'string', description: 'Xero InvoiceID' },
       },
@@ -1036,16 +1054,17 @@ export async function executeTool(
     case 'create_xero_invoice': {
       const now = new Date()
       const defaultDue = new Date(now.getTime() + 14 * 86400000).toISOString().slice(0, 10)
-      const invoice = await createXeroInvoice({
+      const res = await createXeroInvoice({
         contactId: input.contact_id as string,
         contactName: input.contact_name as string,
         date: now.toISOString().slice(0, 10),
         dueDate: (input.due_date as string) || defaultDue,
         lineItems: [{ Description: (input.description as string) || 'Services', UnitAmount: input.amount as number, Quantity: 1 }],
         reference: (input.reference as string) || undefined,
-        status: input.send_now ? 'AUTHORISED' : 'DRAFT',
+        status: input.approve ? 'AUTHORISED' : 'DRAFT',
       })
-      if (!invoice) return JSON.stringify({ error: 'Failed to create invoice. Xero may not be connected or may require updated permissions.' })
+      if (!res.ok) return JSON.stringify({ error: res.error })
+      const invoice = res.data
       return JSON.stringify({ success: true, invoice: { id: invoice.InvoiceID, number: invoice.InvoiceNumber, status: invoice.Status, total: invoice.Total } })
     }
 
@@ -1055,20 +1074,36 @@ export async function executeTool(
     }
 
     case 'approve_xero_invoice': {
-      const ok = await approveXeroInvoice(input.invoice_id as string)
-      if (!ok) return JSON.stringify({ error: 'Failed to approve invoice.' })
-      return JSON.stringify({ success: true })
+      const res = await approveXeroInvoice(input.invoice_id as string)
+      if (!res.ok) return JSON.stringify({ error: res.error })
+      return JSON.stringify({ success: true, invoice: { id: res.data.InvoiceID, number: res.data.InvoiceNumber, status: res.data.Status, total: res.data.Total } })
+    }
+
+    case 'send_xero_invoice': {
+      // Approve first when it is still a draft: Xero refuses to email anything
+      // that is not AUTHORISED, and "approve then send" is one action as far
+      // as Arlo is concerned.
+      const invoiceId = input.invoice_id as string
+      const existing = await getXeroInvoice(invoiceId)
+      if (!existing) return JSON.stringify({ error: 'That invoice is not in Xero.' })
+      if (existing.Status === 'DRAFT' || existing.Status === 'SUBMITTED') {
+        const approved = await approveXeroInvoice(invoiceId)
+        if (!approved.ok) return JSON.stringify({ error: `Could not approve it before sending: ${approved.error}` })
+      }
+      const sent = await emailXeroInvoice(invoiceId)
+      if (!sent.ok) return JSON.stringify({ error: sent.error })
+      return JSON.stringify({ success: true, sent_to: sent.data.sentTo, invoice_number: sent.data.number })
     }
 
     case 'void_xero_invoice': {
-      const ok = await voidXeroInvoice(input.invoice_id as string)
-      if (!ok) return JSON.stringify({ error: 'Failed to void invoice — it may have payments allocated, or may not be in AUTHORISED status.' })
+      const res = await voidXeroInvoice(input.invoice_id as string)
+      if (!res.ok) return JSON.stringify({ error: `${res.error} (An invoice with payments allocated has to have those removed first, and only an AUTHORISED invoice can be voided.)` })
       return JSON.stringify({ success: true })
     }
 
     case 'delete_xero_invoice': {
-      const ok = await deleteXeroInvoice(input.invoice_id as string)
-      if (!ok) return JSON.stringify({ error: 'Failed to delete invoice — it may already be AUTHORISED (use void_xero_invoice instead) or not exist.' })
+      const res = await deleteXeroInvoice(input.invoice_id as string)
+      if (!res.ok) return JSON.stringify({ error: `${res.error} (An AUTHORISED invoice cannot be deleted — void it instead.)` })
       return JSON.stringify({ success: true })
     }
 
@@ -1088,8 +1123,8 @@ export async function executeTool(
     }
 
     case 'remove_xero_payment': {
-      const ok = await deleteXeroPayment(input.payment_id as string)
-      if (!ok) return JSON.stringify({ error: 'Failed to remove payment — it may already be deleted, or reconciled in a way Xero won\'t allow removing via API.' })
+      const res = await deleteXeroPayment(input.payment_id as string)
+      if (!res.ok) return JSON.stringify({ error: res.error })
       return JSON.stringify({ success: true })
     }
 
@@ -1100,8 +1135,8 @@ export async function executeTool(
         dueDate: input.due_date as string | undefined,
         reference: input.reference as string | undefined,
       })
-      if (!invoice) return JSON.stringify({ error: 'Failed to update invoice — it may no longer be in DRAFT status.' })
-      return JSON.stringify({ success: true, invoice: { id: invoice.InvoiceID, number: invoice.InvoiceNumber, status: invoice.Status, total: invoice.Total } })
+      if (!invoice.ok) return JSON.stringify({ error: `${invoice.error} (Only a DRAFT invoice can be edited.)` })
+      return JSON.stringify({ success: true, invoice: { id: invoice.data.InvoiceID, number: invoice.data.InvoiceNumber, status: invoice.data.Status, total: invoice.data.Total } })
     }
 
     // ── Email ───────────────────────────────

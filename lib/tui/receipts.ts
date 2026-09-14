@@ -80,6 +80,7 @@ const TOOL_VERBS: Record<string, string> = {
   create_xero_invoice: 'Raising Xero invoice',
   list_xero_invoices: 'Reading Xero invoices',
   approve_xero_invoice: 'Approving Xero invoice',
+  send_xero_invoice: 'Emailing Xero invoice',
   void_xero_invoice: 'Voiding Xero invoice',
   delete_xero_invoice: 'Deleting Xero invoice',
   get_xero_invoice_detail: 'Reading Xero invoice',

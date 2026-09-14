@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowUp, ExternalLink, Check, Loader2, AlertTriangle, ShieldAlert } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useMounted } from '@/lib/useMounted'
 import type { ThreadMessage } from '@/lib/tui/thread'
 import { decodeEvents } from '@/lib/tui/receipts'
 import { renderMarkdown } from './chat-markup'
@@ -20,12 +21,20 @@ import { renderMarkdown } from './chat-markup'
 //  - **/dashboard/tui and the ⌘K overlay** read and write sms_messages, the
 //    same table the Telegram brain uses, so those two and Telegram are
 //    genuinely one continuous conversation.
-//  - **The Today panel is a scratch pad.** It opens empty on every load and
-//    nothing said in it is written to the shared thread. It is the box you
-//    use to ask a quick question while looking at the dashboard, and a quick
-//    question does not belong in the middle of a Telegram conversation. The
-//    trade is real and deliberate: Telegram will not know what was asked
-//    here, so anything worth remembering should be asked on the Tui AI page.
+//  - **The Today panel is a scratch pad.** Nothing said in it is written to
+//    the shared thread. It is the box you use to ask a quick question while
+//    looking at the dashboard, and a quick question does not belong in the
+//    middle of a Telegram conversation. The trade is real and deliberate:
+//    Telegram will not know what was asked here, so anything worth
+//    remembering should be asked on the Tui AI page.
+//
+// Every mount survives navigation. A client component unmounts when you leave
+// the route, so the panel used to lose a conversation the moment you clicked
+// through to the job it was about, and the two shared mounts came back with
+// the words but without their receipts or their approve buttons. State is
+// mirrored into sessionStorage instead: it outlives a route change and a hard
+// reload, it is per tab, and it is gone when the tab closes, which is exactly
+// the lifetime a scratch pad should have.
 
 type Receipt = { id: string; label: string; state: 'running' | 'done' | 'failed'; detail?: string }
 type LinkOut = { path: string; label: string }
@@ -51,6 +60,37 @@ const SUGGESTIONS = [
 // How much history to send back to the model per turn — enough for continuity,
 // bounded so the payload stays small and the turn stays fast.
 const HISTORY_CAP = 20
+
+// Per-tab conversation memory. Two keys, because the two behaviours are two
+// conversations: the shared thread (the Tui AI page and the ⌘K overlay, which
+// Telegram also writes into) and the dashboard scratch pad. sessionStorage,
+// not localStorage, so closing the tab is still a clean slate.
+const STORE_PREFIX = 'tui-thread:'
+// Bounded: receipts make a message fat and sessionStorage throws when it fills.
+// Only the tail is worth keeping anyway.
+const STORE_CAP = 60
+
+function readStore(key: string): Message[] | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.sessionStorage.getItem(STORE_PREFIX + key)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) && parsed.length > 0 ? (parsed as Message[]) : null
+  } catch {
+    return null
+  }
+}
+
+function writeStore(key: string, messages: Message[]) {
+  if (typeof window === 'undefined') return
+  try {
+    window.sessionStorage.setItem(STORE_PREFIX + key, JSON.stringify(messages.slice(-STORE_CAP)))
+  } catch {
+    // Quota, or a browser with storage switched off. Losing the mirror is not
+    // worth taking the chat down for.
+  }
+}
 
 function toMessages(thread: ThreadMessage[]): Message[] {
   return thread.map((m) => ({
@@ -93,21 +133,55 @@ export default function TuiThread({
 
   // An ephemeral mount is seeded by definition — with nothing.
   const seeded = ephemeral || initialThread !== undefined
+  const storeKey = ephemeral ? 'panel' : 'shared'
+
+  // Restore whatever this tab was last saying.
+  //
+  // Not in the useState initialiser and not in an effect. This component is
+  // server-rendered, so reading sessionStorage during the hydration render
+  // would give the client different markup from the server's; doing it in an
+  // effect paints the empty thread for a frame first and is the cascading
+  // setState the lint rule is about. useMounted() is false through hydration
+  // and true from the render after it (lib/useMounted.ts), so this adjusts
+  // state during render exactly once, on the client, before anything paints.
+  //
+  // The saved copy wins over the server-seeded one when it is at least as
+  // long, because it is the same messages plus the receipts, links and pending
+  // approvals the server thread cannot carry. A genuinely longer server thread
+  // (something said on Telegram since) wins instead.
+  const mounted = useMounted()
+  const [restored, setRestored] = useState(false)
+  if (mounted && !restored) {
+    setRestored(true)
+    const saved = readStore(storeKey)
+    if (saved && saved.length >= messages.length) {
+      setMessages(saved)
+      setHasChatted(true)
+    }
+  }
 
   // Overlay-only: pull the shared thread once so ⌘K opens mid-conversation
   // rather than on a blank slate.
   useEffect(() => {
-    if (seeded) return
+    if (seeded || !restored) return
     let cancelled = false
     fetch('/api/ai/thread')
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled || !data?.thread) return
-        setMessages((prev) => (prev.length > 0 ? prev : toMessages(data.thread)))
+        const fetched = toMessages(data.thread)
+        setMessages((prev) => (fetched.length > prev.length ? fetched : prev))
       })
       .catch(() => { /* an empty thread is a fine fallback */ })
     return () => { cancelled = true }
-  }, [seeded])
+  }, [seeded, restored])
+
+  // Mirror every change back out. Guarded on `restored` so the first render's
+  // seed cannot overwrite a longer saved conversation before it is read.
+  useEffect(() => {
+    if (!restored) return
+    writeStore(storeKey, messages)
+  }, [messages, restored, storeKey])
 
   useEffect(() => {
     const el = scrollRef.current
@@ -226,7 +300,14 @@ export default function TuiThread({
               patchLast((m) => ({ ...m, links: [...(m.links ?? []), { path: ev.path, label: ev.label }] }))
               break
             case 'mutated':
+              // Refresh the moment the write lands rather than waiting for the
+              // turn to finish. The page behind this panel is the thing Arlo
+              // is looking at, and a job that has already moved should not
+              // still read "review" while Tui types a sentence about it.
+              // router.refresh() is a no-op on unchanged output, so the
+              // occasional second call in one turn costs nothing visible.
               didMutate = true
+              router.refresh()
               break
             case 'error':
               failed = ev.v
@@ -245,7 +326,8 @@ export default function TuiThread({
         await new Promise((r) => setTimeout(r, 16))
       }
 
-      // Only invalidate server data when Tui actually wrote something.
+      // One more at the end: the mid-turn refresh above can land before a
+      // later write in the same turn does.
       if (didMutate) router.refresh()
     } catch {
       fail('Something went wrong there. Try again.')

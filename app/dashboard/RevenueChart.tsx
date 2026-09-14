@@ -28,6 +28,16 @@ export default function RevenueChart({
   width?: number
 }) {
   const [indicator, setIndicator] = useState<{ x: number; y: number; nearestIdx: number } | null>(null)
+
+  // Isolating a line moves the readout to it, so an indicator measured against
+  // the other one is stale the instant focus changes. Dropped during render
+  // rather than in an effect, which would paint the dot off its line for a
+  // frame first (same reason as RevisionPanel in the client portal).
+  const [lastFocus, setLastFocus] = useState(focus)
+  if (focus !== lastFocus) {
+    setLastFocus(focus)
+    setIndicator(null)
+  }
   const svgRef = useRef<SVGSVGElement>(null)
   const uid = useId().replace(/:/g, '')
   const gradId = `rg${uid}`
@@ -78,6 +88,20 @@ export default function RevenueChart({
       })
     : []
 
+  // Which line the cursor reads.
+  //
+  // The hover indicator used to be wired to `data` unconditionally, so
+  // isolating Out on the dashboard dimmed the In line and then went on
+  // reporting In's figures against it: the dot rode the faint line and the
+  // pill showed money coming in while the label said Out. Isolating a series
+  // has to move the readout onto that series, or the click is decorative.
+  const trackComparison =
+    focus === 'comparison' && comparisonData != null && comparisonData.length > 1
+  const tXs = trackComparison ? cxs : xs
+  const tYs = trackComparison ? cys : ys
+  const tData = trackComparison ? comparisonData! : data
+  const tColour = trackComparison ? (comparisonColor ?? 'var(--text-tertiary)') : 'var(--accent)'
+
   const clampY = (y: number) => Math.max(PAD_T, Math.min(fillBottom, y))
 
   function smooth(pts: number[][]): string {
@@ -101,11 +125,11 @@ export default function RevenueChart({
   const fillPath = `${linePath} L${xs[xs.length - 1]},${fillBottom} L${xs[0]},${fillBottom} Z`
   const compPath = cxs.length > 1 ? smooth(cxs.map((x, i) => [x, cys[i]])) : null
 
-  const bezierSegs = xs.length >= 2 ? Array.from({ length: xs.length - 1 }, (_, i) => {
-    const p0 = [xs[Math.max(i - 1, 0)], ys[Math.max(i - 1, 0)]]
-    const p1 = [xs[i], ys[i]]
-    const p2 = [xs[i + 1], ys[i + 1]]
-    const p3 = [xs[Math.min(i + 2, xs.length - 1)], ys[Math.min(i + 2, xs.length - 1)]]
+  const bezierSegs = tXs.length >= 2 ? Array.from({ length: tXs.length - 1 }, (_, i) => {
+    const p0 = [tXs[Math.max(i - 1, 0)], tYs[Math.max(i - 1, 0)]]
+    const p1 = [tXs[i], tYs[i]]
+    const p2 = [tXs[i + 1], tYs[i + 1]]
+    const p3 = [tXs[Math.min(i + 2, tXs.length - 1)], tYs[Math.min(i + 2, tXs.length - 1)]]
     return {
       x1: p1[0], y1: p1[1],
       cx1: p1[0] + (p2[0] - p0[0]) / 6,
@@ -125,14 +149,14 @@ export default function RevenueChart({
   }
 
   function handleMouseMove(e: React.MouseEvent) {
-    if (!svgRef.current || xs.length < 2) return
+    if (!svgRef.current || tXs.length < 2) return
     const rect = svgRef.current.getBoundingClientRect()
     const svgX = ((e.clientX - rect.left) / rect.width) * W
-    const clamped = Math.max(xs[0], Math.min(xs[xs.length - 1], svgX))
+    const clamped = Math.max(tXs[0], Math.min(tXs[tXs.length - 1], svgX))
 
-    let segIdx = xs.length - 2
-    for (let i = 0; i < xs.length - 1; i++) {
-      if (clamped <= xs[i + 1]) { segIdx = i; break }
+    let segIdx = tXs.length - 2
+    for (let i = 0; i < tXs.length - 1; i++) {
+      if (clamped <= tXs[i + 1]) { segIdx = i; break }
     }
 
     const seg = bezierSegs[segIdx]
@@ -143,13 +167,13 @@ export default function RevenueChart({
       else hi = mid
     }
     const interpY = evalBezier(seg, (lo + hi) / 2).y
-    const nearestIdx = xs.reduce((best, x, i) =>
-      Math.abs(x - clamped) < Math.abs(xs[best] - clamped) ? i : best, 0)
+    const nearestIdx = tXs.reduce((best, x, i) =>
+      Math.abs(x - clamped) < Math.abs(tXs[best] - clamped) ? i : best, 0)
 
     setIndicator({ x: clamped, y: interpY, nearestIdx })
   }
 
-  const tipValue = indicator != null ? data[indicator.nearestIdx]?.value ?? 0 : 0
+  const tipValue = indicator != null ? tData[indicator.nearestIdx]?.value ?? 0 : 0
   const tipX = indicator ? Math.max(Y_W + 2, Math.min(indicator.x - 27, W - PAD_R - 56)) : 0
   const tipY = indicator ? Math.max(PAD_T + 2, indicator.y - 27) : 0
 
@@ -224,15 +248,15 @@ export default function RevenueChart({
             fill={indicator?.nearestIdx === i ? 'var(--text-primary)' : 'var(--text-tertiary)'}
             fontSize="12" style={{ fontFamily: 'inherit', transition: 'fill 120ms' }}
           >
-            {data[i].label}
+            {tData[i]?.label ?? data[i].label}
           </text>
         ))}
 
         {/* Persistent dot at current (latest) point */}
-        {!indicator && xs.length > 0 && (
+        {!indicator && tXs.length > 0 && (
           <circle
-            cx={xs[xs.length - 1]} cy={ys[ys.length - 1]} r={4}
-            fill="var(--accent)" stroke="var(--bg-surface)" strokeWidth="2"
+            cx={tXs[tXs.length - 1]} cy={tYs[tYs.length - 1]} r={4}
+            fill={tColour} stroke="var(--bg-surface)" strokeWidth="2"
           />
         )}
 
@@ -243,8 +267,8 @@ export default function RevenueChart({
               x1={indicator.x} y1={PAD_T} x2={indicator.x} y2={fillBottom}
               stroke="var(--text-tertiary)" strokeWidth="0.8" strokeDasharray="3 3"
             />
-            <circle cx={indicator.x} cy={indicator.y} r={4.5} fill="var(--bg-surface)" stroke="var(--accent)" strokeWidth="2" />
-            <rect x={tipX} y={tipY} width={54} height={19} rx={6} fill="var(--accent)" />
+            <circle cx={indicator.x} cy={indicator.y} r={4.5} fill="var(--bg-surface)" stroke={tColour} strokeWidth="2" />
+            <rect x={tipX} y={tipY} width={54} height={19} rx={6} fill={tColour} />
             <text
               x={tipX + 27} y={tipY + 13}
               fill="var(--on-accent)" fontSize="10.5" fontWeight="600" textAnchor="middle"

@@ -216,6 +216,59 @@ async function fetchValidXeroAccount(): Promise<StoredAccount | null> {
   return account
 }
 
+// ─── Errors that say what actually went wrong ────────────────────────────────
+// Every write helper here used to be `catch { return null }`, and the tool
+// layer turned that null into "Xero may not be connected or may require
+// updated permissions." That sentence was wrong every time it mattered: the
+// real answer was sitting in a 400 body Xero had already sent us. A single
+// operator debugging their own CRM needs the actual message, so the body is
+// carried on the error and unpacked for display.
+
+export class XeroApiError extends Error {
+  status: number
+  body: string
+  constructor(message: string, status: number, body: string) {
+    super(message)
+    this.name = 'XeroApiError'
+    this.status = status
+    this.body = body
+  }
+}
+
+/**
+ * Pulls the human half out of a Xero failure. A ValidationException buries the
+ * useful line under Elements[].ValidationErrors[].Message — for example
+ * "EXCLUSIVE is not a valid value for LineAmountTypes", which is what an
+ * invoice against a non-GST-registered org gets back.
+ */
+export function friendlyXeroError(err: unknown): string {
+  if (!(err instanceof XeroApiError)) {
+    return err instanceof Error ? err.message : String(err ?? 'Unknown Xero error')
+  }
+  if (err.status === 401) return 'Xero rejected the token. Reconnect Xero from Settings.'
+  if (err.status === 403) return 'Xero says this app is not allowed to do that. The connection probably needs reauthorising with invoice write access.'
+  try {
+    const body = JSON.parse(err.body) as {
+      Message?: string
+      Elements?: Array<{
+        ValidationErrors?: Array<{ Message?: string }>
+        LineItems?: Array<{ ValidationErrors?: Array<{ Message?: string }> }>
+      }>
+    }
+    const messages: string[] = []
+    for (const el of body.Elements ?? []) {
+      for (const v of el.ValidationErrors ?? []) if (v.Message) messages.push(v.Message)
+      for (const li of el.LineItems ?? []) for (const v of li.ValidationErrors ?? []) if (v.Message) messages.push(v.Message)
+    }
+    if (messages.length > 0) return messages.join('; ')
+    if (body.Message) return body.Message
+  } catch { /* body was not JSON */ }
+  return `Xero returned ${err.status}.`
+}
+
+/** A write that either produced something or has a reason it did not. */
+export type XeroWriteResult<T> = { ok: true; data: T } | { ok: false; error: string }
+
 /** Authenticated GET against the Xero accounting API for a specific tenant. */
 async function xeroGet<T>(path: string, accessToken: string, tenantId: string): Promise<T> {
   const url = path.startsWith('http') ? path : `${XERO_API_BASE}${path}`
@@ -229,7 +282,7 @@ async function xeroGet<T>(path: string, accessToken: string, tenantId: string): 
   })
   if (!res.ok) {
     const text = await res.text()
-    throw new Error(`Xero ${path} failed (${res.status}): ${text}`)
+    throw new XeroApiError(`Xero ${path} failed (${res.status}): ${text}`, res.status, text)
   }
   return (await res.json()) as T
 }
@@ -256,8 +309,10 @@ async function xeroPost<T>(
   })
   if (!res.ok) {
     const text = await res.text()
-    throw new Error(`Xero ${method} ${path} failed (${res.status}): ${text}`)
+    throw new XeroApiError(`Xero ${method} ${path} failed (${res.status}): ${text}`, res.status, text)
   }
+  // 204 No Content (the Email endpoint) has no body to parse.
+  if (res.status === 204 || res.headers.get('content-length') === '0') return undefined as T
   return (await res.json()) as T
 }
 
@@ -1010,58 +1065,138 @@ export type XeroCreatedInvoice = {
   DateString?: string
   DueDateString?: string
   /** Present on reads; Xero returns it inline on the invoice. */
-  Contact?: { ContactID?: string; Name?: string }
+  Contact?: { ContactID?: string; Name?: string; EmailAddress?: string }
 }
 
-export async function createXeroInvoice(input: XeroInvoiceCreateInput): Promise<XeroCreatedInvoice | null> {
-  const account = await getValidXeroAccount()
-  if (!account || !account.account_id) return null
+// ─── GST, or the absence of it ───────────────────────────────────────────────
+// Tui Media is not GST registered (Organisation.SalesTaxBasis is "NONE"), and
+// Xero enforces that on the way in: an ACCREC invoice posted with
+// LineAmountTypes "Exclusive" and TaxType "OUTPUT2" comes back 400 with
+// "EXCLUSIVE is not a valid value for LineAmountTypes". Both of those were
+// hardcoded here, so EVERY invoice Tui tried to raise failed, and the swallowed
+// error made it look like a broken connection.
+//
+// It is read off the org rather than hardcoded the other way, because the day
+// the business crosses the GST threshold this has to flip on its own — a second
+// silent breakage a year from now is not an improvement on the first.
 
-  const payload = {
-    Type: 'ACCREC',
-    Contact: { ContactID: input.contactId },
-    Date: input.date,
-    DueDate: input.dueDate,
-    Status: input.status ?? 'DRAFT',
-    LineAmountTypes: 'EXCLUSIVE',   // line amounts are GST-exclusive
-    Reference: input.reference ?? '',
-    LineItems: input.lineItems.map((li) => ({
-      Description: li.Description,
-      UnitAmount: li.UnitAmount,
-      Quantity: li.Quantity ?? 1,
-      AccountCode: li.AccountCode ?? '200',
-      TaxType: li.TaxType ?? 'OUTPUT2',
-    })),
-  }
+type XeroTaxProfile = { lineAmountTypes: 'Exclusive' | 'NoTax'; salesTaxType: string; gstRegistered: boolean }
+
+// Cached for the life of the instance: an org's GST registration changes once
+// a decade, and this sits in front of every invoice write.
+let taxProfileCache: XeroTaxProfile | null = null
+
+export async function getXeroTaxProfile(): Promise<XeroTaxProfile> {
+  if (taxProfileCache) return taxProfileCache
+  const account = await getValidXeroAccount()
+  if (!account || !account.account_id) throw new Error('Xero is not connected.')
+
+  const res = await xeroGet<{ Organisations?: Array<{ SalesTaxBasis?: string }> }>(
+    '/Organisation',
+    account.access_token,
+    account.account_id,
+  )
+  const basis = (res.Organisations?.[0]?.SalesTaxBasis ?? '').toUpperCase()
+  const gstRegistered = basis !== '' && basis !== 'NONE'
+  taxProfileCache = gstRegistered
+    ? { lineAmountTypes: 'Exclusive', salesTaxType: 'OUTPUT2', gstRegistered: true }
+    : { lineAmountTypes: 'NoTax', salesTaxType: 'NONE', gstRegistered: false }
+  return taxProfileCache
+}
+
+export async function createXeroInvoice(input: XeroInvoiceCreateInput): Promise<XeroWriteResult<XeroCreatedInvoice>> {
+  const account = await getValidXeroAccount()
+  if (!account || !account.account_id) return { ok: false, error: 'Xero is not connected. Reconnect it from Settings.' }
 
   try {
+    const tax = await getXeroTaxProfile()
+
+    const payload = {
+      Type: 'ACCREC',
+      Contact: { ContactID: input.contactId },
+      Date: input.date,
+      DueDate: input.dueDate,
+      Status: input.status ?? 'DRAFT',
+      LineAmountTypes: tax.lineAmountTypes,
+      Reference: input.reference ?? '',
+      LineItems: input.lineItems.map((li) => ({
+        Description: li.Description,
+        UnitAmount: li.UnitAmount,
+        Quantity: li.Quantity ?? 1,
+        AccountCode: li.AccountCode ?? '200',
+        TaxType: li.TaxType ?? tax.salesTaxType,
+      })),
+    }
+
     const res = await xeroPost<{ Invoices?: XeroCreatedInvoice[] }>(
       '/Invoices',
       { Invoices: [payload] },
       account.access_token,
       account.account_id,
     )
-    return res.Invoices?.[0] ?? null
-  } catch {
-    return null
+    const invoice = res.Invoices?.[0]
+    if (!invoice?.InvoiceID) return { ok: false, error: 'Xero accepted the request but returned no invoice.' }
+    return { ok: true, data: invoice }
+  } catch (err) {
+    return { ok: false, error: friendlyXeroError(err) }
   }
 }
 
-export async function approveXeroInvoice(invoiceId: string): Promise<boolean> {
+export async function approveXeroInvoice(invoiceId: string): Promise<XeroWriteResult<XeroCreatedInvoice>> {
   const account = await getValidXeroAccount()
-  if (!account || !account.account_id) return false
+  if (!account || !account.account_id) return { ok: false, error: 'Xero is not connected. Reconnect it from Settings.' }
 
   try {
-    await xeroPost(
+    const res = await xeroPost<{ Invoices?: XeroCreatedInvoice[] }>(
       `/Invoices/${invoiceId}`,
-      { Status: 'AUTHORISED' },
+      { InvoiceID: invoiceId, Status: 'AUTHORISED' },
       account.access_token,
       account.account_id,
       'POST',
     )
-    return true
-  } catch {
-    return false
+    const invoice = res.Invoices?.[0]
+    if (!invoice?.InvoiceID) return { ok: false, error: 'Xero accepted the request but returned no invoice.' }
+    return { ok: true, data: invoice }
+  } catch (err) {
+    return { ok: false, error: friendlyXeroError(err) }
+  }
+}
+
+/**
+ * Emails an invoice to the contact, from Xero, using the org's own invoice
+ * template and reply-to address. Xero only sends AUTHORISED invoices and only
+ * to a contact that has an email address, so both are checked here to give a
+ * reason rather than a bare 400.
+ *
+ * There is no attachment or body to pass: POST /Invoices/{id}/Email takes an
+ * empty payload and returns 204.
+ */
+export async function emailXeroInvoice(invoiceId: string): Promise<XeroWriteResult<{ sentTo: string; number: string }>> {
+  const account = await getValidXeroAccount()
+  if (!account || !account.account_id) return { ok: false, error: 'Xero is not connected. Reconnect it from Settings.' }
+
+  const invoice = await getXeroInvoice(invoiceId)
+  if (!invoice) return { ok: false, error: 'That invoice is not in Xero.' }
+  if (invoice.Status !== 'AUTHORISED') {
+    return { ok: false, error: `Invoice ${invoice.InvoiceNumber} is ${invoice.Status}. It has to be approved before Xero will send it.` }
+  }
+
+  const email = invoice.Contact?.EmailAddress?.trim()
+  if (!email) {
+    return { ok: false, error: `${invoice.Contact?.Name ?? 'That contact'} has no email address in Xero, so there is nowhere to send it.` }
+  }
+
+  try {
+    await xeroPost(
+      `/Invoices/${invoiceId}/Email`,
+      {},
+      account.access_token,
+      account.account_id,
+      'POST',
+    )
+    return { ok: true, data: { sentTo: email, number: invoice.InvoiceNumber } }
+  } catch (err) {
+    return { ok: false, error: friendlyXeroError(err) }
   }
 }
 
@@ -1070,21 +1205,21 @@ export async function approveXeroInvoice(invoiceId: string): Promise<boolean> {
  * permanent. Fails (returns false) if the invoice has payments/credit notes
  * allocated to it; those must be removed in Xero first.
  */
-export async function voidXeroInvoice(invoiceId: string): Promise<boolean> {
+export async function voidXeroInvoice(invoiceId: string): Promise<XeroWriteResult<true>> {
   const account = await getValidXeroAccount()
-  if (!account || !account.account_id) return false
+  if (!account || !account.account_id) return { ok: false, error: 'Xero is not connected. Reconnect it from Settings.' }
 
   try {
     await xeroPost(
       `/Invoices/${invoiceId}`,
-      { Status: 'VOIDED' },
+      { InvoiceID: invoiceId, Status: 'VOIDED' },
       account.access_token,
       account.account_id,
       'POST',
     )
-    return true
-  } catch {
-    return false
+    return { ok: true, data: true }
+  } catch (err) {
+    return { ok: false, error: friendlyXeroError(err) }
   }
 }
 
@@ -1093,21 +1228,21 @@ export async function voidXeroInvoice(invoiceId: string): Promise<boolean> {
  * applies to unapproved invoices; anything AUTHORISED must be voided
  * instead, never hard-deleted, for accounting-trail integrity).
  */
-export async function deleteXeroInvoice(invoiceId: string): Promise<boolean> {
+export async function deleteXeroInvoice(invoiceId: string): Promise<XeroWriteResult<true>> {
   const account = await getValidXeroAccount()
-  if (!account || !account.account_id) return false
+  if (!account || !account.account_id) return { ok: false, error: 'Xero is not connected. Reconnect it from Settings.' }
 
   try {
     await xeroPost(
       `/Invoices/${invoiceId}`,
-      { Status: 'DELETED' },
+      { InvoiceID: invoiceId, Status: 'DELETED' },
       account.access_token,
       account.account_id,
       'POST',
     )
-    return true
-  } catch {
-    return false
+    return { ok: true, data: true }
+  } catch (err) {
+    return { ok: false, error: friendlyXeroError(err) }
   }
 }
 
@@ -1140,9 +1275,9 @@ export async function getXeroInvoice(invoiceId: string): Promise<(XeroCreatedInv
  * — this also un-reconciles the underlying bank transaction if it was matched,
  * so the money doesn't disappear, it just needs re-matching in Xero afterward.
  */
-export async function deleteXeroPayment(paymentId: string): Promise<boolean> {
+export async function deleteXeroPayment(paymentId: string): Promise<XeroWriteResult<true>> {
   const account = await getValidXeroAccount()
-  if (!account || !account.account_id) return false
+  if (!account || !account.account_id) return { ok: false, error: 'Xero is not connected. Reconnect it from Settings.' }
 
   try {
     await xeroPost(
@@ -1152,9 +1287,9 @@ export async function deleteXeroPayment(paymentId: string): Promise<boolean> {
       account.account_id,
       'POST',
     )
-    return true
-  } catch {
-    return false
+    return { ok: true, data: true }
+  } catch (err) {
+    return { ok: false, error: friendlyXeroError(err) }
   }
 }
 
@@ -1164,24 +1299,29 @@ export async function updateXeroInvoice(invoiceId: string, updates: {
   amount?: number
   dueDate?: string
   reference?: string
-}): Promise<XeroCreatedInvoice | null> {
+}): Promise<XeroWriteResult<XeroCreatedInvoice>> {
   const account = await getValidXeroAccount()
-  if (!account || !account.account_id) return null
-
-  const payload: Record<string, unknown> = {}
-  if (updates.dueDate) payload.DueDate = updates.dueDate
-  if (updates.reference !== undefined) payload.Reference = updates.reference
-  if (updates.description !== undefined || updates.amount !== undefined) {
-    payload.LineItems = [{
-      Description: updates.description ?? 'Services',
-      UnitAmount: updates.amount,
-      Quantity: 1,
-      AccountCode: '200',
-      TaxType: 'OUTPUT2',
-    }]
-  }
+  if (!account || !account.account_id) return { ok: false, error: 'Xero is not connected. Reconnect it from Settings.' }
 
   try {
+    // Same GST trap as createXeroInvoice: a hardcoded OUTPUT2 line is rejected
+    // outright on a non-GST-registered org.
+    const tax = await getXeroTaxProfile()
+
+    const payload: Record<string, unknown> = { InvoiceID: invoiceId }
+    if (updates.dueDate) payload.DueDate = updates.dueDate
+    if (updates.reference !== undefined) payload.Reference = updates.reference
+    if (updates.description !== undefined || updates.amount !== undefined) {
+      payload.LineAmountTypes = tax.lineAmountTypes
+      payload.LineItems = [{
+        Description: updates.description ?? 'Services',
+        UnitAmount: updates.amount,
+        Quantity: 1,
+        AccountCode: '200',
+        TaxType: tax.salesTaxType,
+      }]
+    }
+
     const res = await xeroPost<{ Invoices?: XeroCreatedInvoice[] }>(
       `/Invoices/${invoiceId}`,
       payload,
@@ -1189,9 +1329,11 @@ export async function updateXeroInvoice(invoiceId: string, updates: {
       account.account_id,
       'POST',
     )
-    return res.Invoices?.[0] ?? null
-  } catch {
-    return null
+    const invoice = res.Invoices?.[0]
+    if (!invoice?.InvoiceID) return { ok: false, error: 'Xero accepted the request but returned no invoice.' }
+    return { ok: true, data: invoice }
+  } catch (err) {
+    return { ok: false, error: friendlyXeroError(err) }
   }
 }
 
