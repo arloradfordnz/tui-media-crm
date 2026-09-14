@@ -144,6 +144,34 @@ function describeFailure(err: unknown): string {
   return 'Something went wrong there. Try again.'
 }
 
+// ── "I'm sending it now" with nothing behind it ─────────────────────────────
+//
+// Three separate times Tui answered "Sending INV-0168 to Sky Automotive now."
+// and never called send_xero_invoice. No tool_use block means no receipt, no
+// confirmation card, and no invoice — Arlo read a sentence saying the thing
+// had happened when nothing had. The prompt was told twice to always follow an
+// opener with the tool call; it held in isolated tests and did not hold in
+// practice, which is the point at which prompting stops being the fix.
+//
+// So the claim is checked against what actually ran. Sentence-initial, present
+// tense, first person: "Sending X now", "I'm marking that delivered",
+// "Drafting the invoice". Deliberately narrow — past-tense description of
+// history ("that was sent last week"), questions and offers ("want me to send
+// it?") all have to miss, because the response to a match is to force a tool
+// call, and forcing one that was never needed is its own small harm.
+const ACTION_CLAIM =
+  /(^|[.!?]\s+)(i'?m\s+|i\s+will\s+|i'?ll\s+|let me\s+)?(sending|send|creating|create|drafting|draft|raising|raise|updating|update|marking|mark|moving|move|deleting|delete|approving|approve|voiding|void|logging|log|invoicing|emailing|email)\b/i
+
+// A question or an offer is not a claim, however it starts.
+const OFFER_OR_QUESTION = /\?\s*$|\b(want me to|should i|shall i|do you want)\b/i
+
+function claimsUnfulfilledAction(text: string): boolean {
+  const trimmed = text.trim()
+  if (!trimmed) return false
+  if (OFFER_OR_QUESTION.test(trimmed)) return false
+  return ACTION_CLAIM.test(trimmed)
+}
+
 // ── POST Handler ───────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
@@ -202,6 +230,10 @@ export async function POST(request: NextRequest) {
         let mutated = false
         let finalText = ''
         const maxRounds = 10
+        // Set for exactly one round after an unfulfilled action claim, so the
+        // model has to produce a tool_use block instead of another sentence.
+        let forceToolUse = false
+        let alreadyForced = false
 
         // Two cache breakpoints: one after the large static system prompt, one
         // after the tool list. The static prompt hits the cache on every turn
@@ -224,10 +256,19 @@ export async function POST(request: NextRequest) {
             system: systemBlocks,
             messages: currentMessages,
             tools: cachedTools,
+            // 'any' = must call some tool, model picks which. Only ever set by
+            // the unfulfilled-claim guard below, and only once per turn.
+            ...(forceToolUse ? { tool_choice: { type: 'any' as const } } : {}),
           })
+          forceToolUse = false
 
+          // This round's prose on its own. finalText spans the whole turn, and
+          // the claim check has to look at what was just said, not at an
+          // opener from two rounds ago that was already honoured.
+          let roundText = ''
           anthropicStream.on('text', (text) => {
             finalText += text
+            roundText += text
             send({ t: 'text', v: text })
           })
 
@@ -238,6 +279,28 @@ export async function POST(request: NextRequest) {
           )
 
           if (toolUseBlocks.length === 0) {
+            // Said it was doing something, did nothing. Give it exactly one
+            // forced round rather than letting the claim stand.
+            //
+            // For a CONFIRM_TOOLS action this lands exactly where it should:
+            // the forced call comes back confirmation_required, the card
+            // appears, and nothing actually happens until Arlo presses it. If
+            // the guard misfires on a turn that genuinely needed no tool, the
+            // model picks a read and the cost is one stray receipt — a far
+            // better failure than a phantom send.
+            if (!alreadyForced && !mutated && claimsUnfulfilledAction(roundText)) {
+              alreadyForced = true
+              forceToolUse = true
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              currentMessages.push({ role: 'assistant', content: finalMessage.content as any })
+              currentMessages.push({
+                role: 'user',
+                content:
+                  'You just said you were doing that, but you did not call the tool, so nothing happened. Make the call now with the arguments you already have. Do not reply with text.',
+              })
+              continue
+            }
+
             // Log the reply into the shared thread so the Telegram brain knows
             // what was already discussed here and doesn't re-flag it.
             //
