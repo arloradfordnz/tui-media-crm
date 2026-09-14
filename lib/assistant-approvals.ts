@@ -65,6 +65,63 @@ export async function recordPendingAction(
 }
 
 /**
+ * Redeem a parked action by its FINGERPRINT rather than a quoted code, for the
+ * dashboard's Confirm button.
+ *
+ * The button used to work by sending "Yes — go ahead." into the chat and
+ * trusting the model to reissue the identical tool call. It did not always do
+ * that: it would reply "sending it now" as plain text, no tool ran, no receipt
+ * appeared, and the invoice was never actually sent — a confirmation that
+ * silently did nothing, which is the worst possible behaviour for this button.
+ *
+ * Executing from the parked row takes the model out of the path entirely. The
+ * fingerprint still binds the approval to the exact arguments that were shown
+ * in the confirmation, so this cannot run anything other than what Arlo saw.
+ */
+export async function consumeApprovalByFingerprint(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  fingerprint: string
+): Promise<(PendingAction & { toolInput: Record<string, unknown> }) | null> {
+  const { data, error } = await supabase
+    .from('assistant_pending_actions')
+    .select('id, fingerprint, code, tool_name, tool_input, description')
+    .eq('fingerprint', fingerprint)
+    .is('consumed_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (error) {
+    console.error('[approvals] fingerprint lookup failed:', error.message)
+    return null
+  }
+  const row = (data ?? [])[0]
+  if (!row) return null
+
+  // Consume first, same as the code path: a double-clicked button must not be
+  // able to send the same invoice twice.
+  const { error: consumeError } = await supabase
+    .from('assistant_pending_actions')
+    .update({ consumed_at: new Date().toISOString() })
+    .eq('id', row.id)
+    .is('consumed_at', null)
+
+  if (consumeError) {
+    console.error('[approvals] could not consume:', consumeError.message)
+    return null
+  }
+
+  return {
+    fingerprint: row.fingerprint,
+    code: row.code,
+    toolName: row.tool_name,
+    description: row.description,
+    toolInput: (row.tool_input ?? {}) as Record<string, unknown>,
+  }
+}
+
+/**
  * Pull a confirmation code out of an inbound message.
  * Requires the literal word "confirm" — an agreeable-sounding message that
  * happens to contain four hex characters is not a confirmation.

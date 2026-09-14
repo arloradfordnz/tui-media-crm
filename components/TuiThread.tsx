@@ -395,15 +395,86 @@ export default function TuiThread({
   // Approving is a fresh turn carrying the fingerprint. The fingerprint is
   // bound to the exact tool arguments server-side, so it can only unlock the
   // action that was actually shown here.
-  function approve(c: Confirm) {
-    setMessages((prev) =>
-      prev.map((m) =>
+  // Confirming runs the parked action server-side (/api/ai/confirm) rather
+  // than posting "Yes — go ahead." into the chat and hoping the model reissues
+  // the identical tool call. It did not reliably do that: it would reply
+  // "sending it now" as plain text, no tool ran, no receipt appeared, and the
+  // invoice was never sent. The fingerprint is bound server-side to the exact
+  // arguments Arlo was shown, so this can only ever run what was on the card.
+  async function approve(c: Confirm) {
+    if (loading) return
+    setMessages((prev) => [
+      ...prev.map((m) =>
         m.confirms?.some((x) => x.fingerprint === c.fingerprint)
           ? { ...m, confirms: m.confirms.filter((x) => x.fingerprint !== c.fingerprint) }
           : m
-      )
-    )
-    sendMessage('Yes — go ahead.', [c.fingerprint])
+      ),
+      { role: 'assistant', content: '' },
+    ])
+    setLoading(true)
+
+    try {
+      const res = await fetch('/api/ai/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fingerprint: c.fingerprint }),
+      })
+
+      if (!res.ok) {
+        let errorMsg = 'That confirmation could not be run.'
+        try {
+          const data = await res.json()
+          errorMsg = data.error || errorMsg
+        } catch { /* not JSON */ }
+        patchLast(() => ({ role: 'assistant', content: errorMsg }))
+        setLoading(false)
+        return
+      }
+
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let didMutate = false
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const { events, rest } = decodeEvents(buffer)
+        buffer = rest
+
+        for (const ev of events) {
+          switch (ev.t) {
+            case 'text':
+              patchLast((m) => ({ ...m, content: m.content + ev.v }))
+              break
+            case 'tool':
+              patchLast((m) => ({
+                ...m,
+                receipts: [...(m.receipts ?? []), { id: ev.id, label: ev.label, state: 'running' }],
+              }))
+              break
+            case 'tool_done':
+              patchReceipt(ev.id, (r) => ({ ...r, state: ev.ok ? 'done' : 'failed', detail: ev.detail }))
+              break
+            case 'mutated':
+              didMutate = true
+              router.refresh()
+              break
+            case 'error':
+              patchLast(() => ({ role: 'assistant', content: ev.v }))
+              break
+            case 'done':
+              break
+          }
+        }
+      }
+
+      if (didMutate) router.refresh()
+    } catch {
+      patchLast(() => ({ role: 'assistant', content: 'Something went wrong running that. Nothing was sent.' }))
+    }
+    setLoading(false)
   }
 
   function dismiss(c: Confirm) {

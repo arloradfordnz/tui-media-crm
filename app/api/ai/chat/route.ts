@@ -7,6 +7,7 @@ import { buildDashboardSystem } from '@/lib/assistant-persona'
 import { getContentBacklog, summariseBacklog } from '@/lib/content-backlog'
 import { fetchOutstandingInvoicesCached } from '@/lib/xero'
 import { encodeEvent, toolLabel, summariseResult, type TuiEvent } from '@/lib/tui/receipts'
+import { recordPendingAction } from '@/lib/assistant-approvals'
 import { tidyPunctuation } from '@/lib/tui/text'
 
 // Dashboard surface of the Tui assistant. Same persona and same tool set as
@@ -321,6 +322,16 @@ export async function POST(request: NextRequest) {
               // fingerprint so the UI can offer a real approve button rather
               // than relying on the model to relay the question faithfully.
               if (parsed.status === 'confirmation_required' && parsed.fingerprint) {
+                // Park the exact call so /api/ai/confirm can run it verbatim
+                // when Arlo taps the button, without asking the model to
+                // reissue it. Best-effort: if the store is unavailable the
+                // button falls back to the old "tell the model yes" path.
+                await recordPendingAction(supabase, {
+                  fingerprint: parsed.fingerprint,
+                  toolName: block.name,
+                  toolInput: block.input as Record<string, unknown>,
+                  description: parsed.action ?? 'Confirm this action.',
+                }).catch(() => null)
                 send({ t: 'confirm', fingerprint: parsed.fingerprint, action: parsed.action ?? 'Confirm this action.' })
               }
               if (parsed.success) {
