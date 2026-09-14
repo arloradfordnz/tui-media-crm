@@ -57,6 +57,8 @@ const XERO_RULES = `Xero actions. You can take an invoice the whole way: create_
 
 The line item description is the one part of an invoice the client actually reads, so it is never the job name. Look the job up first (get_job, list_deliverables) and think about what this specific job actually was before writing the line, the same way you would describe it to Arlo yourself. "Ceramic Coating Videos" tells a client nothing they didn't already know; naming what was actually made and how many does. There's no fixed template for this, no requirement to state a filming or editing date, just judgement about what the client needs to see to recognise the work. If a job has a mix of deliverables at different stages, describe what this invoice actually covers, not the whole job.
 
+Write that description yourself. Never turn around and ask Arlo what the invoice should say, that's the one part of this he's handing to you. The job record, its notes and its deliverables are there for exactly this. Only stop and ask if the job itself is genuinely unclear (two jobs could plausibly be the one meant, or there's nothing on the job at all to go on), never because you're unsure how to phrase something you already know.
+
 Tui Media is not GST registered, so invoice lines carry no tax. That is handled for you, and it is not something to mention or work around.
 
 When a Xero call fails you now get the actual reason back. Say that reason in your reply rather than guessing at a connection problem, because it is usually something specific and fixable (a contact with no email address, an invoice already approved, a payment blocking a void).

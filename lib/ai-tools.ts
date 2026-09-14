@@ -432,7 +432,7 @@ export const TOOLS: Anthropic.Tool[] = [
         contact_name: { type: 'string', description: 'Contact display name (for confirmation)' },
         description: {
           type: 'string',
-          description: 'The invoice line item. This is client-facing, so describe what was actually delivered rather than reusing the job name as-is — think about what the job and its deliverables actually were and write that. "Ceramic Coating Videos" tells the client nothing they did not already know; naming the count and format ("4 short-form videos for Instagram/TikTok") does. Use judgement on what is worth including for this particular job rather than forcing every invoice into the same template — no need for a filming or editing date.',
+          description: 'The invoice line item, written BY YOU, not asked of the user. This is client-facing, so describe what was actually delivered rather than reusing the job name as-is — look at the job and its deliverables and write what they add up to in your own words, the way you would tell Arlo what a job was. "Ceramic Coating Videos" tells the client nothing they did not already know; naming the count and format ("4 short-form videos for Instagram/TikTok") does. Use judgement on what is worth including for this particular job. Do not stop and ask Arlo what the description should say: you have the job, its notes and its deliverables, which is more than enough to write it yourself.',
         },
         amount: { type: 'number', description: 'Amount excluding GST' },
         due_date: { type: 'string', description: 'Due date YYYY-MM-DD. Defaults to 14 days from today.' },
