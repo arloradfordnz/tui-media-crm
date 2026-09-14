@@ -5,7 +5,6 @@ import { getAuthUser, unauthorizedResponse } from '@/lib/supabase-admin'
 import { TOOLS, MUTATING_TOOLS, executeTool } from '@/lib/ai-tools'
 import { buildDashboardSystem } from '@/lib/assistant-persona'
 import { getContentBacklog, summariseBacklog } from '@/lib/content-backlog'
-import { fetchOutstandingInvoicesCached } from '@/lib/xero'
 import { encodeEvent, toolLabel, summariseResult, type TuiEvent } from '@/lib/tui/receipts'
 import { recordPendingAction } from '@/lib/assistant-approvals'
 import { tidyPunctuation } from '@/lib/tui/text'
@@ -44,17 +43,25 @@ async function getDynamicContext(supabase: ReturnType<typeof createServerSupabas
   // at ~1.4s, while one more query inside this existing parallel wave costs
   // nothing (they all finish together) and a few hundred uncached tokens.
   //
-  // So the client roster and the outstanding invoices are here rather than
-  // behind search_clients / list_xero_invoices. Those two were the most common
-  // first round of a turn by a long way — "invoice Sky", "who owes me money"
-  // both used to spend 1.4s on a lookup before any real work started, and now
-  // answer from context with zero rounds.
+  // The client roster is here rather than behind search_clients — a name to
+  // an id has no meaningful staleness window and nobody ever asks Tui to
+  // "check" a client roster, so it is safe to answer from context with zero
+  // rounds and no expectation of a receipt.
   //
-  // IMAP is still deliberately absent, and Xero is only here through its
-  // stale-while-revalidate cache (lib/xero.ts), which is a kv_cache row, not a
-  // Xero round trip. A live Xero call takes seconds and would land on every
-  // single message — that is the thing the original comment here was right to
-  // refuse, and it still is.
+  // Outstanding Xero invoices used to be here too, and it was a mistake: it
+  // meant a direct "is that invoice sent" or "who owes me money" COULD be
+  // answered from a snapshot that might be minutes old, and the model did
+  // exactly that — no tool call, no receipt, and (worse) no guarantee the
+  // answer was still true. Telling it in the prompt to call the real tool
+  // for a direct check anyway did not reliably hold. So money status is
+  // mechanical now, the same fix as the confirm button: it is not in
+  // context, at all, which means the ONLY way to answer a Xero question is
+  // to actually call list_xero_invoices / get_xero_invoice_detail — a real
+  // receipt every time, not a prompt asking nicely for one.
+  //
+  // IMAP is still deliberately absent for the same reason web search would
+  // be: a live round trip on every single message. Xero invoices are simply
+  // not fetched here at all now, live or cached.
   const [
     { data: weekEvents },
     { data: activeJobs },
@@ -64,7 +71,6 @@ async function getDynamicContext(supabase: ReturnType<typeof createServerSupabas
     { data: recentThread },
     backlog,
     { data: clientRoster },
-    outstandingInvoices,
   ] = await Promise.all([
     supabase.from('events').select('title, event_type, date, start_time').gte('date', todayISO).lte('date', weekFromNow).order('date').order('start_time').limit(7),
     supabase.from('jobs').select('name, status, clients(name)').not('status', 'in', '("delivered","archived")').order('created_at', { ascending: false }).limit(8),
@@ -74,18 +80,6 @@ async function getDynamicContext(supabase: ReturnType<typeof createServerSupabas
     supabase.from('sms_messages').select('direction, body, created_at').order('created_at', { ascending: false }).limit(8),
     getContentBacklog(supabase, now).catch(() => null),
     supabase.from('clients').select('id, name').order('name').limit(60),
-    // Timeboxed, because the ONE path through this cache that is slow is the
-    // genuinely-cold one: with no kv_cache row at all, swrCached blocks on a
-    // real Xero call, measured at 1.7s against 0.4s for the rest of this wave.
-    // That would make the cold turn slower than it was before this was added,
-    // which defeats the point. Warm (the normal case) it returns in a few ms;
-    // cold, the turn proceeds without invoices in context and the model can
-    // still call list_xero_invoices if it actually needs them. The refresh it
-    // kicked off lands in kv_cache for the next message either way.
-    Promise.race([
-      fetchOutstandingInvoicesCached().catch(() => []),
-      new Promise<[]>((resolve) => setTimeout(() => resolve([]), 400)),
-    ]),
   ])
 
   const clientName = (j: { clients: unknown }) => (j.clients as { name: string } | null)?.name
@@ -113,8 +107,7 @@ async function getDynamicContext(supabase: ReturnType<typeof createServerSupabas
   if ((clientRoster ?? []).length > 0)
     lines.push(`Clients (id — name, use these IDs directly instead of calling search_clients): ${(clientRoster ?? []).map(c => `${c.id} — ${c.name}`).join(' | ')}`)
 
-  if ((outstandingInvoices ?? []).length > 0)
-    lines.push(`Outstanding Xero invoices (cached, use instead of list_xero_invoices unless he asks for a refresh): ${(outstandingInvoices ?? []).map(i => `${i.InvoiceNumber} ${i.Contact?.Name ?? ''} $${i.AmountDue} [${i.Status}] due ${i.DueDateString?.slice(0, 10) ?? '?'} id=${i.InvoiceID}`).join(' | ')}`)
+
 
   if ((recentThread ?? []).length > 0)
     lines.push(`Recent thread with Arlo (oldest first, spans Telegram and this panel): ${(recentThread ?? []).slice().reverse().map(m => `${m.direction === 'inbound' ? 'Arlo' : 'You'}: ${m.body}`).join(' | ')}`)
