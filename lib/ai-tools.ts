@@ -11,6 +11,27 @@ import { syncShootEvent, removeShootEvent } from '@/lib/job-calendar'
 // "delivered" from a text message must behave identically to marking it
 // delivered from the dashboard.
 
+// Every *_id lookup below takes whatever string the model passes as a real
+// database id — and a model that hasn't actually looked the record up yet
+// will sometimes invent a plausible-looking one ("SKY00002" for a Sky
+// Automotive job) rather than call search_jobs/search_clients first. Postgres
+// then rejects it as invalid UUID syntax, and that raw message ("invalid
+// input syntax for type uuid: \"SKY00002\"") used to go straight back to the
+// model as the tool result, which relayed it to Arlo verbatim as if it were a
+// real error condition. It isn't — it's the model guessing. Route every id
+// lookup's error through this so the tool result says what actually happened
+// and tells the model what to do about it (search first) instead of a
+// database internals message it has no way to act on.
+function dbErrorMessage(error: { message: string; code?: string }): string {
+  // Postgres 22P02 = invalid_text_representation, the code for "this string
+  // isn't a UUID at all" — distinct from a well-formed id that just doesn't
+  // exist, which comes back as a clean empty result, not this.
+  if (error.code === '22P02') {
+    return 'That ID is not a real one. IDs are UUIDs returned by a search tool (search_jobs, search_clients, and so on) — never invent or guess one. Search for the record first and use the ID it returns.'
+  }
+  return error.message
+}
+
 // Tool names that mutate state — used by callers to decide whether to
 // invalidate a cached view (dashboard router.refresh()) after the turn.
 export const MUTATING_TOOLS = new Set([
@@ -148,7 +169,7 @@ export const TOOLS: Anthropic.Tool[] = [
   // ── Jobs ──────────────────────────────────────
   {
     name: 'search_jobs',
-    description: 'Search for jobs by name, or filter by status/client. Returns id, name, status, job_type, shoot_date, quote_value, and client name.',
+    description: 'Search for jobs by name, or filter by status/client. Matches against the JOB name only, not the client name — for "the Sky Automotive job" search client_id (from search_clients) or a distinctive word from the job name itself, not the client name. Returns id, name, status, job_type, shoot_date, quote_value, and client name. This is the only source of a real job_id — never construct or guess one.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -165,7 +186,7 @@ export const TOOLS: Anthropic.Tool[] = [
     input_schema: {
       type: 'object' as const,
       properties: {
-        job_id: { type: 'string' },
+        job_id: { type: 'string', description: "The job's real UUID, as returned by search_jobs or create_job. Never invent or guess one — if you don't already have it from an earlier call this turn, call search_jobs first." },
       },
       required: ['job_id'],
     },
@@ -633,7 +654,7 @@ export async function executeTool(
         .select('*, jobs(id, name, status, job_type, shoot_date, quote_value)')
         .eq('id', input.client_id as string)
         .single()
-      if (error) return JSON.stringify({ error: error.message })
+      if (error) return JSON.stringify({ error: dbErrorMessage(error) })
       return JSON.stringify({ client: data })
     }
 
@@ -668,7 +689,7 @@ export async function executeTool(
       if (input.tags !== undefined) updates.tags = JSON.stringify(input.tags)
 
       const { data, error } = await supabase.from('clients').update(updates).eq('id', input.client_id as string).select('id, name').single()
-      if (error) return JSON.stringify({ error: error.message })
+      if (error) return JSON.stringify({ error: dbErrorMessage(error) })
       return JSON.stringify({ success: true, client: data })
     }
 
@@ -693,7 +714,7 @@ export async function executeTool(
         .select('*, clients(name, email, phone), job_tasks(id, phase, title, completed, sort_order), deliverables(id, title, completed), revisions(id, round, request, status)')
         .eq('id', input.job_id as string)
         .single()
-      if (error) return JSON.stringify({ error: error.message })
+      if (error) return JSON.stringify({ error: dbErrorMessage(error) })
       return JSON.stringify({ job: data })
     }
 
@@ -759,7 +780,7 @@ export async function executeTool(
       if (input.status === 'delivered') updates.delivered_at = new Date().toISOString()
 
       const { data, error } = await supabase.from('jobs').update(updates).eq('id', input.job_id as string).select('id, name').single()
-      if (error) return JSON.stringify({ error: error.message })
+      if (error) return JSON.stringify({ error: dbErrorMessage(error) })
 
       if (input.status) {
         await supabase.from('activities').insert({
@@ -793,13 +814,13 @@ export async function executeTool(
       // shoot would otherwise survive its job as an orphan on the calendar.
       await removeShootEvent(supabase, input.job_id as string)
       const { error } = await supabase.from('jobs').delete().eq('id', input.job_id as string)
-      if (error) return JSON.stringify({ error: error.message })
+      if (error) return JSON.stringify({ error: dbErrorMessage(error) })
       return JSON.stringify({ success: true })
     }
 
     case 'toggle_task': {
       const { error } = await supabase.from('job_tasks').update({ completed: input.completed as boolean }).eq('id', input.task_id as string)
-      if (error) return JSON.stringify({ error: error.message })
+      if (error) return JSON.stringify({ error: dbErrorMessage(error) })
       return JSON.stringify({ success: true })
     }
 
@@ -964,7 +985,7 @@ export async function executeTool(
 
     case 'delete_event': {
       const { error } = await supabase.from('events').delete().eq('id', input.event_id as string)
-      if (error) return JSON.stringify({ error: error.message })
+      if (error) return JSON.stringify({ error: dbErrorMessage(error) })
       return JSON.stringify({ success: true })
     }
 
@@ -987,7 +1008,7 @@ export async function executeTool(
 
     case 'delete_document': {
       const { error } = await supabase.from('documents').delete().eq('id', input.doc_id as string)
-      if (error) return JSON.stringify({ error: error.message })
+      if (error) return JSON.stringify({ error: dbErrorMessage(error) })
       return JSON.stringify({ success: true })
     }
 
