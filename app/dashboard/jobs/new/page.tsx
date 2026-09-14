@@ -198,13 +198,22 @@ export default function NewJobPage() {
         </div>
       )}
 
-      {/* Step 1: Job Type */}
+      {/* Step 1: Job Type.
+          Picking a card SELECTS it and nothing else. It used to jump straight
+          to step 2 on the click, which made the card behave like a link while
+          looking like a choice: there was no beat in which you could see what
+          you had picked, no way to change your mind without going back, and
+          the Next button below sat there doing nothing on this step alone.
+          Every other step in this wizard is choose-then-Next, and so is this
+          one now. */}
       {step === 1 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {JOB_TYPES.map((t) => (
             <button
               key={t.value}
-              onClick={() => { chooseJobType(t.value); setStep(2) }}
+              type="button"
+              aria-pressed={jobType === t.value}
+              onClick={() => chooseJobType(t.value)}
               className="card flex flex-col items-center gap-3 py-6 cursor-pointer transition-all text-center"
               style={{
                 borderColor: jobType === t.value ? 'var(--accent)' : 'var(--bg-border)',

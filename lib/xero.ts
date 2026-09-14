@@ -446,6 +446,20 @@ export type XeroSummary = {
 /**
  * Pull a tight financial snapshot for the daily health report. Returns null
  * if no Xero account is connected.
+ *
+ * ── Cash basis, deliberately ──────────────────────────────────────────────
+ * The P&L calls below pass paymentsOnly=true, the same as the monthly chart
+ * in fetchMonthlyPnlChunk. Without it Xero answers on an ACCRUAL basis, which
+ * books an invoice as income the day it is APPROVED rather than the day it is
+ * paid — so the weekly briefing was reporting invoices that Finance was, on
+ * the same screen, still listing as AUTHORISED and owed. One number said the
+ * money had been made and the other said it had not arrived, and both were
+ * reading the same Xero.
+ *
+ * Cash basis is also the honest answer for a sole operator: what he has been
+ * paid is the figure that decides whether he can spend anything. What has been
+ * invoiced and not paid already has its own two figures here, outstanding and
+ * overdue, and that is where it belongs.
  */
 export async function fetchXeroSummary(): Promise<XeroSummary | null> {
   const account = await getValidXeroAccount()
@@ -478,12 +492,12 @@ export async function fetchXeroSummary(): Promise<XeroSummary | null> {
       tenantId,
     ),
     xeroGet<{ Reports?: Array<{ Rows?: Array<{ Title?: string; RowType?: string; Rows?: Array<{ Cells?: Array<{ Value?: string }>; RowType?: string }> }> }> }>(
-      `/Reports/ProfitAndLoss?fromDate=${fromDate}&toDate=${toDate}`,
+      `/Reports/ProfitAndLoss?fromDate=${fromDate}&toDate=${toDate}&paymentsOnly=true`,
       accessToken,
       tenantId,
     ),
     xeroGet<{ Reports?: Array<{ Rows?: Array<{ Title?: string; RowType?: string; Rows?: Array<{ Cells?: Array<{ Value?: string }>; RowType?: string }> }> }> }>(
-      `/Reports/ProfitAndLoss?fromDate=${lastMonthFromDate}&toDate=${lastMonthToDate}`,
+      `/Reports/ProfitAndLoss?fromDate=${lastMonthFromDate}&toDate=${lastMonthToDate}&paymentsOnly=true`,
       accessToken,
       tenantId,
     ),
@@ -565,6 +579,11 @@ export async function fetchXeroSummary(): Promise<XeroSummary | null> {
     }
     revenueMonth = findRow(/^Total\s+Income$/i) ?? findRow(/^Income$/i)
     netProfitMonth = findRow(/^Net\s+Profit$/i)
+    // On cash basis Xero omits the Income section entirely in a month where
+    // nothing has been PAID yet, so a missing row means zero rather than
+    // unknown. Without this a month with invoices out but none paid renders
+    // identically to Xero not being connected at all.
+    if (revenueMonth == null && rows.length > 0) revenueMonth = 0
   }
 
   let revenueLastMonth: number | null = null
@@ -595,6 +614,7 @@ export async function fetchXeroSummary(): Promise<XeroSummary | null> {
       return null
     }
     revenueLastMonth = findRowLast(/^Total\s+Income$/i) ?? findRowLast(/^Income$/i)
+    if (revenueLastMonth == null && rows.length > 0) revenueLastMonth = 0
   }
 
   return {

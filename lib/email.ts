@@ -552,7 +552,7 @@ export function renderWeeklyBriefing(data: WeeklyBriefingData): { subject: strin
     subjectHook = `First shoot ${fmtShortDate(nextShoot.date)}: ${nextShoot.title}`
     focusFallback = `First shoot of the week is ${nextShoot.title} on ${fmtShortDate(nextShoot.date)}. Get the gear and the shot list sorted before it lands on you.`
   } else if (revenue != null && revenue > 0) {
-    subjectHook = `${fmtNZD(revenue)} in this month, and the week is clear`
+    subjectHook = `${fmtNZD(revenue)} paid in this month, and the week is clear`
     focusFallback = `Nothing forced on you this week. That is the week to line up shoots and get ahead on edits rather than let it fill itself.`
   } else {
     subjectHook = `A clear week ahead`
@@ -584,7 +584,7 @@ export function renderWeeklyBriefing(data: WeeklyBriefingData): { subject: strin
     for (let i = 0; i < cells.length; i += 2) rows.push(`<tr>${cells[i]}${cells[i + 1] ?? '<td width="50%"></td>'}</tr>`)
     const big = revenue != null
       ? `<p class="figure" style="color:${C.ink};font-size:32px;font-weight:500;letter-spacing:-0.035em;line-height:1;margin:0 0 6px;">${fmtNZD(revenue)}</p>
-         <p style="color:${C.faint};font-size:12px;margin:0 0 ${rows.length ? '22px' : '0'};">Revenue this month</p>`
+         <p style="color:${C.faint};font-size:12px;margin:0 0 ${rows.length ? '22px' : '0'};">Paid this month</p>`
       : ''
     const grid = rows.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows.join('')}</table>` : ''
     moneyCard = card('Money', `${big}${grid}`)

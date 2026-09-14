@@ -138,7 +138,7 @@ export default async function BusinessHealth() {
       {/* Signal chips */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
         <SignalChip
-          label="Revenue MTD"
+          label="Paid MTD"
           value={nzd(xero.connected ? xero.revenue_this_month_nzd ?? null : (signals.revenue_this_month_nzd as number))}
         />
         <SignalChip label="Pipeline value" value={nzd(signals.pipeline_value_nzd as number)} />
@@ -146,7 +146,7 @@ export default async function BusinessHealth() {
         <SignalChip label="Leads" value={String((signals.leads_in_pipeline as number) ?? '—')} />
         {xero.connected && (
           <>
-            <SignalChip label="Last month" value={nzd(xero.revenue_last_month_nzd ?? null)} />
+            <SignalChip label="Paid last month" value={nzd(xero.revenue_last_month_nzd ?? null)} />
             <SignalChip label="Net profit MTD" value={nzd(xero.net_profit_this_month_nzd ?? null)} />
             <SignalChip label="Bank balance" value={nzd(xero.bank_balance_nzd ?? null)} />
             <SignalChip label="Overdue" value={nzd(xero.overdue_invoices_nzd ?? 0)} />

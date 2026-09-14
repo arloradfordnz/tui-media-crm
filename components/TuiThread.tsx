@@ -92,6 +92,21 @@ function writeStore(key: string, messages: Message[]) {
   }
 }
 
+// Collapse consecutive same-role messages into one. The thread can hold
+// several assistant bubbles in a row now, and the Messages API requires the
+// roles to alternate.
+function mergeRoles(msgs: Message[]): { role: 'user' | 'assistant'; content: string }[] {
+  const out: { role: 'user' | 'assistant'; content: string }[] = []
+  for (const m of msgs) {
+    const content = m.content.trim()
+    if (!content) continue
+    const last = out[out.length - 1]
+    if (last && last.role === m.role) last.content += `\n\n${content}`
+    else out.push({ role: m.role, content })
+  }
+  return out
+}
+
 function toMessages(thread: ThreadMessage[]): Message[] {
   return thread.map((m) => ({
     role: m.direction === 'inbound' ? ('user' as const) : ('assistant' as const),
@@ -197,13 +212,30 @@ export default function TuiThread({
     })
   }
 
+  // A turn can now span several bubbles (see the segmenting note in
+  // sendMessage), so a receipt finishing does not necessarily belong to the
+  // last one. Find the message that actually carries that id and patch there.
+  function patchReceipt(id: string, fn: (r: Receipt) => Receipt) {
+    setMessages((prev) => {
+      for (let i = prev.length - 1; i >= 0; i--) {
+        const receipts = prev[i].receipts
+        if (!receipts?.some((r) => r.id === id)) continue
+        const updated = [...prev]
+        updated[i] = { ...prev[i], receipts: receipts.map((r) => (r.id === id ? fn(r) : r)) }
+        return updated
+      }
+      return prev
+    })
+  }
+
   async function sendMessage(text: string, approvals: string[] = []) {
     if (!text.trim() || loading) return
 
     const userMsg: Message = { role: 'user', content: text.trim() }
-    const history = [...messages, userMsg]
-      .slice(-HISTORY_CAP)
-      .map((m) => ({ role: m.role, content: m.content }))
+    // One turn can be several bubbles here but is one assistant turn to the
+    // API, which requires the roles to alternate — so consecutive bubbles are
+    // rejoined before they go back out.
+    const history = mergeRoles([...messages, userMsg].slice(-HISTORY_CAP))
     setMessages((prev) => [...prev, userMsg, { role: 'assistant', content: '' }])
     setInput('')
     setLoading(true)
@@ -216,6 +248,29 @@ export default function TuiThread({
     let pending = ''
     let streamDone = false
     let rafId: number | null = null
+
+    // ── One turn, several messages ────────────────────────────────────────
+    // Tui used to answer in a single bubble with every receipt stacked above
+    // it, so a turn that looked up three things showed nothing at all until
+    // the work was finished and then dropped the lot in at once. What it says
+    // before it reaches for a tool is a real message ("looking for that job
+    // now"), and what it says afterwards is a different one — the answer.
+    //
+    // So a segment is closed the moment a tool is announced AFTER some text
+    // has been written, and the receipts plus everything said after them go
+    // into a fresh bubble. Several rounds of tools make several bubbles, in
+    // the order the work actually happened.
+    let segmentHasText = false
+
+    // Reveal everything still buffered right now. Needed before closing a
+    // segment: text already streamed belongs to the bubble it was written
+    // into, not the one about to be opened.
+    const flushPendingNow = () => {
+      if (pending.length === 0) return
+      const rest = pending
+      pending = ''
+      patchLast((m) => ({ ...m, content: m.content + rest }))
+    }
 
     const flushTick = () => {
       if (pending.length === 0) {
@@ -275,20 +330,21 @@ export default function TuiThread({
           switch (ev.t) {
             case 'text':
               pending += ev.v
+              segmentHasText = true
               break
             case 'tool':
+              if (segmentHasText) {
+                flushPendingNow()
+                setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
+                segmentHasText = false
+              }
               patchLast((m) => ({
                 ...m,
                 receipts: [...(m.receipts ?? []), { id: ev.id, label: ev.label, state: 'running' }],
               }))
               break
             case 'tool_done':
-              patchLast((m) => ({
-                ...m,
-                receipts: (m.receipts ?? []).map((r) =>
-                  r.id === ev.id ? { ...r, state: ev.ok ? 'done' : 'failed', detail: ev.detail } : r
-                ),
-              }))
+              patchReceipt(ev.id, (r) => ({ ...r, state: ev.ok ? 'done' : 'failed', detail: ev.detail }))
               break
             case 'confirm':
               patchLast((m) => ({
