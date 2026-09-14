@@ -432,7 +432,7 @@ export const TOOLS: Anthropic.Tool[] = [
         contact_name: { type: 'string', description: 'Contact display name (for confirmation)' },
         description: {
           type: 'string',
-          description: 'The invoice line item. This is client-facing, so describe what was actually delivered, in enough detail that the client recognises the work without asking — count, format, platform, and the period or job it covers. "Ceramic Coating Videos" is not enough; "4 short-form videos (Reels/TikTok) for the ceramic coating range, filmed and edited September 2026" is the bar. Pull the specifics from the job and its deliverables rather than reusing the job name as-is.',
+          description: 'The invoice line item. This is client-facing, so describe what was actually delivered rather than reusing the job name as-is — think about what the job and its deliverables actually were and write that. "Ceramic Coating Videos" tells the client nothing they did not already know; naming the count and format ("4 short-form videos for Instagram/TikTok") does. Use judgement on what is worth including for this particular job rather than forcing every invoice into the same template — no need for a filming or editing date.',
         },
         amount: { type: 'number', description: 'Amount excluding GST' },
         due_date: { type: 'string', description: 'Due date YYYY-MM-DD. Defaults to 14 days from today.' },
@@ -524,7 +524,7 @@ export const TOOLS: Anthropic.Tool[] = [
       type: 'object' as const,
       properties: {
         invoice_id: { type: 'string', description: 'Xero InvoiceID' },
-        description: { type: 'string', description: 'New line item description. Same bar as on create_xero_invoice: specific and client-facing (count, format, platform, period), not the job name.' },
+        description: { type: 'string', description: 'New line item description. Same bar as on create_xero_invoice: specific and client-facing, not just the job name.' },
         amount: { type: 'number', description: 'New amount excluding GST' },
         due_date: { type: 'string', description: 'New due date YYYY-MM-DD' },
         reference: { type: 'string', description: 'New invoice reference/PO number' },
