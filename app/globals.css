@@ -3091,6 +3091,3 @@ input, textarea, select, button { font-family: inherit; }
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
-/* The one bill with no card charge. Muted so the em dash reads as "not
-   applicable" rather than as a missing figure. */
-.sub-amount-none { color: var(--text-tertiary); }

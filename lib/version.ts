@@ -14,4 +14,5 @@
 // chart. Enough visibly changed that a returning user has to relearn the app.
 //
 // 3.0.1 — Subscriptions card on the dashboard, under Money.
-export const APP_VERSION = '3.0.1'
+// 3.0.2 — Xero's $28.18 added to the subscriptions total.
+export const APP_VERSION = '3.0.2'

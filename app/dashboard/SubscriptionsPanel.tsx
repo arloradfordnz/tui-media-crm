@@ -24,8 +24,8 @@ const NZ_TZ = 'Pacific/Auckland'
 
 type Subscription = {
   name: string
-  /** NZD per month. Null when the charge does not come off Arlo's card. */
-  amount: number | null
+  /** NZD per month. */
+  amount: number
   /** Day of the month it renews. Clamped to the month's length. */
   day: number
   /** Short muted qualifier shown under the name, where there is one. */
@@ -36,7 +36,7 @@ type Subscription = {
 const SUBSCRIPTIONS: Subscription[] = [
   { name: 'Anthropic (Claude)', amount: 40.74, day: 5 },
   { name: 'iCloud+', amount: 6.10, day: 8 },
-  { name: 'Xero', amount: null, day: 13, note: 'Billed through WK Strawbridge' },
+  { name: 'Xero', amount: 28.18, day: 13, note: 'Billed through WK Strawbridge' },
   { name: 'Google One', amount: 3.49, day: 16 },
   { name: 'Meta Verified (Instagram)', amount: 19.34, day: 26 },
   { name: 'ChatGPT', amount: 14.25, day: 28 },
@@ -86,10 +86,10 @@ export default function SubscriptionsPanel() {
     return { ...sub, when, away }
   }).sort((a, b) => a.away - b.away)
 
-  // Xero has no amount here because it is not charged to the card, so it is
-  // out of the total rather than counted as zero — and the footnote says so,
-  // otherwise a monthly figure that quietly omits a bill is worse than none.
-  const monthly = rows.reduce((sum, r) => sum + (r.amount ?? 0), 0)
+  // Every subscription counts toward this, Xero included — it goes out through
+  // WK Strawbridge rather than off the card, but it is still money leaving
+  // monthly, and a total that quietly omitted one would be worse than none.
+  const monthly = rows.reduce((sum, r) => sum + r.amount, 0)
 
   return (
     <section>
@@ -108,16 +108,14 @@ export default function SubscriptionsPanel() {
                 {row.note ? ` · ${row.note}` : ''}
               </span>
             </div>
-            <span className={`sub-amount${row.amount === null ? ' sub-amount-none' : ''}`}>
-              {row.amount === null ? '—' : nzd.format(row.amount)}
-            </span>
+            <span className="sub-amount">{nzd.format(row.amount)}</span>
           </div>
         ))}
       </div>
 
       <p className="text-2xs mt-2" style={{ color: 'var(--text-tertiary)' }}>
-        NZD, renewing monthly. The total leaves out Xero, which is billed
-        through WK Strawbridge rather than off the card.
+        NZD, renewing monthly. Xero is in the total but bills through WK
+        Strawbridge rather than off the card.
       </p>
     </section>
   )
