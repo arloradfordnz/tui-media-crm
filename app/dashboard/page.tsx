@@ -5,6 +5,7 @@ import { CheckCircle2, Plus, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import Greeting from './Greeting'
 import MoneyPanel, { MoneyPanelSkeleton } from './MoneyPanel'
+import SubscriptionsPanel from './SubscriptionsPanel'
 import TuiThread from '@/components/TuiThread'
 
 export const dynamic = 'force-dynamic'
@@ -147,6 +148,12 @@ export default async function DashboardPage() {
           <Suspense fallback={<MoneyPanelSkeleton />}>
             <MoneyPanel />
           </Suspense>
+
+          {/* Under the money, because it is the same question one step down:
+              the chart is what went out last month, this is what goes out
+              next regardless. Touches nothing — no Xero, no Supabase — so it
+              sits outside the Suspense and paints with the rest of the page. */}
+          <SubscriptionsPanel />
         </div>
       </div>
     </div>

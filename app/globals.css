@@ -3059,3 +3059,38 @@ input, textarea, select, button { font-family: inherit; }
 @media (max-width: 768px) {
   .tui-composer { --tui-control-h: 48px; }
 }
+
+/* ── Subscription rows (the standing monthly bills) ───────────
+   Same 14px/18px rhythm and hairline as .attention-row so the right-hand
+   column reads as one stack of cards, but no dot and no action: nothing here
+   needs a decision, and a column of identical buttons that all did nothing
+   would be six pieces of furniture pretending to be affordances. The amount
+   is tabular so the figures line up down the right edge. */
+.sub-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--bg-border);
+}
+.sub-row:last-child { border-bottom: none; }
+
+.sub-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.sub-name { font-size: var(--t-md); color: var(--text-primary); }
+.sub-meta {
+  font-size: var(--t-xs);
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sub-amount {
+  flex: 0 0 auto;
+  font-size: var(--t-md);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+/* The one bill with no card charge. Muted so the em dash reads as "not
+   applicable" rather than as a missing figure. */
+.sub-amount-none { color: var(--text-tertiary); }

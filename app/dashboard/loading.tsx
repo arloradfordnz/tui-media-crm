@@ -6,8 +6,8 @@ import { Line, Heading } from '@/components/Skeleton'
 //
 // Current shape: greeting + two actions, then a two-column split — Tui AI
 // running the full height of the left column, and on the right one "Your
-// week" list (bookings and attention items share the same row treatment) with
-// the money panel under it.
+// week" list (bookings and attention items share the same row treatment), the
+// money panel under it, and the subscriptions list under that.
 export default function DashboardLoading() {
   return (
     <div className="space-y-10 animate-fade-in">
@@ -66,6 +66,27 @@ export default function DashboardLoading() {
                 ))}
               </div>
               <div className="skeleton" style={{ height: 240, borderRadius: 12 }} />
+            </div>
+          </section>
+
+          {/* Six subscription rows — the list is a fixed length, so the
+              placeholder can be too. */}
+          <section>
+            <Heading w={104} />
+            <div className="card-flush">
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-3 px-4"
+                  style={{ paddingTop: 15, paddingBottom: 15, borderBottom: i === 5 ? 'none' : '1px solid var(--bg-border)' }}
+                >
+                  <div className="flex-1 space-y-2" style={{ minWidth: 0 }}>
+                    <Line w={`${58 - i * 4}%`} h={14} />
+                    <Line w={96} h={11} />
+                  </div>
+                  <Line w={62} h={14} />
+                </div>
+              ))}
             </div>
           </section>
         </div>
