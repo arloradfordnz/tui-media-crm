@@ -12,4 +12,6 @@
 // notification state, event-driven triggers in place of seven daily crons, the
 // job record split into tabs, a Money page, and Finance rebuilt around one
 // chart. Enough visibly changed that a returning user has to relearn the app.
-export const APP_VERSION = '3.0.0'
+//
+// 3.0.1 — Subscriptions card on the dashboard, under Money.
+export const APP_VERSION = '3.0.1'
