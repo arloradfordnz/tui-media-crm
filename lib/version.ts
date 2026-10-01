@@ -23,4 +23,7 @@
 // the phone needs only one calendar.
 // 3.3.1 — iCloud writes made one at a time with retries; parallel PUTs got 500s.
 // 3.4.0 — Tui can search the web when asked, mainly to look up clients.
-export const APP_VERSION = '3.4.0'
+// 3.4.1 — web searches animate while they run (a sweeping magnifier and a
+// shimmering label), start the moment the search does, and show the query and
+// result count when done.
+export const APP_VERSION = '3.4.1'

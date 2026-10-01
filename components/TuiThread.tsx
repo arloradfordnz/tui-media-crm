@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowUp, ExternalLink, Check, Loader2, AlertTriangle, ShieldAlert } from 'lucide-react'
+import { ArrowUp, ExternalLink, Check, Loader2, AlertTriangle, ShieldAlert, Search } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useMounted } from '@/lib/useMounted'
@@ -36,7 +36,7 @@ import { renderMarkdown } from './chat-markup'
 // reload, it is per tab, and it is gone when the tab closes, which is exactly
 // the lifetime a scratch pad should have.
 
-type Receipt = { id: string; label: string; state: 'running' | 'done' | 'failed'; detail?: string }
+type Receipt = { id: string; name?: string; label: string; state: 'running' | 'done' | 'failed'; detail?: string }
 type LinkOut = { path: string; label: string }
 type Confirm = { fingerprint: string; action: string }
 
@@ -340,7 +340,7 @@ export default function TuiThread({
               }
               patchLast((m) => ({
                 ...m,
-                receipts: [...(m.receipts ?? []), { id: ev.id, label: ev.label, state: 'running' }],
+                receipts: [...(m.receipts ?? []), { id: ev.id, name: ev.name, label: ev.label, state: 'running' }],
               }))
               break
             case 'tool_done':
@@ -451,7 +451,7 @@ export default function TuiThread({
             case 'tool':
               patchLast((m) => ({
                 ...m,
-                receipts: [...(m.receipts ?? []), { id: ev.id, label: ev.label, state: 'running' }],
+                receipts: [...(m.receipts ?? []), { id: ev.id, name: ev.name, label: ev.label, state: 'running' }],
               }))
               break
             case 'tool_done':
@@ -676,14 +676,16 @@ function ReceiptRow({ receipt }: { receipt: Receipt }) {
 
   return (
     <div className="flex items-center gap-2 text-xs" style={{ color: colour }}>
-      {receipt.state === 'running' ? (
+      {receipt.state === 'running' && receipt.name === 'web_search' ? (
+        <Search className="w-3 h-3 shrink-0 tui-search-sweep" />
+      ) : receipt.state === 'running' ? (
         <Loader2 className="w-3 h-3 shrink-0 tui-receipt-spin" />
       ) : receipt.state === 'failed' ? (
         <AlertTriangle className="w-3 h-3 shrink-0" />
       ) : (
         <Check className="w-3 h-3 shrink-0" />
       )}
-      <span className="truncate">{receipt.label}</span>
+      <span className={`truncate${receipt.state === 'running' && receipt.name === 'web_search' ? ' tui-search-shimmer' : ''}`}>{receipt.label}</span>
       {receipt.detail && (
         <span className="truncate" style={{ color: 'var(--text-tertiary)', opacity: 0.75 }}>
           · {receipt.detail}

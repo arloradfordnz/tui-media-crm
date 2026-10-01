@@ -1115,6 +1115,36 @@ input, textarea, select, button { font-family: inherit; }
   .tui-receipt-spin { animation: none; opacity: 0.6; }
 }
 
+/* A web search in flight: the magnifying glass sweeps in a small circle, as if
+   scanning, and the label shimmers. Still, rather than gone, under
+   reduced-motion. */
+.tui-search-sweep {
+  animation: tui-search-sweep 1.3s ease-in-out infinite;
+}
+@keyframes tui-search-sweep {
+  0%   { transform: translate(0, 0); }
+  25%  { transform: translate(2px, -2px); }
+  50%  { transform: translate(0, -3px); }
+  75%  { transform: translate(-2px, -1px); }
+  100% { transform: translate(0, 0); }
+}
+.tui-search-shimmer {
+  background: linear-gradient(90deg, var(--accent) 0%, var(--text-primary) 50%, var(--accent) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: tui-search-shimmer 1.6s linear infinite;
+}
+@keyframes tui-search-shimmer {
+  to { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tui-search-sweep { animation: none; }
+  .tui-search-shimmer { animation: none; }
+}
+
 /* ── Custom Select ────────────────────────────────────────── */
 .custom-select-trigger {
   width: 100%;

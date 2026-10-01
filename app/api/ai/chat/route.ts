@@ -277,30 +277,40 @@ export async function POST(request: NextRequest) {
             send({ t: 'text', v: text })
           })
 
+          // A web search is a receipt like any other tool, and it has to start
+          // spinning the moment the model decides to search, not when the round
+          // is over, or there is nothing to animate. The query is still being
+          // streamed when the call starts, so it joins the receipt on finish.
+          const searchQueries = new Map<string, string>()
+          anthropicStream.on('contentBlock', (block) => {
+            if (block.type === 'server_tool_use' && block.name === 'web_search') {
+              const q = (block.input as { query?: unknown } | null)?.query
+              if (typeof q === 'string') searchQueries.set(block.id, q)
+            }
+          })
+          anthropicStream.on('streamEvent', (ev) => {
+            if (ev.type !== 'content_block_start') return
+            const block = ev.content_block
+            if (block.type === 'server_tool_use' && block.name === 'web_search') {
+              send({ t: 'tool', id: block.id, name: 'web_search', label: toolLabel('web_search', {}) })
+            } else if (block.type === 'web_search_tool_result') {
+              // A failed search is still a 200, with an error object where the
+              // list of results would be.
+              const hits = Array.isArray(block.content) ? block.content.length : null
+              const q = searchQueries.get(block.tool_use_id)
+              const count = hits === null ? 'search failed' : `${hits} ${hits === 1 ? 'result' : 'results'}`
+              send({ t: 'tool_done', id: block.tool_use_id, ok: hits !== null, detail: q ? `${q} · ${count}` : count })
+            }
+          })
+
           const finalMessage = await anthropicStream.finalMessage()
 
-          // Web searches already ran inside that call, on Anthropic's side.
-          // Give each one a receipt like any other tool, so Arlo can see a
-          // search actually happened rather than taking the answer on trust.
+          // Web searches run inside that call, on Anthropic's side, so what is
+          // known after it is already stale. Their receipts were emitted live
+          // from the stream above; this is only for the claim guard below.
           const searches = finalMessage.content.filter(
-            (b): b is Anthropic.ServerToolUseBlock => b.type === 'server_tool_use'
+            (b): b is Anthropic.ServerToolUseBlock => b.type === 'server_tool_use' && b.name === 'web_search'
           )
-          for (const s of searches) {
-            const input = (s.input ?? {}) as Record<string, unknown>
-            const result = finalMessage.content.find(
-              (b): b is Anthropic.WebSearchToolResultBlock => b.type === 'web_search_tool_result' && b.tool_use_id === s.id
-            )
-            // A failed search still returns 200, with an error object where
-            // the list of results would be.
-            const hits = result && Array.isArray(result.content) ? result.content.length : null
-            send({ t: 'tool', id: s.id, name: s.name, label: toolLabel(s.name, input) })
-            send({
-              t: 'tool_done',
-              id: s.id,
-              ok: hits !== null,
-              detail: hits !== null ? `${hits} ${hits === 1 ? 'result' : 'results'}` : 'search failed',
-            })
-          }
 
           // A long search can pause the turn. Resume from where it stopped,
           // with no new user message.
