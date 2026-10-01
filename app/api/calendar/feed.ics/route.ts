@@ -35,7 +35,9 @@ export async function GET(request: NextRequest) {
   }
 
   const [{ data: events }, { data: jobs }] = await Promise.all([
-    supabase.from('events').select('id, title, event_type, date, start_time, end_time, notes').order('date', { ascending: true }),
+    // Events mirrored FROM the iPhone are left out: they are already on the
+    // phone, and feeding them back would show every one twice.
+    supabase.from('events').select('id, title, event_type, date, start_time, end_time, notes').or('source.is.null,source.neq.icloud').order('date', { ascending: true }),
     supabase.from('jobs').select('id, name, shoot_date, shoot_location').not('shoot_date', 'is', null),
   ])
 

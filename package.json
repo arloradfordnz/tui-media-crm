@@ -1,6 +1,6 @@
 {
   "name": "tui-media-os",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -25,6 +25,7 @@
     "jose": "^6.2.2",
     "lucide-react": "^1.7.0",
     "next": "16.2.2",
+    "node-ical": "^0.27.2",
     "pg": "^8.23.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",

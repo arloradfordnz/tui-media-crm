@@ -295,11 +295,6 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
       {/* Tab content */}
       {tab === 'details' && (
         <form action={action} className="card space-y-5">
-          {/* Not nested in the Industry Field: Field takes a single child, and
-              a datalist is referenced by id from anywhere in the document. */}
-          <datalist id="industry-options">
-            {INDUSTRIES.map((i) => <option key={i} value={i} />)}
-          </datalist>
           <input type="hidden" name="clientId" value={client.id} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Client / Business Name *">
@@ -357,7 +352,18 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
             {/* Free text with suggestions, not a locked list — see INDUSTRIES
                 in lib/client-fields.ts. */}
             <Field label="Industry">
-              <input name="industry" list="industry-options" defaultValue={client.industry || ''} className="field-input" placeholder="Construction, marine, tourism..." />
+              <CustomSelect
+                name="industry"
+                defaultValue={client.industry || ''}
+                placeholder="Select..."
+                // A value typed in before this was a dropdown stays selectable
+                // rather than silently blanking on the next save.
+                options={[
+                  { value: '', label: 'Select...' },
+                  ...(client.industry && !INDUSTRIES.includes(client.industry) ? [{ value: client.industry, label: client.industry }] : []),
+                  ...INDUSTRIES.map((i) => ({ value: i, label: i })),
+                ]}
+              />
       </Field>
             <Field label="Brand">
               <CustomSelect

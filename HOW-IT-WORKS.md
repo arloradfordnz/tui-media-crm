@@ -98,6 +98,15 @@ A job record is four tabs:
 
 **Booking a shoot now puts it on the calendar.** Setting a shoot date creates a
 calendar event and moving the date moves it. Clearing the date removes it.
+
+**Your iPhone work calendar comes in too.** Paste the Public Calendar link from
+the phone into **Settings → iPhone calendar** and those events appear on the
+calendar page, Today and in Tui, refreshed within about five minutes of you
+opening the CRM or texting Tui. It only reads: edit on the phone, and an event
+deleted on the phone disappears here. They are marked iPhone, can't be deleted
+from the CRM, and are left out of the CRM's own calendar feed so they don't
+come back onto the phone twice. Clearing the link switches it off and removes
+them. Anyone with that link can see the calendar, so use the work one.
 Shoots booked before this shipped need `supabase/backfill_shoot_events.sql` run
 once.
 

@@ -18,6 +18,7 @@ const EVENT_COLORS: Record<string, string> = {
   call: 'var(--accent-soft)',
   deadline: 'var(--warning)',
   personal: 'var(--text-tertiary)',
+  iphone: 'var(--text-secondary)',
 }
 
 type EventData = {
@@ -215,13 +216,15 @@ export default function CalendarView({ events, jobs, month, year, feedToken }: {
                 <div className="flex-1">
                   <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{e.title}</p>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="badge badge-muted">{statusLabel(e.eventType)}</span>
+                    <span className="badge badge-muted">{e.eventType === 'iphone' ? 'iPhone' : statusLabel(e.eventType)}</span>
                     {e.startTime && <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{e.startTime}{e.endTime ? ` – ${e.endTime}` : ''}</span>}
                   </div>
                   {e.notes && <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>{e.notes}</p>}
                   {e.job && <p className="text-xs mt-1" style={{ color: 'var(--accent)' }}>Job: {e.job.name}</p>}
                 </div>
-                <button
+                {/* Mirrored from the phone: it would be back on the next sync,
+                    so the only real delete is on the phone. */}
+                {e.eventType !== 'iphone' && <button
                   onClick={() => setConfirm({
                     title: 'Delete this event?',
                     body: `"${e.title}" comes off the calendar. If it is a shoot mirrored from a job, editing the job is the better move — this removes only the calendar entry.`,
@@ -231,7 +234,7 @@ export default function CalendarView({ events, jobs, month, year, feedToken }: {
                   })}
                   className="btn-icon"
                   aria-label={`Delete ${e.title}`}
-                ><Trash2 className="w-4 h-4" style={{ color: 'var(--danger)' }} /></button>
+                ><Trash2 className="w-4 h-4" style={{ color: 'var(--danger)' }} /></button>}
               </div>
             ))
           )}

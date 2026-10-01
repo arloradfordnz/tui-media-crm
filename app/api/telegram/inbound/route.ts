@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { verifyTelegramSecret } from '@/lib/telegram'
 import { runAssistantTurn } from '@/lib/assistant-agent'
+import { syncIcloudIfStale } from '@/lib/icloud-calendar'
 import { parseConfirmation, consumeApproval } from '@/lib/assistant-approvals'
 
 // Telegram expects a fast webhook ack. The agent loop can take longer across
@@ -58,15 +59,17 @@ export async function POST(req: NextRequest) {
     console.warn('[telegram/inbound] confirmation code not live:', code)
   }
 
-  after(() =>
-    runAssistantTurn(supabase, {
+  after(async () => {
+    // So "what's on Thursday" includes what was just added on the phone.
+    await syncIcloudIfStale(supabase)
+    await runAssistantTurn(supabase, {
       trigger: 'inbound',
       inboundBody: body,
       approvals: approved ? [approved.fingerprint] : undefined,
     }).catch((err) => {
       console.error('[telegram/inbound] Agent turn failed:', err)
     })
-  )
+  })
 
   return NextResponse.json({ ok: true })
 }

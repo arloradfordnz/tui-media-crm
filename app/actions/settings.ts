@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient, getVerifiedUser } from '@/lib/supabase'
+import { createAdminClient } from '@/lib/supabase-admin'
+import { ICLOUD_URL_SETTING, syncIcloudCalendar } from '@/lib/icloud-calendar'
 
 export async function changePassword(prevState: { error?: string; success?: boolean } | undefined, formData: FormData) {
   const currentPassword = formData.get('currentPassword') as string
@@ -89,4 +91,36 @@ export async function saveAdminIps(prevState: { error?: string; success?: boolea
   const bad = ips.find((ip) => ip.length > 45 || /[^0-9a-fA-F:.]/.test(ip))
   if (bad) return { error: `"${bad}" doesn't look like an IP address.` }
   return saveAppSetting('admin_ips', ips.join(','))
+}
+
+// ── iPhone calendar ──────────────────────────────────────────────────────────
+// The iCloud public-calendar link. Saving it syncs straight away so the answer
+// to "did that work?" is a number rather than a wait; an empty value switches
+// the sync off and takes the mirrored events back off the calendar.
+export async function saveIcloudCalendar(prevState: { error?: string; success?: string } | undefined, formData: FormData) {
+  const url = ((formData.get('icloudUrl') as string) || '').trim()
+  if (!(await getVerifiedUser())) return { error: 'Not authenticated.' }
+
+  if (url) {
+    let host = ''
+    try { host = new URL(url.replace(/^webcals?:\/\//i, 'https://')).hostname } catch { /* falls through */ }
+    if (!/^(webcals?|https):\/\//i.test(url) || !/(^|\.)icloud\.com$/.test(host)) {
+      return { error: 'That should be the Public Calendar link from the iPhone, starting webcal:// and on icloud.com.' }
+    }
+  }
+
+  const saved = await saveAppSetting(ICLOUD_URL_SETTING, url)
+  if ('error' in saved && saved.error) return { error: saved.error }
+
+  const admin = createAdminClient()
+  if (!admin) return { error: 'Saved, but the server cannot sync right now.' }
+  try {
+    const r = await syncIcloudCalendar(admin)
+    revalidatePath('/dashboard/calendar')
+    revalidatePath('/dashboard')
+    if (!url) return { success: 'Switched off. iPhone events removed from the calendar.' }
+    return { success: `Synced. ${r ? r.added + r.updated : 0} events from your phone are on the calendar.` }
+  } catch (err) {
+    return { error: `Saved, but iCloud would not hand the calendar over: ${err instanceof Error ? err.message : 'unknown error'}. Check Public Calendar is still switched on.` }
+  }
 }

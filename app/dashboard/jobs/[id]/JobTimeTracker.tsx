@@ -362,9 +362,7 @@ export default function JobTimeTracker({
                 <input type="number" name="minutes" min={0} max={59} defaultValue={30} className="field-input text-sm" />
       </Field>
               <Field label="Category">
-                <select name="category" defaultValue="general" className="field-input text-sm">
-                  {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+                <CustomSelect name="category" defaultValue="general" options={CATEGORY_OPTIONS} />
               </Field>
             </div>
             <Field label="Description" className="mb-3">
@@ -486,9 +484,7 @@ function EntryRow({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
           <input type="number" min={0} value={editHours} onChange={(ev) => onEditHours(parseInt(ev.target.value) || 0)} className="field-input text-sm" placeholder="Hours" />
           <input type="number" min={0} max={59} value={editMinutes} onChange={(ev) => onEditMinutes(parseInt(ev.target.value) || 0)} className="field-input text-sm" placeholder="Min" />
-          <select value={editCategory} onChange={(ev) => onEditCategory(ev.target.value)} className="field-input text-sm">
-            {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          <CustomSelect value={editCategory} onChange={onEditCategory} options={CATEGORY_OPTIONS} />
           <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
             <input type="checkbox" checked={editBillable} onChange={(ev) => onEditBillable(ev.target.checked)} /> Billable
           </label>

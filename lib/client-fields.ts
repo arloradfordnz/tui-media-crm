@@ -19,13 +19,11 @@ export const CLIENT_CATEGORIES = [
 ] as const
 
 /**
- * Suggestions, deliberately not a filter.
- *
- * The rebrand copy names construction, marine, agriculture and tourism as the
- * industries the work suits best. That is positioning for the website, not a
- * rule for the CRM — anything that broadly fits is worth taking. So this backs
- * a `<datalist>` on a free-text input: it makes the common answers one keypress
- * away without rejecting anything that isn't on the list.
+ * The Industry dropdown. 'Other' covers anything that broadly fits — the
+ * rebrand copy names construction, marine, agriculture and tourism as the
+ * work that suits best, but that is positioning for the website, not a rule
+ * for the CRM. A client record that already holds some other value keeps it as
+ * an extra option rather than losing it.
  */
 export const INDUSTRIES = [
   'Construction & Trades',

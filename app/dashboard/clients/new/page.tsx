@@ -33,11 +33,6 @@ export default function NewClientPage() {
       </div>
 
       <form action={action} className="card space-y-5">
-        {/* Not nested in the Industry Field: Field takes a single child, and a
-            datalist is referenced by id from anywhere in the document. */}
-        <datalist id="industry-options">
-          {INDUSTRIES.map((i) => <option key={i} value={i} />)}
-        </datalist>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Client / Business Name *">
             <input name="name" required className="field-input" placeholder="Acme Co. or full name" />
@@ -85,10 +80,12 @@ export default function NewClientPage() {
               options={[{ value: '', label: 'Select...' }, ...CLIENT_CATEGORIES.map((c) => ({ value: c.value, label: c.label }))]}
             />
       </Field>
-          {/* Free text with suggestions — see INDUSTRIES in lib/client-fields.ts
-              for why this isn't a locked-down select. */}
           <Field label="Industry">
-            <input name="industry" list="industry-options" className="field-input" placeholder="Construction, marine, tourism..." />
+            <CustomSelect
+              name="industry"
+              placeholder="Select..."
+              options={[{ value: '', label: 'Select...' }, ...INDUSTRIES.map((i) => ({ value: i, label: i }))]}
+            />
       </Field>
           <Field label="Brand">
             <CustomSelect

@@ -1,5 +1,8 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
+import { after } from 'next/server'
+import { createAdminClient } from '@/lib/supabase-admin'
+import { syncIcloudIfStale } from '@/lib/icloud-calendar'
 import { hasAdminClaim, isClientAccount } from '@/lib/client-auth'
 import DashboardShell from './DashboardShell'
 
@@ -40,6 +43,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // without the claim means the refresh could not fix it, and signing in again
   // is the honest answer — far better than rendering an empty CRM.
   if (!(await hasAdminClaim())) redirect('/login?reason=stale')
+
+  // Pull the iPhone work calendar in after the response has gone, so a slow
+  // iCloud never holds a page up. It is a cached no-op inside five minutes.
+  after(() => syncIcloudIfStale(createAdminClient()))
 
   return <DashboardShell>{children}</DashboardShell>
 }
