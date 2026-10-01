@@ -201,6 +201,11 @@ that shipped in full.
 A month with no job at all is the worst case, not a clean slate: it means the
 month was never set up, so every video for it is outstanding.
 
+**Pausing a retainer.** Set **Retainer paused from** on the client's Details
+tab to the first month they don't owe. From that month on nothing is counted,
+the client shows as Paused, and Tui stops chasing it. Clear the field to
+resume. Team Bainbridge is paused from August 2026.
+
 ---
 
 ## Documents
@@ -233,6 +238,12 @@ hearing about it in four hours.
 
 Signatures record the IP and timestamp, and show them, so the signature is
 defensible rather than decorative.
+
+**Approved videos can go straight to their marketing person.** Put an address
+in **Marketing Email** on the client's Details tab (only Johnson Residential has
+one) and the first time a cut is approved, that person is emailed a download
+link. The link opens that one file, not the portal, and works until the file
+is archived at two months. Leave the field empty and nothing extra is sent.
 
 ---
 

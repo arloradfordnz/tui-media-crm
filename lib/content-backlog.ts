@@ -46,6 +46,8 @@ export type ClientBacklog = {
   videosPerMonth: number | null
   /** The shoot target from the client record. Null when nothing is set. */
   shootsPerMonth: number | null
+  /** First month not owed ('2026-08'), or null when the retainer is running. */
+  pausedFrom: string | null
   /** Shoots logged this calendar month, however many videos came out of them. */
   shootsThisMonth: number
   months: MonthStatus[]
@@ -123,6 +125,7 @@ type RawClient = {
   monthly_retainer: number | null
   shoots_per_month: number | null
   videos_per_month: number | null
+  retainer_paused_from: string | null
 }
 
 /**
@@ -158,7 +161,7 @@ export async function getContentBacklog(
   //
   // Verified against live data that the flattened embeds are byte-identical to
   // what the separate queries returned.
-  const CLIENT_COLS = 'id, name, monthly_retainer, shoots_per_month, videos_per_month'
+  const CLIENT_COLS = 'id, name, monthly_retainer, shoots_per_month, videos_per_month, retainer_paused_from'
   // Archived jobs are included on purpose: an archived month still shipped its
   // videos, and dropping it would invent a hole in the history.
   const JOB_EMBED = 'jobs(id, name, created_at, client_id, deliverables(id, delivery_files(id, created_at)))'
@@ -293,6 +296,11 @@ export async function getContentBacklog(
     if (typical === 0) typical = client.shoots_per_month ?? 0
     if (typical === 0) continue
 
+    // A paused retainer owes nothing from the pause month on, so the walk
+    // stops there instead of at today. Without this a pause read as a run of
+    // never-started months, each sized at the full monthly volume.
+    const pausedFrom = client.retainer_paused_from?.slice(0, 7) ?? null
+
     // Walk every month from the client's first content month to now, so gaps
     // show up as months rather than being skipped over.
     const first = byMonth.get(sortedKeys[0])!
@@ -303,6 +311,7 @@ export async function getContentBacklog(
 
     while (guard++ < 36) {
       const key = monthKey(cursorYear, cursorMonth)
+      if (pausedFrom && key >= pausedFrom) break
       const entry = byMonth.get(key)
       const { expected, uploaded } = entry ? countFor(entry) : { expected: 0, uploaded: 0 }
       const effectiveExpected = entry && expected > 0 ? expected : typical
@@ -342,6 +351,7 @@ export async function getContentBacklog(
       typicalVideosPerMonth: typical,
       videosPerMonth: client.videos_per_month ?? null,
       shootsPerMonth: client.shoots_per_month ?? null,
+      pausedFrom,
       shootsThisMonth: shootsFor(client.id, currentKey),
       months,
       overdueMonths: behindMonths.length,
@@ -401,6 +411,7 @@ export function summariseBacklog(backlog: ContentBacklog): string {
       ? ` Current month ${cur.label}: ${cur.uploaded}/${cur.expected} uploaded so far${cur.jobExists ? '' : ', job not created yet'}, ${cur.shoots}${shootTarget} shoot${cur.shoots === 1 && !shootTarget ? '' : 's'} logged.`
       : ''
 
+    const paused = c.pausedFrom ? ` Retainer PAUSED from ${c.pausedFrom}: nothing is owed for that month or after, and it is not current work.` : ''
     const cadence = c.shootsPerMonth ? `, ${c.shootsPerMonth} shoots/month` : ''
     // "~" only where the number is still inferred from job history. Where the
     // target is actually stored, say it flat, because hedging a figure Arlo
@@ -408,7 +419,7 @@ export function summariseBacklog(backlog: ContentBacklog): string {
     const volume = c.videosPerMonth
       ? `${c.videosPerMonth} videos/month`
       : `~${c.typicalVideosPerMonth} videos/month (inferred, no target set)`
-    return `${c.clientName} [$${c.monthlyRetainer ?? 0}/mo, ${volume}${cadence}]: ${headline}.${pastText}${curText}`
+    return `${c.clientName} [$${c.monthlyRetainer ?? 0}/mo, ${volume}${cadence}]: ${headline}.${pastText}${curText}${paused}`
   })
 
   return [

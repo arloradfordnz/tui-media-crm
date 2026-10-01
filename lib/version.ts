@@ -15,4 +15,6 @@
 //
 // 3.0.1 — Subscriptions card on the dashboard, under Money.
 // 3.0.2 — Xero's $28.18 added to the subscriptions total.
-export const APP_VERSION = '3.0.2'
+// 3.1.0 — Retainers can be paused (Bainbridge from August), and approved
+// videos can be emailed straight to a client's marketing contact.
+export const APP_VERSION = '3.1.0'

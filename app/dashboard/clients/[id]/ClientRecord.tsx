@@ -23,6 +23,7 @@ type ClientData = {
   contactPerson: string | null
   email: string | null
   phone: string | null
+  marketingEmail: string | null
   location: string | null
   leadSource: string | null
   firstContact: string | null
@@ -33,6 +34,7 @@ type ClientData = {
   monthlyRetainer: number | null
   shootsPerMonth: number | null
   videosPerMonth: number | null
+  retainerPausedFrom: string | null
   invoiceDay: number | null
   industry: string | null
   brand: string | null
@@ -85,7 +87,7 @@ function RetainerSchedule({
         </h3>
         {backlog && (
           <span className="text-xs" style={{ color: backlog.videosOwed > 0 ? 'var(--danger)' : 'var(--text-tertiary)' }}>
-            {backlog.videosOwed > 0 ? `${backlog.videosOwed} owed` : 'up to date'}
+            {backlog.videosOwed > 0 ? `${backlog.videosOwed} owed` : backlog.pausedFrom ? 'paused' : 'up to date'}
           </span>
         )}
       </div>
@@ -312,6 +314,11 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
             <Field label="Phone">
               <input name="phone" defaultValue={client.phone || ''} className="field-input" />
       </Field>
+            {/* Whoever posts their videos, when that isn't the person who approves
+                them. An approval in the portal emails this address the file. */}
+            <Field label="Marketing Email (gets approved videos)">
+              <input name="marketingEmail" type="email" defaultValue={client.marketingEmail || ''} className="field-input" />
+      </Field>
             <Field label="Location">
               <input name="location" defaultValue={client.location || ''} className="field-input" />
       </Field>
@@ -389,6 +396,14 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
                 defaultValue={client.videosPerMonth ?? ''}
                 className="field-input"
                 placeholder="e.g. 4 — retainer clients only"
+              />
+            </Field>
+            <Field label="Retainer paused from" hint="First month nothing is owed. Clear it to resume">
+              <input
+                name="retainerPausedFrom"
+                type="month"
+                defaultValue={client.retainerPausedFrom ?? ''}
+                className="field-input"
               />
             </Field>
           </div>

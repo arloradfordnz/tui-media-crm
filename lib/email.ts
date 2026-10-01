@@ -705,6 +705,33 @@ export async function sendAdminDeliveryApprovedEmail(clientName: string, jobName
   await send({ to: ADMIN_INBOX, subject, html, type: 'admin_delivery_approved', clientId, jobId })
 }
 
+// To the client's marketing person, not the client. The one who approves the
+// cut is often not the one who posts it (Sam at Johnson Residential), so the
+// finished file goes straight to whoever does, instead of waiting on a forward.
+export async function sendApprovedVideoToMarketingEmail({
+  to, clientName, approverName, jobName, fileName, shareUrl, clientId, jobId,
+}: {
+  to: string
+  clientName: string
+  approverName: string | null
+  jobName: string
+  fileName: string
+  shareUrl: string
+  clientId?: string
+  jobId?: string
+}) {
+  const who = approverName ? `${esc(approverName)} at ${esc(clientName)}` : esc(clientName)
+  const subject = `Approved and ready to post — ${jobName}`
+  const html = wrap(`
+    ${buildGreeting()}
+    <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0 0 16px;">${who} has just approved <span style="color:${C.ink};">${esc(fileName)}</span> for <span style="color:${C.ink};">${esc(jobName)}</span>. It's final, so it's ready for you to download and share.</p>
+    <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">The link stays live for two months.</p>
+    ${button(shareUrl, 'Download the video')}
+    ${plainLink(shareUrl)}
+  `)
+  await send({ to, subject, html, type: 'marketing_approved_video', clientId, jobId })
+}
+
 export async function sendAdminRevisionRequestedEmail(clientName: string, jobName: string, round: number, request: string, jobId?: string, clientId?: string, revisionId?: string) {
   const subject = `Revision requested — ${jobName} (round ${round})`
   // Straight to the revision, not to the jobs list. The point of this email is

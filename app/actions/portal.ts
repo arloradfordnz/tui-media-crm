@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { sendApprovalConfirmationEmail, sendRevisionRequestEmail, sendAdminDeliveryViewedEmail, sendAdminDeliveryApprovedEmail, sendAdminRevisionRequestedEmail, sendAdminFileDownloadedEmail } from '@/lib/email'
+import { sendApprovalConfirmationEmail, sendRevisionRequestEmail, sendAdminDeliveryViewedEmail, sendAdminDeliveryApprovedEmail, sendAdminRevisionRequestedEmail, sendAdminFileDownloadedEmail, sendApprovedVideoToMarketingEmail } from '@/lib/email'
 import { isAdminViewing } from '@/lib/admin-ip'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { emitAssistantEvent } from '@/lib/tui/events'
@@ -12,11 +12,13 @@ import { emitAssistantEvent } from '@/lib/tui/events'
 // matched the token to a client and confirmed the target row belongs to them.
 // Never trust a jobId/fileId from the request without this ownership check.
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
+
 type Admin = NonNullable<ReturnType<typeof createAdminClient>>
 
-async function resolveClient(admin: Admin, portalToken: string): Promise<{ id: string; name: string; email: string | null } | null> {
+async function resolveClient(admin: Admin, portalToken: string): Promise<{ id: string; name: string; email: string | null; contact_person: string | null; marketing_email: string | null } | null> {
   if (!portalToken) return null
-  const { data } = await admin.from('clients').select('id, name, email').eq('portal_token', portalToken).single()
+  const { data } = await admin.from('clients').select('id, name, email, contact_person, marketing_email').eq('portal_token', portalToken).single()
   return data ?? null
 }
 
@@ -44,7 +46,7 @@ export async function approveDelivery(deliveryFileId: string, jobId: string, por
   // Make sure the file actually belongs to this job before touching it.
   const { data: file } = await admin
     .from('delivery_files')
-    .select('id, original_name, deliverables(job_id)')
+    .select('id, original_name, share_token, delivery_status, deliverables(job_id)')
     .eq('id', deliveryFileId)
     .single()
   const fileJobId = (file?.deliverables as unknown as { job_id: string } | null)?.job_id
@@ -66,9 +68,24 @@ export async function approveDelivery(deliveryFileId: string, jobId: string, por
 
   const adminViewing = await isAdminViewing()
   if (!adminViewing) {
+    // Only on the first approval: pressing Approve twice should not send the
+    // marketing person the same video twice.
+    const alreadyApproved = file.delivery_status === 'approved'
     await Promise.all([
       clientRel.email ? sendApprovalConfirmationEmail(clientRel.email, clientRel.name, job.name) : Promise.resolve(),
       sendAdminDeliveryApprovedEmail(clientRel.name, job.name, fileName, jobId, job.client_id),
+      client.marketing_email && !alreadyApproved
+        ? sendApprovedVideoToMarketingEmail({
+            to: client.marketing_email,
+            clientName: clientRel.name,
+            approverName: client.contact_person,
+            jobName: job.name,
+            fileName,
+            shareUrl: `${APP_URL}/api/share/${file.share_token}`,
+            clientId: job.client_id,
+            jobId,
+          })
+        : Promise.resolve(),
     ])
   }
 

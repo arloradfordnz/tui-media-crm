@@ -83,6 +83,11 @@ export default async function RetainersPage() {
                               that row on every width under 1025px. */}
                           <p className="text-sm font-medium flex items-center gap-2 flex-wrap" style={{ color: 'var(--text-primary)' }}>
                             {c.clientName}
+                            {c.pausedFrom && (
+                              <span style={{ color: 'var(--text-tertiary)', fontWeight: 600, fontSize: 'var(--t-xs)' }}>
+                                Paused
+                              </span>
+                            )}
                             {c.videosOwed > 0 && (
                               <span style={{ color: 'var(--danger)', fontWeight: 600, fontSize: 'var(--t-xs)' }}>
                                 {c.videosOwed} owed
@@ -142,7 +147,7 @@ export default async function RetainersPage() {
 
                     {/* Exactly one action: open this month's job, or create it. */}
                     <td className="px-4 py-4 text-right" data-role="trailing">
-                      {current?.jobId ? (
+                      {c.pausedFrom && !current ? null : current?.jobId ? (
                         <Link href={`/dashboard/jobs/${current.jobId}`} className="btn-ghost">
                           Open {current.label.slice(0, 3)}
                         </Link>

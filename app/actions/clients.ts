@@ -78,6 +78,7 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
   const contactPerson = formData.get('contactPerson') as string
   const email = formData.get('email') as string
   const phone = formData.get('phone') as string
+  const marketingEmail = formData.get('marketingEmail') as string
   const location = formData.get('location') as string
   const leadSource = formData.get('leadSource') as string
   const firstContact = formData.get('firstContact') as string
@@ -89,6 +90,8 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
   const monthlyRetainerRaw = formData.get('monthlyRetainer') as string
   const shootsPerMonthRaw = formData.get('shootsPerMonth') as string
   const videosPerMonthRaw = formData.get('videosPerMonth') as string
+  // A month input posts '2026-08'; stored as the 1st of that month.
+  const retainerPausedFrom = formData.get('retainerPausedFrom') as string
   const industry = formData.get('industry') as string
   const brand = formData.get('brand') as string
   const sells = formData.get('sells') as string
@@ -111,6 +114,7 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
     contact_person: contactPerson || null,
     email: email || null,
     phone: phone || null,
+    marketing_email: marketingEmail?.trim() || null,
     location: location || null,
     lead_source: leadSource || null,
     first_contact: firstContact ? new Date(firstContact).toISOString() : null,
@@ -132,6 +136,7 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
     monthly_retainer: monthlyRetainer,
     shoots_per_month: shootsPerMonth,
     videos_per_month: videosPerMonth,
+    retainer_paused_from: /^\d{4}-\d{2}$/.test(retainerPausedFrom ?? '') ? `${retainerPausedFrom}-01` : null,
   }).eq('id', clientId)
 
   if (error) return { error: error.message }
