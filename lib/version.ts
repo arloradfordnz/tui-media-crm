@@ -22,4 +22,5 @@
 // 3.3.0 — CRM events are written into the iPhone work calendar over CalDAV, so
 // the phone needs only one calendar.
 // 3.3.1 — iCloud writes made one at a time with retries; parallel PUTs got 500s.
-export const APP_VERSION = '3.3.1'
+// 3.4.0 — Tui can search the web when asked, mainly to look up clients.
+export const APP_VERSION = '3.4.0'

@@ -90,6 +90,7 @@ const TOOL_VERBS: Record<string, string> = {
   get_content_backlog: 'Checking retainer backlog',
   snooze_flag: 'Snoozing that',
   resolve_flag: 'Marking that resolved',
+  web_search: 'Searching the web',
 }
 
 // The most identifying free-text argument, if the call has one. A receipt that

@@ -3,6 +3,7 @@ import { NextRequest, after } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { getAuthUser, unauthorizedResponse } from '@/lib/supabase-admin'
 import { TOOLS, MUTATING_TOOLS, executeTool } from '@/lib/ai-tools'
+import { WEB_SEARCH_TOOL_BASIC } from '@/lib/web-search'
 import { buildDashboardSystem } from '@/lib/assistant-persona'
 import { getContentBacklog, summariseBacklog } from '@/lib/content-backlog'
 import { encodeEvent, toolLabel, summariseResult, type TuiEvent } from '@/lib/tui/receipts'
@@ -239,11 +240,13 @@ export async function POST(request: NextRequest) {
         // after the tool list. The static prompt hits the cache on every turn
         // regardless of changing live context; the second breakpoint extends
         // the cache over system + tools so a stable live context also hits.
-        const cachedTools = TOOLS.map((t, i) =>
-          i === TOOLS.length - 1
-            ? ({ ...t, cache_control: { type: 'ephemeral' } } as Anthropic.Tool)
-            : t
-        )
+        //
+        // Web search sits last so the breakpoint covers it too. It runs on
+        // Anthropic's side; see lib/web-search.ts.
+        const cachedTools: Anthropic.ToolUnion[] = [
+          ...TOOLS,
+          { ...WEB_SEARCH_TOOL_BASIC, cache_control: { type: 'ephemeral' } },
+        ]
         const systemBlocks: Anthropic.TextBlockParam[] = [
           { type: 'text', text: STATIC_SYSTEM, cache_control: { type: 'ephemeral' } },
           { type: 'text', text: dynamicContext },
@@ -252,7 +255,9 @@ export async function POST(request: NextRequest) {
         for (let round = 0; round < maxRounds; round++) {
           const anthropicStream = anthropic.messages.stream({
             model: 'claude-haiku-4-5-20251001',
-            max_tokens: 512,
+            // 1024 rather than 512: a reply summarising what a search found
+            // about a client runs longer than a CRM one-liner.
+            max_tokens: 1024,
             system: systemBlocks,
             messages: currentMessages,
             tools: cachedTools,
@@ -274,6 +279,37 @@ export async function POST(request: NextRequest) {
 
           const finalMessage = await anthropicStream.finalMessage()
 
+          // Web searches already ran inside that call, on Anthropic's side.
+          // Give each one a receipt like any other tool, so Arlo can see a
+          // search actually happened rather than taking the answer on trust.
+          const searches = finalMessage.content.filter(
+            (b): b is Anthropic.ServerToolUseBlock => b.type === 'server_tool_use'
+          )
+          for (const s of searches) {
+            const input = (s.input ?? {}) as Record<string, unknown>
+            const result = finalMessage.content.find(
+              (b): b is Anthropic.WebSearchToolResultBlock => b.type === 'web_search_tool_result' && b.tool_use_id === s.id
+            )
+            // A failed search still returns 200, with an error object where
+            // the list of results would be.
+            const hits = result && Array.isArray(result.content) ? result.content.length : null
+            send({ t: 'tool', id: s.id, name: s.name, label: toolLabel(s.name, input) })
+            send({
+              t: 'tool_done',
+              id: s.id,
+              ok: hits !== null,
+              detail: hits !== null ? `${hits} ${hits === 1 ? 'result' : 'results'}` : 'search failed',
+            })
+          }
+
+          // A long search can pause the turn. Resume from where it stopped,
+          // with no new user message.
+          if (finalMessage.stop_reason === 'pause_turn') {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            currentMessages.push({ role: 'assistant', content: finalMessage.content as any })
+            continue
+          }
+
           const toolUseBlocks = finalMessage.content.filter(
             (block) => block.type === 'tool_use'
           )
@@ -288,7 +324,9 @@ export async function POST(request: NextRequest) {
             // the guard misfires on a turn that genuinely needed no tool, the
             // model picks a read and the cost is one stray receipt — a far
             // better failure than a phantom send.
-            if (!alreadyForced && !mutated && claimsUnfulfilledAction(roundText)) {
+            // A round that searched the web did act, just not through tool_use,
+            // so "Searching for them now." is not an unfulfilled claim.
+            if (!alreadyForced && !mutated && searches.length === 0 && claimsUnfulfilledAction(roundText)) {
               alreadyForced = true
               forceToolUse = true
               // eslint-disable-next-line @typescript-eslint/no-explicit-any

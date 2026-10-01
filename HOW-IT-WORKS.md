@@ -49,6 +49,15 @@ Once it has raised something it will not raise it again for a day, then three
 days, then a week, then a fortnight. Tell it to leave something alone and that
 becomes a real snooze rather than a promise it forgets.
 
+**It can search the web when you ask it to.** "Look up Johnson Residential",
+"google Sky Automotive", "what do Team Bainbridge do": it checks the CRM first,
+then searches, and tells you what it found and where. Searches are weighted to
+Nelson so a local business comes up before a namesake overseas. It never
+searches on its own, never on a portal event, and never changes the CRM
+because of something it found unless you ask. On the dashboard each search
+shows a receipt like any other tool. Up to five searches per question; each
+search costs about 1.5 cents on the Anthropic account.
+
 **If it says it is out of credit**, that is the Anthropic account, not a bug.
 It will tell you so in those words rather than "something went wrong".
 

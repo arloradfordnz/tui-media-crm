@@ -6,6 +6,7 @@ import { sendTelegramMessage } from '@/lib/telegram'
 import { buildContext, tierForTrigger } from '@/lib/tui/context'
 import { syncFlags, markNotified } from '@/lib/tui/flags'
 import { tidyPunctuation } from '@/lib/tui/text'
+import { WEB_SEARCH_TOOL } from '@/lib/web-search'
 
 // One place to change the model. Both the agent loop and the forced
 // send_message round must run the same one — thinking blocks are echoed back
@@ -94,7 +95,14 @@ export async function runAssistantTurn(
   // agent loop re-sends both on every round, so from round two onward the
   // whole prefix is a cache hit. Cuts per-round latency and cost noticeably
   // on multi-tool turns.
-  const tools = [...TOOLS, { ...SEND_MESSAGE_TOOL, cache_control: { type: 'ephemeral' } } as Anthropic.Tool]
+  //
+  // Web search only on a reply to Arlo. A portal event is never an occasion to
+  // go looking things up online, and leaving the tool off makes that certain.
+  const tools: Anthropic.ToolUnion[] = [
+    ...TOOLS,
+    ...(opts.trigger === 'inbound' ? [WEB_SEARCH_TOOL] : []),
+    { ...SEND_MESSAGE_TOOL, cache_control: { type: 'ephemeral' } },
+  ]
   const systemBlocks: Anthropic.TextBlockParam[] = [
     { type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } },
   ]
@@ -103,6 +111,7 @@ export async function runAssistantTurn(
   let messageBody: string | undefined
   let reasoning = ''
   let truncated = false
+  let nudged = false
 
   for (let round = 0; round < 8; round++) {
     const message = await anthropic.messages.create({
@@ -126,11 +135,30 @@ export async function runAssistantTurn(
       break
     }
 
+    // A long web search can pause the turn part-way. The API resumes it from
+    // the assistant content as it stands, with no new user message.
+    if (message.stop_reason === 'pause_turn') {
+      messages.push({ role: 'assistant', content: message.content })
+      continue
+    }
+
     const textBlocks = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join(' ').trim()
     if (textBlocks) reasoning = textBlocks
 
     const toolUseBlocks = message.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
-    if (toolUseBlocks.length === 0) break
+    if (toolUseBlocks.length === 0) {
+      // Wrote the answer as text and stopped, so Arlo got nothing. Most
+      // often after a web search: the findings are in this conversation and
+      // nowhere else, and the forced round below starts from scratch, so it
+      // would text a generic line and lose them. One nudge, in context.
+      if (!messageSent && !nudged && textBlocks) {
+        nudged = true
+        messages.push({ role: 'assistant', content: message.content })
+        messages.push({ role: 'user', content: 'That reply has not reached Arlo. Only send_message does. Send it now.' })
+        continue
+      }
+      break
+    }
 
     messages.push({ role: 'assistant', content: message.content })
 
