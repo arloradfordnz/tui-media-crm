@@ -21,4 +21,5 @@
 // tracker's Category now use the custom dropdown.
 // 3.3.0 — CRM events are written into the iPhone work calendar over CalDAV, so
 // the phone needs only one calendar.
-export const APP_VERSION = '3.3.0'
+// 3.3.1 — iCloud writes made one at a time with retries; parallel PUTs got 500s.
+export const APP_VERSION = '3.3.1'

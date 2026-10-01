@@ -22,7 +22,7 @@ const SERVER = 'https://caldav.icloud.com'
 const WINDOW_PAST_DAYS = 30
 // iCloud rate-limits bursts, so a first run with a lot to write finishes over
 // the next few syncs instead of in one go.
-const MAX_OPS_PER_RUN = 60
+const MAX_OPS_PER_RUN = 30
 
 export const SECRET_USER = 'icloud_caldav_user'
 export const SECRET_PASSWORD = 'icloud_caldav_password'
@@ -129,16 +129,25 @@ export async function listCalendars(user: string, password: string): Promise<Cal
 }
 
 async function dav(method: 'PUT' | 'DELETE', url: string, auth: string, body?: string) {
-  const res = await fetch(url, {
-    method,
-    headers: { Authorization: auth, ...(body ? { 'Content-Type': 'text/calendar; charset=utf-8' } : {}) },
-    body,
-    signal: AbortSignal.timeout(15000),
-  })
-  if (res.status === 401) throw new Error(BAD_LOGIN)
-  // A delete of something already gone is the outcome that was wanted.
-  if (method === 'DELETE' && res.status === 404) return
-  if (!res.ok) throw new Error(`iCloud answered ${res.status} to ${method}`)
+  // iCloud answers 500 now and then, and reliably when writes to one calendar
+  // overlap (five parallel PUTs failed on the first real run; the same event
+  // sent alone went through). So writes are sequential, and a 5xx gets two
+  // more tries with a pause before it counts as a failure.
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, {
+      method,
+      headers: { Authorization: auth, ...(body ? { 'Content-Type': 'text/calendar; charset=utf-8' } : {}) },
+      body,
+      signal: AbortSignal.timeout(15000),
+    })
+    if (res.status === 401) throw new Error(BAD_LOGIN)
+    // A delete of something already gone is the outcome that was wanted.
+    if (method === 'DELETE' && res.status === 404) return
+    if (res.ok) return
+    if (res.status >= 500 && attempt < 2) { await new Promise((r) => setTimeout(r, 1500 * (attempt + 1))); continue }
+    const detail = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 160)
+    throw new Error(`iCloud answered ${res.status} to ${method}${detail ? `: ${detail}` : ''}`)
+  }
 }
 
 const hrefFor = (calendarUrl: string, eventId: string) =>
@@ -209,8 +218,9 @@ export async function pushToIcloud(admin: SupabaseClient, opts: { removeAll?: bo
   const batch = ops.slice(0, MAX_OPS_PER_RUN)
   const result: PushResult = { created: 0, updated: 0, removed: 0, remaining: ops.length - batch.length }
 
-  for (let i = 0; i < batch.length; i += 5) {
-    await Promise.all(batch.slice(i, i + 5).map(async (op) => {
+  // One at a time — see dav() for why not in parallel.
+  for (const op of batch) {
+    await (async () => {
       if (op.kind === 'delete') {
         await dav('DELETE', op.href, auth)
         // A moved event is re-created by its own put; only a true removal
@@ -222,7 +232,7 @@ export async function pushToIcloud(admin: SupabaseClient, opts: { removeAll?: bo
       await dav('PUT', op.href, auth, buildIcs(op.event, now))
       await admin.from('icloud_push').upsert({ event_id: op.id, href: op.href, hash: op.hash, pushed_at: now.toISOString() })
       if (op.fresh) result.created++; else result.updated++
-    }))
+    })()
   }
   return result
 }
