@@ -19,4 +19,6 @@
 // videos can be emailed straight to a client's marketing contact.
 // 3.2.0 — iPhone work calendar synced into the CRM; Industry and the time
 // tracker's Category now use the custom dropdown.
-export const APP_VERSION = '3.2.0'
+// 3.3.0 — CRM events are written into the iPhone work calendar over CalDAV, so
+// the phone needs only one calendar.
+export const APP_VERSION = '3.3.0'

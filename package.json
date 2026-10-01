@@ -1,6 +1,6 @@
 {
   "name": "tui-media-os",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -29,7 +29,8 @@
     "pg": "^8.23.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "resend": "^6.10.0"
+    "resend": "^6.10.0",
+    "tsdav": "^2.3.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

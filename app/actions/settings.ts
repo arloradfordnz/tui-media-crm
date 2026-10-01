@@ -4,6 +4,10 @@ import { revalidatePath } from 'next/cache'
 import { createServerSupabaseClient, getVerifiedUser } from '@/lib/supabase'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { ICLOUD_URL_SETTING, syncIcloudCalendar } from '@/lib/icloud-calendar'
+import {
+  SECRET_USER, SECRET_PASSWORD, SETTING_CALENDAR_URL, SETTING_CALENDAR_NAME, SETTING_CALENDARS,
+  getCaldavConfig, listCalendars, runPushAndRecord,
+} from '@/lib/icloud-push'
 
 export async function changePassword(prevState: { error?: string; success?: boolean } | undefined, formData: FormData) {
   const currentPassword = formData.get('currentPassword') as string
@@ -123,4 +127,65 @@ export async function saveIcloudCalendar(prevState: { error?: string; success?: 
   } catch (err) {
     return { error: `Saved, but iCloud would not hand the calendar over: ${err instanceof Error ? err.message : 'unknown error'}. Check Public Calendar is still switched on.` }
   }
+}
+
+// ── CRM → iPhone ─────────────────────────────────────────────────────────────
+// One form, three intents. Step one stores the Apple ID and app-specific
+// password and lists the account's calendars; step two picks the work
+// calendar and starts writing to it; 'disconnect' takes everything that was
+// written back off the phone and forgets the credentials.
+export async function saveIcloudPush(prevState: { error?: string; success?: string } | undefined, formData: FormData) {
+  if (!(await getVerifiedUser())) return { error: 'Not authenticated.' }
+  const admin = createAdminClient()
+  if (!admin) return { error: 'The server cannot reach the database right now.' }
+
+  const intent = (formData.get('intent') as string) || 'save'
+  const now = new Date().toISOString()
+  const setSecret = (key: string, value: string) => admin.from('integration_secrets').upsert({ key, value, updated_at: now })
+  const setSetting = (key: string, value: string) => admin.from('app_settings').upsert({ key, value, updated_at: now })
+  const finish = () => { revalidatePath('/dashboard/settings'); revalidatePath('/dashboard/calendar') }
+
+  if (intent === 'disconnect') {
+    await runPushAndRecord(admin, { removeAll: true })
+    await admin.from('integration_secrets').delete().in('key', [SECRET_USER, SECRET_PASSWORD])
+    await admin.from('app_settings').delete().in('key', [SETTING_CALENDAR_URL, SETTING_CALENDAR_NAME, SETTING_CALENDARS])
+    await admin.from('icloud_push').delete().neq('event_id', '00000000-0000-0000-0000-000000000000')
+    finish()
+    return { success: 'Disconnected. CRM events were taken off the phone calendar.' }
+  }
+
+  const user = ((formData.get('appleId') as string) || '').trim()
+  // Apple shows the app-specific password in dashed groups; the dashes are
+  // cosmetic and both forms work, so strip nothing but whitespace.
+  const password = ((formData.get('appPassword') as string) || '').replace(/\s+/g, '')
+  const calendarUrl = ((formData.get('calendarUrl') as string) || '').trim()
+  const current = await getCaldavConfig(admin)
+
+  // New or changed credentials: prove them, and refresh the calendar list.
+  if (password || (user && user !== current.user)) {
+    if (!user || !password) return { error: 'Enter both the Apple ID and the app-specific password.' }
+    try {
+      const calendars = await listCalendars(user, password)
+      if (calendars.length === 0) return { error: 'Logged in, but that account has no calendars.' }
+      await setSecret(SECRET_USER, user)
+      await setSecret(SECRET_PASSWORD, password)
+      await setSetting(SETTING_CALENDARS, JSON.stringify(calendars))
+      finish()
+      return { success: 'Connected. Now choose your work calendar below and save.' }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : 'Could not connect to iCloud.' }
+    }
+  }
+
+  if (!current.user || !current.password) return { error: 'Enter the Apple ID and app-specific password first.' }
+  const choice = current.calendars.find((c) => c.url === calendarUrl)
+  if (!choice) return { error: 'Choose a calendar.' }
+
+  await setSetting(SETTING_CALENDAR_URL, choice.url)
+  await setSetting(SETTING_CALENDAR_NAME, choice.name)
+  const r = await runPushAndRecord(admin)
+  finish()
+  if (!r) return { error: 'Saved, but the first write to iCloud failed. The reason is shown on this card.' }
+  const more = r.remaining ? ` ${r.remaining} more will follow over the next few minutes.` : ''
+  return { success: `Writing to "${choice.name}". ${r.created} events added to the phone calendar.${more}` }
 }

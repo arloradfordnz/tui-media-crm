@@ -107,6 +107,17 @@ deleted on the phone disappears here. They are marked iPhone, can't be deleted
 from the CRM, and are left out of the CRM's own calendar feed so they don't
 come back onto the phone twice. Clearing the link switches it off and removes
 them. Anyone with that link can see the calendar, so use the work one.
+
+**And the other way: CRM events go onto the phone's work calendar.** In
+**Settings → Send CRM events to your phone**, enter your Apple ID and an
+app-specific password (made at account.apple.com under Sign-In and Security;
+it can only reach Calendar and can be revoked there), then pick the work
+calendar. Shoots and anything added in the CRM or by Tui are written into it,
+kept in step when they change, and removed when they are deleted, so you only
+need that one calendar and can drop the "Tui Media" subscription. It runs on the
+same five-minute rhythm as the read side. The password is stored where only the
+server can read it and is never shown again. Disconnecting takes everything it
+wrote off the phone. If a sync fails (a revoked password, say) the card says why.
 Shoots booked before this shipped need `supabase/backfill_shoot_events.sql` run
 once.
 

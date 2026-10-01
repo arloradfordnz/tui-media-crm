@@ -1,5 +1,6 @@
 import ical, { type VEvent } from 'node-ical'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { PUSHED_UID_PREFIX, runPushAndRecord } from '@/lib/icloud-push'
 
 // Mirrors Arlo's iCloud work calendar into `events`, one way: phone → CRM.
 //
@@ -96,6 +97,9 @@ export async function fetchIcloudRows(url: string, now = new Date()): Promise<Ro
     // A RECURRENCE-ID override is applied through its parent's expansion.
     if (event.recurrenceid) continue
     if (text(event.status).toUpperCase() === 'CANCELLED') continue
+    // Pushed there from the CRM (lib/icloud-push.ts). Mirroring it back would
+    // double it.
+    if (event.uid?.startsWith(PUSHED_UID_PREFIX)) continue
 
     for (const inst of ical.expandRecurringEvent(event, { from, to, expandOngoing: true })) {
       const title = text(inst.summary) || 'Busy'
@@ -163,7 +167,10 @@ export async function syncIcloudIfStale(admin: SupabaseClient | null): Promise<v
     const { data } = await admin.from('kv_cache').select('value').eq('key', SYNCED_AT_KEY).maybeSingle()
     const last = (data?.value as { at?: string } | null)?.at
     if (last && Date.now() - new Date(last).getTime() < SYNC_EVERY_MS) return
-    await syncIcloudCalendar(admin)
+    // Phone → CRM, then CRM → phone. Each fails on its own: an expired Apple
+    // password should not stop the phone's events arriving, and vice versa.
+    try { await syncIcloudCalendar(admin) } catch (err) { console.error('[icloud-calendar] pull failed:', err) }
+    await runPushAndRecord(admin)
   } catch (err) {
     console.error('[icloud-calendar] sync failed:', err)
   }

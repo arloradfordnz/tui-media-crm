@@ -4,6 +4,9 @@ import EmailTemplatesForm from './EmailTemplatesForm'
 import RetainerInvoiceSettings from './RetainerInvoiceSettings'
 import PortalNotificationSettings from './PortalNotificationSettings'
 import IcloudCalendarSettings from './IcloudCalendarSettings'
+import IcloudPushSettings from './IcloudPushSettings'
+import { createAdminClient } from '@/lib/supabase-admin'
+import { getCaldavConfig, STATUS_KEY } from '@/lib/icloud-push'
 import { APP_VERSION } from '@/lib/version'
 import { getAppSetting } from '@/app/actions/settings'
 import { getAdminIps, getRequestIp } from '@/lib/admin-ip'
@@ -23,6 +26,16 @@ export default async function SettingsPage() {
     getRequestIp(),
     getAppSetting('icloud_calendar_url'),
   ])
+
+  // The password never leaves the server: the card is told only whether one is
+  // saved. Status is what the last push did, so a failure is visible.
+  const admin = createAdminClient()
+  const [caldav, pushStatus] = admin
+    ? await Promise.all([
+        getCaldavConfig(admin),
+        admin.from('kv_cache').select('value').eq('key', STATUS_KEY).maybeSingle(),
+      ])
+    : [null, null]
 
   return (
     <div className="space-y-6">
@@ -76,6 +89,13 @@ export default async function SettingsPage() {
 
       {/* iPhone calendar */}
       <IcloudCalendarSettings currentUrl={icloudUrl ?? ''} />
+      <IcloudPushSettings
+        appleId={caldav?.user ?? ''}
+        connected={!!caldav?.user && !!caldav?.password}
+        calendars={caldav?.calendars ?? []}
+        calendarUrl={caldav?.calendarUrl ?? ''}
+        status={(pushStatus?.data?.value as { at: string; ok: boolean; error?: string; created?: number; updated?: number; removed?: number; remaining?: number } | undefined) ?? null}
+      />
 
       {/* Portal self-view */}
       <PortalNotificationSettings currentIps={adminIps} requestIp={requestIp} />
