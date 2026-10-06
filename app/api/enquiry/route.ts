@@ -7,6 +7,9 @@
 // an email and nowhere else, so qualifying a lead meant going back through the
 // inbox and the CRM had a client record with a name and nothing behind it.
 //
+// Since the site added monthly content, the form only asks customer value and
+// ad spend when the enquiry includes an ad project, so either can be missing.
+//
 // The site still sends the email (see wireframe/api/enquiry.js in the rebrand
 // repo). This endpoint is additive, and deliberately so: if the CRM is down or
 // this route changes shape, the enquiry must still reach a human. The site
@@ -22,6 +25,7 @@ type Payload = {
   name?: string
   business?: string
   email?: string
+  interest?: string
   sell?: string
   value?: string
   spend?: string
@@ -104,10 +108,11 @@ export async function POST(req: Request) {
   const applicationNote = [
     '── Application from tuimedia.nz ──',
     body.name && `Name: ${body.name}`,
+    body.interest && `After: ${body.interest}`,
     body.sell && `Sells: ${body.sell}`,
     body.value && `Customer worth: ${body.value}`,
     body.spend && `Monthly ad spend: ${body.spend}`,
-    body.when && `Wants ads live: ${body.when}`,
+    body.when && `Wants to start: ${body.when}`,
     body.decision && `Signs it off: ${body.decision}`,
     body.capacity && `Capacity for more work: ${body.capacity}`,
     body.notes && `Notes: ${body.notes}`,
@@ -121,7 +126,10 @@ export async function POST(req: Request) {
     first_contact: new Date().toISOString(),
     pipeline_stage: 'enquiry',
     status: 'lead',
-    client_category: 'video_ads',
+    // The site offers monthly content alongside ad projects now. A lead that
+    // only wants the monthly option is retainer work; anything that includes
+    // an ad project (or hasn't said) stays a video ads lead.
+    client_category: body.interest === 'Monthly content' ? 'retainer' : 'video_ads',
     brand: 'tui_media',
     sells: body.sell?.trim() || null,
     customer_value: parseMoney(body.value),
@@ -145,10 +153,17 @@ export async function POST(req: Request) {
   let clientId: string | null = null
 
   if (existing) {
+    // Only what this application actually answered. A monthly-content
+    // application has no customer value or ad spend (the site only asks those
+    // about ad projects), and writing its nulls over a past ad application
+    // would erase answers the client gave the first time.
+    const answered = Object.fromEntries(
+      Object.entries(fields).filter(([, v]) => v !== null),
+    )
     const { error } = await supabase
       .from('clients')
       .update({
-        ...fields,
+        ...answered,
         // Never demote a client who is already won or active back to a lead
         // just because they applied again for a second project.
         status: existing.status === 'lead' ? 'lead' : existing.status,
