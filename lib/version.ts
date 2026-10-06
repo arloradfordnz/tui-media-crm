@@ -30,4 +30,7 @@
 // dashboard, linking straight to the revision to accept, decline or reply.
 // 3.5.1 — those rows name the client, job and deliverable; the retainer row
 // names who is owed; Tui's links land under the last bubble of a turn.
-export const APP_VERSION = '3.5.1'
+// 3.6.0 — client emails are read from the inbox, matched to the client by
+// sender, and summarised into a tailored line in Your week ("Marty's Meat
+// Smash wants to move Thursday's shoot"), clearing once you reply.
+export const APP_VERSION = '3.6.0'

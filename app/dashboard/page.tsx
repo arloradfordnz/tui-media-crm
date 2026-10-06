@@ -1,5 +1,8 @@
 import { Suspense } from 'react'
+import { after } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { createAdminClient } from '@/lib/supabase-admin'
+import { syncClientMail } from '@/lib/client-mail'
 import { getAttention, type AttentionItem, type WeekEvent } from '@/lib/attention'
 import { CheckCircle2, Plus, UserPlus } from 'lucide-react'
 import Link from 'next/link'
@@ -9,6 +12,8 @@ import SubscriptionsPanel from './SubscriptionsPanel'
 import TuiThread from '@/components/TuiThread'
 
 export const dynamic = 'force-dynamic'
+// The mail sync below runs in after(), which counts against this.
+export const maxDuration = 60
 
 // The home screen answers "what do I do now", not "how is the business doing".
 //
@@ -49,6 +54,15 @@ export default async function DashboardPage() {
   // The Tui panel below is deliberately not seeded from the shared thread, so
   // there is nothing else to fetch here.
   const attention = await getAttention(supabase, new Date())
+
+  // Pick up new client mail for the NEXT view of this page. Runs after the
+  // response is flushed — IMAP plus a model call per new email is seconds, and
+  // nothing above waits on it — and syncClientMail throttles itself to once
+  // per five minutes, so reloading does not re-read the mailbox.
+  const admin = createAdminClient()
+  if (admin) {
+    after(() => syncClientMail(admin).catch((err) => console.error('[client-mail] sync failed:', err)))
+  }
 
   const { todayISO, todayLabel, weekEvents, items } = attention
   const shown = items.slice(0, MAX_ITEMS)

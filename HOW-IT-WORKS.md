@@ -93,6 +93,26 @@ Xero before it could draw anything.
 
 ---
 
+## Client emails in Your week
+
+Mail from a client shows up on the dashboard as a line about that client, e.g.
+*Marty's Meat Smash wants to move Thursday's shoot*, rather than a generic
+"unread email".
+
+Opening the dashboard triggers `lib/client-mail.ts` after the page has
+rendered (at most once every five minutes). It reads the last 60 inbox
+messages over IMAP, keeps the ones sent from a client's `email` or
+`marketing_email` (or, failing that, a company domain only that client uses —
+never Gmail and friends), and has Haiku write the heading and a two-sentence
+summary for each new one. Only those are stored in `client_emails`; **the body
+is never saved**, and nothing is marked as read. Reply to the client from Apple
+Mail and the row leaves Your week on the next sync; anything older than ten
+days drops off regardless. Thank-yous and FYIs are filed but not shown.
+
+Mail from someone who is not on a client record is ignored. If a client writes
+from a new address, add it to their record. `POST /api/client-mail/sync`
+(signed in, or `Bearer CRON_SECRET`) forces a sync past the throttle.
+
 ## Jobs
 
 The list reflows on a narrow screen instead of scrolling sideways, so you keep

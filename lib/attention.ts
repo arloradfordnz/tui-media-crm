@@ -110,6 +110,7 @@ export async function getAttention(
     coldLeadsRes,
     handoversDueRes,
     pendingRevisionsRes,
+    clientEmailsRes,
     backlog,
   ] = await Promise.all([
     supabase
@@ -198,6 +199,21 @@ export async function getAttention(
       .is('responded_at', null)
       .order('created_at')
       .limit(10),
+    // Mail from a client that nothing has been sent back to — filed by
+    // lib/client-mail.ts, which turns each email into a heading about that
+    // client. Ten days is the cut-off: past that it is either dealt with in a
+    // way the sent folder did not record, or no longer news.
+    //
+    // Returns { data: null } rather than throwing if client_emails does not
+    // exist yet, absorbed by `?? []`.
+    supabase
+      .from('client_emails')
+      .select('id, heading, kind, received_at, client_id, clients(id, name)')
+      .eq('needs_action', true)
+      .is('answered_at', null)
+      .gte('received_at', new Date(now.getTime() - 10 * 86400000).toISOString())
+      .order('received_at')
+      .limit(10),
     // Best-effort: the backlog costs two nested queries, and losing it should
     // cost the backlog line, not the whole page.
     getContentBacklog(supabase, now).catch(() => null),
@@ -231,6 +247,25 @@ export async function getAttention(
         waiting <= 0 ? 'asked today' : `waiting ${plural(waiting, 'day')}`,
         ask ? `“${ask.length > 70 ? ask.slice(0, 70).trimEnd() + '…' : ask}”` : null,
       ].filter(Boolean).join(' · '),
+    })
+  }
+
+  // ── Client emails waiting on a reply ────────────────────────
+  // The heading is written per email ("wants to move Thursday's shoot"), so
+  // each row reads as news about that client. A reschedule or a payment query
+  // is time-sensitive; the rest are due.
+  for (const e of (clientEmailsRes?.data ?? []) as {
+    id: string; heading: string; kind: string; received_at: string; client_id: string
+    clients: { id: string; name: string } | null
+  }[]) {
+    const waiting = daysAgo(e.received_at, todayISO)
+    items.push({
+      id: `email:${e.id}`,
+      kind: 'client_email',
+      severity: e.kind === 'reschedule' || e.kind === 'payment' ? 'urgent' : 'due',
+      sentence: `${e.clients?.name ?? 'A client'} ${e.heading}`,
+      action: { label: 'Open client', href: `/dashboard/clients/${e.client_id}` },
+      meta: waiting <= 0 ? 'emailed today' : `emailed ${plural(waiting, 'day')} ago`,
     })
   }
 

@@ -29,10 +29,19 @@ export type EmailSummary = {
   to: string[]
 }
 
-/** Where sent mail actually lives on this account — see the folder probe run
- *  6 September 2026 (`imapflow`'s `list()`): a manually-organised mailbox with
- *  its own naming, not one of the auto-detected \\Sent special-use folders. */
-const SENT_MAILBOX = 'INBOX.Sent Messages'
+/** Where sent mail actually lives. Hard-coding a name went wrong twice: first
+ *  the account's manual "INBOX.Sent Messages", which the server later emptied
+ *  in favour of "INBOX.Sent" (found 7 October 2026 — the folder was reading 0
+ *  messages, so nothing ever counted as answered). The server flags the real
+ *  one \\Sent, so ask it. */
+async function resolveSentMailbox(client: ImapFlow): Promise<string> {
+  try {
+    const boxes = await client.list()
+    return boxes.find((b) => b.specialUse === '\\Sent')?.path ?? 'INBOX.Sent'
+  } catch {
+    return 'INBOX.Sent'
+  }
+}
 
 async function withClient<T>(fn: (client: ImapFlow) => Promise<T>): Promise<T | null> {
   const host = process.env.EMAIL_IMAP_HOST
@@ -164,7 +173,7 @@ export async function fetchMailAwaitingReply(limit = 6): Promise<WaitingEmail[]>
     // messages it has to cross-reference. Same window as the inbox read is
     // the simplest correct bound: nothing older than the oldest inbox
     // candidate needs an answer to be checked against.
-    const sent = await fetchMailboxEnvelopes(client, SENT_MAILBOX, 150).catch(() => [] as EmailSummary[])
+    const sent = await fetchMailboxEnvelopes(client, await resolveSentMailbox(client), 150).catch(() => [] as EmailSummary[])
     return { inbox, sent }
   })
   if (!result) return []
@@ -201,6 +210,154 @@ export async function fetchMailAwaitingReply(limit = 6): Promise<WaitingEmail[]>
     }))
     .sort((a, b) => b.ageDays - a.ageDays)
     .slice(0, limit)
+}
+
+// ── Inbox with message text, for client matching ────────────────────────────
+//
+// Everything above is envelope-only on purpose. Tailoring a heading to what a
+// client actually said needs the words, so this is the one place that reads
+// bodies — and it keeps the same guarantee: imapflow's download() issues
+// BODY.PEEK, the mailbox lock is read-only, and nothing here sets \\Seen.
+//
+// The text is returned to the caller to be summarised and thrown away. It is
+// never stored (see supabase/migrations/20261006_0001_client_emails.sql).
+
+export type InboxMessage = EmailSummary & {
+  /** RFC 822 Message-ID — the dedup key, since a sync re-reads the inbox. */
+  messageId: string
+  /** Plain text, quoted history trimmed, capped. Empty when unreadable. */
+  text: string
+}
+
+const BODY_CAP_BYTES = 12_000
+
+type StructureNode = {
+  part?: string
+  type?: string
+  disposition?: string
+  childNodes?: StructureNode[]
+}
+
+/** The best readable part: first text/plain, else first text/html. */
+function pickTextPart(node: StructureNode | undefined): { part: string; html: boolean } | null {
+  let html: string | null = null
+  const walk = (n: StructureNode): string | null => {
+    if (n.childNodes?.length) {
+      for (const child of n.childNodes) {
+        const found = walk(child)
+        if (found) return found
+      }
+      return null
+    }
+    if (n.disposition === 'attachment') return null
+    const part = n.part ?? '1'
+    if (n.type === 'text/plain') return part
+    if (n.type === 'text/html' && !html) html = part
+    return null
+  }
+  if (!node) return null
+  const plain = walk(node)
+  if (plain) return { part: plain, html: false }
+  return html ? { part: html, html: true } : null
+}
+
+function htmlToText(html: string): string {
+  return html
+    .replace(/<(style|script)[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<br\s*\/?>|<\/(p|div|tr|li)>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"')
+}
+
+/** Drop the quoted thread below the new reply — it is history, not news. */
+function stripQuoted(text: string): string {
+  const lines = text.replace(/\r/g, '').split('\n')
+  const out: string[] = []
+  for (const line of lines) {
+    if (/^On .+wrote:\s*$/i.test(line.trim()) || /^-{2,}\s*(Original|Forwarded) message/i.test(line.trim())) break
+    if (line.trim().startsWith('>')) continue
+    out.push(line)
+  }
+  return out.join('\n').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
+}
+
+async function readPartText(client: ImapFlow, uid: number, found: { part: string; html: boolean }): Promise<string> {
+  try {
+    const { content } = await client.download(String(uid), found.part, { uid: true, maxBytes: BODY_CAP_BYTES })
+    const chunks: Buffer[] = []
+    for await (const chunk of content) chunks.push(chunk as Buffer)
+    const raw = Buffer.concat(chunks).toString('utf8')
+    return stripQuoted(found.html ? htmlToText(raw) : raw).slice(0, 4000)
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Recent inbox messages WITH their text, plus the sent folder's envelopes so
+ * the caller can tell which ones have been answered. `alreadyKnown` lets the
+ * caller skip the body download for messages it has summarised before — the
+ * expensive part of a sync is bodies, and on most syncs there are none new.
+ */
+export async function fetchInboxForClientSync(
+  limit: number,
+  alreadyKnown: Set<string>,
+  /** Cheap pre-check on the envelope, so bodies are only downloaded for mail the caller will use. */
+  wantBody: (m: EmailSummary) => boolean = () => true
+): Promise<{ messages: InboxMessage[]; sent: EmailSummary[] } | null> {
+  return withClient(async (client) => {
+    const headers: { messageId: string; uid: number; summary: EmailSummary; structure?: StructureNode }[] = []
+    let messages: InboxMessage[] = []
+
+    const lock = await client.getMailboxLock('INBOX', { readOnly: true })
+    try {
+      const total = (await client.status('INBOX', { messages: true })).messages ?? 0
+      if (total > 0) {
+        const start = Math.max(1, total - limit + 1)
+        for await (const msg of client.fetch(`${start}:${total}`, {
+          uid: true, envelope: true, flags: true, bodyStructure: true, headers: BULK_HEADERS,
+        })) {
+          const raw = msg.headers?.toString('utf8').toLowerCase() ?? ''
+          const messageId = msg.envelope?.messageId
+          if (!messageId) continue
+          headers.push({
+            messageId,
+            uid: msg.uid,
+            structure: msg.bodyStructure as StructureNode | undefined,
+            summary: {
+              subject: msg.envelope?.subject ?? '(no subject)',
+              from: msg.envelope?.from?.[0]?.address?.toLowerCase() ?? 'unknown',
+              date: msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : null,
+              unread: !msg.flags?.has('\\Seen'),
+              flagged: !!msg.flags?.has('\\Flagged'),
+              bulk: BULK_HEADERS.some((h) => raw.includes(`${h}:`)),
+              to: [],
+            },
+          })
+        }
+      }
+
+      // Bodies are fetched after the envelope loop finishes: imapflow cannot
+      // run a second command while a fetch iterator is still open.
+      messages = []
+      for (const h of headers) {
+        if (h.summary.bulk) continue
+        let text = ''
+        if (!alreadyKnown.has(h.messageId) && wantBody(h.summary)) {
+          const found = pickTextPart(h.structure)
+          if (found) text = await readPartText(client, h.uid, found)
+        }
+        messages.push({ ...h.summary, messageId: h.messageId, text })
+      }
+
+    } finally {
+      lock.release()
+    }
+
+    // After the inbox lock is gone — a client holds one mailbox at a time.
+    const sent = await fetchMailboxEnvelopes(client, await resolveSentMailbox(client), 150).catch(() => [] as EmailSummary[])
+    return { messages, sent }
+  })
 }
 
 /** True only if login actually succeeds — used by the daily heartbeat to report real connectivity, not just "no results". */
