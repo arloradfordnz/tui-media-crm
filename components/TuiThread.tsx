@@ -538,6 +538,22 @@ export default function TuiThread({
           // receipt exists it says more than an animation can.
           const thinking = loading && isLast && m.role === 'assistant' && !m.content && receipts.length === 0
 
+          // A turn with several rounds of tools is several bubbles, and a link
+          // arrives attached to whichever one was open when the tool ran — so
+          // "View September Content" used to land mid-turn, above the
+          // deliverables still being added and the closing line. Links are
+          // what you do once it is all finished, so they gather onto the last
+          // bubble of the run of assistant messages.
+          const endsRun = m.role === 'assistant' && messages[i + 1]?.role !== 'assistant'
+          const runLinks: LinkOut[] = []
+          if (endsRun) {
+            for (let k = i; k >= 0 && messages[k].role === 'assistant'; k--) {
+              for (const l of messages[k].links ?? []) {
+                if (!runLinks.some((x) => x.path === l.path)) runLinks.unshift(l)
+              }
+            }
+          }
+
           return (
             <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className="max-w-[85%] space-y-1.5">
@@ -601,9 +617,9 @@ export default function TuiThread({
                   </div>
                 ))}
 
-                {(m.links ?? []).length > 0 && !loading && (
+                {runLinks.length > 0 && !loading && (
                   <div className="flex flex-wrap gap-1.5 justify-start">
-                    {(m.links ?? []).map((link, li) => (
+                    {runLinks.map((link, li) => (
                       <Link
                         key={li}
                         href={link.path}

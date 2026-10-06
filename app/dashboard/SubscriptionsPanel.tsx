@@ -36,6 +36,7 @@ type Subscription = {
 const SUBSCRIPTIONS: Subscription[] = [
   { name: 'Anthropic (Claude)', amount: 40.74, day: 5 },
   { name: 'iCloud+', amount: 6.10, day: 8 },
+  { name: 'Synology C2 Cloud Storage', amount: 7.99, day: 9 },
   { name: 'Xero', amount: 28.18, day: 13, note: 'Billed through WK Strawbridge' },
   { name: 'Google One', amount: 3.49, day: 16 },
   { name: 'Meta Verified (Instagram)', amount: 19.34, day: 26 },

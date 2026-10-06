@@ -69,16 +69,16 @@ export default function DashboardLoading() {
             </div>
           </section>
 
-          {/* Six subscription rows — the list is a fixed length, so the
+          {/* Seven subscription rows — the list is a fixed length, so the
               placeholder can be too. */}
           <section>
             <Heading w={104} />
             <div className="card-flush">
-              {[0, 1, 2, 3, 4, 5].map((i) => (
+              {[0, 1, 2, 3, 4, 5, 6].map((i) => (
                 <div
                   key={i}
                   className="flex items-center gap-3 px-4"
-                  style={{ paddingTop: 15, paddingBottom: 15, borderBottom: i === 5 ? 'none' : '1px solid var(--bg-border)' }}
+                  style={{ paddingTop: 15, paddingBottom: 15, borderBottom: i === 6 ? 'none' : '1px solid var(--bg-border)' }}
                 >
                   <div className="flex-1 space-y-2" style={{ minWidth: 0 }}>
                     <Line w={`${58 - i * 4}%`} h={14} />

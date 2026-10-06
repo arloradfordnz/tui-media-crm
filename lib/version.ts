@@ -26,4 +26,8 @@
 // 3.4.1 — web searches animate while they run (a sweeping magnifier and a
 // shimmering label), start the moment the search does, and show the query and
 // result count when done.
-export const APP_VERSION = '3.4.1'
+// 3.5.0 — unanswered client revision requests appear in Your week on the
+// dashboard, linking straight to the revision to accept, decline or reply.
+// 3.5.1 — those rows name the client, job and deliverable; the retainer row
+// names who is owed; Tui's links land under the last bubble of a turn.
+export const APP_VERSION = '3.5.1'

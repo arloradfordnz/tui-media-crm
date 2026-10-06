@@ -109,6 +109,7 @@ export async function getAttention(
     staleProposalsRes,
     coldLeadsRes,
     handoversDueRes,
+    pendingRevisionsRes,
     backlog,
   ] = await Promise.all([
     supabase
@@ -184,12 +185,54 @@ export async function getAttention(
       .not('status', 'in', '("archived")')
       .order('campaign_ends_at')
       .limit(10),
+    // Client revision requests nobody has answered. A reply alone stamps
+    // responded_at without leaving 'pending', so "unanswered" is both
+    // conditions — once Arlo has replied or accepted, it is off this list.
+    //
+    // Returns { data: null } rather than throwing if
+    // migration_revision_responses.sql hasn't been run, absorbed by `?? []`.
+    supabase
+      .from('revisions')
+      .select('id, round, request, created_at, job_id, jobs(id, name, clients(name)), deliverables(title)')
+      .eq('status', 'pending')
+      .is('responded_at', null)
+      .order('created_at')
+      .limit(10),
     // Best-effort: the backlog costs two nested queries, and losing it should
     // cost the backlog line, not the whole page.
     getContentBacklog(supabase, now).catch(() => null),
   ])
 
   const items: AttentionItem[] = []
+
+  // ── Client revision requests waiting on a response ──────────
+  // First, so they lead the urgent group: this is a client waiting on Arlo,
+  // and the link lands on the revision itself (?revision=) with the
+  // accept / decline / reply controls ready.
+  for (const r of (pendingRevisionsRes?.data ?? []) as {
+    id: string; round: number; request: string | null; created_at: string; job_id: string
+    jobs: { id: string; name: string; clients: { name: string } | null } | null
+    deliverables: { title: string } | null
+  }[]) {
+    const client = r.jobs?.clients?.name ?? 'A client'
+    // Client, then job, then deliverable — enough to know which one without
+    // opening it. A job-level revision has no deliverable, so it ends at the job.
+    const what = [r.jobs?.name, r.deliverables?.title].filter(Boolean).join(' · ')
+    const waiting = daysAgo(r.created_at, todayISO)
+    const ask = (r.request ?? '').replace(/\s+/g, ' ').trim()
+    items.push({
+      id: `revision:${r.id}`,
+      kind: 'revision_request',
+      severity: 'urgent',
+      sentence: `${client} wants revisions${what ? ` — ${what}` : ''}`,
+      action: { label: 'Review', href: `/dashboard/jobs/${r.job_id}?revision=${r.id}` },
+      meta: [
+        `Round ${r.round}`,
+        waiting <= 0 ? 'asked today' : `waiting ${plural(waiting, 'day')}`,
+        ask ? `“${ask.length > 70 ? ask.slice(0, 70).trimEnd() + '…' : ask}”` : null,
+      ].filter(Boolean).join(' · '),
+    })
+  }
 
   // ── Overdue tasks ───────────────────────────────────────────
   for (const t of (overdueTasksRes?.data ?? []) as {
@@ -261,7 +304,10 @@ export async function getAttention(
       id: 'backlog',
       kind: 'content_backlog',
       severity: 'due',
-      sentence: `${plural(backlog.totals.videos_owed, 'video')} owed across ${plural(backlog.totals.clients_behind, 'client')}`,
+      sentence: `${plural(backlog.totals.videos_owed, 'video')} owed — ${backlog.clients
+        .filter((c) => c.videosOwed > 0)
+        .map((c) => `${c.clientName} (${c.videosOwed})`)
+        .join(', ')}`,
       action: { label: 'Open retainers', href: '/dashboard/retainers' },
       meta: backlog.totals.months_never_started > 0
         ? `${plural(backlog.totals.months_never_started, 'month')} never set up`
