@@ -15,40 +15,25 @@ Font.register({
   ],
 })
 
-Font.register({
-  family: 'Patrick Hand',
-  src: '/fonts/patrick-hand.ttf',
-})
-
-// Brand tokens — kept in sync with wireframe/PALETTES.md (blue palette).
-// Paper/ink/accent are the dark-cover colours; the "print" variants are
-// deepened so the same hue still reads on white paper.
-const BRAND = {
-  paper: '#060D1A',
-  ink: '#EFF2F8',
-  mutedOnDark: '#8996B2',
-  accent: '#6E9BF7',
-  navy: '#0B1220',
-  muted: '#6B7280',
-  accentPrint: '#3D63C9',
-  rule: '#E3E6EC',
-}
-
+// Black and white only. Bricolage Grotesque (the website's typeface) on
+// plain white paper, signatures included; greys exist only for secondary
+// text and hairlines.
 const C = {
-  black: BRAND.navy,
-  grey: BRAND.muted,
-  lgrey: BRAND.rule,
-  dgrey: '#444444',
+  black: '#111111', // the website logo's black
+  grey: '#6B6B6B',
+  lgrey: '#E5E5E5',
+  dgrey: '#333333',
 }
 
 const styles = StyleSheet.create({
   page: {
     fontFamily: 'Bricolage Grotesque',
-    fontSize: 11,
+    fontSize: 10.5,
     color: C.black,
-    paddingTop: 48,
-    paddingBottom: 60,
-    paddingHorizontal: 52,
+    backgroundColor: '#FFFFFF',
+    paddingTop: 56,
+    paddingBottom: 64,
+    paddingHorizontal: 60,
   },
 
   // ── Header ──────────────────────────────────────────────────────────────
@@ -58,100 +43,52 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 6,
   },
-  headerTitle: {
-    fontFamily: 'Bricolage Grotesque',
-    fontWeight: 600,
-    fontSize: 22,
-    color: C.black,
-    lineHeight: 1.2,
-  },
-  headerClient: {
-    fontSize: 10,
-    color: C.grey,
-    marginTop: 6,
-    lineHeight: 1.5,
-  },
-  headerDate: {
-    fontSize: 9,
-    color: C.grey,
-    marginTop: 2,
-  },
+  headerTitle: { fontWeight: 600, fontSize: 16, color: C.black, lineHeight: 1.2 },
+  headerClient: { fontSize: 9.5, color: C.grey, marginTop: 6, lineHeight: 1.5 },
+  headerDate: { fontSize: 9.5, color: C.grey, marginTop: 1 },
 
   // ── Rule ────────────────────────────────────────────────────────────────
-  rule: {
-    borderBottomWidth: 0.5,
-    borderBottomColor: C.lgrey,
-    marginTop: 14,
-    marginBottom: 0,
-  },
-  accentRule: {
-    borderBottomWidth: 2,
-    borderBottomColor: BRAND.accentPrint,
-    width: 48,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-
-  // ── Section label ────────────────────────────────────────────────────────
-  sectionLabel: {
-    fontFamily: 'Bricolage Grotesque',
-    fontWeight: 600,
-    fontSize: 8,
-    color: BRAND.accentPrint,
-    letterSpacing: 1.4,
-    marginTop: 16,
-    marginBottom: 6,
-  },
+  rule: { borderBottomWidth: 0.5, borderBottomColor: C.lgrey, marginTop: 16 },
 
   // ── Body text ────────────────────────────────────────────────────────────
-  paragraph: { fontSize: 11, color: C.black, lineHeight: 1.8, marginBottom: 8 },
-  h1: {
-    fontFamily: 'Bricolage Grotesque',
-    fontWeight: 800,
-    fontSize: 30,
-    color: BRAND.navy,
-    marginTop: 26,
-    marginBottom: 2,
-    lineHeight: 1.05,
-    letterSpacing: -0.5,
-  },
-  h3: { fontFamily: 'Bricolage Grotesque', fontWeight: 600, fontSize: 11, color: C.black, marginTop: 12, marginBottom: 3 },
+  paragraph: { fontSize: 10.5, color: C.black, lineHeight: 1.65, marginBottom: 8 },
+  h1: { fontWeight: 600, fontSize: 13, color: C.black, marginTop: 24, marginBottom: 8 },
+  h3: { fontWeight: 600, fontSize: 10.5, color: C.black, marginTop: 10, marginBottom: 3 },
 
   // ── Signature ────────────────────────────────────────────────────────────
   signatureBlock: { flexDirection: 'row', marginTop: 32, gap: 36 },
   signatureCol:   { flex: 1 },
   signatureField: { position: 'relative', height: 26, marginBottom: 12 },
-  signatureFieldLine: { position: 'absolute', bottom: 0, left: 44, right: 0, height: 0, borderBottomWidth: 0.5, borderBottomColor: C.lgrey },
-  signatureFieldLabel: { position: 'absolute', bottom: 4, left: 0, fontFamily: 'Bricolage Grotesque', fontWeight: 600, fontSize: 10, color: C.black },
-  signatureTyped: { position: 'absolute', bottom: 2, left: 50, fontFamily: 'Patrick Hand', fontSize: 18, color: C.black, lineHeight: 1 },
-  signatureDateValue: { position: 'absolute', bottom: 3, left: 50, fontFamily: 'Patrick Hand', fontSize: 13, color: C.dgrey, lineHeight: 1 },
-  signatureName: { fontFamily: 'Bricolage Grotesque', fontWeight: 600, fontSize: 11, color: C.black, marginTop: 6 },
-  signaturePrinted: { fontSize: 10, color: C.grey, marginTop: 2 },
+  signatureFieldLine: { position: 'absolute', bottom: 0, left: 44, right: 0, height: 0, borderBottomWidth: 0.5, borderBottomColor: C.black },
+  signatureFieldLabel: { position: 'absolute', bottom: 4, left: 0, fontSize: 9.5, color: C.grey },
+  signatureTyped: { position: 'absolute', bottom: 3, left: 50, fontWeight: 600, fontSize: 13, color: C.black, lineHeight: 1 },
+  signatureDateValue: { position: 'absolute', bottom: 3, left: 50, fontSize: 10.5, color: C.dgrey, lineHeight: 1 },
+  signatureName: { fontWeight: 600, fontSize: 10.5, color: C.black, marginTop: 6 },
+  signaturePrinted: { fontSize: 9.5, color: C.grey, marginTop: 2 },
 
   // ── Footer ───────────────────────────────────────────────────────────────
-  footer: { position: 'absolute', bottom: 24, left: 52, right: 52, flexDirection: 'row', justifyContent: 'space-between', fontSize: 9, color: C.grey },
+  footer: { position: 'absolute', bottom: 28, left: 60, right: 60, flexDirection: 'row', justifyContent: 'space-between', fontSize: 8.5, color: C.grey },
 
   // ── Cover page (Contract only) ──────────────────────────────────────────
   cover: {
     fontFamily: 'Bricolage Grotesque',
-    backgroundColor: BRAND.paper,
-    color: BRAND.ink,
-    paddingTop: 48,
-    paddingBottom: 48,
-    paddingHorizontal: 52,
+    backgroundColor: '#FFFFFF',
+    color: C.black,
+    paddingTop: 56,
+    paddingBottom: 56,
+    paddingHorizontal: 60,
     flexDirection: 'column',
   },
   coverTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  coverDocNumber: { fontSize: 9, color: BRAND.mutedOnDark, letterSpacing: 1, marginTop: 4 },
+  coverDocNumber: { fontSize: 9, color: C.grey, marginTop: 4 },
   coverSpacer: { flexGrow: 1 },
-  coverKicker: { fontSize: 10, color: BRAND.accent, letterSpacing: 2, marginBottom: 10 },
-  coverHeadline: { fontFamily: 'Bricolage Grotesque', fontWeight: 800, fontSize: 56, color: BRAND.ink, lineHeight: 0.98, letterSpacing: -1 },
-  coverRule: { borderBottomWidth: 1, borderBottomColor: 'rgba(239,242,248,0.18)', marginTop: 28, marginBottom: 20 },
+  coverHeadline: { fontWeight: 600, fontSize: 32, color: C.black, lineHeight: 1.1, letterSpacing: -0.5 },
+  coverRule: { borderBottomWidth: 0.5, borderBottomColor: C.lgrey, marginTop: 28, marginBottom: 20 },
   coverMetaRow: { flexDirection: 'row', justifyContent: 'space-between' },
   coverMetaCol: { maxWidth: '46%' },
-  coverMetaLabel: { fontSize: 8, color: BRAND.mutedOnDark, letterSpacing: 1.4, marginBottom: 4 },
-  coverMetaValue: { fontSize: 12, fontWeight: 600, color: BRAND.ink, lineHeight: 1.4 },
-  coverMetaSub: { fontSize: 9, color: BRAND.mutedOnDark, marginTop: 2 },
+  coverMetaLabel: { fontSize: 8, color: C.grey, letterSpacing: 1, marginBottom: 4 },
+  coverMetaValue: { fontSize: 11, fontWeight: 600, color: C.black, lineHeight: 1.4 },
+  coverMetaSub: { fontSize: 9.5, color: C.grey, marginTop: 2 },
 })
 
 type FormData = {
@@ -185,7 +122,7 @@ function TuiLogo({ fill = C.black }: { fill?: string }) {
       </G>
       <G>
         <Path d="M145.74,234c-8.53-15.34-30.37-46.95-30.12-53.57.05-1.35.41-2.6.41-2.6,1.27-3.08,2.84-7.57,3.75-13.14,1.04-6.3,1.03-12.62-.32-21.43-1.07-6.99-3.39-20.63-10.94-36.78-11.78-25.17-29.53-40.9-40.11-48.89,2.72-12.63-4.25-12.73-5.21-16.31-.5-1.85.56-3.47,1.35-4.88,5.06-9.1,4.43-9.87,6.42-12.53,4.62-6.15,15.36-11.86,29.13-13.48,2.24-.51,2.72-1.11,2.78-1.54.18-1.33-3.38-3.07-5.63-3.75-4.49-1.36-7.08-1.08-15.5-.19-9.58,1.01-10.91-3.42-22.22-4.51C28.54-2.59,26.9,11.7,15.87,34.61c-4.34,9.04-6.63,13.47-8.37,18.46-.95,2.71-2.97,9.06-4.46,18.31-2.18,13.53-4.88,30.25-1.26,49.25,5.64,29.65,26.71,65.26,52.74,73.33,4.35,1.35,9.12,2.02,12.71,6.38,7.38,8.97,4.85,27.62,9.96,35.1.41.59,1.29,2.09,3.1,2.94,3.27,1.53,6.74-.48,7.85.76,2.55,16.48,11.45,26.09,18.16,25.36,5.05-.55,8.45-6.92,9.75-9.71.39.3,5.3,3.91,11.26,1.88,5.44-1.86,7.29-6.89,7.51-7.51,2.41.64,12.18,3.09,15.01-.95,1.87-2.67-.13-7.1-4.08-14.22Z" fill={fill} />
-        <Ellipse cx="61.72" cy="54.04" rx="8.92" ry="11.37" fill={fill === C.black ? '#fff' : BRAND.paper} stroke={fill} strokeWidth={2.18} />
+        <Ellipse cx="61.72" cy="54.04" rx="8.92" ry="11.37" transform="translate(-8.51, 11.64) rotate(-10.08)" fill="#FFFFFF" stroke={fill} strokeWidth={2.18} />
       </G>
     </Svg>
   )
@@ -224,18 +161,12 @@ function renderBody(body: string): ReactElement[] {
     const h3 = /^###\s+(.+)/.exec(line)
     if (h1) {
       flush()
-      // Big poster-style section headline — the Tui contract's signature move.
-      out.push(
-        <View key={key++} wrap={false}>
-          <Text style={styles.h1}>{h1[1].toUpperCase()}</Text>
-          <View style={styles.accentRule} />
-        </View>
-      )
+      out.push(<Text key={key++} style={styles.h1} minPresenceAhead={40}>{renderInline(h1[1])}</Text>)
       continue
     }
     if (h2) {
       flush()
-      out.push(<View key={key++}><View style={styles.rule} /><Text style={styles.sectionLabel}>{h2[1].toUpperCase()}</Text></View>)
+      out.push(<Text key={key++} style={styles.h1} minPresenceAhead={40}>{renderInline(h2[1])}</Text>)
       continue
     }
     if (h3) { flush(); out.push(<Text key={key++} style={styles.h3}>{renderInline(h3[1])}</Text>); continue }
@@ -254,7 +185,7 @@ function ContractCover({ form, documentNumber }: { form: FormData; documentNumbe
     <Page size="A4" style={styles.cover}>
       <View style={styles.coverTopRow}>
         <View>
-          <TuiLogo fill={BRAND.ink} />
+          <TuiLogo />
           <Text style={styles.coverDocNumber}>{documentNumber}</Text>
         </View>
         {formattedDate ? <Text style={[styles.coverDocNumber, { textAlign: 'right' }]}>{formattedDate}</Text> : null}
@@ -263,8 +194,7 @@ function ContractCover({ form, documentNumber }: { form: FormData; documentNumbe
       <View style={styles.coverSpacer} />
 
       <View>
-        <Text style={styles.coverKicker}>NOT AN AGENCY</Text>
-        <Text style={styles.coverHeadline}>CLIENT{'\n'}CONTRACT</Text>
+        <Text style={styles.coverHeadline}>Client contract</Text>
       </View>
 
       <View style={styles.coverRule} />
@@ -317,7 +247,7 @@ export default function TuiDocument({ template, form }: { template: string; form
         <View>
           {form.jobDescription ? (
             <View>
-              <Text style={styles.sectionLabel}>PROJECT</Text>
+              <Text style={styles.h1}>Project</Text>
               <Text style={styles.paragraph}>{form.jobDescription}</Text>
             </View>
           ) : null}
@@ -329,8 +259,7 @@ export default function TuiDocument({ template, form }: { template: string; form
         <View wrap={false}>
           {isContract && (
             <View>
-              <Text style={styles.h1}>APPROVAL</Text>
-              <View style={styles.accentRule} />
+              <Text style={styles.h1}>Approval</Text>
               <Text style={styles.paragraph}>
                 By signing below, both parties agree to the scope, terms and payment set out in this contract.
               </Text>

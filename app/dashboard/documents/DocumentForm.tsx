@@ -48,7 +48,7 @@ async function fetchNextDocumentNumber(): Promise<string> {
   return '#100'
 }
 
-export type CreateMode = { kind: 'create'; initialClientId?: string }
+export type CreateMode = { kind: 'create'; initialClientId?: string; contractTemplate?: string }
 export type EditMode = {
   kind: 'edit'
   docId: string
@@ -89,6 +89,8 @@ export default function DocumentForm({ clients, mode }: { clients: ClientOption[
     if (mode.kind === 'edit') return { ...EMPTY_FORM, ...mode.initialForm }
     return {
       ...EMPTY_FORM,
+      // New contracts start from the saved contract template.
+      body: mode.contractTemplate || '',
       clientName: initialClient?.name || '',
       contactPerson: initialClient?.contactPerson || '',
       clientEmail: initialClient?.email || '',
@@ -143,6 +145,15 @@ export default function DocumentForm({ clients, mode }: { clients: ClientOption[
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Switching to Contract on an empty body fills in the saved contract wording,
+  // so the default template is there whichever way you arrive at it.
+  function handleTemplateChange(next: string) {
+    setTemplate(next)
+    if (mode.kind !== 'create' || !mode.contractTemplate) return
+    if (next === 'Contract' && !form.body.trim()) update('body', mode.contractTemplate)
+    else if (next !== 'Contract' && form.body.trim() === mode.contractTemplate.trim()) update('body', '')
+  }
 
   const fileNameSafe = `${template.replace(/\s+/g, '_')}_${form.clientName || 'document'}.pdf`
   const inferredName = `${template} - ${form.clientName || 'Untitled'}`
@@ -335,7 +346,7 @@ async function persistNew() {
         <div style={{ minWidth: '200px' }}>
           <CustomSelect
             value={template}
-            onChange={setTemplate}
+            onChange={handleTemplateChange}
             options={TEMPLATES.map((t) => ({ value: t, label: t }))}
           />
         </div>

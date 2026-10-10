@@ -5,6 +5,7 @@ import { fetchRecentEmails, fetchUnreadEmails } from '@/lib/mail'
 import { getContentBacklog, parseJobMonth } from '@/lib/content-backlog'
 import { findDuplicateJobName } from '@/lib/job-naming'
 import { syncShootEvent, removeShootEvent } from '@/lib/job-calendar'
+import { getContractTemplate, saveContractTemplate, nextDocumentNumber, unfilledPlaceholders } from '@/lib/document-templates'
 
 // Shared tool definitions + executor for every AI surface (dashboard chat,
 // SMS assistant). One tool set, one set of side effects — a job marked
@@ -39,6 +40,7 @@ export const MUTATING_TOOLS = new Set([
   'create_job', 'update_job', 'update_job_status', 'delete_job', 'toggle_task',
   'create_event', 'delete_event',
   'create_document', 'delete_document',
+  'update_contract_template', 'create_contract', 'update_contract',
   'create_deliverable',
   'create_todo', 'complete_todo',
   'create_xero_invoice', 'approve_xero_invoice', 'send_xero_invoice', 'void_xero_invoice', 'delete_xero_invoice', 'update_xero_invoice', 'remove_xero_payment',
@@ -399,6 +401,58 @@ export const TOOLS: Anthropic.Tool[] = [
         content: { type: 'string', description: 'Document body text' },
       },
       required: ['name'],
+    },
+  },
+  {
+    name: 'get_contract_template',
+    description: 'Read the default Tui Media contract wording that every new contract starts from. Square brackets are blanks to fill per client. Read it before editing it or drafting a contract.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'update_contract_template',
+    description: 'Replace the default contract wording. Pass the COMPLETE new body (read it with get_contract_template first and change only what Arlo asked for). Markdown: "# Heading" for a section heading, **bold**, blank line between paragraphs, no bullet lists, no em dashes. Keep [square brackets] for per-client blanks. This only changes future contracts, not ones already created.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        body: { type: 'string', description: 'The full contract body in markdown.' },
+      },
+      required: ['body'],
+    },
+  },
+  {
+    name: 'create_contract',
+    description: 'Create a Tui Media contract for a client from the default template. It is saved straight into the CRM and shows in the client portal. It is NOT emailed. Fill every [square bracket] in the body from what you know; never invent a fee, date or term, leave the bracket and tell Arlo what is missing. If you omit body, the template is used as it stands.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        client_id: { type: 'string', description: 'Client UUID from search_clients.' },
+        job_description: { type: 'string', description: 'One line describing the project.' },
+        shoot_date: { type: 'string', description: 'YYYY-MM-DD' },
+        date: { type: 'string', description: 'Contract date, YYYY-MM-DD. Defaults to today.' },
+        location: { type: 'string' },
+        body: { type: 'string', description: 'Contract body in markdown with the brackets filled in. Defaults to the template.' },
+      },
+      required: ['client_id'],
+    },
+  },
+  {
+    name: 'update_contract',
+    description: 'Edit an existing contract (not yet signed by the client): its body wording, project line, dates or location. Pass only what changes. Refuses once the client has signed.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        document_id: { type: 'string' },
+        body: { type: 'string', description: 'The complete new body in markdown.' },
+        job_description: { type: 'string' },
+        shoot_date: { type: 'string', description: 'YYYY-MM-DD' },
+        date: { type: 'string', description: 'YYYY-MM-DD' },
+        location: { type: 'string' },
+      },
+      required: ['document_id'],
     },
   },
   {
@@ -1116,6 +1170,79 @@ export async function executeTool(
       }).select('id, name').single()
       if (error) return JSON.stringify({ error: error.message })
       return JSON.stringify({ success: true, document: data })
+    }
+
+    case 'get_contract_template': {
+      const t = await getContractTemplate(supabase)
+      return JSON.stringify({ body: t.body, is_default: t.isDefault, updated_at: t.updatedAt })
+    }
+
+    case 'update_contract_template': {
+      const result = await saveContractTemplate(supabase, String(input.body ?? ''))
+      if (result.error) return JSON.stringify({ error: result.error })
+      return JSON.stringify({ success: true, note: 'Future contracts will start from this wording. Existing contracts are unchanged.' })
+    }
+
+    case 'create_contract': {
+      const { data: client, error: clientError } = await supabase.from('clients').select('id, name, contact_person, email, phone, location, portal_token').eq('id', input.client_id as string).single()
+      if (clientError || !client) return JSON.stringify({ error: clientError ? dbErrorMessage(clientError) : 'No such client.' })
+
+      const body = typeof input.body === 'string' && input.body.trim() ? (input.body as string) : (await getContractTemplate(supabase)).body
+      const documentNumber = await nextDocumentNumber(supabase)
+      const form = {
+        clientName: client.name,
+        contactPerson: client.contact_person || '',
+        clientEmail: client.email || '',
+        clientPhone: client.phone || '',
+        businessName: client.name,
+        date: (input.date as string) || new Date().toISOString().split('T')[0],
+        jobDescription: (input.job_description as string) || '',
+        shootDate: (input.shoot_date as string) || '',
+        location: (input.location as string) || client.location || '',
+        body,
+        clientSignature: '',
+        clientSignedAt: '',
+        documentNumber,
+      }
+      const docName = `Contract - ${client.name}`
+      const { data: doc, error } = await supabase.from('documents').insert({
+        name: docName,
+        doc_type: 'contract',
+        content: JSON.stringify({ template: 'Contract', form }),
+        client_id: client.id,
+      }).select('id').single()
+      if (error || !doc) return JSON.stringify({ error: error?.message || 'Could not save the contract.' })
+
+      if (!client.portal_token) await supabase.from('clients').update({ portal_token: crypto.randomUUID() }).eq('id', client.id)
+      await supabase.from('activities').insert({ action: 'document_created', details: `Contract "${docName}" created for ${client.name}`, client_id: client.id })
+      return JSON.stringify({
+        success: true,
+        document_id: doc.id,
+        document_number: documentNumber,
+        link: `/dashboard/documents/${doc.id}`,
+        unfilled_placeholders: unfilledPlaceholders(body),
+        note: 'Saved and visible in the client portal. Not emailed. Tell Arlo about any unfilled placeholders.',
+      })
+    }
+
+    case 'update_contract': {
+      const { data: doc, error: docError } = await supabase.from('documents').select('id, content').eq('id', input.document_id as string).single()
+      if (docError || !doc) return JSON.stringify({ error: docError ? dbErrorMessage(docError) : 'No such document.' })
+      let parsed: { template?: string; form?: Record<string, unknown> }
+      try { parsed = JSON.parse(doc.content) } catch { return JSON.stringify({ error: 'That document is free text, not a structured contract, so it cannot be edited this way.' }) }
+      if (!parsed?.form) return JSON.stringify({ error: 'That document has no contract fields to edit.' })
+      if (parsed.form.clientSignature) return JSON.stringify({ error: 'The client has already signed this contract, so it is locked. Create a new contract instead.' })
+
+      const form = { ...parsed.form }
+      if (typeof input.body === 'string' && input.body.trim()) form.body = input.body
+      if (typeof input.job_description === 'string') form.jobDescription = input.job_description
+      if (typeof input.shoot_date === 'string') form.shootDate = input.shoot_date
+      if (typeof input.date === 'string') form.date = input.date
+      if (typeof input.location === 'string') form.location = input.location
+
+      const { error } = await supabase.from('documents').update({ content: JSON.stringify({ ...parsed, form }) }).eq('id', doc.id)
+      if (error) return JSON.stringify({ error: error.message })
+      return JSON.stringify({ success: true, unfilled_placeholders: unfilledPlaceholders(String(form.body ?? '')) })
     }
 
     case 'delete_document': {

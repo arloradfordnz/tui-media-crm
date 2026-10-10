@@ -50,4 +50,8 @@
 // 3.9.0 — the dashboard's money graph moves under Tui and stretches so both
 // columns finish level; subscriptions move into a table and Tui can add,
 // change and cancel them.
-export const APP_VERSION = '3.9.0'
+// 3.10.0 — the contract PDF is redesigned (white, black and white only, the
+// website logo and font, one heading size), and the default contract wording
+// is a saved template that can be edited in Documents or by Tui, which can
+// also create and edit contracts.
+export const APP_VERSION = '3.10.0'

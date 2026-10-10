@@ -1,6 +1,6 @@
 ---
 name: tui-contract
-description: Draft a Tui Media client contract and save it directly into the CRM so it appears in the client's portal immediately, in the brand's poster-style contract template. Use whenever asked to draft, create, write, or issue a Tui Media contract for a client.
+description: Draft a Tui Media client contract and save it directly into the CRM so it appears in the client's portal immediately, in the brand's minimal black-and-white contract template. Use whenever asked to draft, create, write, or issue a Tui Media contract for a client.
 ---
 
 # Tui Media contract
@@ -13,8 +13,8 @@ uses — so it shows up in `/dashboard/documents` and the client's
 ## The visual style is fixed — don't design it in chat
 
 The "same style every time" part is handled by code, not by you. The
-contract's look — dark navy poster cover, huge bold section headlines in
-Bricolage Grotesque, the accent-blue rule, the approval/signature page — all
+contract's look — plain white cover, black-and-white only, modest bold
+section headings in Bricolage Grotesque, the approval/signature page — all
 lives in
 [`app/dashboard/documents/TuiPdfDocument.tsx`](../../../app/dashboard/documents/TuiPdfDocument.tsx),
 gated on `template === 'Contract'`. Your job is only to gather the right
@@ -39,8 +39,14 @@ into the single project fee — not billed separately. At the end of that
 month, the client gets everything: raw footage, final cuts, and the ad
 account itself. No guarantees of results, no retainer, no lock-in.
 
-Draft the `body` markdown using these section headings unless the user gives
-you different ones — each becomes a big bold headline in the PDF:
+The standard wording lives in the CRM as the **contract template** (Documents >
+Contract template; Tui can edit it too). If the payload has no `body`, the
+script uses that saved template as it stands, with its `[square brackets]`
+still unfilled, so normally write a `body` from it with the brackets filled in.
+Never invent a fee, date or term to fill one.
+
+Otherwise draft the `body` markdown using these section headings unless the user gives
+you different ones — each becomes a bold section heading in the PDF:
 
 ```
 # Scope of Work
@@ -68,9 +74,9 @@ duplicate it.
 
 ### Markdown conventions the renderer understands
 
-- `# Heading` → big poster-style section headline (this is the house style —
+- `# Heading` → bold section heading (this is the house style —
   use it for every major section above)
-- `## Heading` → small accent-blue caps label (for a minor sub-point inside a
+- `## Heading` → small grey caps label (for a minor sub-point inside a
   section, used sparingly)
 - `### Heading` → small bold heading
 - `**text**` → bold inline

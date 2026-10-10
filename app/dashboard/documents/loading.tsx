@@ -5,7 +5,7 @@ import { Line, PageHeader } from '@/components/Skeleton'
 export default function DocumentsLoading() {
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader subtitle actions={1} />
+      <PageHeader subtitle actions={2} />
       <div className="card space-y-4">
         <div className="flex items-center justify-between gap-3">
           <Line w={130} h={20} />

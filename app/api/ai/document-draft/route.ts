@@ -51,8 +51,8 @@ VOICE. Plain and direct. No marketing words used only to sound impressive. Never
 
 const FORMAT_RULES = `FORMAT. The document is rendered by a PDF generator that understands exactly four things. Use only these:
 
-# A heading         renders as a large poster-style headline in caps with an accent rule under it. Use it at most once or twice.
-## A heading        renders as a section label in caps above a hairline rule. This is the workhorse for section titles.
+# A heading         renders as a bold section heading in normal case. Use it for each major section.
+## A heading        renders as a small grey label in caps, for a minor sub-point inside a section.
 ### A heading       renders as a small inline heading in normal case.
 **bold**            renders as bold inside a paragraph.
 

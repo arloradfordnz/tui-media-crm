@@ -6,6 +6,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { sendAdminDocumentSignedEmail } from '@/lib/email'
 import { headers } from 'next/headers'
+import { DEFAULT_CONTRACT_BODY, saveContractTemplate } from '@/lib/document-templates'
 
 // Service-role client bypasses RLS. The portal/client table is anon-readable
 // but anon cannot UPDATE documents/INSERT activities — we authorise the
@@ -244,4 +245,26 @@ export async function submitDocumentFeedback(
   revalidatePath('/portal/')
   revalidatePath(`/dashboard/documents/${docId}`)
   return { success: true }
+}
+
+// The default contract wording. Writes go through the signed-in client, so
+// the admin-only RLS policy on document_templates is the authorisation.
+export async function updateContractTemplate(body: string): Promise<{ error?: string }> {
+  const supabase = await createServerSupabaseClient()
+  const result = await saveContractTemplate(supabase, body)
+  if (!result.error) {
+    revalidatePath('/dashboard/documents')
+    revalidatePath('/dashboard/documents/template')
+  }
+  return result
+}
+
+export async function resetContractTemplate(): Promise<{ error?: string; body: string }> {
+  const supabase = await createServerSupabaseClient()
+  const result = await saveContractTemplate(supabase, DEFAULT_CONTRACT_BODY)
+  if (!result.error) {
+    revalidatePath('/dashboard/documents')
+    revalidatePath('/dashboard/documents/template')
+  }
+  return { ...result, body: DEFAULT_CONTRACT_BODY }
 }

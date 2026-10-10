@@ -107,6 +107,13 @@ async function nextDocumentNumber() {
   return `#${max + 1}`
 }
 
+// The saved default contract wording (Documents > Contract template), when the
+// payload doesn't bring its own body.
+async function defaultBody() {
+  const { data } = await supabase.from('document_templates').select('body').eq('template', 'Contract').maybeSingle()
+  return data?.body || ''
+}
+
 async function main() {
   const client = await resolveClient(payload.client)
 
@@ -134,7 +141,7 @@ async function main() {
     jobDescription: payload.jobDescription || '',
     shootDate: payload.shootDate || '',
     location: payload.location || client.location || '',
-    body: payload.body || '',
+    body: payload.body || (await defaultBody()),
     clientSignature: '',
     clientSignedAt: '',
     documentNumber,
