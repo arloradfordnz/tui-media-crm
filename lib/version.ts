@@ -41,4 +41,13 @@
 // glass button beside it.
 // 3.7.1 — the tab bar's highlight can be pressed and dragged like iOS 26
 // glass, and focusing a field (the Tui message box) no longer zooms the page.
-export const APP_VERSION = '3.7.1'
+// 3.8.0 — Tui: a dropped connection no longer wipes the reply or says "try
+// again" after work saved (it keeps the receipts and says what went through),
+// the server finishes a turn even if the phone disconnects, and creating a
+// client twice is guarded. Booking a new client's job is one call with the
+// status, notes and agreed price read from the email thread, template tasks
+// insert in one batch, and the dashboard chat runs on Claude Haiku 5.5.
+// 3.9.0 — the dashboard's money graph moves under Tui and stretches so both
+// columns finish level; subscriptions move into a table and Tui can add,
+// change and cancel them.
+export const APP_VERSION = '3.9.0'

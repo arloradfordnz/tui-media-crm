@@ -19,7 +19,13 @@ import MoneyMiniChart from './MoneyMiniChart'
 
 const MONTHS = 6
 
-export default async function MoneyPanel() {
+/**
+ * `fill`: the panel stretches to take whatever height its column has spare and
+ * the chart grows to match, so the dashboard's two columns finish level however
+ * long the right-hand one gets. The CSS that does the stretching only applies
+ * at the two-column width; stacked, the chart is its usual 240px.
+ */
+export default async function MoneyPanel({ fill = false }: { fill?: boolean } = {}) {
   let monthly: Awaited<ReturnType<typeof fetchMonthlyPnlCached>> = null
   try {
     monthly = await fetchMonthlyPnlCached(MONTHS)
@@ -30,7 +36,7 @@ export default async function MoneyPanel() {
 
   if (!monthly || monthly.length === 0) {
     return (
-      <Shell>
+      <Shell fill={fill}>
         <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
           No Xero figures yet. <Link href="/dashboard/finance" style={{ color: 'var(--accent)' }}>Connect Xero</Link> to see money
           in against money out here.
@@ -45,10 +51,10 @@ export default async function MoneyPanel() {
   const net = rows.reduce((a, m) => a + m.income - m.expenses, 0)
 
   return (
-    <Shell>
+    <Shell fill={fill}>
       {/* Figures and chart are one client component: the figures toggle which
           line is isolated, so they have to share that state with the chart. */}
-      <MoneyMiniChart inData={inData} outData={outData} net={net} />
+      <MoneyMiniChart inData={inData} outData={outData} net={net} fill={fill} />
       <p className="text-2xs mt-2" style={{ color: 'var(--text-tertiary)' }}>
         Up to the last {rows.length} months, from Xero. The chart drops the
         oldest months when the column is too narrow to label them all.
@@ -57,9 +63,9 @@ export default async function MoneyPanel() {
   )
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ children, fill = false }: { children: React.ReactNode; fill?: boolean }) {
   return (
-    <section>
+    <section className={`today-money${fill ? ' money-fill' : ''}`}>
       <div className="section-head">
         <h2 className="section-heading">Money</h2>
         <Link href="/dashboard/finance" className="section-head-meta" style={{ color: 'var(--accent)' }}>
@@ -71,9 +77,9 @@ function Shell({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function MoneyPanelSkeleton() {
+export function MoneyPanelSkeleton({ fill = false }: { fill?: boolean } = {}) {
   return (
-    <Shell>
+    <Shell fill={fill}>
       {/* Same three figures over the same chart box as the real panel, so the
           Xero wait does not end in the card changing height. */}
       <div className="money-mini-figures">
@@ -84,7 +90,9 @@ export function MoneyPanelSkeleton() {
           </div>
         ))}
       </div>
-      <div className="skeleton" style={{ height: 240, borderRadius: 12 }} />
+      <div className="money-chart-slot">
+        <div className="skeleton" style={{ position: 'absolute', inset: 0, borderRadius: 12 }} />
+      </div>
     </Shell>
   )
 }

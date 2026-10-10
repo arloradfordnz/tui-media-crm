@@ -2864,32 +2864,55 @@ input, textarea, select, button { font-family: inherit; }
   .today-split { grid-template-columns: minmax(0, 1fr); gap: 40px; }
 }
 
-/* ── Home: a column you type into, a column you read ──────────
-   The chat runs the full height of the viewport and stays put while the right
-   column scrolls past it. A composer that stops 420px down the page reads as a
-   widget you glance at; one that reaches the bottom of the screen reads as the
-   thing the page is for.
+/* ── Home: two columns that finish level ──────────────────────
+   Left is Tui and the money graph, right is Your week and the subscriptions.
+   The grid stretches both columns to the taller one, and the money panel is
+   the give: it takes whatever height the left side has spare and the chart
+   grows into it. Add a booking or a subscription on the right and the chart
+   gets taller to match, rather than the left column stopping short.
 
-   Sticky is relative to .scroll-invisible in DashboardShell, which is the real
-   scroll container — so `top: 0` sticks to the top of the content area, not to
-   the window. The height leaves room for the page header above it.
+   The chart slot is sized by CSS and the chart is drawn absolutely inside it,
+   so the chart's own height never counts toward the column it is measuring.
+   Without that, a taller chart makes a taller column makes a taller chart.
 
-   Both of these only apply at the size where .today-split is actually two
-   columns; below 1100px it is one column and a sticky full-height chat would
-   mean scrolling past a screenful of it to reach anything else. */
+   Only at the two-column width. Stacked, there is nothing to match, so the
+   chart goes back to its usual 240px. */
+.money-chart-slot { position: relative; height: 240px; margin-top: 4px; }
+.money-chart-abs { position: absolute; inset: 0; }
+
 @media (min-width: 1101px) {
-  .today-split-main {
+  .today-split { align-items: stretch; }
+  .today-split-main { display: flex; flex-direction: column; min-height: 0; }
+
+  /* Tui keeps a fixed, comfortable height; the money panel below it flexes. */
+  .today-tui {
     display: flex;
     flex-direction: column;
-    position: sticky;
-    top: 0;
-    height: calc(100vh - 190px);
-    min-height: 460px;
+    height: clamp(460px, 58vh, 620px);
+    flex: none;
   }
   /* min-height:0 is what lets the shell shrink inside the flex column instead
      of overflowing it — without it the thread's own scroll area never gets a
-     bounded height and the whole panel grows past the viewport. */
-  .today-split-main .tui-shell { flex: 1; min-height: 0; }
+     bounded height and the whole panel grows past it. */
+  .today-tui .tui-shell { flex: 1; min-height: 0; }
+
+  .money-fill { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .money-fill > .card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .money-fill .money-mini-fill { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .money-fill .money-chart-slot { flex: 1; height: auto; min-height: 220px; }
+}
+
+/* Stacked: Tui, then what needs you, then money, then subscriptions. The two
+   column wrappers dissolve so their sections can be ordered as one list. */
+@media (max-width: 1100px) {
+  /* Child selectors on purpose: .dash-stack (display: flex) is defined
+     further down the file and would win a same-specificity tie on order. */
+  .today-split > .today-split-main,
+  .today-split > .today-split-side { display: contents; }
+  .today-tui  { order: 1; }
+  .today-week { order: 2; }
+  .today-money { order: 3; }
+  .today-subs { order: 4; }
 }
 
 /* The read-only column: three stacked sections, spaced like the page's own

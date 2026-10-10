@@ -228,6 +228,39 @@ export default function TuiThread({
     })
   }
 
+  // A turn that dies mid-stream (the phone dropped signal, Safari suspended
+  // the tab, the app went to the background) used to replace the whole bubble
+  // with "Something went wrong there. Try again." — wiping the receipts for
+  // work that had already saved. Tui once created a client and a job, lost the
+  // connection on the final sentence, and told Arlo to try again, which would
+  // have made duplicates. Now the bubble keeps everything it already showed,
+  // any step still spinning is marked unconfirmed rather than left spinning
+  // forever, and the note says plainly whether anything was saved.
+  function settleRunningReceipts() {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.receipts?.some((r) => r.state === 'running')
+          ? {
+              ...m,
+              receipts: m.receipts.map((r) =>
+                r.state === 'running' ? { ...r, state: 'failed', detail: 'not confirmed, check the record' } : r
+              ),
+            }
+          : m
+      )
+    )
+  }
+
+  function appendNote(note: string) {
+    patchLast((m) => ({ ...m, content: m.content.trim() ? `${m.content.trim()}\n\n${note}` : note }))
+  }
+
+  function interruptedNote(saved: boolean) {
+    return saved
+      ? "Lost the connection before I finished, but the ticked steps above went through. Don't resend it or you'll get doubles."
+      : 'Lost the connection before I could finish. Try again.'
+  }
+
   async function sendMessage(text: string, approvals: string[] = []) {
     if (!text.trim() || loading) return
 
@@ -289,10 +322,17 @@ export default function TuiThread({
 
     rafId = requestAnimationFrame(flushTick)
 
+    // Saved anything this turn? Lives outside the try so the catch can see it.
+    let didMutate = false
+
     function fail(message: string) {
       streamDone = true
       if (rafId !== null) cancelAnimationFrame(rafId)
-      patchLast(() => ({ role: 'assistant', content: message }))
+      // Reveal what had streamed, then add the note under it — never replace.
+      if (pending) { const rest = pending; pending = ''; patchLast((m) => ({ ...m, content: m.content + rest })) }
+      settleRunningReceipts()
+      appendNote(message)
+      if (didMutate) router.refresh()
       setLoading(false)
     }
 
@@ -316,7 +356,6 @@ export default function TuiThread({
       const reader = res.body!.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
-      let didMutate = false
       let failed: string | null = null
 
       while (true) {
@@ -386,7 +425,9 @@ export default function TuiThread({
       // later write in the same turn does.
       if (didMutate) router.refresh()
     } catch {
-      fail('Something went wrong there. Try again.')
+      // The server logs every failure it catches, and this one never reaches
+      // it: the reply was cut off in transit. Almost always the connection.
+      fail(interruptedNote(didMutate))
       return
     }
     setLoading(false)
@@ -412,6 +453,7 @@ export default function TuiThread({
       { role: 'assistant', content: '' },
     ])
     setLoading(true)
+    let didMutate = false
 
     try {
       const res = await fetch('/api/ai/confirm', {
@@ -434,7 +476,6 @@ export default function TuiThread({
       const reader = res.body!.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
-      let didMutate = false
 
       while (true) {
         const { done, value } = await reader.read()
@@ -462,7 +503,8 @@ export default function TuiThread({
               router.refresh()
               break
             case 'error':
-              patchLast(() => ({ role: 'assistant', content: ev.v }))
+              settleRunningReceipts()
+              appendNote(ev.v)
               break
             case 'done':
               break
@@ -472,7 +514,15 @@ export default function TuiThread({
 
       if (didMutate) router.refresh()
     } catch {
-      patchLast(() => ({ role: 'assistant', content: 'Something went wrong running that. Nothing was sent.' }))
+      // "Nothing was sent" was a guess, and the wrong one when the connection
+      // dropped after the send had already gone out.
+      settleRunningReceipts()
+      appendNote(
+        didMutate
+          ? 'Lost the connection, but the ticked step above went through.'
+          : "Lost the connection before I heard back, so I can't confirm it ran. Check the record before trying again."
+      )
+      router.refresh()
     }
     setLoading(false)
   }

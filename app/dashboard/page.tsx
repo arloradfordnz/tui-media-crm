@@ -8,7 +8,7 @@ import { CheckCircle2, Plus, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import Greeting from './Greeting'
 import MoneyPanel, { MoneyPanelSkeleton } from './MoneyPanel'
-import SubscriptionsPanel from './SubscriptionsPanel'
+import SubscriptionsPanel, { getSubscriptions } from './SubscriptionsPanel'
 import TuiThread from '@/components/TuiThread'
 
 export const dynamic = 'force-dynamic'
@@ -53,7 +53,12 @@ export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient()
   // The Tui panel below is deliberately not seeded from the shared thread, so
   // there is nothing else to fetch here.
-  const attention = await getAttention(supabase, new Date())
+  // One wave: the subscriptions read rides along with the attention queries
+  // rather than costing a second sequential round trip.
+  const [attention, subscriptions] = await Promise.all([
+    getAttention(supabase, new Date()),
+    getSubscriptions(supabase),
+  ])
 
   // Pick up new client mail for the NEXT view of this page. Runs after the
   // response is flushed — IMAP plus a model call per new email is seconds, and
@@ -88,30 +93,33 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* ── One column you type into, one column you read ─────
-          Tui is the only thing on this page you put a cursor into, so it gets
-          the whole left side and the full height of the screen — a chat panel
-          that ends halfway down the page is a chat panel you stop using.
+      {/* ── Two columns that finish level ──────────────────────
+          Left: Tui, then the money graph under it. Right: what is booked and
+          waiting this week, then the subscriptions. The columns are stretched
+          to the same height and the money chart takes up whatever the left
+          side has spare, so adding a booking or a subscription on the right
+          grows the chart on the left instead of leaving a gap under it.
 
-          Everything on the right is read-only and ordered by how soon it
-          changes what you do: what is booked this week, what is waiting on
-          you, then the money, which moves monthly and is the thing you check
-          rather than act on. They collapse to one column below 1100px, where
-          side by side would leave the chat too narrow to hold a sentence. */}
+          Below 1100px they stack into one column, where the order is by how
+          soon each thing changes what you do: Tui, Your week, Money,
+          Subscriptions (CSS order, see .today-split in globals.css). */}
       <div className="today-split">
-        {/* A scratch pad, not the Telegram thread.
-            It used to open on the last twelve Telegram messages, which meant
-            the dashboard's most prominent panel was usually showing the middle
-            of a conversation from some other day, and anything typed here
-            landed in Telegram. It now starts empty on every load and writes
-            nothing to the shared thread — the continuous conversation lives on
-            the Tui AI page and in ⌘K. */}
-        <section className="today-split-main">
-          <div className="section-head">
-            <h2 className="section-heading">Tui AI</h2>
-          </div>
-          <TuiThread variant="panel" ephemeral fill />
-        </section>
+        <div className="today-split-main dash-stack">
+          {/* A scratch pad, not the Telegram thread. It starts empty on every
+              load and writes nothing to the shared thread — the continuous
+              conversation lives on the Tui AI page and in ⌘K. */}
+          <section className="today-tui">
+            <div className="section-head">
+              <h2 className="section-heading">Tui AI</h2>
+            </div>
+            <TuiThread variant="panel" ephemeral fill />
+          </section>
+
+          {/* Streamed, not awaited — see MoneyPanel. */}
+          <Suspense fallback={<MoneyPanelSkeleton fill />}>
+            <MoneyPanel fill />
+          </Suspense>
+        </div>
 
         <div className="today-split-side dash-stack">
           {/* One list, not two.
@@ -125,7 +133,7 @@ export default async function DashboardPage() {
               The bookings keep the accent dot the calendar gives a shoot, so
               they are still distinguishable at a glance from something that
               has gone wrong. */}
-          <section>
+          <section className="today-week">
             {/* "Needs you" was accurate when the panel held only problems.
                 It now leads with this week's bookings, and a shoot that is
                 simply booked does not "need you" — it is just what is
@@ -156,18 +164,8 @@ export default async function DashboardPage() {
             )}
           </section>
 
-          {/* Streamed, not awaited — see MoneyPanel. Last in the column
-              because it is the slowest thing here and the least urgent: the
-              list above it is already painted by the time it lands. */}
-          <Suspense fallback={<MoneyPanelSkeleton />}>
-            <MoneyPanel />
-          </Suspense>
-
-          {/* Under the money, because it is the same question one step down:
-              the chart is what went out last month, this is what goes out
-              next regardless. Touches nothing — no Xero, no Supabase — so it
-              sits outside the Suspense and paints with the rest of the page. */}
-          <SubscriptionsPanel />
+          {/* What goes out next regardless. Read in the page's one wave above. */}
+          <SubscriptionsPanel subscriptions={subscriptions} />
         </div>
       </div>
     </div>

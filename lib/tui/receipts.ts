@@ -76,6 +76,10 @@ const TOOL_VERBS: Record<string, string> = {
   create_deliverable: 'Adding deliverable',
   list_deliverables: 'Reading deliverables',
   get_dashboard_stats: 'Checking the numbers',
+  list_subscriptions: 'Reading subscriptions',
+  add_subscription: 'Adding subscription',
+  update_subscription: 'Updating subscription',
+  cancel_subscription: 'Cancelling subscription',
   list_xero_contacts: 'Reading Xero contacts',
   create_xero_invoice: 'Raising Xero invoice',
   list_xero_invoices: 'Reading Xero invoices',
@@ -99,6 +103,11 @@ const TOOL_VERBS: Record<string, string> = {
 const DETAIL_KEYS = ['query', 'name', 'title', 'search', 'status', 'reference']
 
 export function toolLabel(name: string, input: Record<string, unknown>): string {
+  // A new client and their first job are one call now, so one receipt says both.
+  const newClient = (input.new_client as { name?: unknown } | undefined)?.name
+  if (name === 'create_job' && typeof newClient === 'string' && newClient.trim()) {
+    return `Creating client and job — ${newClient.trim()}`
+  }
   const verb = TOOL_VERBS[name] ?? name.replace(/_/g, ' ')
   for (const key of DETAIL_KEYS) {
     const value = input[key]

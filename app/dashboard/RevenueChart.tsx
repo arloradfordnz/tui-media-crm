@@ -12,6 +12,7 @@ export default function RevenueChart({
   comparisonColor,
   focus,
   width,
+  height,
 }: {
   data: Point[]
   comparisonData?: Point[]
@@ -26,6 +27,9 @@ export default function RevenueChart({
    *  (no scaling) so narrowing the container never shrinks it — the
    *  parent cuts months instead. */
   width?: number
+  /** Measured container height in px, for a chart that fills its slot
+   *  (the dashboard money panel). Defaults to 240. */
+  height?: number
 }) {
   const [indicator, setIndicator] = useState<{ x: number; y: number; nearestIdx: number } | null>(null)
 
@@ -57,7 +61,7 @@ export default function RevenueChart({
   const max = Math.max(...allValues.map((v) => Math.max(0, v)), 1)
 
   const W = Math.max(300, Math.round(width ?? 720))
-  const H = 240
+  const H = Math.max(160, Math.round(height ?? 240))
   const Y_W = 44
   const PAD_R = 12
   const PAD_T = 14

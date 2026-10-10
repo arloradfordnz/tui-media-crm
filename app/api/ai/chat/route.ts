@@ -24,6 +24,11 @@ import { tidyPunctuation } from '@/lib/tui/text'
 // the dashboard is opened. Nothing else changes: the same tools run, and the
 // same reads happen. It is only the logging that is skipped.
 
+// A turn can run several model rounds plus tool writes and a web search, so
+// it gets the same ceiling as the Telegram routes rather than the platform
+// default.
+export const maxDuration = 60
+
 // Static system prompt — stable across turns, cached with a cache_control
 // breakpoint and reused on every request.
 const STATIC_SYSTEM = buildDashboardSystem()
@@ -142,7 +147,10 @@ function describeFailure(err: unknown): string {
   if (status === 529 || status === 503) {
     return 'Anthropic is overloaded right now. Try again shortly.'
   }
-  return 'Something went wrong there. Try again.'
+  // Name the actual error. A bare "something went wrong" sent the last
+  // investigation looking in the wrong place.
+  const short = (detail || raw).replace(/\s+/g, ' ').trim().slice(0, 140)
+  return short ? `Something went wrong on my end (${short}). Try again.` : 'Something went wrong there. Try again.'
 }
 
 // ── "I'm sending it now" with nothing behind it ─────────────────────────────
@@ -224,11 +232,29 @@ export async function POST(request: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
-      const send = (event: TuiEvent) => controller.enqueue(encoder.encode(encodeEvent(event)))
+      // If the browser goes away mid-turn (a dropped signal, a backgrounded
+      // phone), enqueue throws. That used to abort the turn wherever it was,
+      // so a client could be created and the job that needed its id never
+      // made. Now the turn finishes its work regardless and only the
+      // streaming stops.
+      let open = true
+      const send = (event: TuiEvent) => {
+        if (!open) return
+        try {
+          controller.enqueue(encoder.encode(encodeEvent(event)))
+        } catch {
+          open = false
+        }
+      }
+      const close = () => {
+        if (!open) return
+        open = false
+        try { controller.close() } catch { /* already closed */ }
+      }
 
+      let mutated = false
       try {
         const currentMessages: Anthropic.MessageParam[] = [...apiMessages]
-        let mutated = false
         let finalText = ''
         const maxRounds = 10
         // Set for exactly one round after an unfulfilled action claim, so the
@@ -254,10 +280,18 @@ export async function POST(request: NextRequest) {
 
         for (let round = 0; round < maxRounds; round++) {
           const anthropicStream = anthropic.messages.stream({
-            model: 'claude-haiku-4-5-20251001',
-            // 1024 rather than 512: a reply summarising what a search found
-            // about a client runs longer than a CRM one-liner.
-            max_tokens: 1024,
+            // Haiku 5.5: a tenth of Haiku 4.5's price and much better at
+            // following the prompt, which is most of what goes wrong here.
+            // It thinks by default; effort 'low' lets it skip thinking on a
+            // one-liner and still think through a pasted email thread, which
+            // keeps a routine reply as quick as 4.5's was. Thinking blocks
+            // ride along in finalMessage.content and are echoed back
+            // unchanged with the tool results below, as the API requires.
+            model: 'claude-haiku-5-5',
+            output_config: { effort: 'low' },
+            // Thinking draws from the same budget as the reply, so the old
+            // 1024 ceiling could cut an answer off after a long think.
+            max_tokens: 4096,
             system: systemBlocks,
             messages: currentMessages,
             tools: cachedTools,
@@ -366,7 +400,7 @@ export async function POST(request: NextRequest) {
               })
             }
             send({ t: 'done' })
-            controller.close()
+            close()
             return
           }
 
@@ -453,11 +487,14 @@ export async function POST(request: NextRequest) {
         send({ t: 'text', v: '\n\n(Reached maximum tool rounds.)' })
         if (mutated) send({ t: 'mutated' })
         send({ t: 'done' })
-        controller.close()
+        close()
       } catch (err) {
         console.error('AI chat error:', err)
-        send({ t: 'error', v: describeFailure(err) })
-        controller.close()
+        // If something already saved, "try again" is the wrong advice: it
+        // makes doubles. Say what is true.
+        const why = describeFailure(err)
+        send({ t: 'error', v: mutated ? `The ticked steps above saved, but I fell over finishing up. Don't resend it. ${why.replace(/ Try again\.$/, '')}` : why })
+        close()
       }
     },
   })

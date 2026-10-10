@@ -44,6 +44,7 @@ export const MUTATING_TOOLS = new Set([
   'create_xero_invoice', 'approve_xero_invoice', 'send_xero_invoice', 'void_xero_invoice', 'delete_xero_invoice', 'update_xero_invoice', 'remove_xero_payment',
   'log_shoot',
   'snooze_flag', 'resolve_flag',
+  'add_subscription', 'update_subscription', 'cancel_subscription',
 ])
 
 // ── Confirmation gate ────────────────────────────────────────
@@ -127,7 +128,7 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'create_client',
-    description: 'Create a new client. Only name is required.',
+    description: 'Create a new client. Only name is required. If a client with the same name already exists, returns that one instead of making a duplicate. When the new client comes with a job to book, use create_job with new_client instead: one call, not two.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -193,19 +194,37 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'create_job',
-    description: 'Create a new job. Requires a name and client_id. Optionally specify job_type to auto-populate tasks from templates. If a job with essentially the same name already exists for this client (e.g. "July Content" when "Team Bainbridge — July Content" already exists), this returns a duplicate warning instead of creating it — check with Arlo whether he meant that existing job, then call again with confirm:true only if he really wants a second one.',
+    description: 'Create a new job. Needs a name plus EITHER client_id (an existing client, from the roster in your context) OR new_client (a client not in the roster: it is created first, in the same call). Optionally specify job_type to auto-populate tasks from templates. If a job with essentially the same name already exists for this client (e.g. "July Content" when "Team Bainbridge — July Content" already exists), this returns a duplicate warning instead of creating it — check with Arlo whether he meant that existing job, then call again with confirm:true only if he really wants a second one.',
     input_schema: {
       type: 'object' as const,
       properties: {
         name: { type: 'string' },
-        client_id: { type: 'string', description: 'Client UUID. Search for the client first if you need to find their ID.' },
+        client_id: { type: 'string', description: 'Existing client UUID, straight from the roster in your context. Omit when using new_client.' },
+        new_client: {
+          type: 'object',
+          description: 'For a client who is not in the roster yet. Created (or matched by name if they turn out to exist) before the job, so booking a brand new client is one call.',
+          properties: {
+            name: { type: 'string', description: 'The business name, not the contact person.' },
+            contact_person: { type: 'string' },
+            email: { type: 'string' },
+            phone: { type: 'string' },
+            location: { type: 'string' },
+            lead_source: { type: 'string' },
+            pipeline_stage: { type: 'string', enum: ['enquiry', 'discovery', 'proposal', 'negotiation', 'won', 'lost'] },
+            status: { type: 'string', enum: ['lead', 'active', 'past', 'archived'] },
+            client_category: { type: 'string', enum: ['video_ads', 'retainer', 'marketing', 'one_off'] },
+          },
+          required: ['name'],
+        },
+        status: { type: 'string', enum: ['enquiry', 'booked', 'preproduction', 'shootday', 'editing', 'review', 'approved', 'live', 'delivered', 'handed_over', 'archived'], description: 'Defaults to enquiry. Use booked once the client has said yes ("lock it in", "confirmed", "go ahead").' },
+        notes: { type: 'string', description: 'The brief in a few lines: what is being delivered, timing and turnaround, where it will be used, anything the client stressed. Write it so Arlo can shoot from it without reopening the email.' },
         job_type: { type: 'string', description: 'e.g. wedding, commercial, event, music_video' },
         shoot_date: { type: 'string', description: 'ISO date (YYYY-MM-DD)' },
         shoot_location: { type: 'string' },
         quote_value: { type: 'number' },
         confirm: { type: 'boolean', description: 'Set true to create anyway after a duplicate warning and Arlo confirming he wants a second job with that name. Omit on the first attempt.' },
       },
-      required: ['name', 'client_id'],
+      required: ['name'],
     },
   },
   {
@@ -431,6 +450,53 @@ export const TOOLS: Anthropic.Tool[] = [
     },
   },
 
+  // ── Subscriptions ─────────────────────────────
+  // Arlo's own standing monthly bills (Claude, iCloud, Xero...), shown on the
+  // dashboard. Not client money and not Xero: a list he keeps by telling Tui.
+  {
+    name: 'list_subscriptions',
+    description: "List Arlo's active monthly subscriptions (his own bills, not client work): name, NZD amount, renewal day, and their ids for update or cancel.",
+    input_schema: { type: 'object' as const, properties: {}, required: [] },
+  },
+  {
+    name: 'add_subscription',
+    description: 'Add one of Arlo\'s own monthly subscriptions to the dashboard list. Amount is NZD per month as charged; day is the day of the month it renews. If he gives a price in another currency, ask for the NZD figure off his statement rather than converting it yourself.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        name: { type: 'string', description: 'The service, e.g. "Adobe Creative Cloud".' },
+        amount: { type: 'number', description: 'NZD per month.' },
+        day: { type: 'integer', minimum: 1, maximum: 31, description: 'Day of the month it renews.' },
+        note: { type: 'string', description: 'Optional short qualifier shown under the name, e.g. "Billed through WK Strawbridge".' },
+      },
+      required: ['name', 'amount', 'day'],
+    },
+  },
+  {
+    name: 'update_subscription',
+    description: 'Change a subscription\'s name, amount, renewal day or note. Get the id from list_subscriptions.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        subscription_id: { type: 'string' },
+        name: { type: 'string' },
+        amount: { type: 'number' },
+        day: { type: 'integer', minimum: 1, maximum: 31 },
+        note: { type: 'string' },
+      },
+      required: ['subscription_id'],
+    },
+  },
+  {
+    name: 'cancel_subscription',
+    description: 'Take a subscription off the dashboard list when Arlo has cancelled it. Kept on record as inactive, not deleted, so it can be restored. Get the id from list_subscriptions.',
+    input_schema: {
+      type: 'object' as const,
+      properties: { subscription_id: { type: 'string' } },
+      required: ['subscription_id'],
+    },
+  },
+
   // ── Xero Finance ──────────────────────────────
   {
     name: 'list_xero_contacts',
@@ -612,6 +678,17 @@ export const TOOLS: Anthropic.Tool[] = [
 
 // ── Tool Executor ──────────────────────────────────────────────────────────────
 
+// Exact name match, ignoring case and surrounding space. Deliberately not
+// fuzzy: "Sky" must not swallow "Sky Automotive".
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function findClientByName(supabase: any, name: string): Promise<{ id: string; name: string } | null> {
+  const clean = (name ?? '').trim()
+  if (!clean) return null
+  const escaped = clean.replace(/[\\%_]/g, (c) => '\\' + c)
+  const { data } = await supabase.from('clients').select('id, name').ilike('name', escaped).limit(1)
+  return data?.[0] ?? null
+}
+
 export async function executeTool(
   name: string,
   input: Record<string, unknown>,
@@ -660,6 +737,11 @@ export async function executeTool(
     }
 
     case 'create_client': {
+      // A retried turn (the first reply never arrived) used to make a second
+      // copy of the client. Same name means same client.
+      const existing = await findClientByName(supabase, input.name as string)
+      if (existing) return JSON.stringify({ success: true, existing: true, client: existing, note: 'A client with this name already exists, so no new one was created. Use this id.' })
+
       const { data, error } = await supabase.from('clients').insert({
         name: input.name as string,
         email: (input.email as string) || null,
@@ -720,6 +802,35 @@ export async function executeTool(
     }
 
     case 'create_job': {
+      // A brand new client and their first job in one call. Creating the
+      // client as its own tool call cost a whole extra model round (~1.5s)
+      // between "create the client" and "now create the job", for no reason
+      // other than the job needing the id.
+      let clientCreated: { id: string; name: string } | null = null
+      if (!input.client_id && input.new_client) {
+        const nc = input.new_client as Record<string, unknown>
+        const existing = await findClientByName(supabase, nc.name as string)
+        if (existing) {
+          input.client_id = existing.id
+        } else {
+          const { data, error } = await supabase.from('clients').insert({
+            name: nc.name as string,
+            contact_person: (nc.contact_person as string) || null,
+            email: (nc.email as string) || null,
+            phone: (nc.phone as string) || null,
+            location: (nc.location as string) || null,
+            lead_source: (nc.lead_source as string) || null,
+            pipeline_stage: (nc.pipeline_stage as string) || 'enquiry',
+            status: (nc.status as string) || 'lead',
+            client_category: (nc.client_category as string) || null,
+          }).select('id, name').single()
+          if (error) return JSON.stringify({ error: `Could not create the client: ${error.message}` })
+          clientCreated = data
+          input.client_id = data.id
+        }
+      }
+      if (!input.client_id) return JSON.stringify({ error: 'create_job needs client_id (an existing client) or new_client (a new one).' })
+
       if (!input.confirm) {
         const dup = await findDuplicateJobName(supabase, input.client_id as string, input.name as string)
         if (dup) return JSON.stringify({ error: `A job called "${dup.name}" already exists for this client (status: ${dup.status}). Ask Arlo whether he meant that one, or call create_job again with confirm:true if he really wants a second job with this name.`, duplicate_job_id: dup.id })
@@ -732,41 +843,41 @@ export async function executeTool(
         shoot_date: input.shoot_date ? new Date(input.shoot_date as string).toISOString() : null,
         shoot_location: (input.shoot_location as string) || null,
         quote_value: input.quote_value != null ? Number(input.quote_value) : null,
+        status: (input.status as string) || 'enquiry',
+        notes: (input.notes as string) || null,
       }).select('id, name').single()
 
-      if (error) return JSON.stringify({ error: error.message })
+      if (error) return JSON.stringify({ error: error.message, ...(clientCreated ? { client_created: clientCreated, note: 'The client was created; only the job failed. Do not create the client again.' } : {}) })
 
-      if (input.job_type && job) {
-        const { data: template } = await supabase
-          .from('job_templates')
-          .select('id, template_tasks(phase, title, sort_order), template_deliverables(title, description)')
-          .eq('job_type', input.job_type as string)
-          .single()
+      // Everything after the job row is independent, so it goes in one
+      // concurrent wave. Template tasks used to be inserted one await at a
+      // time: 30 sequential round trips (~4s) for a video_ads job.
+      const template = input.job_type
+        ? (await supabase
+            .from('job_templates')
+            .select('id, template_tasks(phase, title, sort_order), template_deliverables(title, description)')
+            .eq('job_type', input.job_type as string)
+            .maybeSingle()).data
+        : null
+      const tasks = (template?.template_tasks ?? []) as { phase: string; title: string; sort_order: number }[]
+      const delivs = (template?.template_deliverables ?? []) as { title: string; description: string | null }[]
 
-        if (template) {
-          for (const t of (template.template_tasks as { phase: string; title: string; sort_order: number }[])) {
-            await supabase.from('job_tasks').insert({ job_id: job.id, phase: t.phase, title: t.title, sort_order: t.sort_order })
-          }
-          for (const d of (template.template_deliverables as { title: string; description: string | null }[])) {
-            await supabase.from('deliverables').insert({ job_id: job.id, title: d.title, description: d.description })
-          }
-        }
-      }
-
-      if (job) {
-        await supabase.from('activities').insert({
+      await Promise.all([
+        tasks.length ? supabase.from('job_tasks').insert(tasks.map((t) => ({ job_id: job.id, phase: t.phase, title: t.title, sort_order: t.sort_order }))) : null,
+        delivs.length ? supabase.from('deliverables').insert(delivs.map((d) => ({ job_id: job.id, title: d.title, description: d.description }))) : null,
+        supabase.from('activities').insert({
           action: 'job_created',
           details: `Job "${input.name}" created`,
           job_id: job.id,
           client_id: input.client_id as string,
-        })
+        }),
         // Same mirror the dashboard uses. A shoot Tui books over Telegram has
         // to land on the calendar too, or the two surfaces disagree about the
         // one date that cannot move.
-        await syncShootEvent(supabase, job.id)
-      }
+        syncShootEvent(supabase, job.id),
+      ])
 
-      return JSON.stringify({ success: true, job })
+      return JSON.stringify({ success: true, job, ...(clientCreated ? { client: clientCreated } : {}) })
     }
 
     case 'update_job': {
@@ -1035,6 +1146,75 @@ export async function executeTool(
     }
 
     // ── Dashboard ───────────────────────────
+    // ── Subscriptions ───────────────────────
+    case 'list_subscriptions': {
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('id, name, amount, day, note')
+        .eq('active', true)
+        .order('day')
+      if (error) return JSON.stringify({ error: error.message })
+      const rows = (data ?? []).map((r: { amount: unknown }) => ({ ...r, amount: Number(r.amount) }))
+      const monthly = rows.reduce((sum: number, r: { amount: number }) => sum + r.amount, 0)
+      return JSON.stringify({ subscriptions: rows, monthly_total_nzd: Math.round(monthly * 100) / 100 })
+    }
+
+    case 'add_subscription': {
+      const name = String(input.name ?? '').trim()
+      const amount = Number(input.amount)
+      const day = Math.round(Number(input.day))
+      if (!name) return JSON.stringify({ error: 'A subscription needs a name.' })
+      if (!Number.isFinite(amount) || amount < 0) return JSON.stringify({ error: 'Amount must be a positive NZD figure.' })
+      if (!(day >= 1 && day <= 31)) return JSON.stringify({ error: 'Day must be the day of the month it renews, 1 to 31.' })
+
+      // Same name already on the list: that is an update, not a second row.
+      const { data: existing } = await supabase
+        .from('subscriptions')
+        .select('id, name, amount, day')
+        .eq('active', true)
+        .ilike('name', name.replace(/[\\%_]/g, (c) => '\\' + c))
+        .limit(1)
+      if (existing?.[0]) {
+        return JSON.stringify({ error: `${existing[0].name} is already on the list ($${Number(existing[0].amount).toFixed(2)} on the ${existing[0].day}). Use update_subscription with id ${existing[0].id} if it changed.` })
+      }
+
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .insert({ name, amount, day, note: (input.note as string)?.trim() || null })
+        .select('id, name, amount, day')
+        .single()
+      if (error) return JSON.stringify({ error: error.message })
+      return JSON.stringify({ success: true, subscription: { ...data, amount: Number(data.amount) } })
+    }
+
+    case 'update_subscription': {
+      const updates: Record<string, unknown> = {}
+      if (input.name !== undefined) updates.name = String(input.name).trim()
+      if (input.amount !== undefined) updates.amount = Number(input.amount)
+      if (input.day !== undefined) updates.day = Math.round(Number(input.day))
+      if (input.note !== undefined) updates.note = (input.note as string)?.trim() || null
+      if (Object.keys(updates).length === 0) return JSON.stringify({ error: 'Nothing to change.' })
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .update(updates)
+        .eq('id', input.subscription_id as string)
+        .select('id, name, amount, day')
+        .single()
+      if (error) return JSON.stringify({ error: dbErrorMessage(error) })
+      return JSON.stringify({ success: true, subscription: { ...data, amount: Number(data.amount) } })
+    }
+
+    case 'cancel_subscription': {
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .update({ active: false })
+        .eq('id', input.subscription_id as string)
+        .select('id, name')
+        .single()
+      if (error) return JSON.stringify({ error: dbErrorMessage(error) })
+      return JSON.stringify({ success: true, cancelled: data.name })
+    }
+
     case 'get_dashboard_stats': {
       const now = new Date()
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()

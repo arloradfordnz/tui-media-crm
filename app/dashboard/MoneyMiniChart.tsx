@@ -34,24 +34,30 @@ export default function MoneyMiniChart({
   inData,
   outData,
   net,
+  fill = false,
 }: {
   inData: Point[]
   outData: Point[]
   net: number
+  /** Grow to the height of the slot the panel gives it (see MoneyPanel). */
+  fill?: boolean
 }) {
   // A callback ref, not an effect. See MoneyChart for the incident — an effect
   // rebuilt the observer on every render and the pending callback was
   // disconnected before it could fire, leaving the width at 0.
   const [width, setWidth] = useState<number | null>(null)
+  const [height, setHeight] = useState<number | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
   const wrapRef = useCallback((el: HTMLDivElement | null) => {
     observerRef.current?.disconnect()
     if (!el) return
     const ro = new ResizeObserver(([entry]) => {
       const w = entry.contentRect.width
+      const h = entry.contentRect.height
       // A detached or hidden element reports 0; keeping the last real width
       // stops the chart collapsing to its 300px minimum.
       if (w > 0) setWidth(w)
+      if (h > 0) setHeight(h)
     })
     ro.observe(el)
     observerRef.current = ro
@@ -75,7 +81,7 @@ export default function MoneyMiniChart({
   const outTotal = outData.reduce((a, p) => a + p.value, 0)
 
   return (
-    <div>
+    <div className={fill ? 'money-mini-fill' : undefined}>
       <div className="money-mini-figures">
         <Figure
           label="In"
@@ -113,14 +119,21 @@ export default function MoneyMiniChart({
         </div>
       </div>
 
-      <div ref={wrapRef}>
-        <RevenueChart
-          data={shownIn}
-          comparisonData={shownOut}
-          comparisonColor="var(--chart-out)"
-          focus={focus}
-          width={width ?? undefined}
-        />
+      {/* In fill mode the slot is sized by CSS and the chart is drawn into it
+          absolutely, so the chart can never feed its own height back into the
+          column it is measuring (which would grow it forever). The 4px is the
+          chart's own top margin. */}
+      <div ref={wrapRef} className={fill ? 'money-chart-slot' : undefined}>
+        <div className={fill ? 'money-chart-abs' : undefined}>
+          <RevenueChart
+            data={shownIn}
+            comparisonData={shownOut}
+            comparisonColor="var(--chart-out)"
+            focus={focus}
+            width={width ?? undefined}
+            height={fill && height ? height - 4 : undefined}
+          />
+        </div>
       </div>
     </div>
   )
