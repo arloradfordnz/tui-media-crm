@@ -3365,3 +3365,72 @@ input, textarea, select, button { font-family: inherit; }
 @media (max-width: 768px) and (display-mode: standalone) {
   .mobile-tab-bar { bottom: max(12px, calc(env(safe-area-inset-bottom) - 8px)); }
 }
+
+/* ── Draggable lens ───────────────────────────────────────────
+   While the bar is pressed the highlight lifts into a lens — bigger than the
+   tab, lighter, and allowed to spill past the pill's edge, as iOS 26 does —
+   and while dragging it follows the finger with no easing so it never lags.
+   `scale` is its own property so it animates independently of the translate
+   that tracks the tab, which is what lets the lens grow while it moves. */
+@media (max-width: 768px) {
+  .glass-pill { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+  .glass-pill a { -webkit-touch-callout: none; }
+
+  .glass-pill-indicator {
+    scale: 1;
+    transition:
+      transform 420ms cubic-bezier(0.32, 0.72, 0, 1),
+      scale 360ms cubic-bezier(0.34, 1.56, 0.64, 1),
+      background 240ms ease,
+      box-shadow 240ms ease,
+      opacity var(--dur-base) ease;
+  }
+  .glass-pill[data-lifted] { transform: none; }
+  .glass-pill[data-lifted] .glass-pill-indicator {
+    scale: 1.22 1.16;
+    background: rgba(239, 242, 248, 0.16);
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.5),
+      inset 0 -1px 1px rgba(255, 255, 255, 0.14),
+      inset 0 0 14px rgba(255, 255, 255, 0.12),
+      0 8px 22px -4px rgba(0, 0, 0, 0.55);
+    filter: none;
+  }
+  .glass-pill[data-lifted] .glass-pill-indicator { -webkit-backdrop-filter: blur(5px) saturate(190%) brightness(1.35); }
+  .glass-pill[data-lifted] .glass-pill-indicator { backdrop-filter: blur(5px) saturate(190%) brightness(1.35); }
+  /* Tracks the finger exactly while dragging; springs when released. */
+  .glass-pill[data-dragging] .glass-pill-indicator {
+    transition:
+      transform 0s,
+      scale 360ms cubic-bezier(0.34, 1.56, 0.64, 1),
+      background 240ms ease,
+      box-shadow 240ms ease;
+  }
+}
+
+/* ── No zoom-on-focus ─────────────────────────────────────────
+   iOS Safari zooms the whole page when a focused field's text is under 16px,
+   and doesn't zoom back out — the app ends up magnified, scrollable sideways,
+   and the fixed tab bar hangs at the wrong height because it is pinned to the
+   zoomed viewport. The Tui message box was 14px (its own rule sits after the
+   16px mobile rule, so it won). This is the catch-all: on a touch screen every
+   text field is 16px whatever class it carries, so no future field can bring
+   the zoom back. The viewport still allows pinch-zoom on purpose. */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* The keyboard covers the bar anyway; slide it away while typing so it never
+   floats over the field or sits mid-screen as the keyboard animates. */
+@media (max-width: 768px) {
+  .mobile-tab-bar { transition: transform 260ms var(--ease-panel), opacity 200ms ease; }
+  body:has(input:focus, textarea:focus, select:focus) .mobile-tab-bar {
+    transform: translateY(140%);
+    opacity: 0;
+    pointer-events: none;
+  }
+}

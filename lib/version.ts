@@ -39,4 +39,6 @@
 // 3.7.0 — the phone tab bar is a floating liquid-glass capsule (Today, Jobs,
 // Retainers, Settings) with a sliding highlight, and Tui AI is its own round
 // glass button beside it.
-export const APP_VERSION = '3.7.0'
+// 3.7.1 — the tab bar's highlight can be pressed and dragged like iOS 26
+// glass, and focusing a field (the Tui message box) no longer zooms the page.
+export const APP_VERSION = '3.7.1'
