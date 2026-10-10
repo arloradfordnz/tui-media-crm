@@ -202,8 +202,16 @@
 /* ── Reset ────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 
+/* Nothing should ever pan sideways on a phone. `clip` rather than `hidden`:
+   hidden on one axis silently turns the other into a scroll container, which
+   breaks sticky positioning and the page's own scroller; clip just cuts. The
+   real fixes are in the elements that overflowed (the parked report panel and
+   sidebar); this is the backstop so one stray wide element can't bring the
+   sideways scroll back. */
 html, body {
   max-width: 100vw;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
 }
 body {
   font-family: 'Bricolage Grotesque', 'Helvetica Neue', Arial, sans-serif;
@@ -1338,8 +1346,16 @@ input, textarea, select, button { font-family: inherit; }
   .sidebar-panel {
     z-index: 65;
     transform: translateX(calc(-100% - 24px));
+    /* Parked off-screen, but still a box iOS Safari will let you pan to.
+       visibility waits for the slide to finish before it hides. */
+    visibility: hidden;
+    transition: transform var(--dur-panel) var(--ease-panel), visibility 0s linear var(--dur-panel);
   }
-  .sidebar-panel.sidebar-panel-open { transform: translateX(0); }
+  .sidebar-panel.sidebar-panel-open {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform var(--dur-panel) var(--ease-panel), visibility 0s;
+  }
 }
 
 /* ── KPI cards (flat stat cards, reference style) ─────────── */
@@ -1711,68 +1727,12 @@ input, textarea, select, button { font-family: inherit; }
 }
 
 /* ── Mobile tab bar ───────────────────────────────────────────
-   Five thumb-reachable destinations, mobile only. Hidden at >=769px,
-   where the sidebar is pinned open and there is nothing to reach for. */
-:root { --tab-bar-h: 56px; }
+   Mobile only; hidden at >=769px where the sidebar is pinned open. The bar
+   itself (Apple's liquid-glass floating tab bar) is styled at the end of the
+   file. --tab-bar-h is the height every bottom clearance is measured from. */
+:root { --tab-bar-h: 62px; }
 
 .mobile-tab-bar { display: none; }
-
-@media (max-width: 768px) {
-  .mobile-tab-bar {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 70;
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    align-items: stretch;
-    height: calc(var(--tab-bar-h) + env(safe-area-inset-bottom));
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-
-  .mobile-tab {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    min-height: var(--tab-bar-h);
-    border: none;
-    background: transparent;
-    color: var(--text-tertiary);
-    font-family: inherit;
-    text-decoration: none;
-    cursor: pointer;
-    transition: color var(--dur-fast) ease;
-  }
-  .mobile-tab.active { color: var(--accent); }
-
-  .mobile-tab-icon { width: 20px; height: 20px; stroke-width: 1.75px; }
-  .mobile-tab-label { font-size: var(--t-2xs); font-weight: 500; letter-spacing: -0.01em; }
-
-  /* Tui is the centre tab and the fastest path to an answer, so it reads as
-     an action rather than a peer destination — accent-filled, label dropped. */
-  /* Tui breaks the plane of the bar rather than sitting inside it — lifted
-     above the top edge with its own shadow so it reads as a control floating
-     over the chrome, not another tab. This is why the bar carries no
-     border-top: a hairline would cut straight through it. */
-  .mobile-tab-centre { position: relative; }
-  .mobile-tab-centre .mobile-tab-icon {
-    width: 54px;
-    height: 54px;
-    padding: 15px;
-    border-radius: var(--r-pill);
-    background: var(--accent);
-    color: var(--on-accent);
-    stroke-width: 2.25px;
-    transform: translateY(-16px);
-    box-shadow: 0 10px 24px -6px rgba(0, 0, 0, 0.55), var(--shadow-glow-accent);
-  }
-  .mobile-tab-centre:active .mobile-tab-icon { transform: translateY(-16px) scale(0.94); }
-  .mobile-tab-centre .mobile-tab-label { display: none; }
-  .mobile-tab-centre.active .mobile-tab-icon { background: var(--accent-hover); }
-}
 
 /* ── Tui full-page route ──────────────────────────────────── */
 /* Tui as a full-page surface.
@@ -2352,19 +2312,6 @@ input, textarea, select, button { font-family: inherit; }
 .sidebar-panel { -webkit-backdrop-filter: blur(30px) saturate(190%); }
 .sidebar-panel { backdrop-filter: blur(30px) saturate(190%); }
 
-@media (max-width: 768px) {
-  .mobile-tab-bar {
-    background: var(--glass-bg);
-    border: none;
-    /* Shadow thrown upward — the bar sits at the bottom, so the light has to
-       come from the same direction it does everywhere else. */
-    box-shadow: 0 -10px 34px -10px rgba(0, 0, 0, 0.6);
-    /* Must not clip: the Tui button deliberately overflows the top edge. */
-    overflow: visible;
-  }
-  .mobile-tab-bar { -webkit-backdrop-filter: blur(30px) saturate(190%); }
-  .mobile-tab-bar { backdrop-filter: blur(30px) saturate(190%); }
-}
 
 /* ── Settings: mobile section nav ─────────────────────────────
    Only exists below the sidebar breakpoint. Above it the sidebar is pinned
@@ -3120,4 +3067,301 @@ input, textarea, select, button { font-family: inherit; }
   font-size: var(--t-md);
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Phone spacing pass ───────────────────────────────────────
+   Last in the file on purpose: several base rules above sit after the main
+   mobile block, so an override placed up there loses on order. Everything
+   here is ≤768px only; desktop is untouched.
+
+   The desktop rhythm was carried down to the phone unchanged — 28px page
+   gutters around 24px card padding meant a form field started 52px in from
+   each edge, a third of a 375px screen spent on margins. iOS's own apps sit
+   content 16-20px from the edge; this brings the CRM to the same. */
+@media (max-width: 768px) {
+  /* Top clears the status bar when opened from the home screen
+     (black-translucent draws the page under it); it is 0 in Safari. */
+  .page-shell-inner {
+    padding:
+      calc(20px + env(safe-area-inset-top))
+      16px
+      calc(var(--tab-bar-h) + 24px + env(safe-area-inset-bottom));
+  }
+  .tui-page {
+    height: calc(
+      100dvh - 20px - env(safe-area-inset-top) - var(--tab-bar-h) - 24px - env(safe-area-inset-bottom)
+    );
+  }
+
+  .page-header { margin-bottom: 28px; }
+  .today-split { gap: 32px; }
+  .dash-stack { gap: 32px; }
+
+  .card { padding: 18px; }
+  .card-hero { padding: 20px; }
+  .kpi-card { padding: 18px 20px; }
+  .stat-card { padding: 16px; }
+
+  /* Three stats across a phone: the 32px figure wrapped "$0.00" and the
+     labels broke onto two lines. */
+  .stat-strip .stat-value { font-size: 22px; }
+  .stat-strip .stat-label { line-height: 1.3; }
+
+  /* Header actions. Search gets its own full row when it shares the header
+     with two or more buttons, and the buttons split the row below it evenly,
+     instead of a squashed search box and a button left on its own line. */
+  .page-header-actions > .search-field { min-width: 0; }
+  .page-header-actions:has(> :nth-child(3)) > .search-field { flex: 1 1 100%; }
+  .page-header-actions:has(> .search-field):has(> :nth-child(3)) > :not(.search-field) { flex: 1 1 0; }
+
+  /* Record tabs scroll rather than squash. */
+  .tab { white-space: nowrap; flex-shrink: 0; }
+
+  /* Your week: the action moves up beside the sentence instead of taking a
+     line of its own under every row, and the whole row is the tap target
+     (the link's ::after covers it), so the visible pill can be compact. */
+  .attention-row {
+    position: relative;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "dot body action";
+    gap: 10px;
+    padding: 14px 16px;
+  }
+  .attention-action {
+    align-self: center;
+    min-height: 0;
+    height: 30px;
+    padding: 0 12px;
+  }
+  .attention-action::after { content: ''; position: absolute; inset: 0; }
+  .attention-row:active { background: var(--bg-elevated); }
+  .sub-row { padding: 14px 16px; }
+
+  /* The report panel is 380px wide, wider than the phone. */
+  .report-panel { width: auto; left: 0; }
+}
+
+/* ── Liquid-glass tab bar (phone) ─────────────────────────────
+   Modelled on iOS 26's floating tab bar: a capsule of the four destinations
+   that floats off the bottom edge with content scrolling under it, and Tui AI
+   as its own round glass button beside it — where Apple puts Search.
+
+   The glass is four layers, which is what makes it read as a lens rather
+   than a tinted panel:
+     1. a thin navy tint, so the page shows through but the labels hold
+     2. blur + saturation (split across two rules — Lightning CSS keeps only
+        one of the pair if they share a rule; see AGENTS.md)
+     3. a specular rim: a bright inset hairline on top fading to a faint one
+        at the bottom, so the edge catches light like curved glass
+     4. a soft drop shadow lifting it off the page
+   The active tab sits in a darker recessed capsule that slides between tabs. */
+@media (max-width: 768px) {
+  .mobile-tab-bar {
+    position: fixed;
+    z-index: 70;
+    left: 14px;
+    right: 14px;
+    /* Sits into the home-indicator area the way Apple's does, but never
+       closer than 12px to the bottom on phones without one. */
+    bottom: max(12px, calc(env(safe-area-inset-bottom) - 8px));
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    height: var(--tab-bar-h);
+    pointer-events: none; /* the gap between pill and button stays tappable */
+  }
+
+  .glass-pill,
+  .glass-orb {
+    position: relative;
+    pointer-events: auto;
+    background:
+      linear-gradient(180deg, rgba(239, 242, 248, 0.10) 0%, rgba(239, 242, 248, 0.02) 45%, rgba(239, 242, 248, 0.04) 100%),
+      rgba(16, 26, 50, 0.6);
+    border: 0.5px solid rgba(239, 242, 248, 0.16);
+    box-shadow:
+      inset 0 1px 0.5px rgba(255, 255, 255, 0.22),
+      inset 0 -1px 0.5px rgba(255, 255, 255, 0.06),
+      inset 0 0 18px rgba(255, 255, 255, 0.03),
+      0 10px 30px -6px rgba(0, 0, 0, 0.6),
+      0 2px 6px rgba(0, 0, 0, 0.25);
+  }
+  .glass-pill,
+  .glass-orb { -webkit-backdrop-filter: blur(22px) saturate(180%) brightness(1.05); }
+  .glass-pill,
+  .glass-orb { backdrop-filter: blur(22px) saturate(180%) brightness(1.05); }
+
+  .glass-pill {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    padding: 4px;
+    border-radius: var(--r-pill);
+  }
+
+  /* The recessed capsule behind the active tab. One element that moves, so
+     switching tabs reads as the highlight sliding, not one turning off and
+     another on. --i is the active index, set inline by MobileTabBar. */
+  .glass-pill-indicator {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    left: 4px;
+    width: calc((100% - 8px) / 4);
+    border-radius: var(--r-pill);
+    background: rgba(2, 6, 14, 0.42);
+    box-shadow:
+      inset 0 1px 2px rgba(0, 0, 0, 0.35),
+      0 0.5px 0 rgba(255, 255, 255, 0.07);
+    transform: translateX(calc(var(--i, 0) * 100%));
+    transition: transform 420ms cubic-bezier(0.32, 0.72, 0, 1), opacity var(--dur-base) ease;
+  }
+  .glass-pill-indicator[data-hidden] { opacity: 0; }
+
+  .mobile-tab {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
+    border-radius: var(--r-pill);
+    color: var(--text-primary);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: color var(--dur-fast) ease, transform var(--dur-fast) var(--ease-out);
+  }
+  .mobile-tab:active { transform: scale(0.94); }
+  .mobile-tab.active { color: var(--accent); }
+
+  .mobile-tab-icon { width: 23px; height: 23px; stroke-width: 1.9px; }
+  .mobile-tab-label {
+    font-size: var(--t-2xs);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  /* Tui AI — the separate round button. */
+  .glass-orb {
+    flex: 0 0 var(--tab-bar-h);
+    width: var(--tab-bar-h);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: var(--text-primary);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform var(--dur-fast) var(--ease-out), color var(--dur-fast) ease;
+  }
+  .glass-orb:active { transform: scale(0.92); }
+  .glass-orb .mobile-tab-icon { width: 26px; height: 26px; }
+  .glass-orb.active { color: var(--accent); }
+}
+
+/* No blur to see through: fall back to a solid enough fill to read. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  @media (max-width: 768px) {
+    .glass-pill,
+    .glass-orb { background-color: rgba(16, 26, 50, 0.94); }
+  }
+}
+
+/* ── Liquid-glass tab bar: touch response + scroll edge ───────
+   From the Liquid Glass guidance (the skill's `.interactive()` and
+   scroll-edge rules), translated to CSS:
+     - interactive glass: under a finger it lifts, brightens and a highlight
+       blooms where it is touched, then springs back
+     - scroll edge: content fades into the page ground behind the bar rather
+       than being cut off by a hard line, so the bar floats on the content
+     - one family: the pill and the Tui orb share one set of glass tokens
+       (above) and the same press curve, so they read as a single piece of
+       glass, which is what GlassEffectContainer is for
+     - tint only means something: the accent is reserved for "you are here" */
+@media (max-width: 768px) {
+  /* Scroll edge. A tall, soft fade of the page colour under the bar. */
+  .mobile-tab-bar::before {
+    content: '';
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: calc(var(--tab-bar-h) + 44px + env(safe-area-inset-bottom));
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(to top, var(--bg-base) 0%, rgba(6, 13, 26, 0.85) 38%, rgba(6, 13, 26, 0) 100%);
+  }
+
+  /* Press: the glass rises toward the finger. Springy overshoot on release. */
+  .glass-pill,
+  .glass-orb {
+    transition:
+      transform 380ms cubic-bezier(0.34, 1.56, 0.64, 1),
+      box-shadow 380ms var(--ease-out);
+  }
+  .glass-pill:active,
+  .glass-orb:active {
+    transform: scale(1.035);
+    transition-duration: 140ms;
+    box-shadow:
+      inset 0 1px 0.5px rgba(255, 255, 255, 0.34),
+      inset 0 -1px 0.5px rgba(255, 255, 255, 0.1),
+      inset 0 0 26px rgba(255, 255, 255, 0.07),
+      0 14px 36px -6px rgba(0, 0, 0, 0.65),
+      0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+  /* The orb already scaled down on press; swap to the same lift as the pill. */
+  .glass-orb:active { transform: scale(1.08); }
+
+  /* The tab under the finger no longer shrinks — the glass does the moving. */
+  .mobile-tab:active { transform: none; }
+  .glass-pill:has(.mobile-tab:active) .glass-pill-indicator { filter: brightness(1.25); }
+
+  /* Specular bloom: a soft light that sits where the glass is touched. Anchored
+     per tab so it needs no JS; it fades in on press and out on release. */
+  .mobile-tab::before,
+  .glass-orb::before {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    border-radius: inherit;
+    background: radial-gradient(ellipse at 50% 30%, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 70%);
+    opacity: 0;
+    transition: opacity 320ms var(--ease-out);
+    pointer-events: none;
+  }
+  .mobile-tab:active::before,
+  .glass-orb:active::before { opacity: 1; transition-duration: 90ms; }
+
+  /* The indicator is concentric with the pill: its radius is the pill's minus
+     the inset, so the gap reads the same all the way round. */
+  .glass-pill-indicator { border-radius: calc(var(--tab-bar-h) / 2 - 4px); }
+
+  /* Labels and icons stay white (vibrant) at rest; only the current page is tinted. */
+  .mobile-tab { color: rgba(239, 242, 248, 0.92); }
+  .mobile-tab.active { color: var(--accent); }
+}
+
+@media (max-width: 768px) and (prefers-reduced-motion: reduce) {
+  .glass-pill,
+  .glass-orb,
+  .glass-pill-indicator { transition: none; }
+}
+
+/* ── Tab bar position: Safari tab vs installed app ────────────
+   In a Safari tab the browser's own toolbar already sits below the page, so
+   the bar only needs a small gap above it — the 12px+ it gets as an installed
+   app would stack two floating bars with dead space between. Installed to the
+   Home Screen there is no toolbar and the bar drops down beside the home
+   indicator, the way Apple's own apps sit. */
+@media (max-width: 768px) {
+  .mobile-tab-bar { bottom: 8px; }
+}
+@media (max-width: 768px) and (display-mode: standalone) {
+  .mobile-tab-bar { bottom: max(12px, calc(env(safe-area-inset-bottom) - 8px)); }
 }

@@ -231,9 +231,10 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
         <ArrowLeft className="w-4 h-4" /> Back to Clients
       </Link>
 
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
+      {/* Header — wraps so the portal buttons drop under the name on a phone
+          instead of running off the right edge. */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
           <h1 className="page-title">{client.name}</h1>
           {client.contactPerson && (
             <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>Contact: {client.contactPerson}</p>
@@ -244,7 +245,7 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
             <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>No email</p>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {portalLink && (
             <button onClick={copyPortalLink} className="btn-secondary btn-sm">
               {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -261,7 +262,7 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
       </div>
 
       {/* Stat strip */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-3 sm:gap-4 stat-strip">
         <div className="stat-card">
           <div className="stat-value">{formatNZD(client.lifetimeValue)}</div>
           <div className="stat-label">Lifetime Value</div>
@@ -282,7 +283,7 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
       )}
 
       {/* Tabs */}
-      <div className="flex gap-0" style={{ borderBottom: '1px solid var(--bg-border)' }}>
+      <div className="flex gap-0 page-tabs-scroll" style={{ borderBottom: '1px solid var(--bg-border)' }}>
         {TABS.map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)} className={`tab ${tab === t.key ? 'active' : ''}`}>
             <span className="flex items-center gap-2">

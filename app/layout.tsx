@@ -6,6 +6,14 @@ export const metadata: Metadata = {
   title: "Tui Media",
   description: "Tui Media — studio dashboard and client portal",
   // Favicon comes from app/icon.svg (Next.js convention) — same mark as tuimedia.nz.
+  // The home-screen icon is app/apple-icon.png, rendered from that same SVG.
+  // appleWebApp makes "Add to Home Screen" open full screen like an app, with
+  // the status bar drawn over the navy rather than a white strip above it.
+  appleWebApp: {
+    capable: true,
+    title: 'Tui Media',
+    statusBarStyle: 'black-translucent',
+  },
 };
 
 // viewport-fit=cover is what lets env(safe-area-inset-*) resolve to anything
@@ -19,6 +27,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#060D1A",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

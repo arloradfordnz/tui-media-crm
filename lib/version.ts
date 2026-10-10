@@ -33,4 +33,10 @@
 // 3.6.0 — client emails are read from the inbox, matched to the client by
 // sender, and summarised into a tailored line in Your week ("Marty's Meat
 // Smash wants to move Thursday's shoot"), clearing once you reply.
-export const APP_VERSION = '3.6.0'
+// 3.6.1 — phone pass: no more sideways scrolling (a hidden panel was parked
+// off the right edge), tighter mobile spacing, and Add to Home Screen opens
+// full screen with the favicon's bird as the app icon.
+// 3.7.0 — the phone tab bar is a floating liquid-glass capsule (Today, Jobs,
+// Retainers, Settings) with a sliding highlight, and Tui AI is its own round
+// glass button beside it.
+export const APP_VERSION = '3.7.0'

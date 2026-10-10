@@ -59,6 +59,14 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
           className="report-panel"
           style={{
             transform: panelOpen ? 'translateX(0)' : `translateX(calc(100% + 24px))`,
+            // Closed, the panel is parked 380px past the right edge, and iOS
+            // Safari lets you pan sideways to reach it — the whole app
+            // scrolled side to side on a phone because of a panel nobody had
+            // open. Hidden once the slide-out finishes, shown at once on open.
+            visibility: panelOpen ? 'visible' : 'hidden',
+            transition: panelOpen
+              ? 'transform var(--dur-panel) var(--ease-panel), visibility 0s'
+              : 'transform var(--dur-panel) var(--ease-panel), visibility 0s linear var(--dur-panel)',
           }}
         >
           {panelContent}
@@ -82,7 +90,7 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
           }}
         >
           {/* Scrollable page content — scrollbar hidden, scroll still works */}
-          <div className="scroll-invisible" style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
+          <div className="scroll-invisible" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minWidth: 0 }}>
             <div className="page-shell-inner">
               {children}
             </div>

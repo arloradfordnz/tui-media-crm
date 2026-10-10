@@ -27,7 +27,7 @@ export default function SearchInput({ basePath, placeholder, paramName = 'search
   }
 
   return (
-    <div className="relative flex-1">
+    <div className="search-field relative flex-1">
       <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
       <input
         defaultValue={defaultValue}
