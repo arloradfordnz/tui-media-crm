@@ -1,4 +1,5 @@
 import { Line, Heading } from '@/components/Skeleton'
+import { TxSkeleton } from './TransactionsCard'
 
 // Mirrors app/dashboard/page.tsx, and has to be re-checked every time that
 // page's layout moves — a skeleton in a different shape than what replaces it
@@ -6,7 +7,8 @@ import { Line, Heading } from '@/components/Skeleton'
 //
 // Current shape: greeting + two actions, then a two-column split that
 // finishes level — Tui AI with the money panel under it on the left (the money
-// card stretches to the right column's height), and on the right one "Your
+// card and a recent-transactions card stretch to the right column's height,
+// sharing the extra), and on the right one "Your
 // week" list and the subscriptions under it. Stacked below 1100px in the order
 // Tui, Your week, Money, Subscriptions, same as the page.
 export default function DashboardLoading() {
@@ -43,11 +45,14 @@ export default function DashboardLoading() {
                   </div>
                 ))}
               </div>
-              <div className="money-chart-slot">
-                <div className="skeleton" style={{ position: 'absolute', inset: 0, borderRadius: 12 }} />
+              <div className="money-mini-fill">
+                <div className="money-chart-slot">
+                  <div className="skeleton" style={{ position: 'absolute', inset: 0, borderRadius: 12 }} />
+                </div>
               </div>
             </div>
           </section>
+          <TxSkeleton fill />
         </div>
 
         <div className="today-split-side dash-stack">

@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { ArrowUpRight } from 'lucide-react'
-import { fetchMonthlyPnlCached } from '@/lib/xero'
+import { fetchMonthlyPnlCached, fetchXeroTransactionsCached } from '@/lib/xero'
 import MoneyMiniChart from './MoneyMiniChart'
+import TransactionsCard, { TxSkeleton, type RecentTx } from './TransactionsCard'
 
 /**
  * The home screen's money graph: six months of in against out.
@@ -18,6 +19,10 @@ import MoneyMiniChart from './MoneyMiniChart'
  */
 
 const MONTHS = 6
+// More than the tallest column will ever show; the list trims to what fits.
+const RECENT_TX = 16
+
+const NZ_TZ = 'Pacific/Auckland'
 
 /**
  * `fill`: the panel stretches to take whatever height its column has spare and
@@ -26,13 +31,21 @@ const MONTHS = 6
  * at the two-column width; stacked, the chart is its usual 240px.
  */
 export default async function MoneyPanel({ fill = false }: { fill?: boolean } = {}) {
-  let monthly: Awaited<ReturnType<typeof fetchMonthlyPnlCached>> = null
-  try {
-    monthly = await fetchMonthlyPnlCached(MONTHS)
-  } catch {
-    // Xero being down is not a reason for the home screen to be down.
-    monthly = null
-  }
+  // Both from Xero's cached tier, fetched together so the transactions cost
+  // no extra wait. Xero being down is not a reason for the home screen to be.
+  const [monthly, txs] = await Promise.all([
+    fetchMonthlyPnlCached(MONTHS).catch(() => null),
+    fetchXeroTransactionsCached().catch(() => null),
+  ])
+
+  // Already newest-first. Invoices raised ahead of time carry a future date,
+  // and a "recent" list that leads with December is not recent, so those wait.
+  const todayISO = new Date().toLocaleDateString('en-CA', { timeZone: NZ_TZ })
+  // null means Xero could not be read, which is different from "nothing new".
+  const recent: RecentTx[] | null = txs && txs
+    .filter((t) => t.date <= todayISO)
+    .slice(0, RECENT_TX)
+    .map(({ id, date, type, description, reference, status, amount }) => ({ id, date, type, description, reference, status, amount }))
 
   if (!monthly || monthly.length === 0) {
     return (
@@ -51,15 +64,19 @@ export default async function MoneyPanel({ fill = false }: { fill?: boolean } = 
   const net = rows.reduce((a, m) => a + m.income - m.expenses, 0)
 
   return (
+    <>
     <Shell fill={fill}>
       {/* Figures and chart are one client component: the figures toggle which
           line is isolated, so they have to share that state with the chart. */}
       <MoneyMiniChart inData={inData} outData={outData} net={net} fill={fill} />
       <p className="text-2xs mt-2" style={{ color: 'var(--text-tertiary)' }}>
-        Up to the last {rows.length} months, from Xero. The chart drops the
-        oldest months when the column is too narrow to label them all.
+        Up to the last {rows.length} months, from Xero.
       </p>
     </Shell>
+    {/* Its own card, like Finance's. In fill mode it and the chart card share
+        the column's spare height. */}
+    <TransactionsCard transactions={recent} fill={fill} />
+    </>
   )
 }
 
@@ -90,9 +107,21 @@ export function MoneyPanelSkeleton({ fill = false }: { fill?: boolean } = {}) {
           </div>
         ))}
       </div>
-      <div className="money-chart-slot">
-        <div className="skeleton" style={{ position: 'absolute', inset: 0, borderRadius: 12 }} />
+      <div className="money-mini-fill">
+        <div className="money-chart-slot">
+          <div className="skeleton" style={{ position: 'absolute', inset: 0, borderRadius: 12 }} />
+        </div>
       </div>
     </Shell>
   )
 }
+
+export function MoneyPanelSkeletonWithTx({ fill = false }: { fill?: boolean } = {}) {
+  return (
+    <>
+      <MoneyPanelSkeleton fill={fill} />
+      <TxSkeleton fill={fill} />
+    </>
+  )
+}
+

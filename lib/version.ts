@@ -54,4 +54,8 @@
 // website logo and font, one heading size), and the default contract wording
 // is a saved template that can be edited in Documents or by Tui, which can
 // also create and edit contracts.
-export const APP_VERSION = '3.10.0'
+// 3.10.1 — a Transactions card (the same as Finance's) under the dashboard
+// money chart, the two sharing the left column's spare height; Xero token
+// expiry is read from the token itself, and a failed Xero transactions fetch no
+// longer caches as "no transactions".
+export const APP_VERSION = '3.10.1'

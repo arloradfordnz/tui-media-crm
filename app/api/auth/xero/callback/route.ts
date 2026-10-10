@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getVerifiedUser } from '@/lib/supabase'
-import { exchangeCodeForToken, listConnections } from '@/lib/xero'
+import { exchangeCodeForToken, listConnections, accessTokenExpiry } from '@/lib/xero'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
   // Use the first organisation. Users with multiple orgs can revisit and
   // re-authorise; we'll add an org picker if that ever becomes a need.
   const conn = connections[0]
-  const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString()
+  const expiresAt = accessTokenExpiry(tokens)
 
   // Use service role for the upsert so RLS doesn't block writes from this
   // route (the connected_accounts policies are scoped to authenticated, but

@@ -2896,10 +2896,30 @@ input, textarea, select, button { font-family: inherit; }
      bounded height and the whole panel grows past it. */
   .today-tui .tui-shell { flex: 1; min-height: 0; }
 
-  .money-fill { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  /* The money chart card and the transactions card split the column's spare
+     height between them (3 : 2, both from a zero basis), so a taller right
+     column grows both rather than just one. */
+  .money-fill { flex: 3 1 0; display: flex; flex-direction: column; min-height: 0; }
   .money-fill > .card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
   .money-fill .money-mini-fill { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-  .money-fill .money-chart-slot { flex: 1; height: auto; min-height: 220px; }
+  .money-fill .money-chart-slot { flex: 1; height: auto; min-height: 200px; }
+  .tx-fill { flex: 2 1 0; display: flex; flex-direction: column; min-height: calc(110px + 3 * 37px); }
+  .tx-fill > .tx-card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .tx-fill .tx-slot { flex: 1; height: auto; min-height: 0; }
+}
+
+/* The transactions card. In the two-column layout its rows live in an
+   absolutely-positioned slot (see TransactionsCard) so the table can't grow
+   the column it is measuring; elsewhere it is an ordinary table. */
+/* Stacked (no column to match): the header row plus five 37px rows. */
+.tx-slot { position: relative; height: 216px; }
+.tx-abs { position: absolute; inset: 0; overflow: hidden; }
+/* The Finance card's own table already scrolls sideways if it must. On the
+   dashboard the card is narrower, so the two least useful columns step aside
+   when the CARD (not the viewport) is too narrow for all five. */
+.tx-card { container-type: inline-size; }
+@container (max-width: 480px) {
+  .tx-col-ref, .tx-col-status { display: none; }
 }
 
 /* Stacked: Tui, then what needs you, then money, then subscriptions. The two
@@ -2912,7 +2932,8 @@ input, textarea, select, button { font-family: inherit; }
   .today-tui  { order: 1; }
   .today-week { order: 2; }
   .today-money { order: 3; }
-  .today-subs { order: 4; }
+  .today-tx { order: 4; }
+  .today-subs { order: 5; }
 }
 
 /* The read-only column: three stacked sections, spaced like the page's own
@@ -3457,3 +3478,5 @@ input, textarea, select, button { font-family: inherit; }
     pointer-events: none;
   }
 }
+
+.tx-table-wrap { overflow-x: auto; }

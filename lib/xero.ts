@@ -69,6 +69,29 @@ type TokenResponse = {
   scope: string
 }
 
+/**
+ * When an access token actually expires, read from the token itself.
+ *
+ * `now + expires_in` is wrong whenever two callers refresh with the same
+ * refresh token inside Xero's 30-minute grace window — the live site and a
+ * local dev server sharing this database, or two serverless instances. Xero
+ * answers the second refresh with the SAME token pair it already issued, so
+ * the second caller stamped a token minted (say) at 22:31 with an expiry of
+ * 23:13. Between 23:01 and 23:13 every Xero call then failed "TokenExpired"
+ * while the stored row said the token was fine, and nothing refreshed it.
+ * Seen 11 Oct 2026: Finance and the dashboard went blank for twelve minutes.
+ *
+ * Xero access tokens are JWTs, so `exp` is the truth. Falls back to
+ * expires_in only if the token can't be decoded.
+ */
+export function accessTokenExpiry(tok: { access_token: string; expires_in: number }): string {
+  try {
+    const payload = JSON.parse(Buffer.from(tok.access_token.split('.')[1], 'base64url').toString('utf8'))
+    if (typeof payload.exp === 'number') return new Date(payload.exp * 1000).toISOString()
+  } catch { /* not a JWT — fall through */ }
+  return new Date(Date.now() + tok.expires_in * 1000).toISOString()
+}
+
 export async function exchangeCodeForToken(code: string): Promise<TokenResponse> {
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
@@ -185,7 +208,7 @@ async function fetchValidXeroAccount(): Promise<StoredAccount | null> {
   if (needsRefresh && account.refresh_token) {
     try {
       const tok = await refreshAccessToken(account.refresh_token)
-      const newExpires = new Date(Date.now() + tok.expires_in * 1000).toISOString()
+      const newExpires = accessTokenExpiry(tok)
       await supabase
         .from('connected_accounts')
         .update({
@@ -864,17 +887,18 @@ async function fetchInvoiceTransactions(
 ): Promise<XeroTransaction[]> {
   const results: XeroTransaction[] = []
   for (let page = 1; page <= 4; page++) {
-    let pageData: RawInvoice[]
-    try {
-      const res = await xeroGet<{ Invoices?: RawInvoice[] }>(
-        `/Invoices?Statuses=PAID,AUTHORISED&page=${page}&pageSize=200&order=Date+DESC`,
-        accessToken,
-        tenantId,
-      )
-      pageData = res.Invoices ?? []
-    } catch {
-      break
-    }
+    // No try/catch on purpose. A failed request is not an empty page: this
+    // used to `catch { break }`, so an expired token on page 1 came back as
+    // "no invoices", and swrCached stored that as the new truth, blanking
+    // Finance and the dashboard's recent transactions until the TTL ran out.
+    // Letting it throw makes fetchXeroTransactions return null, which keeps
+    // the last good data.
+    const res = await xeroGet<{ Invoices?: RawInvoice[] }>(
+      `/Invoices?Statuses=PAID,AUTHORISED&page=${page}&pageSize=200&order=Date+DESC`,
+      accessToken,
+      tenantId,
+    )
+    const pageData: RawInvoice[] = res.Invoices ?? []
     if (pageData.length === 0) break
     for (const inv of pageData) {
       const amount = inv.Total ?? 0
@@ -911,17 +935,13 @@ async function fetchBankTransactions(
 ): Promise<XeroTransaction[]> {
   const results: XeroTransaction[] = []
   for (let page = 1; page <= 4; page++) {
-    let pageData: RawBankTx[]
-    try {
-      const res = await xeroGet<{ BankTransactions?: RawBankTx[] }>(
-        `/BankTransactions?Type=SPEND&page=${page}&pageSize=200&order=Date+DESC`,
-        accessToken,
-        tenantId,
-      )
-      pageData = res.BankTransactions ?? []
-    } catch {
-      break
-    }
+    // Throws on failure, same as invoices above: a failure is not "no spending".
+    const res = await xeroGet<{ BankTransactions?: RawBankTx[] }>(
+      `/BankTransactions?Type=SPEND&page=${page}&pageSize=200&order=Date+DESC`,
+      accessToken,
+      tenantId,
+    )
+    const pageData: RawBankTx[] = res.BankTransactions ?? []
     if (pageData.length === 0) break
     for (const tx of pageData) {
       if (tx.Status === 'DELETED') continue
