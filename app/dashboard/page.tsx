@@ -7,7 +7,7 @@ import { getAttention, type AttentionItem, type WeekEvent } from '@/lib/attentio
 import { CheckCircle2, Plus, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import Greeting from './Greeting'
-import MoneyPanel, { MoneyPanelSkeletonWithTx } from './MoneyPanel'
+import MoneyPanel, { MoneyPanelSkeleton } from './MoneyPanel'
 import SubscriptionsPanel, { getSubscriptions } from './SubscriptionsPanel'
 import TuiThread from '@/components/TuiThread'
 
@@ -94,7 +94,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* ── Two columns that finish level ──────────────────────
-          Left: Tui, then the money graph and recent transactions under it. Right: what is booked and
+          Left: Tui, then the money card (graph, then recent transactions) under it. Right: what is booked and
           waiting this week, then the subscriptions. The columns are stretched
           to the same height and the money chart takes up whatever the left
           side has spare, so adding a booking or a subscription on the right
@@ -116,7 +116,7 @@ export default async function DashboardPage() {
           </section>
 
           {/* Streamed, not awaited — see MoneyPanel. */}
-          <Suspense fallback={<MoneyPanelSkeletonWithTx fill />}>
+          <Suspense fallback={<MoneyPanelSkeleton fill />}>
             <MoneyPanel fill />
           </Suspense>
         </div>

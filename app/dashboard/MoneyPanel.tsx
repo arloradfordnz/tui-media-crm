@@ -64,7 +64,6 @@ export default async function MoneyPanel({ fill = false }: { fill?: boolean } = 
   const net = rows.reduce((a, m) => a + m.income - m.expenses, 0)
 
   return (
-    <>
     <Shell fill={fill}>
       {/* Figures and chart are one client component: the figures toggle which
           line is isolated, so they have to share that state with the chart. */}
@@ -72,11 +71,10 @@ export default async function MoneyPanel({ fill = false }: { fill?: boolean } = 
       <p className="text-2xs mt-2" style={{ color: 'var(--text-tertiary)' }}>
         Up to the last {rows.length} months, from Xero.
       </p>
+      {/* Same card: in fill mode the chart and this list share its spare
+          height. */}
+      <TransactionsCard transactions={recent} fill={fill} />
     </Shell>
-    {/* Its own card, like Finance's. In fill mode it and the chart card share
-        the column's spare height. */}
-    <TransactionsCard transactions={recent} fill={fill} />
-    </>
   )
 }
 
@@ -112,16 +110,8 @@ export function MoneyPanelSkeleton({ fill = false }: { fill?: boolean } = {}) {
           <div className="skeleton" style={{ position: 'absolute', inset: 0, borderRadius: 12 }} />
         </div>
       </div>
-    </Shell>
-  )
-}
-
-export function MoneyPanelSkeletonWithTx({ fill = false }: { fill?: boolean } = {}) {
-  return (
-    <>
-      <MoneyPanelSkeleton fill={fill} />
       <TxSkeleton fill={fill} />
-    </>
+    </Shell>
   )
 }
 

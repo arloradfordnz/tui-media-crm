@@ -7,8 +7,8 @@ import { TxSkeleton } from './TransactionsCard'
 //
 // Current shape: greeting + two actions, then a two-column split that
 // finishes level — Tui AI with the money panel under it on the left (the money
-// card and a recent-transactions card stretch to the right column's height,
-// sharing the extra), and on the right one "Your
+// card, chart plus recent transactions, stretches to the right column's
+// height and the two share the extra), and on the right one "Your
 // week" list and the subscriptions under it. Stacked below 1100px in the order
 // Tui, Your week, Money, Subscriptions, same as the page.
 export default function DashboardLoading() {
@@ -50,9 +50,9 @@ export default function DashboardLoading() {
                   <div className="skeleton" style={{ position: 'absolute', inset: 0, borderRadius: 12 }} />
                 </div>
               </div>
+              <TxSkeleton fill />
             </div>
           </section>
-          <TxSkeleton fill />
         </div>
 
         <div className="today-split-side dash-stack">

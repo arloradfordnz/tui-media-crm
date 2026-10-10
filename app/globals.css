@@ -2896,19 +2896,19 @@ input, textarea, select, button { font-family: inherit; }
      bounded height and the whole panel grows past it. */
   .today-tui .tui-shell { flex: 1; min-height: 0; }
 
-  /* The money chart card and the transactions card split the column's spare
-     height between them (3 : 2, both from a zero basis), so a taller right
-     column grows both rather than just one. */
-  .money-fill { flex: 3 1 0; display: flex; flex-direction: column; min-height: 0; }
+  /* The money card fills the column's spare height, and inside it the chart
+     and the transactions list split that height 3 : 2 (both from a zero
+     basis), so a taller right column grows both rather than just one. */
+  .money-fill { flex: 1; display: flex; flex-direction: column; min-height: 0; }
   .money-fill > .card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-  .money-fill .money-mini-fill { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .money-fill .money-mini-fill { flex: 3 1 0; display: flex; flex-direction: column; min-height: 0; }
   .money-fill .money-chart-slot { flex: 1; height: auto; min-height: 200px; }
-  .tx-fill { flex: 2 1 0; display: flex; flex-direction: column; min-height: calc(110px + 3 * 37px); }
-  .tx-fill > .tx-card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .tx-fill { flex: 2 1 0; display: flex; flex-direction: column; min-height: calc(40px + 29px + 3 * 37px); }
   .tx-fill .tx-slot { flex: 1; height: auto; min-height: 0; }
 }
 
-/* The transactions card. In the two-column layout its rows live in an
+/* The transactions block, inside the money card under the chart, set off by a
+   hairline. In the two-column layout its rows live in an
    absolutely-positioned slot (see TransactionsCard) so the table can't grow
    the column it is measuring; elsewhere it is an ordinary table. */
 /* Stacked (no column to match): the header row plus five 37px rows. */
@@ -2917,7 +2917,7 @@ input, textarea, select, button { font-family: inherit; }
 /* The Finance card's own table already scrolls sideways if it must. On the
    dashboard the card is narrower, so the two least useful columns step aside
    when the CARD (not the viewport) is too narrow for all five. */
-.tx-card { container-type: inline-size; }
+.tx-block { container-type: inline-size; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--bg-border); }
 @container (max-width: 480px) {
   .tx-col-ref, .tx-col-status { display: none; }
 }
@@ -2932,8 +2932,7 @@ input, textarea, select, button { font-family: inherit; }
   .today-tui  { order: 1; }
   .today-week { order: 2; }
   .today-money { order: 3; }
-  .today-tx { order: 4; }
-  .today-subs { order: 5; }
+  .today-subs { order: 4; }
 }
 
 /* The read-only column: three stacked sections, spaced like the page's own

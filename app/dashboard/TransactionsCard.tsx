@@ -26,15 +26,14 @@ function fmtTxDate(iso: string) {
 }
 
 /**
- * The latest money movements as their own card, the same card as
- * "Transactions" on Finance (app/dashboard/finance/FinanceDashboard.tsx
- * TxTable): same header, same five columns, same arrows, badges and amounts.
- * Keep the two in step by eye; they are separate because Finance's carries
- * paging, period totals and its own state.
+ * The latest money movements, inside the money card under the chart, in the
+ * same table as "Transactions" on Finance (app/dashboard/finance/
+ * FinanceDashboard.tsx TxTable): same five columns, same arrows, badges and
+ * amounts. Keep the two in step by eye; they are separate because Finance's
+ * carries paging, period totals and its own state.
  *
- * In `fill` mode it sits under the money chart and the two cards share the
- * left column's spare height, so a longer right column makes the chart taller
- * AND the list longer. It shows as many whole rows as fit, never a half-cut
+ * In `fill` mode the chart and this list share the card's spare height, so a
+ * longer right column makes the chart taller AND the list longer. It shows as many whole rows as fit, never a half-cut
  * one: row and header heights are measured off the rendered table rather than
  * assumed, and the rows are drawn absolutely so the table can't feed its own
  * height back into the column it is measuring.
@@ -112,40 +111,33 @@ export default function TransactionsCard({ transactions: txs, fill = false }: { 
   )
 
   return (
-    <section className={`today-tx${fill ? ' tx-fill' : ''}`}>
-      <div className="section-head">
-        <h2 className="section-heading">Transactions</h2>
-        <Link href="/dashboard/finance" className="section-head-meta" style={{ color: 'var(--accent)' }}>
-          Finance ↗
-        </Link>
+    <div className={`tx-block${fill ? ' tx-fill' : ''}`}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <span style={{ fontSize: 'var(--t-xs)', color: 'var(--text-tertiary)', fontWeight: 500 }}>Recent transactions</span>
+        <Link href="/dashboard/finance" style={{ fontSize: 'var(--t-xs)', color: 'var(--accent)' }}>All</Link>
       </div>
-      <div className="card tx-card" style={{ padding: '18px 20px 16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <span style={{ fontSize: 'var(--t-xs)', color: 'var(--text-tertiary)', fontWeight: 500 }}>Recent</span>
+      {transactions.length === 0 ? (
+        <p style={{ fontSize: 'var(--t-sm)', color: 'var(--text-tertiary)', padding: '12px 0' }}>
+          {txs === null ? "Couldn't reach Xero for transactions just now." : 'Nothing recent from Xero.'}
+        </p>
+      ) : fill ? (
+        <div ref={slotRef} className="tx-slot">
+          <div className="tx-abs">{table}</div>
         </div>
-        {transactions.length === 0 ? (
-          <p style={{ fontSize: 'var(--t-sm)', color: 'var(--text-tertiary)', padding: '12px 0' }}>
-            {txs === null ? "Couldn't reach Xero for transactions just now." : 'Nothing recent from Xero.'}
-          </p>
-        ) : fill ? (
-          <div ref={slotRef} className="tx-slot">
-            <div className="tx-abs">{table}</div>
-          </div>
-        ) : (
-          table
-        )}
-      </div>
-    </section>
+      ) : (
+        table
+      )}
+    </div>
   )
 }
 
-// Placeholder rows in the same card, so the Xero wait does not end in the
-// column changing shape.
+// Placeholder rows in the same block, so the Xero wait does not end in the
+// card changing shape.
 export function TxSkeleton({ fill = false }: { fill?: boolean }) {
   return (
-    <section className={`today-tx${fill ? ' tx-fill' : ''}`}>
-      <div className="section-head"><h2 className="section-heading">Transactions</h2></div>
-      <div className="card tx-card" style={{ padding: '18px 20px 16px' }}>
+    <div className={`tx-block${fill ? ' tx-fill' : ''}`}>
+      <div style={{ marginBottom: 10 }}><div className="skeleton" style={{ width: 120, height: 11 }} /></div>
+      <div>
         <div className="tx-slot">
           <div className="tx-abs">
             {[0, 1, 2, 3].map((i) => (
@@ -158,6 +150,6 @@ export function TxSkeleton({ fill = false }: { fill?: boolean }) {
           </div>
         </div>
       </div>
-    </section>
+    </div>
   )
 }

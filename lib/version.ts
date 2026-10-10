@@ -58,4 +58,6 @@
 // money chart, the two sharing the left column's spare height; Xero token
 // expiry is read from the token itself, and a failed Xero transactions fetch no
 // longer caches as "no transactions".
-export const APP_VERSION = '3.10.1'
+// 3.10.2 — the transactions go back inside the money card, under the chart,
+// and the two share the card's spare height.
+export const APP_VERSION = '3.10.2'
