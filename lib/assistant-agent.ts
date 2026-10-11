@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { TOOLS, executeTool, CONFIRM_TOOLS, toolFingerprint } from '@/lib/ai-tools'
+import { TOOLS, executeTool, CONFIRM_TOOLS, DASHBOARD_ONLY_TOOLS, toolFingerprint } from '@/lib/ai-tools'
 import { recordPendingAction } from '@/lib/assistant-approvals'
 import { buildTelegramSystem } from '@/lib/assistant-persona'
 import { sendTelegramMessage } from '@/lib/telegram'
@@ -99,7 +99,8 @@ export async function runAssistantTurn(
   // Web search only on a reply to Arlo. A portal event is never an occasion to
   // go looking things up online, and leaving the tool off makes that certain.
   const tools: Anthropic.ToolUnion[] = [
-    ...TOOLS,
+    // No popups on Telegram, so no ask_arlo: questions go out as plain text.
+    ...TOOLS.filter((t) => !DASHBOARD_ONLY_TOOLS.has(t.name)),
     ...(opts.trigger === 'inbound' ? [WEB_SEARCH_TOOL] : []),
     { ...SEND_MESSAGE_TOOL, cache_control: { type: 'ephemeral' } },
   ]

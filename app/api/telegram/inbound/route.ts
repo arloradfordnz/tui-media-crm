@@ -9,7 +9,9 @@ import { parseConfirmation, consumeApproval } from '@/lib/assistant-approvals'
 // several tool-calling rounds, and the actual reply goes out via the
 // Telegram API from inside the loop — not via this response — so we ack
 // immediately and let the agent keep running via Next's after().
-export const maxDuration = 60
+// 300, not 60: a contract drafted over Telegram runs a minute or more on its
+// own, and 60 was below the project's Fluid default of 300 anyway.
+export const maxDuration = 300
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL

@@ -2,12 +2,13 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowUp, ExternalLink, Check, Loader2, AlertTriangle, ShieldAlert, Search } from 'lucide-react'
+import { ArrowUp, ExternalLink, Check, Loader2, AlertTriangle, ShieldAlert, Search, ListChecks } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useMounted } from '@/lib/useMounted'
 import type { ThreadMessage } from '@/lib/tui/thread'
-import { decodeEvents } from '@/lib/tui/receipts'
+import { decodeEvents, type AskQuestion } from '@/lib/tui/receipts'
+import AskSheet, { formatAnswers } from './AskSheet'
 import { renderMarkdown } from './chat-markup'
 
 // The one Tui surface. Before this component there were two — an AiChat widget
@@ -40,12 +41,16 @@ type Receipt = { id: string; name?: string; label: string; state: 'running' | 'd
 type LinkOut = { path: string; label: string }
 type Confirm = { fingerprint: string; action: string }
 
+type Ask = { id: string; questions: AskQuestion[]; answered?: boolean }
+
 type Message = {
   role: 'user' | 'assistant'
   content: string
   receipts?: Receipt[]
   links?: LinkOut[]
   confirms?: Confirm[]
+  /** Questions Tui asked with tap-to-answer options (ask_arlo). */
+  ask?: Ask
 }
 
 export type TuiVariant = 'panel' | 'page' | 'overlay'
@@ -98,7 +103,12 @@ function writeStore(key: string, messages: Message[]) {
 function mergeRoles(msgs: Message[]): { role: 'user' | 'assistant'; content: string }[] {
   const out: { role: 'user' | 'assistant'; content: string }[] = []
   for (const m of msgs) {
-    const content = m.content.trim()
+    // A turn that only asked questions has no prose, but the model still needs
+    // to see what it asked, or the tapped answers arrive with no context.
+    const asked = m.ask
+      ? m.ask.questions.map((q) => `${q.question} (options: ${q.options.map((o) => o.label).join(' / ')})`).join('\n')
+      : ''
+    const content = [m.content.trim(), asked].filter(Boolean).join('\n\n')
     if (!content) continue
     const last = out[out.length - 1]
     if (last && last.role === m.role) last.content += `\n\n${content}`
@@ -142,6 +152,8 @@ export default function TuiThread({
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [hasChatted, setHasChatted] = useState(false)
+  // The ask_arlo popup that is open, by its tool-call id.
+  const [openAsk, setOpenAsk] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
@@ -265,11 +277,18 @@ export default function TuiThread({
     if (!text.trim() || loading) return
 
     const userMsg: Message = { role: 'user', content: text.trim() }
+    // Anything typed answers (or moves past) any question still open, so its
+    // Answer button should not linger above the new turn.
+    setOpenAsk(null)
     // One turn can be several bubbles here but is one assistant turn to the
     // API, which requires the roles to alternate — so consecutive bubbles are
     // rejoined before they go back out.
     const history = mergeRoles([...messages, userMsg].slice(-HISTORY_CAP))
-    setMessages((prev) => [...prev, userMsg, { role: 'assistant', content: '' }])
+    setMessages((prev) => [
+      ...prev.map((m) => (m.ask && !m.ask.answered ? { ...m, ask: { ...m.ask, answered: true } } : m)),
+      userMsg,
+      { role: 'assistant', content: '' },
+    ])
     setInput('')
     setLoading(true)
     setHasChatted(true)
@@ -357,6 +376,7 @@ export default function TuiThread({
       const decoder = new TextDecoder()
       let buffer = ''
       let failed: string | null = null
+      let askId: string | null = null
 
       while (true) {
         const { done, value } = await reader.read()
@@ -394,6 +414,10 @@ export default function TuiThread({
             case 'link':
               patchLast((m) => ({ ...m, links: [...(m.links ?? []), { path: ev.path, label: ev.label }] }))
               break
+            case 'ask':
+              patchLast((m) => ({ ...m, ask: { id: ev.id, questions: ev.questions } }))
+              askId = ev.id
+              break
             case 'mutated':
               // Refresh the moment the write lands rather than waiting for the
               // turn to finish. The page behind this panel is the thing Arlo
@@ -424,6 +448,8 @@ export default function TuiThread({
       // One more at the end: the mid-turn refresh above can land before a
       // later write in the same turn does.
       if (didMutate) router.refresh()
+      // Questions pop straight up once the turn has finished streaming.
+      if (askId) setOpenAsk(askId)
     } catch {
       // The server logs every failure it catches, and this one never reaches
       // it: the reply was cut off in transit. Almost always the connection.
@@ -527,6 +553,14 @@ export default function TuiThread({
     setLoading(false)
   }
 
+  function answerAsk(ask: Ask, answers: string[]) {
+    setMessages((prev) => prev.map((m) => (m.ask?.id === ask.id ? { ...m, ask: { ...m.ask, answered: true } } : m)))
+    setOpenAsk(null)
+    void sendMessage(formatAnswers(ask.questions, answers))
+  }
+
+  const openAskData = openAsk ? messages.find((m) => m.ask?.id === openAsk && !m.ask.answered)?.ask : undefined
+
   function dismiss(c: Confirm) {
     setMessages((prev) =>
       prev.map((m) =>
@@ -558,7 +592,7 @@ export default function TuiThread({
       }}
     >
       {/* Thread */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-2.5">
+      <div ref={scrollRef} className="tui-scroll flex-1 overflow-y-auto px-5 py-4 space-y-2.5">
         {messages.length === 0 && (
           /* The mark alone. An empty chat is the one place in the app with
              room for it, and it says whose assistant this is faster than a
@@ -634,6 +668,28 @@ export default function TuiThread({
                     ) : m.role === 'assistant' ? (
                       <span dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) || '&#8203;' }} />
                     ) : m.content}
+                  </div>
+                )}
+
+                {m.ask && (
+                  <div className="tui-ask-card">
+                    <ListChecks className="tui-ask-icon" aria-hidden="true" />
+                    <div className="tui-ask-text">
+                      <span className="tui-ask-title">
+                        {m.ask.questions.length === 1 ? 'A question for you' : `${m.ask.questions.length} questions for you`}
+                      </span>
+                      <span className="tui-ask-sub">
+                        {m.ask.questions[0].question}
+                        {m.ask.questions.length > 1 ? ` and ${m.ask.questions.length - 1} more` : ''}
+                      </span>
+                    </div>
+                    {m.ask.answered ? (
+                      <span className="tui-ask-done"><Check className="w-3.5 h-3.5" /> Answered</span>
+                    ) : (
+                      <button type="button" className="btn-primary btn-sm" disabled={loading} onClick={() => setOpenAsk(m.ask!.id)}>
+                        Answer
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -728,6 +784,15 @@ export default function TuiThread({
           </button>
         </form>
       </div>
+
+      {openAskData && (
+        <AskSheet
+          key={openAskData.id}
+          questions={openAskData.questions}
+          onSubmit={(answers) => answerAsk(openAskData, answers)}
+          onClose={() => setOpenAsk(null)}
+        />
+      )}
     </div>
   )
 }

@@ -60,4 +60,10 @@
 // longer caches as "no transactions".
 // 3.10.2 — the transactions go back inside the money card, under the chart,
 // and the two share the card's spare height.
-export const APP_VERSION = '3.10.2'
+// 3.11.0 — contracts are drafted fresh for each deal by a dedicated drafter on
+// Claude Opus 5.5 with a New Zealand legal brief, instead of the default
+// template being filled in every time. Tui reads the client first, then asks
+// the deciding questions as a tap-to-answer popup; changes revise the same
+// contract. The AI button in Documents is gone, and the chat's scroll bar no
+// longer runs past the card's rounded corners.
+export const APP_VERSION = '3.11.0'

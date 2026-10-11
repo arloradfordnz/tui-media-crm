@@ -3479,3 +3479,73 @@ input, textarea, select, button { font-family: inherit; }
 }
 
 .tx-table-wrap { overflow-x: auto; }
+
+/* ── Tui questions (ask_arlo) ─────────────────────────────────
+   The card in the thread that says Tui is waiting on answers, and the popup
+   (AskSheet) that takes them. The popup reuses .confirm-scrim/.confirm-sheet,
+   so it is the same object as every other sheet in the app. */
+.tui-ask-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--r-lg);
+  background: var(--bg-elevated);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.tui-ask-icon { width: 18px; height: 18px; flex: none; color: var(--accent); }
+.tui-ask-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.tui-ask-title { font-size: var(--t-sm); font-weight: 600; color: var(--text-primary); }
+.tui-ask-sub { font-size: var(--t-xs); color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tui-ask-done { display: inline-flex; align-items: center; gap: 4px; font-size: var(--t-xs); color: var(--text-tertiary); flex: none; }
+
+.ask-sheet { max-width: 520px; max-height: min(88dvh, 720px); overflow-y: auto; }
+.ask-progress { display: flex; gap: 4px; margin-bottom: 14px; }
+.ask-progress-bar { flex: 1; height: 3px; border-radius: var(--r-pill); background: var(--bg-border); transition: background var(--dur-base) ease; }
+.ask-progress-bar.is-done { background: var(--accent); }
+.ask-kicker { font-size: var(--t-xs); color: var(--text-tertiary); margin-bottom: 6px; }
+.ask-hint { margin-top: 4px; font-size: var(--t-xs); color: var(--text-tertiary); }
+.ask-options { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.ask-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 11px 14px;
+  text-align: left;
+  border-radius: var(--r-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--bg-border);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease, transform var(--dur-fast) var(--ease-out);
+}
+.ask-option:hover { border-color: var(--text-tertiary); }
+.ask-option:active { transform: scale(0.985); }
+.ask-option.is-on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--bg-elevated)); }
+.ask-option-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.ask-option-label { font-size: var(--t-md); font-weight: 500; }
+.ask-option-detail { font-size: var(--t-xs); color: var(--text-secondary); line-height: 1.4; }
+.ask-option-tick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--bg-border);
+  color: var(--on-accent);
+}
+.ask-option.is-on .ask-option-tick { background: var(--accent); border-color: var(--accent); }
+.ask-own { margin-top: 12px; }
+
+/* ── Scroll bars inside rounded cards ─────────────────────────
+   The chat's scroll bar ran the full height of the card, flush against its
+   edge, so its ends poked out past the rounded corners. The track now stops
+   short of the corners and sits a few pixels in from the edge. */
+.tui-scroll { margin-right: 4px; }
+.tui-scroll::-webkit-scrollbar-track { margin-block: 18px; }
+textarea.field-input::-webkit-scrollbar-track { margin-block: 14px; }

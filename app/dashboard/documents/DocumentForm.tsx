@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Download, Save, Mail, Trash2, Check, Sparkles, Loader2 } from 'lucide-react'
+import { Download, Save, Mail, Trash2, Check } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import Field from '@/components/Field'
 import DatePicker from '@/components/DatePicker'
@@ -118,8 +118,6 @@ export default function DocumentForm({ clients, mode }: { clients: ClientOption[
   const [emailSent, setEmailSent] = useState(false)
   const [emailError, setEmailError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const [drafting, setDrafting] = useState(false)
-  const [draftError, setDraftError] = useState<string | null>(null)
 
   function update<K extends keyof DocFormShape>(key: K, value: DocFormShape[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -270,54 +268,6 @@ async function persistNew() {
     setEmailing(false)
   }
 
-  async function handleDraft() {
-    if (drafting) return
-    setDrafting(true)
-    setDraftError(null)
-    try {
-      const res = await fetch('/api/ai/document-draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: 'oneshot',
-          template,
-          clientName: form.clientName,
-          businessName: form.businessName,
-          contactPerson: form.contactPerson,
-          clientEmail: form.clientEmail,
-          clientPhone: form.clientPhone,
-          jobDescription: form.jobDescription,
-          location: form.location,
-          date: form.date,
-          shootDate: form.shootDate,
-        }),
-      })
-      if (!res.ok) {
-        let message = 'Could not draft that. Try again.'
-        try { message = (await res.json()).error || message } catch { /* not JSON */ }
-        setDraftError(message)
-        return
-      }
-      // Stream into the field so it fills in front of you, rather than sitting
-      // blank for fifteen seconds and then appearing all at once.
-      const reader = res.body!.getReader()
-      const decoder = new TextDecoder()
-      let out = ''
-      update('body', '')
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        out += decoder.decode(value, { stream: true })
-        update('body', out)
-      }
-      if (!out.trim()) setDraftError('The draft came back empty. Try again.')
-    } catch {
-      setDraftError('Could not reach the drafting service.')
-    } finally {
-      setDrafting(false)
-    }
-  }
-
   function handleDelete() {
     if (mode.kind !== 'edit') return
     const docId = mode.docId
@@ -399,35 +349,17 @@ async function persistNew() {
           <DatePicker value={form.date} onChange={(v) => update('date', v)} className="field-input" />
         </Field>
 
-        {/* The label lives inside the box like every other field, and the
-            drafting action lives inside it too — bottom right, on the field it
-            writes into. The formatting note is gone from under the box; the
-            model is told the format instead, which is where that knowledge
-            belongs. */}
-        <Field
-          label="What the document says"
-          className="sm:col-span-2"
-          action={
-            <button
-              type="button"
-              onClick={handleDraft}
-              disabled={drafting}
-              className="field-action"
-              title={form.body.trim() ? 'Rewrite this with AI' : 'Draft this with AI'}
-              aria-label={form.body.trim() ? 'Rewrite this with AI' : 'Draft this with AI'}
-            >
-              {drafting ? <Loader2 className="tui-receipt-spin" /> : <Sparkles />}
-            </button>
-          }
-        >
+        {/* No AI button here any more. Contracts are drafted by Tui, which
+            asks the questions that decide the terms first and then writes the
+            whole agreement properly; a one-shot rewrite button in the corner
+            of this box could only guess. */}
+        <Field label="What the document says" className="sm:col-span-2">
           <textarea
             value={form.body}
             onChange={(e) => update('body', e.target.value)}
             className="field-input"
-            style={drafting ? { opacity: 0.75 } : undefined}
           />
         </Field>
-        {draftError && <p className="text-xs sm:col-span-2" style={{ color: 'var(--danger)' }}>{draftError}</p>}
       </div>
 
       {emailError && (

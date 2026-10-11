@@ -23,10 +23,36 @@ export type TuiEvent =
   | { t: 'link'; path: string; label: string }
   /** Server data changed; the client should revalidate. */
   | { t: 'mutated' }
+  /** Tui is asking Arlo to choose. Rendered as a tap-to-answer popup; his
+   *  answers come back as his next message. Ends the turn. */
+  | { t: 'ask'; id: string; questions: AskQuestion[] }
   /** The turn failed. Terminal. */
   | { t: 'error'; v: string }
   /** The turn is complete. Terminal. */
   | { t: 'done' }
+
+export type AskOption = { label: string; detail?: string }
+export type AskQuestion = { question: string; options: AskOption[]; multi?: boolean }
+
+/** Clean an ask_arlo payload from the model into something safe to render. */
+export function sanitiseAsk(input: unknown): AskQuestion[] {
+  const raw = (input as { questions?: unknown })?.questions
+  if (!Array.isArray(raw)) return []
+  const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '')
+  return raw.slice(0, 6).flatMap((q) => {
+    const question = str((q as { question?: unknown })?.question, 200)
+    const opts = (q as { options?: unknown })?.options
+    const options = (Array.isArray(opts) ? opts : [])
+      .map((o) => (typeof o === 'string' ? { label: str(o, 80) } : { label: str((o as AskOption)?.label, 80), detail: str((o as AskOption)?.detail, 160) || undefined }))
+      .filter((o) => o.label)
+      // The sheet always has its own "type your own answer" box, so a
+      // model-written "Other, I'll type it" option is a duplicate of it.
+      .filter((o) => !/^(other|something else|custom|none of these)\b/i.test(o.label))
+      .slice(0, 5)
+    if (!question || options.length < 2) return []
+    return [{ question, options, multi: (q as { multi?: unknown })?.multi === true }]
+  })
+}
 
 export function encodeEvent(event: TuiEvent): string {
   return JSON.stringify(event) + '\n'
@@ -75,11 +101,13 @@ const TOOL_VERBS: Record<string, string> = {
   delete_document: 'Deleting document',
   get_contract_template: 'Reading contract template',
   update_contract_template: 'Updating contract template',
-  create_contract: 'Creating contract',
-  update_contract: 'Updating contract',
+  prepare_contract: 'Reading what is agreed so far',
+  create_contract: 'Drafting contract (takes a minute)',
+  update_contract: 'Revising contract',
   create_deliverable: 'Adding deliverable',
   list_deliverables: 'Reading deliverables',
   get_dashboard_stats: 'Checking the numbers',
+  ask_arlo: 'Asking you',
   list_subscriptions: 'Reading subscriptions',
   add_subscription: 'Adding subscription',
   update_subscription: 'Updating subscription',

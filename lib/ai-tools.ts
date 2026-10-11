@@ -6,6 +6,7 @@ import { getContentBacklog, parseJobMonth } from '@/lib/content-backlog'
 import { findDuplicateJobName } from '@/lib/job-naming'
 import { syncShootEvent, removeShootEvent } from '@/lib/job-calendar'
 import { getContractTemplate, saveContractTemplate, nextDocumentNumber, unfilledPlaceholders } from '@/lib/document-templates'
+import { draftContract, reviseContract } from '@/lib/contract-drafting'
 
 // Shared tool definitions + executor for every AI surface (dashboard chat,
 // SMS assistant). One tool set, one set of side effects — a job marked
@@ -32,6 +33,11 @@ function dbErrorMessage(error: { message: string; code?: string }): string {
   }
   return error.message
 }
+
+// Tools that only make sense on a surface that can render them. ask_arlo pops
+// up tap-to-answer options in the dashboard chat; Telegram has no popup, so
+// the Telegram brain is not offered it (lib/assistant-agent.ts).
+export const DASHBOARD_ONLY_TOOLS = new Set(['ask_arlo'])
 
 // Tool names that mutate state — used by callers to decide whether to
 // invalidate a cached view (dashboard router.refresh()) after the turn.
@@ -405,7 +411,7 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'get_contract_template',
-    description: 'Read the default Tui Media contract wording that every new contract starts from. Square brackets are blanks to fill per client. Read it before editing it or drafting a contract.',
+    description: "Read Arlo's saved standard contract positions and wording (Documents > Contract template). The contract drafter already receives this automatically, so only read it when Arlo asks about or wants to change his standard terms.",
     input_schema: {
       type: 'object' as const,
       properties: {},
@@ -414,7 +420,7 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'update_contract_template',
-    description: 'Replace the default contract wording. Pass the COMPLETE new body (read it with get_contract_template first and change only what Arlo asked for). Markdown: "# Heading" for a section heading, **bold**, blank line between paragraphs, no bullet lists, no em dashes. Keep [square brackets] for per-client blanks. This only changes future contracts, not ones already created.',
+    description: 'Replace Arlo\'s saved standard contract positions. ONLY when he explicitly says to change his template, default or standard terms ("change my default cancellation terms"). Never to make or change a contract for a client: that is create_contract or update_contract. Pass the COMPLETE new body (read it first, change only what he asked). This only affects future contracts.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -424,35 +430,83 @@ export const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
-    name: 'create_contract',
-    description: 'Create a Tui Media contract for a client from the default template. It is saved straight into the CRM and shows in the client portal. It is NOT emailed. Fill every [square bracket] in the body from what you know; never invent a fee, date or term, leave the bracket and tell Arlo what is missing. If you omit body, the template is used as it stands.',
+    name: 'prepare_contract',
+    description: 'Step one of every new contract: pulls everything already known about the deal for this client in one call (their record including retainer fee and videos per month, their jobs with quotes, dates and notes, any existing contracts and whether they are signed, recent client emails). Call it before asking Arlo anything, so your questions use the real figures and skip what is already settled.',
     input_schema: {
       type: 'object' as const,
-      properties: {
-        client_id: { type: 'string', description: 'Client UUID from search_clients.' },
-        job_description: { type: 'string', description: 'One line describing the project.' },
-        shoot_date: { type: 'string', description: 'YYYY-MM-DD' },
-        date: { type: 'string', description: 'Contract date, YYYY-MM-DD. Defaults to today.' },
-        location: { type: 'string' },
-        body: { type: 'string', description: 'Contract body in markdown with the brackets filled in. Defaults to the template.' },
-      },
+      properties: { client_id: { type: 'string' } },
       required: ['client_id'],
     },
   },
   {
+    name: 'create_contract',
+    description: "Draft and save a complete, lawyer-grade contract for a client. A specialist drafter writes the whole agreement from the terms you pass (it takes up to a minute or two), tailored to this deal, under New Zealand law, with Arlo's standard positions applied. It is saved into the CRM and shows in the client's portal. It is NOT emailed. Before calling, settle the commercial terms with Arlo using ask_arlo; pass every agreed fact in terms. Never invent a price, date, quantity or term: anything you leave out comes back as a [blank] for Arlo to fill.",
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        client_id: { type: 'string', description: 'Client UUID from the roster or search_clients.' },
+        engagement_type: { type: 'string', enum: ['video_ad_project', 'monthly_retainer', 'event_coverage', 'photography', 'other'], description: 'What kind of deal this is. Shapes the whole agreement.' },
+        terms: { type: 'string', description: 'Every agreed fact about this deal, one per line: what is being made (how many, lengths, formats, platforms), shoot days and locations, dates and turnaround, the fee and how it is paid (deposit, schedule, due days), revisions, what happens to raw footage, ownership and portfolio use, rescheduling and cancellation, notice period or minimum term for a retainer, rollover of unused videos, anything Arlo or the client asked for specifically. Include Arlo\'s answers to your questions verbatim where they decide a term.' },
+        client_is_business: { type: 'boolean', description: 'True if the client is a business buying for business purposes (most clients). False for an individual or family (a wedding, a private person), which changes the consumer-law clauses.' },
+        job_description: { type: 'string', description: 'One line for the cover, e.g. "Monthly social content retainer".' },
+        shoot_date: { type: 'string', description: 'YYYY-MM-DD, for the cover, if there is one.' },
+        date: { type: 'string', description: 'Contract date, YYYY-MM-DD. Defaults to today.' },
+        location: { type: 'string' },
+      },
+      required: ['client_id', 'engagement_type', 'terms'],
+    },
+  },
+  {
     name: 'update_contract',
-    description: 'Edit an existing contract (not yet signed by the client): its body wording, project line, dates or location. Pass only what changes. Refuses once the client has signed.',
+    description: 'Change an existing contract that the client has not signed yet. For any wording or term change ("make payment 14 days", "add a clause about drone footage", "fill in the blanks: notice is 48 hours"), pass instructions and the drafter revises that same contract, changing only what was asked and keeping it consistent. Use this whenever Arlo is talking about a contract that already exists: never create a new one to make a change. Get the document_id from the contract you just made or from list_documents. Refuses once the client has signed.',
     input_schema: {
       type: 'object' as const,
       properties: {
         document_id: { type: 'string' },
-        body: { type: 'string', description: 'The complete new body in markdown.' },
+        instructions: { type: 'string', description: 'The changes to make, in plain words, including any answers that fill [blanks].' },
+        client_is_business: { type: 'boolean', description: 'Defaults to true.' },
         job_description: { type: 'string' },
         shoot_date: { type: 'string', description: 'YYYY-MM-DD' },
         date: { type: 'string', description: 'YYYY-MM-DD' },
         location: { type: 'string' },
       },
       required: ['document_id'],
+    },
+  },
+  {
+    name: 'ask_arlo',
+    description: "Ask Arlo one to six questions he answers by tapping an option in a popup, instead of typing. Use it whenever you need decisions from him before acting, above all before drafting a contract. Make every question and option specific to this client and deal (use real names, the quoted price, the actual dates), put the option you would recommend first, and keep labels short. He can always type his own answer instead, so do not add an 'Other' option. Calling this ends your turn: his answers arrive as his next message. Say nothing else in the same turn beyond one short lead-in line.",
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        questions: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 6,
+          items: {
+            type: 'object',
+            properties: {
+              question: { type: 'string', description: 'One short, specific question.' },
+              options: {
+                type: 'array',
+                minItems: 2,
+                maxItems: 5,
+                items: {
+                  type: 'object',
+                  properties: {
+                    label: { type: 'string', description: 'The answer, short (a few words).' },
+                    detail: { type: 'string', description: 'Optional one-line explanation of what choosing it means.' },
+                  },
+                  required: ['label'],
+                },
+              },
+              multi: { type: 'boolean', description: 'True if he can pick more than one.' },
+            },
+            required: ['question', 'options'],
+          },
+        },
+      },
+      required: ['questions'],
     },
   },
   {
@@ -1183,23 +1237,77 @@ export async function executeTool(
       return JSON.stringify({ success: true, note: 'Future contracts will start from this wording. Existing contracts are unchanged.' })
     }
 
+    case 'prepare_contract': {
+      const clientId = input.client_id as string
+      const [client, jobs, docs, emails] = await Promise.all([
+        supabase.from('clients').select('name, contact_person, email, phone, location, status, client_category, monthly_retainer, shoots_per_month, videos_per_month, retainer_paused_from, notes').eq('id', clientId).single(),
+        supabase.from('jobs').select('id, name, status, job_type, shoot_date, shoot_location, quote_value, notes').eq('client_id', clientId).order('created_at', { ascending: false }).limit(8),
+        supabase.from('documents').select('id, name, created_at, content').eq('client_id', clientId).eq('doc_type', 'contract').order('created_at', { ascending: false }).limit(5),
+        supabase.from('client_emails').select('subject, heading, summary, received_at').eq('client_id', clientId).order('received_at', { ascending: false }).limit(5),
+      ])
+      if (client.error || !client.data) return JSON.stringify({ error: client.error ? dbErrorMessage(client.error) : 'No such client.' })
+      const contracts = (docs.data ?? []).map((d: { id: string; name: string; created_at: string; content: string }) => {
+        let form: Record<string, unknown> = {}
+        try { form = JSON.parse(d.content)?.form ?? {} } catch { /* free text */ }
+        const body = String(form.body ?? '')
+        return {
+          document_id: d.id,
+          name: d.name,
+          created: d.created_at.slice(0, 10),
+          signed: Boolean(form.clientSignature),
+          project: form.jobDescription || null,
+          // Enough of the wording to see what was agreed last time, not the whole thing.
+          opening: body.slice(0, 900),
+          unfilled_blanks: unfilledPlaceholders(body),
+        }
+      })
+      return JSON.stringify({
+        client: client.data,
+        jobs: jobs.data ?? [],
+        existing_contracts: contracts,
+        recent_client_emails: emails.data ?? [],
+        guidance: 'Ask only about terms this does not settle. Use these real figures in your options. If there is an unsigned contract for the same work, ask whether to revise it (update_contract) or start a new one.',
+      })
+    }
+
     case 'create_contract': {
       const { data: client, error: clientError } = await supabase.from('clients').select('id, name, contact_person, email, phone, location, portal_token').eq('id', input.client_id as string).single()
       if (clientError || !client) return JSON.stringify({ error: clientError ? dbErrorMessage(clientError) : 'No such client.' })
 
-      const body = typeof input.body === 'string' && input.body.trim() ? (input.body as string) : (await getContractTemplate(supabase)).body
-      const documentNumber = await nextDocumentNumber(supabase)
+      const terms = String(input.terms ?? '').trim()
+      if (!terms) return JSON.stringify({ error: 'Pass the agreed terms. Ask Arlo with ask_arlo first if you do not have them.' })
+
+      // The whole agreement is drafted fresh for this deal. There is no
+      // "use the template as it stands" path any more: that path is how every
+      // contract kept coming back as the same five-section video-ads template.
+      const today = new Date().toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'long', year: 'numeric' })
+      const [standard, documentNumber] = await Promise.all([getContractTemplate(supabase), nextDocumentNumber(supabase)])
+      const drafted = await draftContract({
+        parties: {
+          clientName: client.name,
+          contactPerson: client.contact_person,
+          clientEmail: client.email,
+          clientPhone: client.phone,
+          clientLocation: client.location,
+          clientIsBusiness: input.client_is_business !== false,
+        },
+        terms: `Engagement type: ${String(input.engagement_type ?? 'other').replace(/_/g, ' ')}\n${terms}`,
+        standardPositions: standard.body,
+        today,
+      })
+      if ('error' in drafted) return JSON.stringify({ error: drafted.error })
+
       const form = {
         clientName: client.name,
         contactPerson: client.contact_person || '',
         clientEmail: client.email || '',
         clientPhone: client.phone || '',
         businessName: client.name,
-        date: (input.date as string) || new Date().toISOString().split('T')[0],
+        date: (input.date as string) || new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' }),
         jobDescription: (input.job_description as string) || '',
         shootDate: (input.shoot_date as string) || '',
         location: (input.location as string) || client.location || '',
-        body,
+        body: drafted.body,
         clientSignature: '',
         clientSignedAt: '',
         documentNumber,
@@ -1217,16 +1325,16 @@ export async function executeTool(
       await supabase.from('activities').insert({ action: 'document_created', details: `Contract "${docName}" created for ${client.name}`, client_id: client.id })
       return JSON.stringify({
         success: true,
-        document_id: doc.id,
+        document: { id: doc.id, name: docName },
         document_number: documentNumber,
-        link: `/dashboard/documents/${doc.id}`,
-        unfilled_placeholders: unfilledPlaceholders(body),
-        note: 'Saved and visible in the client portal. Not emailed. Tell Arlo about any unfilled placeholders.',
+        unfilled_blanks: unfilledPlaceholders(drafted.body),
+        drafter_notes: drafted.notes,
+        note: 'Saved and visible in the client portal. Not emailed. If there are blanks, offer to fill them with ask_arlo and then update_contract on THIS document_id.',
       })
     }
 
     case 'update_contract': {
-      const { data: doc, error: docError } = await supabase.from('documents').select('id, content').eq('id', input.document_id as string).single()
+      const { data: doc, error: docError } = await supabase.from('documents').select('id, name, content, client_id').eq('id', input.document_id as string).single()
       if (docError || !doc) return JSON.stringify({ error: docError ? dbErrorMessage(docError) : 'No such document.' })
       let parsed: { template?: string; form?: Record<string, unknown> }
       try { parsed = JSON.parse(doc.content) } catch { return JSON.stringify({ error: 'That document is free text, not a structured contract, so it cannot be edited this way.' }) }
@@ -1234,7 +1342,20 @@ export async function executeTool(
       if (parsed.form.clientSignature) return JSON.stringify({ error: 'The client has already signed this contract, so it is locked. Create a new contract instead.' })
 
       const form = { ...parsed.form }
-      if (typeof input.body === 'string' && input.body.trim()) form.body = input.body
+      let notes = ''
+      const instructions = typeof input.instructions === 'string' ? input.instructions.trim() : ''
+      if (instructions) {
+        const today = new Date().toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'long', year: 'numeric' })
+        const revised = await reviseContract({
+          currentBody: String(form.body ?? ''),
+          instructions,
+          parties: { clientName: String(form.clientName ?? ''), clientIsBusiness: input.client_is_business !== false },
+          today,
+        })
+        if ('error' in revised) return JSON.stringify({ error: revised.error })
+        form.body = revised.body
+        notes = revised.notes
+      }
       if (typeof input.job_description === 'string') form.jobDescription = input.job_description
       if (typeof input.shoot_date === 'string') form.shootDate = input.shoot_date
       if (typeof input.date === 'string') form.date = input.date
@@ -1242,7 +1363,14 @@ export async function executeTool(
 
       const { error } = await supabase.from('documents').update({ content: JSON.stringify({ ...parsed, form }) }).eq('id', doc.id)
       if (error) return JSON.stringify({ error: error.message })
-      return JSON.stringify({ success: true, unfilled_placeholders: unfilledPlaceholders(String(form.body ?? '')) })
+      return JSON.stringify({ success: true, document: { id: doc.id, name: doc.name }, unfilled_blanks: unfilledPlaceholders(String(form.body ?? '')), drafter_notes: notes })
+    }
+
+    case 'ask_arlo': {
+      // Rendered as a popup by the dashboard chat, which intercepts this call
+      // before it gets here. Reaching the executor means a surface without
+      // popups (Telegram), where the tool is not offered in the first place.
+      return JSON.stringify({ error: 'Questions with options only work in the dashboard chat. Ask in plain text instead.' })
     }
 
     case 'delete_document': {

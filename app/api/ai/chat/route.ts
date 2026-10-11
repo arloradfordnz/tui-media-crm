@@ -6,7 +6,7 @@ import { TOOLS, MUTATING_TOOLS, executeTool } from '@/lib/ai-tools'
 import { WEB_SEARCH_TOOL_BASIC } from '@/lib/web-search'
 import { buildDashboardSystem } from '@/lib/assistant-persona'
 import { getContentBacklog, summariseBacklog } from '@/lib/content-backlog'
-import { encodeEvent, toolLabel, summariseResult, type TuiEvent } from '@/lib/tui/receipts'
+import { encodeEvent, toolLabel, summariseResult, sanitiseAsk, type TuiEvent } from '@/lib/tui/receipts'
 import { recordPendingAction } from '@/lib/assistant-approvals'
 import { tidyPunctuation } from '@/lib/tui/text'
 
@@ -24,10 +24,11 @@ import { tidyPunctuation } from '@/lib/tui/text'
 // the dashboard is opened. Nothing else changes: the same tools run, and the
 // same reads happen. It is only the logging that is skipped.
 
-// A turn can run several model rounds plus tool writes and a web search, so
-// it gets the same ceiling as the Telegram routes rather than the platform
-// default.
-export const maxDuration = 60
+// A turn can run several model rounds, tool writes, a web search, and a full
+// contract draft on Opus (a minute or more on its own). 300s is the Hobby
+// plan's ceiling with Fluid compute, which is also the project's default; the
+// 60 this used to say was cutting the default DOWN, not raising it.
+export const maxDuration = 300
 
 // Static system prompt — stable across turns, cached with a cache_control
 // breakpoint and reused on every request.
@@ -404,11 +405,18 @@ export async function POST(request: NextRequest) {
             return
           }
 
+          // ask_arlo is not a tool to run, it is a question for Arlo. It is
+          // pulled out of the round, shown as a popup once anything else in the
+          // round has run, and then the turn ends: his tapped answers arrive
+          // as his next message.
+          const askBlocks = toolUseBlocks.filter((b) => b.type === 'tool_use' && b.name === 'ask_arlo')
+          const runBlocks = toolUseBlocks.filter((b) => !(b.type === 'tool_use' && b.name === 'ask_arlo'))
+
           // Announce every call BEFORE running it, so the receipt appears while
           // the work is in flight rather than after it. This is the whole point
           // of the rewrite: a turn that voids an invoice should not look
           // identical to a turn that reads the calendar.
-          for (const block of toolUseBlocks) {
+          for (const block of runBlocks) {
             if (block.type !== 'tool_use') continue
             send({
               t: 'tool',
@@ -425,7 +433,7 @@ export async function POST(request: NextRequest) {
           // so fanning them out hides round-trip latency when the model asks
           // for several lookups at once.
           const results = await Promise.all(
-            toolUseBlocks.map(async (block) => {
+            runBlocks.map(async (block) => {
               if (block.type !== 'tool_use') return null
               const result = await executeTool(block.name, block.input as Record<string, unknown>, supabase, { approvals: approvedFingerprints })
               return { block, result }
@@ -481,7 +489,41 @@ export async function POST(request: NextRequest) {
             } catch { /* not JSON or no link needed */ }
           }
 
+          // Every tool_use needs a tool_result, ask_arlo included. A malformed
+          // ask gets an error back so the model can fix it on the next round
+          // instead of the turn dying on an unmatched tool call.
+          for (const b of askBlocks) {
+            if (b.type !== 'tool_use') continue
+            const ok = sanitiseAsk(b.input).length > 0
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: b.id,
+              content: ok ? 'Shown to Arlo as a popup.' : 'Each question needs a question and at least two options. Ask again, or ask in plain text.',
+              ...(ok ? {} : { is_error: true }),
+            })
+          }
+
           currentMessages.push({ role: 'user', content: toolResults })
+
+          if (askBlocks.length > 0) {
+            const block = askBlocks[0]
+            const questions = block.type === 'tool_use' ? sanitiseAsk(block.input) : []
+            if (questions.length > 0 && block.type === 'tool_use') {
+              send({ t: 'ask', id: block.id, questions })
+              // The shared thread gets a plain-text version, so the Telegram
+              // brain knows what was asked if the answer comes in there.
+              if (persist) {
+                const asked = tidyPunctuation(`${finalText.trim() ? finalText.trim() + ' ' : ''}${questions.map((q) => `${q.question} (${q.options.map((o) => o.label).join(' / ')})`).join(' ')}`)
+                after(async () => {
+                  await supabase.from('sms_messages').insert({ direction: 'outbound', body: asked })
+                })
+              }
+              if (mutated) send({ t: 'mutated' })
+              send({ t: 'done' })
+              close()
+              return
+            }
+          }
         }
 
         send({ t: 'text', v: '\n\n(Reached maximum tool rounds.)' })

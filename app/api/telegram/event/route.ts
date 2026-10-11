@@ -9,7 +9,9 @@ import { runAssistantTurn } from '@/lib/assistant-agent'
 // It lives on its own route for the time budget: a server action's duration
 // belongs to the visitor waiting on the response, and an assistant turn can
 // run half a minute.
-export const maxDuration = 60
+// 300, not 60: a contract drafted over Telegram runs a minute or more on its
+// own, and 60 was below the project's Fluid default of 300 anyway.
+export const maxDuration = 300
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
