@@ -69,4 +69,7 @@
 // 3.11.1 — picking an answer in Tui's question popup only selects it; Next and
 // Send answers move on. Questions are told to name the client and quote the
 // real figures, with options that are final answers.
-export const APP_VERSION = '3.11.1'
+// 3.11.2 — the tab bar's highlight moves the moment a tab is tapped instead of
+// waiting for the next page, and can no longer get stuck lifted after an odd
+// touch.
+export const APP_VERSION = '3.11.2'

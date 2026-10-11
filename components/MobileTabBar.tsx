@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { House, Clapperboard, Sparkles, Repeat2, Settings } from 'lucide-react'
-import { useRef, useState, type CSSProperties, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 
 // The four thumb-reachable destinations, in a floating liquid-glass capsule,
 // with Tui AI as its own round button beside it — where iOS puts Search.
@@ -54,6 +54,39 @@ export default function MobileTabBar() {
   const liveI = dragI ?? settledI ?? routeIndex
   const nearest = Math.round(Math.min(Math.max(liveI, 0), TABS.length - 1))
   const highlighted = dragging || settledI !== null ? nearest : routeIndex
+
+  // A touch that ends somewhere the pill never hears about (finger slid off
+  // the bar, the OS took the gesture, capture lost) must not leave the glass
+  // stuck lifted. While anything is pressed, the window is listening too; this
+  // only clears the visual state and never navigates.
+  const live = pressed || dragging
+  useEffect(() => {
+    if (!live) return
+    const clear = () => {
+      start.current = null
+      setPressed(false)
+      setDragging(false)
+      setDragI(null)
+    }
+    window.addEventListener('pointerup', clear)
+    window.addEventListener('pointercancel', clear)
+    window.addEventListener('blur', clear)
+    return () => {
+      window.removeEventListener('pointerup', clear)
+      window.removeEventListener('pointercancel', clear)
+      window.removeEventListener('blur', clear)
+    }
+  }, [live])
+
+  // Move the highlight the instant a tab is tapped, not when the next page has
+  // finished loading. Until then it sat on the old tab, lifted, and then
+  // jumped, which on a slow connection read as the bar glitching. It lapses on
+  // its own once the route changes, or after a few seconds if it never does.
+  function selectNow(i: number) {
+    if (i === routeIndex) return
+    setSettled({ i, from: pathname })
+    setTimeout(() => setSettled((cur) => (cur && cur.i === i ? null : cur)), 4000)
+  }
 
   function fractionAt(clientX: number) {
     const rect = pillRef.current!.getBoundingClientRect()
@@ -106,6 +139,13 @@ export default function MobileTabBar() {
         onPointerMove={onPointerMove}
         onPointerUp={() => finish(true)}
         onPointerCancel={() => finish(false)}
+        onLostPointerCapture={() => {
+          // Capture is released after a normal pointerup as well, so this only
+          // clears the visuals (finish() already ran for a real release).
+          setPressed(false)
+          setDragging(false)
+          setDragI(null)
+        }}
         // A drag ends over the pill, not a link, so no link click fires; this
         // also swallows the click if the browser sends one anyway.
         onClickCapture={(e) => { if (didDrag.current) { e.preventDefault(); e.stopPropagation(); didDrag.current = false } }}
@@ -126,6 +166,7 @@ export default function MobileTabBar() {
               key={t.href}
               href={t.href}
               draggable={false}
+              onClick={() => selectNow(i)}
               className={`mobile-tab${active ? ' active' : ''}`}
               aria-current={i === routeIndex ? 'page' : undefined}
             >
