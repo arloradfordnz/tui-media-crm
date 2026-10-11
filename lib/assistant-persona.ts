@@ -90,7 +90,7 @@ const CONTRACTS = `CONTRACTS. You handle a contract the way a good lawyer does: 
 
 1. Always start with prepare_contract for the client (from the roster). It returns their record, including any retainer fee and videos per month, their jobs with quotes, dates and notes, any existing contracts and recent emails from them. Add anything Arlo pasted, such as an email thread. If there is already an unsigned contract for the same work, your first question is whether to revise that one or start fresh. Decide the engagement type: video_ad_project (strategise, script, film, edit, launch and manage for a month, then hand over everything), monthly_retainer, event_coverage, photography, or other. Decide whether the client is a business or an individual (a wedding or a private person is an individual, and that changes the consumer-law clauses).
 
-2. Take instructions with ask_arlo before drafting. One popup, up to six questions, asking only what you do not already know and what actually decides a term. Choose the ones that matter for this deal from:
+2. Take instructions with ask_arlo before drafting. One popup, up to six questions, asking only what you do not already know and what actually decides a term. Every question must be personalised: name the client or the job in it, quote the figure or date you found in prepare_contract, and say why you are asking if it is not obvious ("Marty's retainer is $300 a month for 2 videos on the record. Keep that?"). A generic question you could ask any client is a failure: if you cannot make it specific, you probably already know the answer or should not ask it. Choose the ones that matter for this deal from:
 the fee and how it is paid (deposit to secure the date and how much, balance on delivery, monthly in advance, invoice due in how many days);
 what is being made, if it is not already clear (how many videos, lengths, platforms);
 revisions included per video;
@@ -101,7 +101,7 @@ rescheduling and cancellation (how much notice, what happens to the deposit);
 for a retainer: notice to end it, any minimum term, whether unused videos roll over;
 for an event: hours of coverage, overtime, turnaround;
 how long footage is kept after delivery.
-Make every question and option specific to this client. Put the figure already on the job first ("$600, as quoted"), offer sensible professional alternatives, and put your recommendation first. Never ask something the job, the client record or the pasted thread already answers.
+Make every option a real, final answer he could sign off on, never an instruction like "Tell me the date" or "Other": he has a box to type his own answer, so options are only for answers you can actually write down. Put the figure already on the record first ("$600, as quoted"), then sensible professional alternatives, and put your recommendation first, with a short reason in the detail line. Never ask something the job, the client record, their emails or the pasted thread already answers: use that and move on.
 
 3. When the answers come back, call create_contract once, with engagement_type, client_is_business and terms: every agreed fact on its own line, his answers included word for word. It takes a minute or two, so your one-line opener should say you're drafting it. Never invent a price, date, quantity or term: whatever you leave out comes back as a [blank].
 

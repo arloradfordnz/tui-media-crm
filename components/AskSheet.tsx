@@ -10,9 +10,9 @@ import { useMounted } from '@/lib/useMounted'
 //
 // When Tui needs decisions before it acts (the commercial terms of a contract,
 // above all) it calls ask_arlo, and this pops up with one question at a time
-// and the options Tui tailored to the deal. Tapping an option on a
-// single-choice question moves straight on; the last step sends everything
-// back as one message. Any question can be answered in his own words instead.
+// and the options Tui tailored to the deal. Tapping an option only selects it:
+// he moves on with Next (and sends with Send answers), so a mis-tap is never
+// final. Any question can be answered in his own words instead.
 //
 // Same sheet as ConfirmSheet: bottom sheet on a phone, centred dialog from
 // 640px. Rendered into <body> through a portal, because the chat lives inside
@@ -40,7 +40,6 @@ export default function AskSheet({
   const [typed, setTyped] = useState<string[]>(() => questions.map(() => ''))
   const mounted = useMounted()
   const firstOptionRef = useRef<HTMLButtonElement>(null)
-  const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -52,7 +51,6 @@ export default function AskSheet({
     return () => {
       window.removeEventListener('keydown', onKey)
       document.body.style.overflow = previous
-      if (advanceTimer.current) clearTimeout(advanceTimer.current)
     }
   }, [onClose])
 
@@ -63,8 +61,8 @@ export default function AskSheet({
   const answerFor = (i: number) => typed[i].trim() || picked[i].join(', ')
   const answered = Boolean(answerFor(step))
 
-  function finish(nextPicked = picked) {
-    const answers = questions.map((_, i) => typed[i].trim() || nextPicked[i].join(', '))
+  function finish() {
+    const answers = questions.map((_, i) => typed[i].trim() || picked[i].join(', '))
     if (answers.some((a) => !a)) {
       setStep(answers.findIndex((a) => !a))
       return
@@ -82,13 +80,6 @@ export default function AskSheet({
     next[step] = [label]
     setPicked(next)
     setTyped((t) => t.map((v, i) => (i === step ? '' : v)))
-    // A single choice is the whole answer, so move on. The pause lets the
-    // tick register before the next question replaces it.
-    if (advanceTimer.current) clearTimeout(advanceTimer.current)
-    advanceTimer.current = setTimeout(() => {
-      if (isLast) finish(next)
-      else setStep((s) => s + 1)
-    }, 180)
   }
 
   if (!mounted) return null
