@@ -3524,7 +3524,13 @@ input, textarea, select, button { font-family: inherit; }
 }
 .ask-option:hover { border-color: var(--text-tertiary); }
 .ask-option:active { transform: scale(0.985); }
-.ask-option.is-on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--bg-elevated)); }
+/* One selection treatment, the same as a focused message field: the accent
+   border doubled by a 1px ring and nothing else. The global focus ring is
+   switched off here, or a focused option showed it AND the selected border,
+   which read as a double outline. */
+.ask-option:focus-visible,
+.ask-option.is-on { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.ask-option.is-on { background: color-mix(in srgb, var(--accent) 10%, var(--bg-elevated)); }
 .ask-option-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
 .ask-option-label { font-size: var(--t-md); font-weight: 500; }
 .ask-option-detail { font-size: var(--t-xs); color: var(--text-secondary); line-height: 1.4; }

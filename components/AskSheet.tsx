@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check } from 'lucide-react'
 import type { AskQuestion } from '@/lib/tui/receipts'
@@ -39,7 +39,6 @@ export default function AskSheet({
   const [picked, setPicked] = useState<string[][]>(() => questions.map(() => []))
   const [typed, setTyped] = useState<string[]>(() => questions.map(() => ''))
   const mounted = useMounted()
-  const firstOptionRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -53,8 +52,6 @@ export default function AskSheet({
       document.body.style.overflow = previous
     }
   }, [onClose])
-
-  useEffect(() => { firstOptionRef.current?.focus() }, [step, mounted])
 
   const q = questions[step]
   const isLast = step === questions.length - 1
@@ -110,12 +107,11 @@ export default function AskSheet({
         {q.multi && <p className="ask-hint">Pick any that apply.</p>}
 
         <div className="ask-options">
-          {q.options.map((o, i) => {
+          {q.options.map((o) => {
             const on = picked[step].includes(o.label) && !typed[step].trim()
             return (
               <button
                 key={o.label}
-                ref={i === 0 ? firstOptionRef : undefined}
                 type="button"
                 className={`ask-option${on ? ' is-on' : ''}`}
                 aria-pressed={on}

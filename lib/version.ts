@@ -72,4 +72,6 @@
 // 3.11.2 — the tab bar's highlight moves the moment a tab is tapped instead of
 // waiting for the next page, and can no longer get stuck lifted after an odd
 // touch.
-export const APP_VERSION = '3.11.2'
+// 3.11.3 — the question popup's selected answer is one accent outline, like a
+// focused message field, instead of the focus ring stacked on the selection.
+export const APP_VERSION = '3.11.3'
