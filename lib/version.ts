@@ -79,4 +79,14 @@
 // the link survives mail scanners. Clients can reset a forgotten password and
 // change it from the portal.
 // 3.12.1 — contract PDFs repeat the separator under the date on every page.
-export const APP_VERSION = '3.12.1'
+// 3.13.0 — security pass. The old Prisma tables are locked (they were readable
+// without a login), client accounts can no longer reach admin actions or
+// settings, anon database privileges are gone, secrets compare in constant
+// time, security headers are on, Next.js is patched (16.4.0), and passwords get
+// a live strength meter plus server-side strength and breach checks.
+// 3.14.0 — deleting a client is checked and removes their portal login too;
+// the Application card asks the same questions, with the same dropdown answers,
+// as the form on tuimedia.nz; Tui's thinking and search animations are redone,
+// and empty results no longer say "0 jobs". start-dev.sh points at the right
+// folder.
+export const APP_VERSION = '3.14.0'
