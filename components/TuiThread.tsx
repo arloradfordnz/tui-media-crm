@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowUp, ExternalLink, Check, Loader2, AlertTriangle, ShieldAlert, Search, ListChecks } from 'lucide-react'
+import { ArrowUp, ExternalLink, Check, AlertTriangle, ShieldAlert, Search, ListChecks } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useMounted } from '@/lib/useMounted'
@@ -661,9 +661,9 @@ export default function TuiThread({
                     }}
                   >
                     {thinking ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs">Thinking</span>
-                        <div className="loading-dots"><span /><span /><span /></div>
+                      <div className="flex items-center gap-2.5">
+                        <span className="tui-orb" aria-hidden="true" />
+                        <span className="text-xs tui-live-label tui-live-label--quiet">Thinking</span>
                       </div>
                     ) : m.role === 'assistant' ? (
                       <span dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) || '&#8203;' }} />
@@ -800,23 +800,28 @@ export default function TuiThread({
 // One line of "here is what I actually did". Reads as a log entry rather than a
 // chat bubble on purpose — it is evidence, not conversation.
 function ReceiptRow({ receipt }: { receipt: Receipt }) {
+  const running = receipt.state === 'running'
   const colour =
     receipt.state === 'failed' ? 'var(--danger)'
     : receipt.state === 'done' ? 'var(--text-tertiary)'
     : 'var(--accent)'
 
   return (
-    <div className="flex items-center gap-2 text-xs" style={{ color: colour }}>
-      {receipt.state === 'running' && receipt.name === 'web_search' ? (
-        <Search className="w-3 h-3 shrink-0 tui-search-sweep" />
-      ) : receipt.state === 'running' ? (
-        <Loader2 className="w-3 h-3 shrink-0 tui-receipt-spin" />
+    <div className="flex items-center gap-2 text-xs tui-receipt-row" style={{ color: colour }}>
+      {running && receipt.name === 'web_search' ? (
+        // A lens that circles while a sonar ring pulses out from behind it.
+        <span className="tui-search-icon" aria-hidden="true">
+          <span className="tui-search-ring" />
+          <Search className="w-3 h-3 tui-search-orbit" />
+        </span>
+      ) : running ? (
+        <span className="tui-run-dot" aria-hidden="true" />
       ) : receipt.state === 'failed' ? (
         <AlertTriangle className="w-3 h-3 shrink-0" />
       ) : (
-        <Check className="w-3 h-3 shrink-0" />
+        <Check className="w-3 h-3 shrink-0 tui-check-pop" />
       )}
-      <span className={`truncate${receipt.state === 'running' && receipt.name === 'web_search' ? ' tui-search-shimmer' : ''}`}>{receipt.label}</span>
+      <span className={`truncate${running ? ' tui-live-label' : ''}`}>{receipt.label}</span>
       {receipt.detail && (
         <span className="truncate" style={{ color: 'var(--text-tertiary)', opacity: 0.75 }}>
           · {receipt.detail}

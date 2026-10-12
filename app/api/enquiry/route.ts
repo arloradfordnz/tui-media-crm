@@ -18,6 +18,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { timingSafeEqual } from 'node:crypto'
+import { CUSTOMER_VALUE_OPTIONS, AD_SPEND_OPTIONS, approxFor } from '@/lib/application-fields'
 
 export const runtime = 'nodejs'
 
@@ -132,8 +133,13 @@ export async function POST(req: Request) {
     client_category: body.interest === 'Monthly content' ? 'retainer' : 'video_ads',
     brand: 'tui_media',
     sells: body.sell?.trim() || null,
-    customer_value: parseMoney(body.value),
-    ad_spend_budget: parseMoney(body.spend),
+    interest: body.interest?.trim() || null,
+    customer_value_band: body.value?.trim() || null,
+    ad_spend_band: body.spend?.trim() || null,
+    // The site sends bands. A known band becomes its midpoint; anything else
+    // (an older form, a hand-typed figure) falls back to pulling a number out.
+    customer_value: approxFor(CUSTOMER_VALUE_OPTIONS, body.value?.trim()) ?? parseMoney(body.value),
+    ad_spend_budget: approxFor(AD_SPEND_OPTIONS, body.spend?.trim()) ?? parseMoney(body.spend),
     decision_maker: body.decision?.trim() || null,
     capacity: body.capacity?.trim() || null,
     timeline: body.when?.trim() || null,

@@ -43,11 +43,12 @@ export default async function ClientDetailPage({ params, searchParams }: { param
     const empty = {
       industry: null, brand: null, sells: null, customer_value: null,
       ad_spend_budget: null, decision_maker: null, capacity: null, timeline: null,
+      interest: null, customer_value_band: null, ad_spend_band: null,
     }
     try {
       const { data, error } = await supabase
         .from('clients')
-        .select('industry, brand, sells, customer_value, ad_spend_budget, decision_maker, capacity, timeline')
+        .select('industry, brand, sells, customer_value, ad_spend_budget, decision_maker, capacity, timeline, interest, customer_value_band, ad_spend_band')
         .eq('id', id)
         .single()
       if (error || !data) return empty
@@ -134,6 +135,9 @@ export default async function ClientDetailPage({ params, searchParams }: { param
     decisionMaker: (rebrandFields.decision_maker as string | null) ?? null,
     capacity: (rebrandFields.capacity as string | null) ?? null,
     timeline: (rebrandFields.timeline as string | null) ?? null,
+    interest: (rebrandFields.interest as string | null) ?? null,
+    customerValueBand: (rebrandFields.customer_value_band as string | null) ?? null,
+    adSpendBand: (rebrandFields.ad_spend_band as string | null) ?? null,
     notes: client.notes,
     tags: client.tags,
     portalToken: client.portal_token ?? null,

@@ -161,8 +161,10 @@ export function summariseResult(raw: string): { ok: boolean; detail?: string } {
     return { ok: true }
   }
 
+  // An empty list says nothing worth a label ("0 jobs" under "Reading what is
+  // agreed so far"), so a count only shows when there is something to count.
   if (Array.isArray(parsed)) {
-    return { ok: true, detail: `${parsed.length} ${parsed.length === 1 ? 'result' : 'results'}` }
+    return parsed.length ? { ok: true, detail: `${parsed.length} ${parsed.length === 1 ? 'result' : 'results'}` } : { ok: true }
   }
   if (!parsed || typeof parsed !== 'object') return { ok: true }
 
@@ -175,7 +177,7 @@ export function summariseResult(raw: string): { ok: boolean; detail?: string } {
   // The list-shaped tools return the rows under some plural key.
   for (const [key, value] of Object.entries(obj)) {
     if (Array.isArray(value)) {
-      return { ok: true, detail: `${value.length} ${key.replace(/_/g, ' ')}` }
+      return value.length ? { ok: true, detail: `${value.length} ${key.replace(/_/g, ' ')}` } : { ok: true }
     }
   }
 

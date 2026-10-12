@@ -69,6 +69,10 @@ const nextConfig: NextConfig = {
     "**/*": REACT_PDF_ONLY,
   },
 
+  // Dev only: lets the preview browser pane, which reaches the server as
+  // 127.0.0.1, hydrate. Ignored in production builds.
+  allowedDevOrigins: ['127.0.0.1'],
+
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },

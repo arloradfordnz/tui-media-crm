@@ -1110,47 +1110,146 @@ input, textarea, select, button { font-family: inherit; }
 .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
 .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
 
-/* Tui tool receipts — the spinner on a call that is still in flight. Honours
-   reduced-motion by holding still rather than disappearing, so the icon still
-   distinguishes "running" from "done". */
-.tui-receipt-spin {
-  animation: tui-receipt-spin 900ms linear infinite;
-}
-@keyframes tui-receipt-spin {
-  to { transform: rotate(360deg); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .tui-receipt-spin { animation: none; opacity: 0.6; }
-}
+/* ── Tui: working states ──────────────────────────────────────
+   Three things share one idea — something alive, not something spinning.
+   A running step has a pulsing dot (or, for a web search, an orbiting lens with
+   a sonar ring), its label carries a soft sheen that travels through it, and a
+   finished step pops its tick. "Thinking" is a breathing orb with the same
+   sheen. All of it holds still under reduced-motion, which keeps the shapes so
+   running and done still read differently. */
 
-/* A web search in flight: the magnifying glass sweeps in a small circle, as if
-   scanning, and the label shimmers. Still, rather than gone, under
-   reduced-motion. */
-.tui-search-sweep {
-  animation: tui-search-sweep 1.3s ease-in-out infinite;
-}
-@keyframes tui-search-sweep {
-  0%   { transform: translate(0, 0); }
-  25%  { transform: translate(2px, -2px); }
-  50%  { transform: translate(0, -3px); }
-  75%  { transform: translate(-2px, -1px); }
-  100% { transform: translate(0, 0); }
-}
-.tui-search-shimmer {
-  background: linear-gradient(90deg, var(--accent) 0%, var(--text-primary) 50%, var(--accent) 100%);
-  background-size: 200% 100%;
+/* Light passing through the text: a narrow bright band over the base colour,
+   not a full gradient, so the words stay readable the whole way through. */
+.tui-live-label {
+  background-image: linear-gradient(100deg, var(--accent) 38%, var(--text-primary) 50%, var(--accent) 62%);
+  background-size: 300% 100%;
+  background-position: 100% 0;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
-  animation: tui-search-shimmer 1.6s linear infinite;
+  animation: tui-sheen 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
-@keyframes tui-search-shimmer {
-  to { background-position: -200% 0; }
+.tui-live-label--quiet {
+  background-image: linear-gradient(100deg, var(--text-tertiary) 38%, var(--text-primary) 50%, var(--text-tertiary) 62%);
 }
+@keyframes tui-sheen {
+  to { background-position: -100% 0; }
+}
+
+/* A running tool call: a dot that breathes, with a ring that leaves it. */
+.tui-run-dot {
+  position: relative;
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin: 0 3px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: tui-breathe 1.6s ease-in-out infinite;
+}
+.tui-run-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  animation: tui-ring 1.6s ease-out infinite;
+}
+@keyframes tui-breathe {
+  0%, 100% { transform: scale(0.8); opacity: 0.7; }
+  50%      { transform: scale(1); opacity: 1; }
+}
+@keyframes tui-ring {
+  from { transform: scale(1); opacity: 0.7; }
+  to   { transform: scale(3.2); opacity: 0; }
+}
+
+/* A web search: the lens travels a small circle at a constant pace (rotate,
+   push out, counter-rotate, so it stays upright) while a sonar ring expands
+   from the centre of its path. */
+.tui-search-icon {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+}
+.tui-search-orbit {
+  animation: tui-orbit 1.7s linear infinite;
+}
+@keyframes tui-orbit {
+  from { transform: rotate(0deg) translateX(1.6px) rotate(0deg); }
+  to   { transform: rotate(360deg) translateX(1.6px) rotate(-360deg); }
+}
+.tui-search-ring {
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+  opacity: 0;
+  animation: tui-sonar 1.7s ease-out infinite;
+}
+@keyframes tui-sonar {
+  0%   { transform: scale(0.5); opacity: 0.65; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* A step arriving, and finishing. */
+.tui-receipt-row {
+  animation: tui-receipt-in 260ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes tui-receipt-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+.tui-check-pop {
+  animation: tui-pop 340ms cubic-bezier(0.3, 1.5, 0.5, 1) both;
+}
+@keyframes tui-pop {
+  0%   { transform: scale(0.4); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* "Thinking": an orb that swells and settles, with a soft halo. */
+.tui-orb {
+  position: relative;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--text-primary), var(--accent) 60%);
+  animation: tui-orb 2s ease-in-out infinite;
+}
+.tui-orb::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.25;
+  filter: blur(3px);
+  animation: tui-halo 2s ease-in-out infinite;
+}
+@keyframes tui-orb {
+  0%, 100% { transform: scale(0.82); }
+  50%      { transform: scale(1.08); }
+}
+@keyframes tui-halo {
+  0%, 100% { opacity: 0.12; transform: scale(0.9); }
+  50%      { opacity: 0.4; transform: scale(1.35); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .tui-search-sweep { animation: none; }
-  .tui-search-shimmer { animation: none; }
+  .tui-live-label,
+  .tui-run-dot, .tui-run-dot::after,
+  .tui-search-orbit, .tui-search-ring,
+  .tui-receipt-row, .tui-check-pop,
+  .tui-orb, .tui-orb::after { animation: none; }
+  .tui-live-label { background-position: 40% 0; }
+  .tui-search-ring, .tui-run-dot::after { opacity: 0; }
 }
 
 /* ── Custom Select ────────────────────────────────────────── */

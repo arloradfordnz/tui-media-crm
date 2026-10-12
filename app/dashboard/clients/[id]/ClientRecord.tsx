@@ -9,6 +9,10 @@ import { formatNZD, formatDate, statusLabel, statusBadgeClass, timeAgo, stripJob
 import Link from 'next/link'
 import { ArrowLeft, Trash2, Briefcase, MessageSquare, StickyNote, UserCircle, Copy, Check, FileText, ExternalLink, Camera, Receipt, ClipboardList } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
+import {
+  INTEREST_OPTIONS, CUSTOMER_VALUE_OPTIONS, AD_SPEND_OPTIONS, START_OPTIONS, DECISION_OPTIONS, CAPACITY_OPTIONS,
+  bandFor, withCurrent,
+} from '@/lib/application-fields'
 import DatePicker from '@/components/DatePicker'
 import Field from '@/components/Field'
 import PortalAccountButton from './PortalAccountButton'
@@ -45,6 +49,9 @@ type ClientData = {
   decisionMaker: string | null
   capacity: string | null
   timeline: string | null
+  interest: string | null
+  customerValueBand: string | null
+  adSpendBand: string | null
   notes: string | null
   tags: string | null
   portalToken: string | null
@@ -428,27 +435,40 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
               <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Application</h3>
             </div>
             <p className="text-xs mb-4" style={{ color: 'var(--text-tertiary)' }}>
-              From the form on the site, or filled in by hand after a call.
+              The same questions as the form on the site. Answers from the form land here; fill them in by hand after a call.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="What do they sell?">
-                <input name="sells" defaultValue={client.sells || ''} className="field-input" placeholder="Roofing, boat servicing, tractors..." />
-        </Field>
-              <Field label="Who signs it off?">
-                <input name="decisionMaker" defaultValue={client.decisionMaker || ''} className="field-input" placeholder="Them, or someone else?" />
-        </Field>
-              <Field label="What's a customer worth? (NZD)" hint="One customer, to them">
-                <input name="customerValue" type="number" min="0" step="0.01" defaultValue={client.customerValue ?? ''} className="field-input" placeholder="e.g. 4500" />
-        </Field>
-              <Field label="Monthly ad spend (NZD)" hint="Their budget, paid direct to the platform">
-                <input name="adSpendBudget" type="number" min="0" step="0.01" defaultValue={client.adSpendBudget ?? ''} className="field-input" placeholder="e.g. 1500" />
-        </Field>
-              <Field label="When do they want ads live?">
-                <input name="timeline" defaultValue={client.timeline || ''} className="field-input" placeholder="ASAP, next month, just looking..." />
-        </Field>
-              <Field label="Could they handle more work?">
-                <input name="capacity" defaultValue={client.capacity || ''} className="field-input" placeholder="Yes / at capacity / hiring" />
-        </Field>
+              <Field label="What are you after?">
+                <CustomSelect name="interest" defaultValue={client.interest || ''} placeholder="Not answered" options={withCurrent(INTEREST_OPTIONS, client.interest)} />
+              </Field>
+              <Field label="What do you sell?">
+                <input name="sells" defaultValue={client.sells || ''} className="field-input" />
+              </Field>
+              <Field label="What's a customer worth to you?">
+                <CustomSelect
+                  name="customerValueBand"
+                  defaultValue={client.customerValueBand || bandFor(CUSTOMER_VALUE_OPTIONS, client.customerValue)}
+                  placeholder="Not answered"
+                  options={withCurrent(CUSTOMER_VALUE_OPTIONS, client.customerValueBand)}
+                />
+              </Field>
+              <Field label="Monthly ad spend" hint="Paid direct to the platform">
+                <CustomSelect
+                  name="adSpendBand"
+                  defaultValue={client.adSpendBand || bandFor(AD_SPEND_OPTIONS, client.adSpendBudget)}
+                  placeholder="Not answered"
+                  options={withCurrent(AD_SPEND_OPTIONS, client.adSpendBand)}
+                />
+              </Field>
+              <Field label="When do you want to start?">
+                <CustomSelect name="timeline" defaultValue={client.timeline || ''} placeholder="Not answered" options={withCurrent(START_OPTIONS, client.timeline)} />
+              </Field>
+              <Field label="Who signs this off?">
+                <CustomSelect name="decisionMaker" defaultValue={client.decisionMaker || ''} placeholder="Not answered" options={withCurrent(DECISION_OPTIONS, client.decisionMaker)} />
+              </Field>
+              <Field label="Could you handle more work right now?" className="sm:col-span-2">
+                <CustomSelect name="capacity" defaultValue={client.capacity || ''} placeholder="Not answered" options={withCurrent(CAPACITY_OPTIONS, client.capacity)} />
+              </Field>
             </div>
           </div>
 

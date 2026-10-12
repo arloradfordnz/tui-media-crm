@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { getAuthUser } from '@/lib/supabase-admin'
+import { CUSTOMER_VALUE_OPTIONS, AD_SPEND_OPTIONS, approxFor } from '@/lib/application-fields'
 import { sendWelcomeEmail } from '@/lib/email'
 
 // Service-role client that bypasses RLS. Used for cleanup on tables where the
@@ -96,8 +97,9 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
   const industry = formData.get('industry') as string
   const brand = formData.get('brand') as string
   const sells = formData.get('sells') as string
-  const customerValueRaw = formData.get('customerValue') as string
-  const adSpendBudgetRaw = formData.get('adSpendBudget') as string
+  const interest = formData.get('interest') as string
+  const customerValueBand = formData.get('customerValueBand') as string
+  const adSpendBand = formData.get('adSpendBand') as string
   const decisionMaker = formData.get('decisionMaker') as string
   const capacity = formData.get('capacity') as string
   const timeline = formData.get('timeline') as string
@@ -127,8 +129,13 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
     // The application answers. Editable rather than read-only because plenty of
     // these arrive over the phone rather than through the form on the site.
     sells: sells || null,
-    customer_value: customerValueRaw ? parseFloat(customerValueRaw) : null,
-    ad_spend_budget: adSpendBudgetRaw ? parseFloat(adSpendBudgetRaw) : null,
+    interest: interest || null,
+    customer_value_band: customerValueBand || null,
+    ad_spend_band: adSpendBand || null,
+    // The number is derived from the band (a midpoint), because the new-job
+    // form and Insights still read it. Unanswered stays null.
+    customer_value: approxFor(CUSTOMER_VALUE_OPTIONS, customerValueBand),
+    ad_spend_budget: approxFor(AD_SPEND_OPTIONS, adSpendBand),
     decision_maker: decisionMaker || null,
     capacity: capacity || null,
     timeline: timeline || null,
@@ -173,44 +180,48 @@ export async function updateClientCategory(clientId: string, category: string | 
 }
 
 export async function deleteClient(clientId: string): Promise<{ error?: string } | never> {
-  const supabase = await createServerSupabaseClient()
-  const admin = getAdminClient()
+  // Everything below runs with the service role, so the caller is checked here
+  // rather than left to RLS. It also means a session token that is a little
+  // stale cannot turn this into a delete that silently removes nothing, which
+  // is what RLS does: no error, zero rows.
+  if (!(await getAuthUser())) return { error: 'Not authorised. Sign out and back in, then try again.' }
 
-  // email_logs.client_id FK has no ON DELETE action, and email_logs has RLS
-  // with no UPDATE policy — so we must use the service-role client to null
-  // those refs before the clients delete can succeed.
-  if (admin) {
-    const { error: logErr } = await admin
-      .from('email_logs')
-      .update({ client_id: null })
-      .eq('client_id', clientId)
-    if (logErr) {
-      console.error('[deleteClient] email_logs cleanup failed:', logErr)
-      return { error: `Couldn't clear email logs for this client: ${logErr.message}` }
-    }
-  } else {
-    return { error: 'Missing SUPABASE_SERVICE_ROLE_KEY — set it in Vercel env vars so the server can clean up email_logs before deleting the client.' }
+  const admin = getAdminClient()
+  if (!admin) {
+    return { error: 'Missing SUPABASE_SERVICE_ROLE_KEY — set it in Vercel env vars so the server can delete clients.' }
   }
 
-  // Collect the client's document ids BEFORE deleting the client — the FK is
-  // ON DELETE SET NULL, so after the delete they'd be unfindable by client_id.
-  // The destructive cleanup itself runs AFTER the client delete succeeds, so a
-  // failed delete no longer leaves the client stripped of their documents.
-  const { data: docRows } = await supabase.from('documents').select('id').eq('client_id', clientId)
-  const docIds = (docRows ?? []).map((d) => d.id)
+  // email_logs.client_id FK has no ON DELETE action, and email_logs has RLS
+  // with no UPDATE policy, so the refs are nulled first.
+  const { error: logErr } = await admin.from('email_logs').update({ client_id: null }).eq('client_id', clientId)
+  if (logErr) {
+    console.error('[deleteClient] email_logs cleanup failed:', logErr)
+    return { error: `Couldn't clear email logs for this client: ${logErr.message}` }
+  }
 
-  const { error } = await supabase.from('clients').delete().eq('id', clientId)
+  // Collect what has to be cleaned up BEFORE deleting the client: documents are
+  // ON DELETE SET NULL (unfindable by client_id afterwards), and the portal
+  // login's link row cascades away with the client.
+  const [{ data: docRows }, { data: loginRows }] = await Promise.all([
+    admin.from('documents').select('id').eq('client_id', clientId),
+    admin.from('client_users').select('user_id').eq('client_id', clientId),
+  ])
+  const docIds = (docRows ?? []).map((d) => d.id)
+  const loginIds = (loginRows ?? []).map((r) => r.user_id as string)
+
+  const { data: removed, error } = await admin.from('clients').delete().eq('id', clientId).select('id')
   if (error) {
     console.error('[deleteClient] failed:', error)
     return { error: error.message }
   }
+  if (!removed?.length) return { error: 'That client no longer exists. Refresh the page.' }
 
-  // Cleanup: orphaned documents + notification noise (notifications keep their
-  // client_id — the column has no FK).
-  if (docIds.length > 0) {
-    await supabase.from('documents').delete().in('id', docIds)
-  }
-  await supabase.from('notifications').delete().eq('client_id', clientId)
+  // Cleanup after the delete succeeded, so a failed delete never strips a
+  // client of their documents. The portal login goes too: left behind, it
+  // could still sign in, and the same email could never be invited again.
+  if (docIds.length > 0) await admin.from('documents').delete().in('id', docIds)
+  await admin.from('notifications').delete().eq('client_id', clientId)
+  await Promise.all(loginIds.map((id) => admin.auth.admin.deleteUser(id)))
 
   revalidatePath('/dashboard/clients')
   redirect('/dashboard/clients')
