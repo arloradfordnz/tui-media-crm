@@ -12,12 +12,15 @@
 //   "client": { "id": "<uuid>" }                              // use an existing client, OR
 //   "client": { "name": "Acme Ltd", "create": true, ... }      // create a new one, OR
 //   "client": { "name": "Acme Ltd" }                           // look up by exact name
+//   "clientLegalName": "Acme Limited",   // optional if the client record has legal_name; saved back to it
+//   "entityType": "company",             // company | sole_trader | partnership | other_entity | individual
+//   "signatoryName": "Jane Smith",       // optional: defaults to the client's main contact
 //   "businessName": "Acme Ltd",
 //   "date": "2026-08-25",
 //   "shootDate": "2026-09-10",
 //   "jobDescription": "One short line describing the project",
 //   "location": "Nelson",
-//   "body": "# Scope of Work\n...markdown body using the app's # ## ### ** conventions...",
+//   "body": "# 1. Parties\n\n1.1 ...",   // required, drafted to lib/contract-drafting.ts
 //   "documentNumber": "#142",   // optional — auto-assigned (next in sequence) if omitted
 //   "docName": "Contract - Acme Ltd"  // optional — defaults to "Contract - <clientName>"
 // }
@@ -78,6 +81,8 @@ async function resolveClient(spec) {
     .insert({
       name: spec.name,
       contact_person: spec.contactPerson || null,
+      legal_name: spec.legalName || null,
+      entity_type: spec.entityType || null,
       email: spec.email || null,
       phone: spec.phone || null,
       location: spec.location || null,
@@ -107,15 +112,37 @@ async function nextDocumentNumber() {
   return `#${max + 1}`
 }
 
-// The saved default contract wording (Documents > Contract template), when the
-// payload doesn't bring its own body.
-async function defaultBody() {
-  const { data } = await supabase.from('document_templates').select('body').eq('template', 'Contract').maybeSingle()
-  return data?.body || ''
-}
-
 async function main() {
+  // Checked before anything is written. There is no template to fall back on:
+  // every contract is drafted for its project, and a final one has no
+  // [square bracket] placeholders left in it.
+  const body = String(payload.body || '').trim()
+  if (!body) fail('payload.body is required. Draft it to the brief in lib/contract-drafting.ts.')
+  const blanks = [...new Set(body.match(/\[[^\]\n]+\]/g) ?? [])]
+  if (blanks.length) fail(`the body still has placeholders: ${blanks.join(', ')}`)
+
   const client = await resolveClient(payload.client)
+
+  // The parties clause and signature block need the legal entity and a named
+  // person. Client details the payload supplies are saved to the client record
+  // so they are not asked for again.
+  const legalName = payload.clientLegalName || client.legal_name
+  const entityType = payload.entityType || client.entity_type
+  const signatory = payload.signatoryName || payload.contactPerson || client.contact_person
+  if (!legalName || !entityType || !signatory) {
+    fail('need the client\'s legal name, entity type (company or sole trader) and who signs. Ask the user, then pass clientLegalName / entityType / signatoryName.')
+  }
+  const patch = {}
+  if (legalName !== client.legal_name) patch.legal_name = legalName
+  if (entityType !== client.entity_type) patch.entity_type = entityType
+  if (payload.contactPerson && payload.contactPerson !== client.contact_person) patch.contact_person = payload.contactPerson
+  if (payload.clientEmail && payload.clientEmail !== client.email) patch.email = payload.clientEmail
+  if (payload.clientPhone && payload.clientPhone !== client.phone) patch.phone = payload.clientPhone
+  if (payload.location && !client.location) patch.location = payload.location
+  if (Object.keys(patch).length) {
+    const { error } = await supabase.from('clients').update(patch).eq('id', client.id)
+    if (error) fail(`could not save the client details: ${error.message}`)
+  }
 
   let portalToken = client.portal_token
   if (!portalToken) {
@@ -132,8 +159,8 @@ async function main() {
   const documentNumber = payload.documentNumber || (await nextDocumentNumber())
 
   const form = {
-    clientName: client.name,
-    contactPerson: payload.contactPerson || client.contact_person || '',
+    clientName: legalName,
+    contactPerson: signatory,
     clientEmail: payload.clientEmail || client.email || '',
     clientPhone: payload.clientPhone || client.phone || '',
     businessName: payload.businessName || client.name,
@@ -141,7 +168,7 @@ async function main() {
     jobDescription: payload.jobDescription || '',
     shootDate: payload.shootDate || '',
     location: payload.location || client.location || '',
-    body: payload.body || (await defaultBody()),
+    body,
     clientSignature: '',
     clientSignedAt: '',
     documentNumber,

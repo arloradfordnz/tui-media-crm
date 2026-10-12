@@ -5,7 +5,9 @@ description: Draft a Tui Media client contract and save it directly into the CRM
 
 # Tui Media contract
 
-Produces a Tui Media video-ads project contract and writes it straight into
+Produces a Tui Media client contract (a one-off video ad project, a monthly
+retainer, event coverage or anything else), written for that client's project,
+and writes it straight into
 the CRM's Supabase database, in the same shape the CRM's own document editor
 uses — so it shows up in `/dashboard/documents` and the client's
 `/portal/client/[token]` page immediately, no manual step in the dashboard.
@@ -26,12 +28,12 @@ hand-author HTML/PDF/styling for a contract.
 - Plain and direct. No marketing fluff, no "storytelling" language.
 - **No em dashes**, anywhere.
 - Say "video ads", not "video marketing".
-- Don't imply a guarantee of results. Don't imply a retainer or ongoing
-  commitment — this is a one-off project with a fixed scope.
+- Don't imply a guarantee of results, or an ongoing commitment the deal
+  doesn't have.
 
 ## What the contract must actually say
 
-Tui Media's standard project structure (see the client's own
+For a one-off video ad project, Tui Media's structure (see the client's own
 `Tui_Media_Rebrand_Master_Reference.md` if you have access to the website
 repo) is: **strategise → script → film → edit → launch & manage**. The
 launch/manage phase runs paid ads for a fixed **one-month** period, priced
@@ -39,34 +41,20 @@ into the single project fee — not billed separately. At the end of that
 month, the client gets everything: raw footage, final cuts, and the ad
 account itself. No guarantees of results, no retainer, no lock-in.
 
-The standard wording lives in the CRM as the **contract template** (Documents >
-Contract template; Tui can edit it too). If the payload has no `body`, the
-script uses that saved template as it stands, with its `[square brackets]`
-still unfilled, so normally write a `body` from it with the brackets filled in.
-Never invent a fee, date or term to fill one.
+The rules for what a contract says (structure, rollover, ending the
+agreement, deposits, delivery and feedback through the client portal, the
+defaults for every blank, and the 3 to 4 page length) live in one place: `CONTRACT_DRAFTING_BRIEF` in
+[`lib/contract-drafting.ts`](../../../lib/contract-drafting.ts). Read it and
+follow it. Do not work from memory or from the old five-heading outline, and do
+not copy its rules into this file, so there is one version to keep right.
 
-Otherwise draft the `body` markdown using these section headings unless the user gives
-you different ones — each becomes a bold section heading in the PDF:
+There is no saved contract template. Follow the brief's rules, but write
+every contract for its own client and project: the real deliverables, dates,
+platforms and payment schedule, and nothing that doesn't apply.
 
-```
-# Scope of Work
-...what's being delivered, referencing strategise/script/film/edit/launch & manage...
-
-# Payment
-...project fee, payment schedule/milestones, that media/ad spend is paid
-direct by the client (not through Tui Media)...
-
-# Timeline
-...key dates: shoot date, expected delivery, the one-month launch & manage
-window and when it starts...
-
-# Ownership & Handover
-...client owns the final footage, raw files, and ad account after handover;
-what happens at the end of the month...
-
-# Cancellation
-...cancellation terms. No lock-in beyond the current project.
-```
+Draft the `body` as numbered sections and clauses, as the brief describes
+(`# 1. Parties`, then clauses `1.1`, `1.2` and so on, each its own paragraph).
+Keep it to 3 to 4 pages.
 
 Do **not** add your own "Approval" section — the template always appends one
 automatically before the signature block, so writing one in the body would
@@ -87,11 +75,22 @@ duplicate it.
 Ask (or infer from the CRM) whatever you don't already know:
 
 - Which client this is for — an existing client (by name or id) or a new one
-- Business name, contact person, email, phone, location
+- Business name, main contact person, email, phone, location. The contract
+  names the main contact, and they sign unless the user says otherwise. Take
+  these from the client record; ask the user for any that are missing, and pass
+  them in the payload so the script saves them to the client record.
 - Project description (one line — goes in the "Project" field on the cover
   and header)
 - Shoot date, and the contract date
-- The specifics of scope/payment/timeline/ownership/cancellation above
+- Whether the client is a **company or a sole trader** (or a partnership,
+  trust or individual), their exact **legal name** (a company as registered,
+  ending in Limited), and the **named person who signs** and their role. If
+  this is not clear from the CRM, ask the user. Never guess: the signature
+  block prints it.
+- The fee, any deposit, the number of videos and the dates. These are the only
+  things never defaulted. Everything else (shoot length, turnaround, feedback
+  and approval periods, invoice date, reschedule notice, raw footage timing,
+  storage period) uses the defaults in the brief.
 
 If the client doesn't exist in the CRM yet, confirm with the user before
 creating one — don't silently spawn a new client record from a name
@@ -109,7 +108,11 @@ mentioned in passing.
   "shootDate": "2026-09-10",
   "jobDescription": "One-line project description",
   "location": "Nelson",
-  "body": "# Scope of Work\n...\n\n# Payment\n...\n\n# Timeline\n...\n\n# Ownership & Handover\n...\n\n# Cancellation\n...",
+  "clientLegalName": "Acme Limited",
+  "entityType": "company",
+  "contactPerson": "Jane Smith",
+  "clientEmail": "jane@acme.co.nz",
+  "body": "# 1. Parties\n\n1.1 ...\n\n# 2. The work\n\n2.1 ...",
   "documentNumber": null,
   "docName": null
 }
@@ -133,8 +136,15 @@ node scripts/create-contract.mjs /path/to/payload.json
    document with the service role key, bypassing RLS the same way the app's
    own server actions do.
 
+   The script refuses a body that is missing or still has `[square bracket]`
+   placeholders, and refuses to run without the client's legal name, entity
+   type and a signatory. Legal name, entity type, contact person, email, phone
+   and location passed in the payload are saved to the client record. Add
+   `"signatoryName"` only if someone other than the main contact signs.
+
 3. The script prints JSON with `documentId`, `portalUrl`, and `dashboardUrl`.
-   Report both links back to the user.
+   Report both links back to the user, then list every default you used (one
+   per line, with its clause number) so the user can review them.
 
 ## What this skill must never do on its own
 
@@ -144,6 +154,7 @@ node scripts/create-contract.mjs /path/to/payload.json
   rules. If asked to email it, use the CRM's existing "Email to Client" flow
   (`/dashboard/documents/[id]`) or its `/api/documents/email` route, not an
   ad hoc email.
-- **Never invent numbers, dates, or terms** the user hasn't given you — ask
-  rather than guess at a project fee or payment schedule.
+- **Never invent a fee, deposit, quantity, date, legal name or signatory** the
+  user hasn't given you. Ask. Every other gap gets a default from the brief,
+  which you list for review.
 - **Never create a new client record silently** — confirm first.

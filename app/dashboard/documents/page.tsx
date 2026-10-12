@@ -1,9 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import PdfGenerator from './PdfGenerator'
 import NewDocButton from './NewDocButton'
-import Link from 'next/link'
-import { FileText } from 'lucide-react'
-import { getContractTemplate } from '@/lib/document-templates'
 
 // The Saved Templates grid is gone. It listed every document ever generated as
 // a card grid under the generator, which grew without limit and was not what
@@ -14,13 +11,10 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   const params = await searchParams
   const supabase = await createServerSupabaseClient()
 
-  const [{ data: clients }, contractTemplate] = await Promise.all([
-    supabase
-      .from('clients')
-      .select('id, name, contact_person, email, phone, location, portal_token')
-      .order('name', { ascending: true }),
-    getContractTemplate(supabase),
-  ])
+  const { data: clients } = await supabase
+    .from('clients')
+    .select('id, name, contact_person, email, phone, location, portal_token')
+    .order('name', { ascending: true })
 
   const clientOptions = (clients ?? []).map((c) => ({
     id: c.id,
@@ -37,17 +31,14 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Documents</h1>
-          <p className="page-subtitle">Generate a contract, quote or call sheet as a PDF.</p>
+          <p className="page-subtitle">Generate a quote or call sheet as a PDF. Contracts are drafted by Tui.</p>
         </div>
         <div className="page-header-actions">
-          <Link href="/dashboard/documents/template" className="btn-secondary">
-            <FileText className="w-4 h-4" /> Contract template
-          </Link>
           <NewDocButton clients={clientOptions.map((c) => ({ id: c.id, name: c.name }))} defaultClientId={params.clientId} />
         </div>
       </div>
 
-      <PdfGenerator clients={clientOptions} initialClientId={params.clientId} contractTemplate={contractTemplate.body} />
+      <PdfGenerator clients={clientOptions} initialClientId={params.clientId} />
     </div>
   )
 }
