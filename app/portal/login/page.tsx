@@ -4,8 +4,8 @@ import PortalLoginForm from './PortalLoginForm'
 export const metadata = { title: 'Sign in — Tui Media' }
 
 const MESSAGES: Record<string, string> = {
-  expired: 'That setup link has expired or was already used. Sign in below, or email us for a fresh one.',
-  link: 'That link was incomplete. Sign in below, or email us for a fresh one.',
+  expired: 'That link has expired or was already used. Use “Forgot your password?” below to get a fresh one.',
+  account: 'That login isn’t linked to a client portal. Email hello@tuimedia.nz and we’ll sort it out.',
 }
 
 export default async function PortalLoginPage({

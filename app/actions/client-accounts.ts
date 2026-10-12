@@ -2,9 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient, getAuthUser } from '@/lib/supabase-admin'
-import { sendClientAccountSetupEmail } from '@/lib/email'
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
+import { emailPortalPasswordLink } from '@/lib/portal-setup-link'
 
 export type InviteResult = { ok: true; email: string } | { ok: false; error: string }
 
@@ -41,9 +39,21 @@ export async function inviteClientToPortal(clientId: string): Promise<InviteResu
     .from('client_users')
     .select('user_id')
     .eq('client_id', clientId)
-    .single()
+    .limit(1)
+    .maybeSingle()
 
   let userId = existing?.user_id as string | undefined
+
+  if (userId) {
+    // The client's email may have been corrected since the account was made.
+    // The link is generated for the address on the client record, so the
+    // login has to follow it or generateLink() finds no such user.
+    const { data: current } = await admin.auth.admin.getUserById(userId)
+    if (current?.user && current.user.email?.toLowerCase() !== email.toLowerCase()) {
+      const { error } = await admin.auth.admin.updateUserById(userId, { email, email_confirm: true })
+      if (error) return { ok: false, error: error.message }
+    }
+  }
 
   if (!userId) {
     const { data: created, error } = await admin.auth.admin.createUser({
@@ -73,28 +83,13 @@ export async function inviteClientToPortal(clientId: string): Promise<InviteResu
     }
   }
 
-  // A recovery link, not an invite link: invite links are refused for users
-  // that already exist, and this same action has to work for the re-send.
-  const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
-    type: 'recovery',
+  const sent = await emailPortalPasswordLink(admin, {
     email,
-    options: { redirectTo: `${APP_URL}/portal/auth/callback?next=/portal/setup` },
+    name: (client.contact_person as string | null) || (client.name as string),
+    clientId,
+    kind: 'setup',
   })
-
-  if (linkErr || !link?.properties?.action_link) {
-    return { ok: false, error: linkErr?.message ?? 'Could not generate the setup link.' }
-  }
-
-  try {
-    await sendClientAccountSetupEmail({
-      to: email,
-      clientName: (client.contact_person as string | null) || (client.name as string),
-      setupUrl: link.properties.action_link,
-      clientId,
-    })
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'Could not send the email.' }
-  }
+  if (!sent.ok) return sent
 
   await admin
     .from('clients')

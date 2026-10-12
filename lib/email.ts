@@ -894,11 +894,43 @@ export async function sendClientAccountSetupEmail({
       <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0 0 16px;">You now have your own login for the Tui Media portal, the place where your footage, photos and paperwork live. Everything that used to arrive as a one-off link is in one spot, and it stays there.</p>
       <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">Choose a password to finish setting it up.</p>
       ${button(setupUrl, 'Choose a password')}
-      <p style="color:${C.faint};font-size:13px;line-height:1.55;margin:16px 0 0;">This link is single use and expires in 24 hours. If it has run out by the time you get to it, email hello@tuimedia.nz and I'll send a fresh one.</p>
+      <p style="color:${C.faint};font-size:13px;line-height:1.55;margin:16px 0 0;">This link works once. If it has run out by the time you get to it, press “Forgot your password?” at <a href="${APP_URL}/portal/login" style="color:${C.faint};text-decoration:underline;">${APP_URL.replace(/^https?:\/\//, '')}/portal/login</a> for a fresh one.</p>
       ${plainLink(setupUrl)}
     `,
       SIGNOFF,
       'Choose a password to finish setting up your portal.'
+    ),
+  })
+}
+
+/** The client asked for this from the portal's sign-in page. */
+export async function sendClientPasswordResetEmail({
+  to,
+  clientName,
+  setupUrl,
+  clientId,
+}: {
+  to: string
+  clientName: string
+  setupUrl: string
+  clientId?: string
+}) {
+  await send({
+    to,
+    subject: 'Reset your Tui Media password',
+    type: 'password_reset',
+    clientId,
+    rethrow: true,
+    html: wrap(
+      `
+      ${buildGreeting(clientName)}
+      <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">Someone asked to reset the password for your Tui Media portal. If that was you, choose a new one below.</p>
+      ${button(setupUrl, 'Choose a new password')}
+      <p style="color:${C.faint};font-size:13px;line-height:1.55;margin:16px 0 0;">This link works once. If you didn't ask for it, ignore this email and your password stays as it is.</p>
+      ${plainLink(setupUrl)}
+    `,
+      SIGNOFF,
+      'Choose a new password for your portal.'
     ),
   })
 }

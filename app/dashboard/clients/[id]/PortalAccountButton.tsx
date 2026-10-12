@@ -10,7 +10,7 @@ import { useToast } from '@/components/Toast'
  *
  * Doubles as the re-send: the action reuses an existing account rather than
  * making a second one, so pressing this again just issues a fresh link — which
- * is what Arlo will want when someone lets the 24-hour one lapse.
+ * is what Arlo will want when someone lets theirs lapse.
  */
 export default function PortalAccountButton({
   clientId,

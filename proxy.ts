@@ -67,7 +67,9 @@ export async function proxy(request: NextRequest) {
   if (pathname === '/login' && user) {
     return NextResponse.redirect(new URL(isClient ? '/portal/me' : '/dashboard', request.url))
   }
-  if (pathname === '/portal/login' && user) {
+  // Unless it carries an error: /portal/me sends a signed-in account with no
+  // client behind it here to say so, and bouncing it back would loop.
+  if (pathname === '/portal/login' && user && !request.nextUrl.searchParams.has('error')) {
     return NextResponse.redirect(new URL(isClient ? '/portal/me' : '/dashboard', request.url))
   }
 
@@ -78,7 +80,8 @@ export async function proxy(request: NextRequest) {
   }
 
   // /portal/me is the signed-in portal; the token links under
-  // /portal/client/... stay public, as do login and the setup callback.
+  // /portal/client/... stay public, as do login, forgot and setup (which
+  // checks its own token or session).
   if (pathname.startsWith('/portal/me') && !user) {
     return NextResponse.redirect(new URL('/portal/login', request.url))
   }

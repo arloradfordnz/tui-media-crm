@@ -74,4 +74,8 @@
 // touch.
 // 3.11.3 — the question popup's selected answer is one accent outline, like a
 // focused message field, instead of the focus ring stacked on the selection.
-export const APP_VERSION = '3.11.3'
+// 3.12.0 — client account setup emails work: they link to /portal/setup on
+// this domain instead of Supabase's redirect (which landed on localhost), and
+// the link survives mail scanners. Clients can reset a forgotten password and
+// change it from the portal.
+export const APP_VERSION = '3.12.0'

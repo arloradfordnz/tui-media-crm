@@ -333,7 +333,8 @@ Clients now have two ways in, and both still work:
 To give a client an account, open their record and press **Send account
 setup**. That creates the account, emails them a link to choose a password,
 and records the date. Pressing it again re-sends — it does not make a second
-account, so it is also the fix when someone lets the 24-hour link lapse. The
+account, so it is also the fix when someone lets the link lapse (they can also
+press **Forgot your password?** themselves). The
 button only appears once the client has an email address on file.
 
 An account exists because Arlo made one. **Public sign-up is still switched on
@@ -400,19 +401,18 @@ Two things fix it, and both are needed:
   `role: 'admin'`, so the flip does not lock him out — and the migration
   refuses to run if it would.
 
-**2. Account setup emails point at localhost.**
+**2. Account setup emails used to point at localhost. Fixed in code, 13 October 2026.**
 
-`generateLink()` asks Supabase to redirect to
-`https://dashboard.tuimedia.nz/portal/auth/callback`. That URL is not in the
-project's redirect allow-list, so Supabase silently ignores it and falls back
-to the Site URL, which is still the default `http://localhost:3000`. Every
-"Send account setup" email therefore hands the client a link that verifies
-correctly and then drops them on a dead address on their own machine. They can
-never reach `/portal/setup`, so they can never choose a password.
+The email used to carry Supabase's own link, which redirected to the project's
+Site URL (still `http://localhost:3000`) and, even with that right, delivered
+the session in a `#hash` the server could never read. The email now links
+straight to `/portal/setup?token=…` on this domain and the token is exchanged
+when the client presses **Save**, so neither the Site URL nor the redirect
+allow-list matters any more. Setting the Site URL to
+`https://dashboard.tuimedia.nz` is still tidy, but nothing depends on it.
 
-In **Authentication → URL Configuration**, set the **Site URL** to
-`https://dashboard.tuimedia.nz` and add `https://dashboard.tuimedia.nz/**` to
-**Redirect URLs**. Nothing in the code changes.
+Clients can also reset their own password from **Forgot your password?** on
+`/portal/login`, and change it from the portal once signed in.
 
-Email and password login itself is fine — that path was verified end to end on
-6 September and is not affected by either of these.
+Setup link, sign-in, change password, sign-out and a spent link were verified
+end to end on 13 October 2026.

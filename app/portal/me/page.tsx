@@ -1,10 +1,13 @@
 import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { getClientSession } from '@/lib/client-auth'
+import { getVerifiedUser } from '@/lib/supabase'
 import { loadPortalData, type PortalClient } from '@/lib/portal-data'
 import ClientPortalView from '../client/[token]/ClientPortalView'
 import PortalSignOut from './PortalSignOut'
 import type { Metadata } from 'next'
+import Link from 'next/link'
+import { KeyRound } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Your projects — Tui Media' }
 
@@ -18,7 +21,14 @@ export const metadata: Metadata = { title: 'Your projects — Tui Media' }
  */
 export default async function PortalMePage() {
   const session = await getClientSession()
-  if (!session) redirect('/portal/login')
+  if (!session) {
+    // Plain /portal/login would bounce a signed-in user straight back here
+    // (proxy.ts sends them to their front door), so say why instead.
+    const user = await getVerifiedUser()
+    if (!user) redirect('/portal/login')
+    if (user.app_metadata?.role === 'admin') redirect('/dashboard')
+    redirect('/portal/login?error=account')
+  }
 
   const admin = createAdminClient()
   if (!admin) redirect('/portal/login')
@@ -29,14 +39,18 @@ export default async function PortalMePage() {
     .eq('id', session.clientId)
     .single()
 
-  if (!client) redirect('/portal/login')
+  if (!client) redirect('/portal/login?error=account')
 
   const portalData = await loadPortalData(client as unknown as PortalClient)
-  if (!portalData) redirect('/portal/login')
+  if (!portalData) redirect('/portal/login?error=account')
 
   return (
     <>
-      <div className="flex justify-end px-6 pt-4">
+      <div className="flex justify-end gap-2 px-6 pt-4">
+        <Link href="/portal/setup" className="btn-ghost btn-sm">
+          <KeyRound className="w-3.5 h-3.5" />
+          Change password
+        </Link>
         <PortalSignOut />
       </div>
       <ClientPortalView data={portalData} />

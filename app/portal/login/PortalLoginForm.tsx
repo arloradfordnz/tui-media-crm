@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase-browser'
 import Field from '@/components/Field'
 
@@ -18,7 +19,7 @@ export default function PortalLoginForm({ notice }: { notice: string | null }) {
     const form = new FormData(e.currentTarget)
     const supabase = createClient()
     const { error: err } = await supabase.auth.signInWithPassword({
-      email: String(form.get('email') ?? ''),
+      email: String(form.get('email') ?? '').trim(),
       password: String(form.get('password') ?? ''),
     })
 
@@ -51,6 +52,10 @@ export default function PortalLoginForm({ notice }: { notice: string | null }) {
       <button type="submit" disabled={pending} className="btn-primary w-full mt-2">
         {pending ? 'Signing in…' : 'Sign in'}
       </button>
+
+      <p className="text-center text-sm">
+        <Link href="/portal/forgot" className="link-subtle">Forgot your password?</Link>
+      </p>
     </form>
   )
 }
