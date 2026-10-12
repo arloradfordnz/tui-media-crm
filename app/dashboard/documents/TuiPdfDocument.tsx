@@ -1,6 +1,6 @@
 import { Document, Page, Text, View, StyleSheet, Font, Svg, G, Path, Ellipse } from '@react-pdf/renderer'
 import type { DocumentProps } from '@react-pdf/renderer'
-import type { ReactElement } from 'react'
+import { cloneElement, type ReactElement } from 'react'
 
 // Bricolage Grotesque is Tui Media's brand typeface (see the site's
 // PALETTES.md / wireframe). These are static-weight TTFs pulled from the
@@ -49,10 +49,18 @@ const styles = StyleSheet.create({
 
   // ── Rule ────────────────────────────────────────────────────────────────
   rule: { borderBottomWidth: 0.5, borderBottomColor: C.lgrey, marginTop: 16 },
+  // The gap under the header rule. It is on the repeating header, not on the
+  // first heading, so every page has the same gap whether it opens with a
+  // heading or with a clause that ran over from the page before.
+  headerGap: { marginBottom: 24 },
 
   // ── Body text ────────────────────────────────────────────────────────────
   paragraph: { fontSize: 10.5, color: C.black, lineHeight: 1.65, marginBottom: 8 },
-  h1: { fontWeight: 600, fontSize: 13, color: C.black, marginTop: 24, marginBottom: 8 },
+  // No top margin: the space above a heading is the previous block's bottom
+  // margin (paragraphBeforeHeading), because a top margin is kept at the top of
+  // a page and made pages opening with a heading sit lower than the rest.
+  h1: { fontWeight: 600, fontSize: 13, color: C.black, marginTop: 0, marginBottom: 8 },
+  paragraphBeforeHeading: { fontSize: 10.5, color: C.black, lineHeight: 1.65, marginBottom: 32 },
   h3: { fontWeight: 600, fontSize: 10.5, color: C.black, marginTop: 10, marginBottom: 3 },
 
   // ── Signature ────────────────────────────────────────────────────────────
@@ -147,6 +155,15 @@ function renderBody(body: string): ReactElement[] {
   let buffer: string[] = []
   let key = 0
 
+  // Give the block before a heading the space that used to be the heading's
+  // top margin.
+  const spaceBeforeHeading = () => {
+    const prev = out[out.length - 1]
+    if (prev && (prev.props as { style?: unknown }).style === styles.paragraph) {
+      out[out.length - 1] = cloneElement(prev, { style: styles.paragraphBeforeHeading } as object)
+    }
+  }
+
   const flush = () => {
     if (!buffer.length) return
     out.push(<Text key={key++} style={styles.paragraph}>{renderInline(buffer.join(' '))}</Text>)
@@ -161,11 +178,13 @@ function renderBody(body: string): ReactElement[] {
     const h3 = /^###\s+(.+)/.exec(line)
     if (h1) {
       flush()
+      spaceBeforeHeading()
       out.push(<Text key={key++} style={styles.h1} minPresenceAhead={40}>{renderInline(h1[1])}</Text>)
       continue
     }
     if (h2) {
       flush()
+      spaceBeforeHeading()
       out.push(<Text key={key++} style={styles.h1} minPresenceAhead={40}>{renderInline(h2[1])}</Text>)
       continue
     }
@@ -173,6 +192,8 @@ function renderBody(body: string): ReactElement[] {
     buffer.push(line)
   }
   flush()
+  // The Approval heading that follows the body is an h1 too.
+  spaceBeforeHeading()
   return out
 }
 
@@ -232,7 +253,7 @@ export default function TuiDocument({ template, form }: { template: string; form
 
         {/* Header: title left, logo right, tops aligned. Repeats on every
             overflow page for Contract so a multi-page body stays oriented. */}
-        <View fixed={isContract}>
+        <View fixed={isContract} style={styles.headerGap}>
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>{template}</Text>
@@ -250,7 +271,7 @@ export default function TuiDocument({ template, form }: { template: string; form
           {form.jobDescription ? (
             <View>
               <Text style={styles.h1}>Project</Text>
-              <Text style={styles.paragraph}>{form.jobDescription}</Text>
+              <Text style={styles.paragraphBeforeHeading}>{form.jobDescription}</Text>
             </View>
           ) : null}
 
