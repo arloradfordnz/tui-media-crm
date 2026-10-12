@@ -78,4 +78,5 @@
 // this domain instead of Supabase's redirect (which landed on localhost), and
 // the link survives mail scanners. Clients can reset a forgotten password and
 // change it from the portal.
-export const APP_VERSION = '3.12.0'
+// 3.12.1 — contract PDFs repeat the separator under the date on every page.
+export const APP_VERSION = '3.12.1'

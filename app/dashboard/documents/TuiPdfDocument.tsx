@@ -232,7 +232,8 @@ export default function TuiDocument({ template, form }: { template: string; form
 
         {/* Header: title left, logo right, tops aligned. Repeats on every
             overflow page for Contract so a multi-page body stays oriented. */}
-        <View style={styles.header} fixed={isContract}>
+        <View fixed={isContract}>
+        <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>{template}</Text>
             {businessLine ? <Text style={styles.headerClient}>{businessLine}</Text> : null}
@@ -242,6 +243,7 @@ export default function TuiDocument({ template, form }: { template: string; form
         </View>
 
         <View style={styles.rule} />
+        </View>
 
         {/* Body */}
         <View>
