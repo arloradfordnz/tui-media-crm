@@ -82,7 +82,7 @@ export default async function SettingsPage() {
       </div>
 
       {/* Change Password */}
-      <SettingsForm />
+      <SettingsForm email={user?.email} />
 
       {/* Retainer Invoice Day */}
       <RetainerInvoiceSettings currentDay={retainerInvoiceDay ? parseInt(retainerInvoiceDay, 10) : 1} />

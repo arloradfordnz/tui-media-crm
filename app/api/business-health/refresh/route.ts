@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
 import { fetchXeroSummary } from '@/lib/xero'
+import { secretMatches, hasCronBearer } from '@/lib/secure-compare'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -11,14 +12,10 @@ function unauthorized() {
 }
 
 function isAuthorized(req: NextRequest): boolean {
-  const headerAuth = req.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && headerAuth === `Bearer ${cronSecret}`) return true
-  const token = process.env.BRIEFING_TOKEN
-  if (!token) return false
-  if (headerAuth === `Bearer ${token}`) return true
-  if (req.nextUrl.searchParams.get('token') === token) return true
-  return false
+  if (hasCronBearer(req)) return true
+  const headerAuth = req.headers.get('authorization') ?? ''
+  if (headerAuth.startsWith('Bearer ') && secretMatches(headerAuth.slice(7), process.env.BRIEFING_TOKEN)) return true
+  return secretMatches(req.nextUrl.searchParams.get('token'), process.env.BRIEFING_TOKEN)
 }
 
 export async function GET(req: NextRequest) {

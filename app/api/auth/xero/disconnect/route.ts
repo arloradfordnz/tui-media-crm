@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getVerifiedUser } from '@/lib/supabase'
+import { getAuthUser } from '@/lib/supabase-admin'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  const user = await getVerifiedUser()
+  const user = await getAuthUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createClient(

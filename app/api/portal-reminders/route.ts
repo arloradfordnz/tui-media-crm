@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendDeliveryReminderEmail } from '@/lib/email'
+import { secretMatches, hasCronBearer } from '@/lib/secure-compare'
 
 const REMIND_AFTER_DAYS = 3   // Wait this long after the client first viewed.
 const COOLDOWN_DAYS = 5       // Don't re-remind more often than this.
@@ -13,11 +14,8 @@ function getServiceClient() {
 }
 
 function isAuthorised(req: NextRequest) {
-  const token = req.nextUrl.searchParams.get('token')
-  if (token && token === process.env.BRIEFING_TOKEN) return true
-  const auth = req.headers.get('authorization')
-  if (process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`) return true
-  return false
+  if (secretMatches(req.nextUrl.searchParams.get('token'), process.env.BRIEFING_TOKEN)) return true
+  return hasCronBearer(req)
 }
 
 export async function GET(req: NextRequest) {

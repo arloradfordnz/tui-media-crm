@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
-import { getVerifiedUser } from '@/lib/supabase'
+import { getAuthUser } from '@/lib/supabase-admin'
 import { buildAuthUrl } from '@/lib/xero'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
-  const user = await getVerifiedUser()
+  const user = await getAuthUser()
   if (!user) {
     return NextResponse.redirect(new URL('/login', req.url))
   }

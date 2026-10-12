@@ -1,12 +1,14 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import Link from 'next/link'
 import { setPortalPassword } from '@/app/actions/portal-auth'
 import Field from '@/components/Field'
+import PasswordStrength from '@/components/PasswordStrength'
 
-export default function SetPasswordForm({ token }: { token?: string }) {
+export default function SetPasswordForm({ token, email }: { token?: string; email?: string | null }) {
   const [state, action, pending] = useActionState(setPortalPassword, undefined)
+  const [password, setPassword] = useState('')
 
   // Once the token has been exchanged it is spent; the session it created is
   // what any retry runs on.
@@ -21,12 +23,16 @@ export default function SetPasswordForm({ token }: { token?: string }) {
           name="password"
           type="password"
           required
-          minLength={8}
+          minLength={10}
           autoComplete="new-password"
-          placeholder="At least 8 characters"
+          placeholder="At least 10 characters"
           className="field-input"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
         />
       </Field>
+
+      <PasswordStrength value={password} personal={[email]} />
 
       <Field label="Confirm password">
         <input

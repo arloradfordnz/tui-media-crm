@@ -1,8 +1,10 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createServerSupabaseClient, getVerifiedUser } from '@/lib/supabase'
-import { createAdminClient } from '@/lib/supabase-admin'
+import { createServerSupabaseClient } from '@/lib/supabase'
+import { createAdminClient, getAuthUser } from '@/lib/supabase-admin'
+import { checkPassword } from '@/lib/password-strength'
+import { breachCount } from '@/lib/pwned'
 import { ICLOUD_URL_SETTING, syncIcloudCalendar } from '@/lib/icloud-calendar'
 import {
   SECRET_USER, SECRET_PASSWORD, SETTING_CALENDAR_URL, SETTING_CALENDAR_NAME, SETTING_CALENDARS,
@@ -16,15 +18,21 @@ export async function changePassword(prevState: { error?: string; success?: bool
 
   if (!currentPassword || !newPassword) return { error: 'All fields are required.' }
   if (newPassword !== confirmPassword) return { error: 'New passwords do not match.' }
-  if (newPassword.length < 8) return { error: 'Password must be at least 8 characters.' }
 
   const supabase = await createServerSupabaseClient()
 
   // Re-authenticate to verify current password. Only the address is read
   // here, so the request-cached identity is the right one to use — the
   // signInWithPassword below is what actually proves the old password.
-  const user = await getVerifiedUser()
+  const user = await getAuthUser()
   if (!user?.email) return { error: 'Not authenticated.' }
+
+  const strength = checkPassword(newPassword, [user.email])
+  if (!strength.ok) return { error: strength.problem ?? 'Choose a stronger password.' }
+  if (newPassword === currentPassword) return { error: 'Choose a password you haven’t used before.' }
+  if (await breachCount(newPassword)) {
+    return { error: 'That password has appeared in a data breach, so anyone can guess it. Choose a different one.' }
+  }
 
   const { error: signInError } = await supabase.auth.signInWithPassword({ email: user.email, password: currentPassword })
   if (signInError) return { error: 'Current password is incorrect.' }
@@ -37,7 +45,7 @@ export async function changePassword(prevState: { error?: string; success?: bool
 
 export async function saveAppSetting(key: string, value: string) {
   const supabase = await createServerSupabaseClient()
-  if (!(await getVerifiedUser())) return { error: 'Not authenticated.' }
+  if (!(await getAuthUser())) return { error: 'Not authenticated.' }
 
   const { error } = await supabase
     .from('app_settings')
@@ -69,7 +77,7 @@ export async function saveEmailTemplate(prevState: { error?: string; success?: b
   if (!type || !subject || !body) return { error: 'All fields are required.' }
 
   const supabase = await createServerSupabaseClient()
-  if (!(await getVerifiedUser())) return { error: 'Not authenticated.' }
+  if (!(await getAuthUser())) return { error: 'Not authenticated.' }
 
   const { error } = await supabase
     .from('email_templates')
@@ -103,7 +111,7 @@ export async function saveAdminIps(prevState: { error?: string; success?: boolea
 // the sync off and takes the mirrored events back off the calendar.
 export async function saveIcloudCalendar(prevState: { error?: string; success?: string } | undefined, formData: FormData) {
   const url = ((formData.get('icloudUrl') as string) || '').trim()
-  if (!(await getVerifiedUser())) return { error: 'Not authenticated.' }
+  if (!(await getAuthUser())) return { error: 'Not authenticated.' }
 
   if (url) {
     let host = ''
@@ -135,7 +143,7 @@ export async function saveIcloudCalendar(prevState: { error?: string; success?: 
 // calendar and starts writing to it; 'disconnect' takes everything that was
 // written back off the phone and forgets the credentials.
 export async function saveIcloudPush(prevState: { error?: string; success?: string } | undefined, formData: FormData) {
-  if (!(await getVerifiedUser())) return { error: 'Not authenticated.' }
+  if (!(await getAuthUser())) return { error: 'Not authenticated.' }
   const admin = createAdminClient()
   if (!admin) return { error: 'The server cannot reach the database right now.' }
 

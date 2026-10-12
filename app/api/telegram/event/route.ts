@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { runAssistantTurn } from '@/lib/assistant-agent'
+import { hasCronBearer } from '@/lib/secure-compare'
 
 // One assistant turn, triggered by something that actually happened rather
 // than by the clock. lib/tui/events.ts calls this from inside after(), so the
@@ -21,8 +22,7 @@ function getServiceClient() {
 }
 
 function isAuthorised(req: NextRequest) {
-  const auth = req.headers.get('authorization')
-  return !!process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`
+  return hasCronBearer(req)
 }
 
 export async function POST(req: NextRequest) {

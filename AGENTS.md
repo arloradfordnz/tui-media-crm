@@ -116,8 +116,8 @@ bug and are not one.
 
 ## The dev server serves stale code after an edit
 
-`next.config.ts` puts the dev build in `/tmp/tui-media-crm-next` (out of the
-iCloud-synced folder, where the watcher misses changes). That cache goes stale
+`next.config.ts` puts the dev build in `.next.nosync` (iCloud skips folders
+ending in `.nosync`; the watcher misses changes in synced ones). That cache goes stale
 on its own. Symptoms: an edit "doesn't apply", a hydration mismatch appears
 where the server HTML shows values you just changed away from, or a route
 handler keeps returning its old behaviour with no compile error.
@@ -128,7 +128,7 @@ handler keeps returning its old behaviour with no compile error.
 # 1. STOP the server. Never clear the cache while it is running — that kills
 #    the cache mid-flight and every route 500s with an SST panic that looks
 #    exactly like a code regression.
-# 2. rm -rf /tmp/tui-media-crm-next
+# 2. rm -rf .next.nosync
 # 3. Start it again.
 ```
 

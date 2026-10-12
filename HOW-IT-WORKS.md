@@ -361,6 +361,53 @@ table, never from a claim in their token.
 
 Run `supabase/migration_client_accounts.sql` before any of this works.
 
+### Security audit, 13 October 2026
+
+Found and fixed, all verified from outside with the public anon key and with
+disposable client and role-less accounts:
+
+- **The old Prisma tables were world-readable.** `"User"` (with a `password`
+  column), `"Client"`, `"Proposal"` and the rest of the PascalCase tables had
+  row level security off, so anyone could read them with no login. They are now
+  locked (deny-all), not dropped. **If the password in `"User"` was ever one
+  you still use, change it** — it was readable until today. The tables can be
+  dropped once you are sure nothing in them is needed.
+- **A client account could read and write `app_settings`**, which holds the
+  iCloud calendar settings. Now admin only.
+- **A client account could call the Xero connect/disconnect routes and the
+  iCloud, calendar and settings server actions**, all of which run with the
+  service role. Those guards now require `role = 'admin'`, and so does
+  `getAuthUser()` for every other API route (it used to refuse only clients, so
+  an account with no role at all got through).
+- **`anon` held every privilege on every table**, including TRUNCATE, which RLS
+  does not cover. It now has none, and `authenticated` lost TRUNCATE, TRIGGER
+  and REFERENCES. Future tables inherit that.
+- **Cron and webhook secrets were compared with `===`.** They now use a
+  constant-time comparison (`lib/secure-compare.ts`).
+- **Security headers** on every response: no framing, no MIME sniffing, HSTS, a
+  strict referrer policy (portal and proposal links carry their secret in the
+  URL), and `noindex` plus no-store on the portal, proposals and dashboard.
+- **Next.js was upgraded 16.2.2 to 16.4.0** to close proxy/middleware bypass,
+  server action and image-optimiser vulnerabilities.
+- **Passwords are checked.** A live strength meter on both password forms, and
+  the server enforces the same rules (10+ characters, no common passwords or
+  patterns, not containing the email or name) plus a lookup against known
+  breaches that never sends the password anywhere (`lib/pwned.ts`).
+
+Still open, and only you can do it:
+
+- **Turn off "Allow new users to sign up"** in Authentication → Sign In /
+  Providers. A database trigger cannot do it: Supabase creates invited users the
+  same way (the role is stamped afterwards), so a trigger blocks "Send account
+  setup" too — that was tried and removed. Until the switch is off a stray
+  account is harmless (no role means no access anywhere), but it can still send
+  confirmation emails from your domain.
+- In the same place, set **minimum password length to 10** and switch on
+  **leaked password protection** if the plan allows it, so the rules also hold
+  for Supabase's own reset flow.
+- One moderate advisory remains in `@anthropic-ai/sdk`; fixing it needs a
+  breaking upgrade.
+
 ### The two settings that still need you, in the Supabase dashboard
 
 Checked on 6 September 2026. Both are console settings, so neither can be fixed

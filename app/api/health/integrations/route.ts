@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getValidXeroAccount } from '@/lib/xero'
 import { checkMailConnection } from '@/lib/mail'
 import { sendTelegramMessage } from '@/lib/telegram'
+import { hasCronBearer } from '@/lib/secure-compare'
 
 // Keeps integration_status warm so the assistant never has to probe Xero or
 // IMAP on the request path — and is now the only thing that texts Arlo without
@@ -40,8 +41,7 @@ function getServiceClient() {
 }
 
 function isAuthorised(req: NextRequest) {
-  const auth = req.headers.get('authorization')
-  return !!process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`
+  return hasCronBearer(req)
 }
 
 export async function GET(req: NextRequest) {

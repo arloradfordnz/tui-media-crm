@@ -29,10 +29,12 @@ const REACT_PDF_ONLY = [
 ];
 
 const nextConfig: NextConfig = {
-  // Local dev only: keep build output OUT of the iCloud-synced repo folder,
-  // where the file watcher misses changes and sync can corrupt .next.
-  // Vercel (production build) must use the default .next dir.
-  ...(process.env.NODE_ENV === 'development' ? { distDir: '/tmp/tui-media-crm-next' } : {}),
+  // Local dev only: keep build output away from iCloud, where the file watcher
+  // misses changes and sync can corrupt .next. A folder ending in .nosync is
+  // skipped by iCloud. (It used to be /tmp/tui-media-crm-next, but Next 16.4
+  // refuses a distDir outside the project.) Vercel (production build) must use
+  // the default .next dir.
+  ...(process.env.NODE_ENV === 'development' ? { distDir: '.next.nosync' } : {}),
 
   // ── Keep 6MB of PDF library out of four serverless functions ─────────────
   // @react-pdf is only ever loaded in the BROWSER: both call sites are
@@ -70,6 +72,42 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },
+  // ── Security headers ─────────────────────────────────────────────────────
+  // frame-ancestors / X-Frame-Options stop the dashboard, the portal and the
+  // sign-in pages being framed by another site (clickjacking). The Referrer
+  // policy matters more than it looks: portal and proposal links carry their
+  // secret in the URL path, and without it a click on any outbound link in a
+  // page would hand that URL to the other site. nosniff, HSTS and the
+  // permissions policy are the standard hardening set.
+  //
+  // No script-src on purpose. Next injects inline scripts for hydration and the
+  // layout has its own; a script policy loose enough to work here (unsafe-inline)
+  // adds nothing, and a nonce-based one needs per-request rendering for every
+  // page. These directives do the work without risking a blank page.
+  async headers() {
+    const security = [
+      { key: 'X-Frame-Options', value: 'DENY' },
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
+      { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=()' },
+      { key: 'Content-Security-Policy', value: "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" },
+    ]
+    // Pages that are reached by a secret link or behind a login are never for a
+    // search engine, and anything holding a session is never for a shared cache.
+    const private_ = [
+      { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' },
+      { key: 'Cache-Control', value: 'private, no-store' },
+    ]
+    return [
+      { source: '/:path*', headers: security },
+      { source: '/portal/:path*', headers: private_ },
+      { source: '/proposal/:path*', headers: private_ },
+      { source: '/dashboard/:path*', headers: private_ },
+      { source: '/login', headers: private_ },
+    ]
+  },
+
   compress: true,
   poweredByHeader: false,
   productionBrowserSourceMaps: false,

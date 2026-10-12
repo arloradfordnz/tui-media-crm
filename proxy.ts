@@ -63,13 +63,18 @@ export async function proxy(request: NextRequest) {
   // denies them at the database. This is signposting, not the lock.
   const isClient = user?.app_metadata?.role === 'client'
 
-  // Send each kind of account to its own front door.
-  if (pathname === '/login' && user) {
+  // Send each kind of account to its own front door — but only accounts that
+  // HAVE a role. One with no role (anything that signed itself up) has no front
+  // door: bouncing it to /dashboard just makes the dashboard bounce it back to
+  // /login, forever. It stays on the sign-in page and can sign in as someone
+  // else.
+  const hasRole = isClient || user?.app_metadata?.role === 'admin'
+  if (pathname === '/login' && user && hasRole) {
     return NextResponse.redirect(new URL(isClient ? '/portal/me' : '/dashboard', request.url))
   }
   // Unless it carries an error: /portal/me sends a signed-in account with no
   // client behind it here to say so, and bouncing it back would loop.
-  if (pathname === '/portal/login' && user && !request.nextUrl.searchParams.has('error')) {
+  if (pathname === '/portal/login' && user && hasRole && !request.nextUrl.searchParams.has('error')) {
     return NextResponse.redirect(new URL(isClient ? '/portal/me' : '/dashboard', request.url))
   }
 

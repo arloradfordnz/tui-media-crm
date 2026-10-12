@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase-admin'
 import type { NextRequest } from 'next/server'
+import { secretMatches } from '@/lib/secure-compare'
 
 function escapeIcs(str: string) {
   return str.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n')
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
   //   /api/calendar/feed.ics?token=CALENDAR_FEED_SECRET
   const secret = process.env.CALENDAR_FEED_SECRET
   const token = request.nextUrl.searchParams.get('token')
-  if (!secret || token !== secret) {
+  if (!secretMatches(token, secret)) {
     return new Response('Not found', { status: 404 })
   }
 

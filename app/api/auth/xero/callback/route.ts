@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getVerifiedUser } from '@/lib/supabase'
+import { getAuthUser } from '@/lib/supabase-admin'
 import { exchangeCodeForToken, listConnections, accessTokenExpiry } from '@/lib/xero'
 
 export const dynamic = 'force-dynamic'
@@ -12,7 +12,7 @@ function errorRedirect(req: NextRequest, msg: string): NextResponse {
 }
 
 export async function GET(req: NextRequest) {
-  const user = await getVerifiedUser()
+  const user = await getAuthUser()
   if (!user) return NextResponse.redirect(new URL('/login', req.url))
 
   const code = req.nextUrl.searchParams.get('code')

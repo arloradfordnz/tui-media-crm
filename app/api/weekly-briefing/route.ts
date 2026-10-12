@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { sendWeeklyBriefingEmail } from '@/lib/email'
 import { fetchXeroSummary } from '@/lib/xero'
 import { syncClientLifetimeValues } from '@/lib/lifetime-value'
+import { secretMatches, hasCronBearer } from '@/lib/secure-compare'
 
 const LAT = -41.2706
 const LNG = 173.2840
@@ -25,12 +26,9 @@ function getServiceClient() {
 }
 
 function isAuthorised(req: NextRequest) {
-  const token = req.nextUrl.searchParams.get('token')
-  if (token && token === process.env.BRIEFING_TOKEN) return true
+  if (secretMatches(req.nextUrl.searchParams.get('token'), process.env.BRIEFING_TOKEN)) return true
   // Vercel cron requests carry an Authorization: Bearer <CRON_SECRET> header.
-  const auth = req.headers.get('authorization')
-  if (process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`) return true
-  return false
+  return hasCronBearer(req)
 }
 
 export async function GET(req: NextRequest) {

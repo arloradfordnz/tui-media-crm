@@ -36,7 +36,9 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts",
     "/tmp/tui-media-crm-next/types/**/*.ts",
-    "/tmp/tui-media-crm-next/dev/types/**/*.ts"
+    "/tmp/tui-media-crm-next/dev/types/**/*.ts",
+    ".next.nosync/types/**/*.ts",
+    ".next.nosync/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

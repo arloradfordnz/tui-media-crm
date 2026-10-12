@@ -37,7 +37,10 @@ export const createAdminClient = cache((): SupabaseClient | null => {
 export async function getAuthUser() {
   const user = await getVerifiedUser()
   if (!user) return null
-  if (user.app_metadata?.role === 'client') return null
+  // An allow-list, matching is_admin() in the database. This used to deny only
+  // 'client', which admitted any account with no role at all — including one
+  // that signed itself up while public sign-up is switched on.
+  if (user.app_metadata?.role !== 'admin') return null
   return user
 }
 

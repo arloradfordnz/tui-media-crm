@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, getAuthUser } from '@/lib/supabase-admin'
 import { syncClientMail } from '@/lib/client-mail'
+import { hasCronBearer } from '@/lib/secure-compare'
 
 // Read the inbox and file client mail now, ignoring the five-minute throttle.
 // The dashboard does this itself on load; this exists for a manual run
@@ -8,7 +9,7 @@ import { syncClientMail } from '@/lib/client-mail'
 export const maxDuration = 60
 
 export async function POST(req: NextRequest) {
-  const bearer = !!process.env.CRON_SECRET && req.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`
+  const bearer = hasCronBearer(req)
   if (!bearer && !(await getAuthUser())) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

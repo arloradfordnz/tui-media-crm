@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation'
 import { createServerSupabaseClient, getVerifiedUser } from '@/lib/supabase'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { emailPortalPasswordLink } from '@/lib/portal-setup-link'
+import { checkPassword } from '@/lib/password-strength'
+import { breachCount } from '@/lib/pwned'
 
 export type SetPasswordState =
   | {
@@ -29,9 +31,15 @@ export async function setPortalPassword(_prev: SetPasswordState, formData: FormD
   const password = String(formData.get('password') ?? '')
   const confirm = String(formData.get('confirm') ?? '')
 
-  // Checked before the token is touched, so a typo does not spend the link.
-  if (password.length < 8) return { error: 'Use at least 8 characters.' }
+  // Checked before the token is touched, so a typo or a weak choice does not
+  // spend the link. The browser shows the same meter, but this is the check
+  // that counts.
   if (password !== confirm) return { error: 'Those two passwords don’t match.' }
+  const strength = checkPassword(password)
+  if (!strength.ok) return { error: strength.problem ?? 'Choose a stronger password.' }
+  if (await breachCount(password)) {
+    return { error: 'That password has appeared in a data breach, so anyone can guess it. Choose a different one.' }
+  }
 
   const supabase = await createServerSupabaseClient()
 
@@ -46,10 +54,18 @@ export async function setPortalPassword(_prev: SetPasswordState, formData: FormD
       await supabase.auth.signOut()
       return { error: 'That link isn’t for a portal account.', expired: true }
     }
+    // The email address is only known now. The link is spent, so a retry has
+    // to run on the session it created.
+    if (!checkPassword(password, [data.user.email]).ok) {
+      return { error: 'Don’t use your name or email address in your password.', verified: true }
+    }
   } else {
     const user = await getVerifiedUser()
     if (!user || user.app_metadata?.role !== 'client') {
       return { error: 'Your session has ended. Sign in again, or ask for a fresh link.', expired: true }
+    }
+    if (!checkPassword(password, [user.email]).ok) {
+      return { error: 'Don’t use your name or email address in your password.' }
     }
   }
 

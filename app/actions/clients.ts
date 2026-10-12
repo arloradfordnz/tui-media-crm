@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { createServerSupabaseClient, getVerifiedUser } from '@/lib/supabase'
+import { createServerSupabaseClient } from '@/lib/supabase'
+import { getAuthUser } from '@/lib/supabase-admin'
 import { sendWelcomeEmail } from '@/lib/email'
 
 // Service-role client that bypasses RLS. Used for cleanup on tables where the
@@ -233,7 +234,7 @@ export async function deleteAllDocuments(): Promise<{ ok: true; count: number } 
 // briefing cron also runs the same sync daily.
 export async function syncLifetimeValues() {
   const supabase = await createServerSupabaseClient()
-  if (!(await getVerifiedUser())) return { error: 'Not authorised.' }
+  if (!(await getAuthUser())) return { error: 'Not authorised.' }
 
   const { syncClientLifetimeValues } = await import('@/lib/lifetime-value')
   try {

@@ -43,7 +43,7 @@ export default async function PortalSetupPage({
 
   return (
     <PortalAuthShell title="Change your password" intro={`For ${user.email}.`}>
-      <SetPasswordForm />
+      <SetPasswordForm email={user.email} />
     </PortalAuthShell>
   )
 }

@@ -1,12 +1,14 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { changePassword } from '@/app/actions/settings'
 import { Lock } from 'lucide-react'
 import Field from '@/components/Field'
+import PasswordStrength from '@/components/PasswordStrength'
 
-export default function SettingsForm() {
+export default function SettingsForm({ email }: { email?: string | null }) {
   const [state, action, pending] = useActionState(changePassword, undefined)
+  const [next, setNext] = useState('')
 
   return (
     <div className="card">
@@ -18,8 +20,9 @@ export default function SettingsForm() {
           <input name="currentPassword" type="password" required className="field-input" />
       </Field>
         <Field label="New Password">
-          <input name="newPassword" type="password" required minLength={8} className="field-input" />
+          <input name="newPassword" type="password" required minLength={10} autoComplete="new-password" className="field-input" value={next} onChange={(e) => setNext(e.target.value)} />
       </Field>
+        <PasswordStrength value={next} personal={[email]} />
         <Field label="Confirm New Password">
           <input name="confirmPassword" type="password" required className="field-input" />
       </Field>
