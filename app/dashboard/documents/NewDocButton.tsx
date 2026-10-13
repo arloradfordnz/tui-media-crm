@@ -6,7 +6,8 @@ import { Plus, X } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import Field from '@/components/Field'
 
-const DOC_TYPES = ['contract', 'callsheet', 'shotlist', 'questionnaire']
+// No 'contract': contracts are drafted by Tui, each written for its project.
+const DOC_TYPES = ['callsheet', 'shotlist', 'questionnaire']
 
 type ClientOption = { id: string; name: string }
 
@@ -29,13 +30,13 @@ export default function NewDocButton({ clients, defaultClientId }: { clients: Cl
             </div>
             <form action={action} className="space-y-4">
               <Field label="Name *">
-                <input name="name" required className="field-input" placeholder="e.g. Wedding Contract Template" />
+                <input name="name" required className="field-input" placeholder="e.g. Wedding Shot List" />
       </Field>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Type">
                   <CustomSelect
                     name="docType"
-                    defaultValue="contract"
+                    defaultValue="callsheet"
                     options={DOC_TYPES.map((t) => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
                   />
       </Field>

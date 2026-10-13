@@ -106,7 +106,7 @@ export default function AskSheet({
         <h2 id="ask-title" className="confirm-title">{q.question}</h2>
         {q.multi && <p className="ask-hint">Pick any that apply.</p>}
 
-        <div className="ask-options">
+        {q.options.length > 0 && <div className="ask-options">
           {q.options.map((o) => {
             const on = picked[step].includes(o.label) && !typed[step].trim()
             return (
@@ -125,11 +125,11 @@ export default function AskSheet({
               </button>
             )
           })}
-        </div>
+        </div>}
 
         <input
           className="field-input ask-own"
-          placeholder="Or type your own answer"
+          placeholder={q.options.length > 0 ? 'Or type your own answer' : 'Type your answer'}
           value={typed[step]}
           onChange={(e) => setTyped((t) => t.map((v, i) => (i === step ? e.target.value : v)))}
           onKeyDown={(e) => {

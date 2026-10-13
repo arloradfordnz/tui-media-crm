@@ -498,7 +498,7 @@ export async function POST(request: NextRequest) {
             toolResults.push({
               type: 'tool_result',
               tool_use_id: b.id,
-              content: ok ? 'Shown to Arlo as a popup.' : 'Each question needs a question and at least two options. Ask again, or ask in plain text.',
+              content: ok ? 'Shown to Arlo as a popup.' : 'Each question needs a question, and either at least two options or none (for a typed answer). Ask again, or ask in plain text.',
               ...(ok ? {} : { is_error: true }),
             })
           }
@@ -513,7 +513,7 @@ export async function POST(request: NextRequest) {
               // The shared thread gets a plain-text version, so the Telegram
               // brain knows what was asked if the answer comes in there.
               if (persist) {
-                const asked = tidyPunctuation(`${finalText.trim() ? finalText.trim() + ' ' : ''}${questions.map((q) => `${q.question} (${q.options.map((o) => o.label).join(' / ')})`).join(' ')}`)
+                const asked = tidyPunctuation(`${finalText.trim() ? finalText.trim() + ' ' : ''}${questions.map((q) => (q.options.length ? `${q.question} (${q.options.map((o) => o.label).join(' / ')})` : q.question)).join(' ')}`)
                 after(async () => {
                   await supabase.from('sms_messages').insert({ direction: 'outbound', body: asked })
                 })

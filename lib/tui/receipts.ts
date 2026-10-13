@@ -39,7 +39,7 @@ export function sanitiseAsk(input: unknown): AskQuestion[] {
   const raw = (input as { questions?: unknown })?.questions
   if (!Array.isArray(raw)) return []
   const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '')
-  return raw.slice(0, 6).flatMap((q) => {
+  return raw.flatMap((q) => {
     const question = str((q as { question?: unknown })?.question, 200)
     const opts = (q as { options?: unknown })?.options
     const options = (Array.isArray(opts) ? opts : [])
@@ -49,7 +49,9 @@ export function sanitiseAsk(input: unknown): AskQuestion[] {
       // model-written "Other, I'll type it" option is a duplicate of it.
       .filter((o) => !/^(other|something else|custom|none of these)\b/i.test(o.label))
       .slice(0, 5)
-    if (!question || options.length < 2) return []
+    // No options means a typed answer (a name, an email address). One option
+    // is not a choice, so that is still malformed.
+    if (!question || options.length === 1) return []
     return [{ question, options, multi: (q as { multi?: unknown })?.multi === true }]
   })
 }
@@ -99,8 +101,6 @@ const TOOL_VERBS: Record<string, string> = {
   list_documents: 'Reading documents',
   create_document: 'Creating document',
   delete_document: 'Deleting document',
-  get_contract_template: 'Reading contract template',
-  update_contract_template: 'Updating contract template',
   prepare_contract: 'Reading what is agreed so far',
   create_contract: 'Drafting contract (takes a minute)',
   update_contract: 'Revising contract',

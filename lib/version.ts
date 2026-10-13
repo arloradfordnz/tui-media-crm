@@ -89,4 +89,13 @@
 // as the form on tuimedia.nz; Tui's thinking and search animations are redone,
 // and empty results no longer say "0 jobs". start-dev.sh points at the right
 // folder.
-export const APP_VERSION = '3.14.0'
+// 3.15.0 — contracts are shorter (3 to 4 pages) and written for each project,
+// with Arlo's rules built in: rollover only when Tui Media or the weather
+// cancels, 14 days' notice to end, no deposit on monthly work, delivery and
+// feedback through the client portal, and stated defaults instead of blanks.
+// The contract names the client's legal entity and main contact; Tui asks for
+// anything the client record is missing (no question limit, typed answers
+// allowed) and saves it. The manual contract maker and template are gone.
+// 3.15.1 — contract PDF: the gap under the header rule is the same on every
+// page, not just the ones that open with a heading.
+export const APP_VERSION = '3.15.1'
