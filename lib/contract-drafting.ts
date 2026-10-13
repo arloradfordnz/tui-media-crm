@@ -48,10 +48,12 @@ Every agreement follows the rules in this brief, but it is written for this clie
 
 The client is usually a small local business. A long contract makes them stall, or ask whether they need a lawyer, and it protects Tui Media no better than a short one. So:
 
-- The body is 700 to 1,000 words. Never more than 1,100. With the cover and signature page that is about 4 pages.
+- The body is 700 to 1,000 words. This is a hard limit, not a target: count before you finish, and if you are over 1,000, cut until you are under. With the cover and signature page that is about 4 pages. A draft over 1,100 words is sent back to be shortened.
 - It opens with a short "At a glance" summary, so the client sees the whole deal before any legal wording. Then 8 short sections.
 - One or two sentences per clause, and as few clauses as decide the point. If a clause only repeats the law or common sense, leave it out.
-- No definitions section. Use plain words ("the videos", "the fee") rather than defined terms.
+- No definitions section and no definitions inside clauses either. Never define "Business Day" or anything else everyone already understands. Use plain words ("the videos", "the fee").
+- No housekeeping a court implies anyway: no clause listing which sections survive termination, no severability clause, no notices clause beyond the main contact line in the summary.
+- No new restrictions that are not in the deal, FIRM POSITIONS or the defaults.
 - Never cut these, because they are what actually protects Tui Media: what is and is not included, the fee and when it is paid, who owns the copyright, the liability cap, the CGA/FTA contracting out for a business client, how the agreement ends, and the client's responsibility for filming permissions.
 
 # HOW TO STRUCTURE IT
@@ -92,7 +94,7 @@ Reschedule notice, the rollover rules (or, for a one-off project, what happens t
 
 # 5. Ownership and use
 
-On payment the Client owns the copyright in the final videos (or a licence, if that is the deal). Raw footage on request. Tui Media may show the work in its portfolio unless the Client says no in writing. Licensed music is for the agreed use only. One line on moral rights consent.
+Two clauses, no more. 5.1: on payment the Client owns the copyright in the final videos (or a licence, if that is the deal), and raw footage is sent on request. 5.2: Tui Media may show the work in its portfolio unless the Client says no in writing, licensed music is for the agreed use only, and one short phrase on moral rights consent.
 
 # 6. Working together
 
@@ -104,7 +106,7 @@ The FIRM POSITIONS on ending, nothing more.
 
 # 8. The legal bits
 
-Short and plain: no guarantee of results; each party's liability is capped at the fees paid or payable and excludes indirect loss, except where the law does not allow it; the CGA/FTA business clause or the consumer clause; Tui Media is an independent contractor; neither party is liable for delay outside its control; changes in writing; disputes are talked through first, then mediation in Nelson; New Zealand law; it can be signed electronically. Advertising terms, only if Tui Media is running ads, go here as one or two lines (ad spend paid by the Client direct to the platform, the Client owns the ad account, no promised results).
+Four clauses at most. The CGA/FTA business clause is ONE sentence (name the Acts and sections, say both are in trade and it is fair and reasonable), not three. Fold independent contractor, delays outside control, changes in writing, whole agreement, disputes, governing law and electronic signing into a single last clause. Short and plain: no guarantee of results; each party's liability is capped at the fees paid or payable and excludes indirect loss, except where the law does not allow it; the CGA/FTA business clause or the consumer clause; Tui Media is an independent contractor; neither party is liable for delay outside its control; changes in writing; disputes are talked through first, then mediation in Nelson; New Zealand law; it can be signed electronically. Advertising terms, only if Tui Media is running ads, go here as one or two lines (ad spend paid by the Client direct to the platform, the Client owns the ad account, no promised results).
 
 # FIRM POSITIONS
 
@@ -143,6 +145,7 @@ Order of authority: the terms of this deal first, then FIRM POSITIONS, then thes
 
 Defaults, used only where the deal says nothing:
 
+- Revisions: 2 rounds per video.
 - Shoot length: about 1 hour.
 - Delivery turnaround: the first edit within 3 Business Days after the shoot.
 - Delivery: every edit and final video is delivered through the client portal, where the Client downloads it and approves it or leaves feedback.
@@ -192,6 +195,7 @@ export const SETTLED_CONTRACT_TERMS = [
   'Rollover: a missed shoot rolls over only if Tui Media cancels or weather stops it; a client cancellation or no-show lapses the video; nothing rolls twice.',
   'Deposits: one-off projects only. Monthly work never has a deposit.',
   'Paid but undelivered videos at the end: Tui Media chooses to deliver or refund.',
+  'Revisions: 2 rounds per video.',
   'Shoot length: about 1 hour.',
   'First edit: within 3 business days of the shoot.',
   'Delivery and feedback: through the client portal, 2 business days to approve or give feedback, then a reminder, then approved 2 business days later.',
@@ -272,6 +276,35 @@ async function runDrafter(system: string, user: string): Promise<DraftResult> {
   }
 }
 
+// The brief says 700 to 1,000 words and the model still came back at about
+// 1,450 on a real retainer (Marty's Meats, 6 pages). So the limit is enforced
+// here as well: a draft over the ceiling gets one tightening pass before it is
+// saved. If that pass fails, the longer draft is kept rather than losing the
+// contract altogether. The chat route allows 300s, which covers two passes.
+const WORD_CEILING = 1100
+
+function wordCount(text: string): number {
+  return text.split(/\s+/).filter(Boolean).length
+}
+
+async function keepWithinLength(draft: DraftResult): Promise<DraftResult> {
+  if ('error' in draft) return draft
+  const words = wordCount(draft.body)
+  if (words <= WORD_CEILING) return draft
+  const tightened = await runDrafter(CONTRACT_DRAFTING_BRIEF, `This agreement is ${words} words. The limit is 1,000. Shorten it to between 700 and 1,000 words.
+
+Keep the At a glance summary, every FIRM POSITION, every number and name, and everything LENGTH AND SHAPE says must never be cut. Cut by merging clauses, shortening wording and removing anything the brief says to leave out (definitions, survival and housekeeping clauses, repetition). Do not drop a protection. Keep the same section headings and renumber clauses so they run in order.
+
+Output the complete shortened agreement in the same format, then ===NOTES=== followed by these notes exactly as they are:
+
+${draft.notes || 'None.'}
+
+THE AGREEMENT
+${draft.body}`)
+  if ('error' in tightened) return draft
+  return { body: tightened.body, notes: tightened.notes || draft.notes }
+}
+
 /** Draft a complete contract from the agreed terms. */
 export async function draftContract(opts: {
   parties: ContractParties
@@ -299,7 +332,7 @@ ${facts}
 
 THE DEAL (agreed terms, from Arlo)
 ${opts.terms.trim()}`
-  return runDrafter(CONTRACT_DRAFTING_BRIEF, user)
+  return keepWithinLength(await runDrafter(CONTRACT_DRAFTING_BRIEF, user))
 }
 
 /** Revise an existing contract per Arlo's instructions, changing only what he asked. */
@@ -313,5 +346,5 @@ Make exactly those changes and anything that must change with them for the agree
 
 THE CURRENT AGREEMENT
 ${opts.currentBody}`
-  return runDrafter(CONTRACT_DRAFTING_BRIEF, user)
+  return keepWithinLength(await runDrafter(CONTRACT_DRAFTING_BRIEF, user))
 }

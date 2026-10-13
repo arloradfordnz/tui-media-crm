@@ -115,4 +115,8 @@
 // Calendar and Settings ones corrected, and job, client and document records,
 // the new-job and new-client forms and Tui now have their own instead of
 // showing their parent list's.
-export const APP_VERSION = '3.16.0'
+// 3.16.1 — contracts stay short: the drafter is told the lawyer cuts
+// (no definitions, no survival clause, ownership in two clauses, the legal bits
+// in four), and a draft over 1,100 words gets one automatic tightening pass
+// before it is saved. Revisions default to 2 rounds per video.
+export const APP_VERSION = '3.16.1'
