@@ -10,6 +10,7 @@ import Greeting from './Greeting'
 import MoneyPanel, { MoneyPanelSkeleton } from './MoneyPanel'
 import SubscriptionsPanel, { getSubscriptions } from './SubscriptionsPanel'
 import TuiThread from '@/components/TuiThread'
+import WeekSection from './WeekSection'
 
 export const dynamic = 'force-dynamic'
 // The mail sync below runs in after(), which counts against this.
@@ -71,7 +72,6 @@ export default async function DashboardPage() {
 
   const { todayISO, todayLabel, weekEvents, items } = attention
   const shown = items.slice(0, MAX_ITEMS)
-  const remaining = items.length - shown.length
 
   return (
     <div className="space-y-10">
@@ -133,36 +133,32 @@ export default async function DashboardPage() {
               The bookings keep the accent dot the calendar gives a shoot, so
               they are still distinguishable at a glance from something that
               has gone wrong. */}
-          <section className="today-week">
-            {/* "Needs you" was accurate when the panel held only problems.
-                It now leads with this week's bookings, and a shoot that is
-                simply booked does not "need you" — it is just what is
-                happening. "Your week" covers both without overstating either. */}
-            <div className="section-head">
-              <h2 className="section-heading">Your week</h2>
-              {remaining > 0 && (
-                <span className="section-head-meta">+{remaining} more</span>
-              )}
-            </div>
-
-            {weekEvents.length === 0 && shown.length === 0 ? (
+          {/* "Needs you" was accurate when the panel held only problems.
+              It now leads with this week's bookings, and a shoot that is
+              simply booked does not "need you" — it is just what is
+              happening. "Your week" covers both without overstating either.
+              WeekSection puts the overflow behind the "+N more" control. */}
+          <WeekSection
+            empty={weekEvents.length === 0 && shown.length === 0 ? (
               <div className="today-empty">
                 <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--success)' }} />
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                   Nothing booked this week, and nothing overdue or stalled. Genuinely clear.
                 </p>
               </div>
-            ) : (
-              <div className="card-flush">
-                {weekEvents.map((e) => (
-                  <EventRow key={e.id} event={e} today={e.date === todayISO} />
-                ))}
-                {shown.map((item) => (
-                  <AttentionRow key={item.id} item={item} />
-                ))}
-              </div>
-            )}
-          </section>
+            ) : null}
+            rows={<>
+              {weekEvents.map((e) => (
+                <EventRow key={e.id} event={e} today={e.date === todayISO} />
+              ))}
+              {shown.map((item) => (
+                <AttentionRow key={item.id} item={item} />
+              ))}
+            </>}
+            extra={items.slice(MAX_ITEMS).map((item) => (
+              <AttentionRow key={item.id} item={item} />
+            ))}
+          />
 
           {/* What goes out next regardless. Read in the page's one wave above. */}
           <SubscriptionsPanel subscriptions={subscriptions} />

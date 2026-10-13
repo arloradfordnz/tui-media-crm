@@ -543,14 +543,14 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
           <div className="flex items-center justify-between mb-4">
             <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Client Documents</p>
             <Link href={`/dashboard/documents?clientId=${client.id}`} className="btn-primary btn-sm">
-              <FileText className="w-3.5 h-3.5" /> Create Document
+              <FileText className="w-3.5 h-3.5" /> All documents
             </Link>
           </div>
           {client.documents.length === 0 ? (
             <div className="empty-state">
               <FileText className="w-10 h-10 empty-icon" />
               <p className="empty-title">No documents yet</p>
-              <p className="empty-description">Create a contract, invoice, or other document for this client.</p>
+              <p className="empty-description">Ask Tui to draft a contract for this client and it will appear here.</p>
             </div>
           ) : (
             <div className="space-y-2">
