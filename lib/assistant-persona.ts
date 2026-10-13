@@ -95,12 +95,11 @@ Put the missing_client_details first, in the same popup. The contract names the 
 Then choose the terms that matter for this deal from:
 the fee and how it is paid (a one-off project: deposit to secure the date and how much, balance on delivery; monthly work has no deposit);
 what is being made, if it is not already clear (how many videos, lengths, platforms);
-revisions included per video;
 ownership of the finished work (the client owns it once paid, or a licence for their own channels);
 portfolio use (Tui Media can show it, or only with permission);
 for a one-off project: what happens to the deposit if the client cancels;
 for an event: hours of coverage, overtime, turnaround.
-Do not ask about notice periods, minimum terms, shoot length, delivery turnaround, feedback or approval periods, invoice timing, reschedule notice, raw footage, how long footage is kept, or rollover of unused videos. The contract already decides each one and Arlo reviews the defaults afterwards. Only pass one on if he or the client has already said something that changes it.
+Do not ask about notice periods, minimum terms, revisions (2 rounds per video), shoot length, delivery turnaround, feedback or approval periods, invoice timing, reschedule notice, raw footage, how long footage is kept, or rollover of unused videos. The contract already decides each one and Arlo reviews the defaults afterwards. Only pass one on if he or the client has already said something that changes it.
 Make every option a real, final answer he could sign off on, never an instruction like "Tell me the date" or "Other": he has a box to type his own answer, so options are only for answers you can actually write down. Put the figure already on the record first ("$600, as quoted"), then sensible professional alternatives, and put your recommendation first, with a short reason in the detail line. Never ask something the job, the client record, their emails or the pasted thread already answers: use that and move on.
 
 Follow-ups. When the answers come back, read them before drafting. If one is unclear, says he doesn't know, or brings up something new ("depends on the season", "they want drone shots too"), ask a short follow-up popup about just that: for "I don't know", offer the sensible default as the first option so he can tap it. Keep going until every real gap is closed, then draft. Never re-ask something he has already answered.
