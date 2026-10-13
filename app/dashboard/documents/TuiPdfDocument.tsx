@@ -1,5 +1,6 @@
 import { Document, Page, Text, View, StyleSheet, Font, Svg, G, Path, Ellipse } from '@react-pdf/renderer'
 import type { DocumentProps } from '@react-pdf/renderer'
+import type { Style } from '@react-pdf/types'
 import { cloneElement, type ReactElement } from 'react'
 
 // Bricolage Grotesque is Tui Media's brand typeface (see the site's
@@ -77,26 +78,16 @@ const styles = StyleSheet.create({
   // ── Footer ───────────────────────────────────────────────────────────────
   footer: { position: 'absolute', bottom: 28, left: 60, right: 60, flexDirection: 'row', justifyContent: 'space-between', fontSize: 8.5, color: C.grey },
 
-  // ── Cover page (Contract only) ──────────────────────────────────────────
-  cover: {
-    fontFamily: 'Bricolage Grotesque',
-    backgroundColor: '#FFFFFF',
-    color: C.black,
-    paddingTop: 56,
-    paddingBottom: 56,
-    paddingHorizontal: 60,
-    flexDirection: 'column',
-  },
-  coverTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  coverDocNumber: { fontSize: 9, color: C.grey, marginTop: 4 },
-  coverSpacer: { flexGrow: 1 },
-  coverHeadline: { fontWeight: 600, fontSize: 32, color: C.black, lineHeight: 1.1, letterSpacing: -0.5 },
-  coverRule: { borderBottomWidth: 0.5, borderBottomColor: C.lgrey, marginTop: 28, marginBottom: 20 },
-  coverMetaRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  coverMetaCol: { maxWidth: '46%' },
-  coverMetaLabel: { fontSize: 8, color: C.grey, letterSpacing: 1, marginBottom: 4 },
-  coverMetaValue: { fontSize: 11, fontWeight: 600, color: C.black, lineHeight: 1.4 },
-  coverMetaSub: { fontSize: 9.5, color: C.grey, marginTop: 2 },
+  // ── Contract ─────────────────────────────────────────────────────────────
+  // A contract is set tighter than the other documents and has no cover page,
+  // so a whole agreement, signatures included, fits on 2 to 3 pages. The old
+  // cover plus loose spacing turned a retainer into 6 pages, which was enough
+  // to make a small business stall before signing.
+  contractParagraph: { fontSize: 9.5, color: C.black, lineHeight: 1.5, marginBottom: 5 },
+  contractParagraphBeforeHeading: { fontSize: 9.5, color: C.black, lineHeight: 1.5, marginBottom: 14 },
+  contractH1: { fontWeight: 600, fontSize: 11.5, color: C.black, marginTop: 0, marginBottom: 6 },
+  contractHeaderGap: { marginBottom: 16 },
+  contractSignatureBlock: { flexDirection: 'row', marginTop: 18, gap: 36 },
 })
 
 type FormData = {
@@ -149,7 +140,12 @@ function renderInline(text: string): ReactElement[] {
   return parts
 }
 
-function renderBody(body: string): ReactElement[] {
+type BodyStyles = { paragraph: Style; paragraphBeforeHeading: Style; h1: Style; h3: Style }
+
+const defaultBody: BodyStyles = { paragraph: styles.paragraph, paragraphBeforeHeading: styles.paragraphBeforeHeading, h1: styles.h1, h3: styles.h3 }
+const contractBody: BodyStyles = { paragraph: styles.contractParagraph, paragraphBeforeHeading: styles.contractParagraphBeforeHeading, h1: styles.contractH1, h3: styles.h3 }
+
+function renderBody(body: string, st: BodyStyles): ReactElement[] {
   const lines = body.split('\n')
   const out: ReactElement[] = []
   let buffer: string[] = []
@@ -159,14 +155,14 @@ function renderBody(body: string): ReactElement[] {
   // top margin.
   const spaceBeforeHeading = () => {
     const prev = out[out.length - 1]
-    if (prev && (prev.props as { style?: unknown }).style === styles.paragraph) {
-      out[out.length - 1] = cloneElement(prev, { style: styles.paragraphBeforeHeading } as object)
+    if (prev && (prev.props as { style?: unknown }).style === st.paragraph) {
+      out[out.length - 1] = cloneElement(prev, { style: st.paragraphBeforeHeading } as object)
     }
   }
 
   const flush = () => {
     if (!buffer.length) return
-    out.push(<Text key={key++} style={styles.paragraph}>{renderInline(buffer.join(' '))}</Text>)
+    out.push(<Text key={key++} style={st.paragraph}>{renderInline(buffer.join(' '))}</Text>)
     buffer = []
   }
 
@@ -179,61 +175,22 @@ function renderBody(body: string): ReactElement[] {
     if (h1) {
       flush()
       spaceBeforeHeading()
-      out.push(<Text key={key++} style={styles.h1} minPresenceAhead={40}>{renderInline(h1[1])}</Text>)
+      out.push(<Text key={key++} style={st.h1} minPresenceAhead={40}>{renderInline(h1[1])}</Text>)
       continue
     }
     if (h2) {
       flush()
       spaceBeforeHeading()
-      out.push(<Text key={key++} style={styles.h1} minPresenceAhead={40}>{renderInline(h2[1])}</Text>)
+      out.push(<Text key={key++} style={st.h1} minPresenceAhead={40}>{renderInline(h2[1])}</Text>)
       continue
     }
-    if (h3) { flush(); out.push(<Text key={key++} style={styles.h3}>{renderInline(h3[1])}</Text>); continue }
+    if (h3) { flush(); out.push(<Text key={key++} style={st.h3}>{renderInline(h3[1])}</Text>); continue }
     buffer.push(line)
   }
   flush()
   // The Approval heading that follows the body is an h1 too.
   spaceBeforeHeading()
   return out
-}
-
-function ContractCover({ form, documentNumber }: { form: FormData; documentNumber: string }) {
-  const formattedDate = form.date
-    ? new Date(form.date + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
-    : ''
-
-  return (
-    <Page size="A4" style={styles.cover}>
-      <View style={styles.coverTopRow}>
-        <View>
-          <TuiLogo />
-          <Text style={styles.coverDocNumber}>{documentNumber}</Text>
-        </View>
-        {formattedDate ? <Text style={[styles.coverDocNumber, { textAlign: 'right' }]}>{formattedDate}</Text> : null}
-      </View>
-
-      <View style={styles.coverSpacer} />
-
-      <View>
-        <Text style={styles.coverHeadline}>Client contract</Text>
-      </View>
-
-      <View style={styles.coverRule} />
-
-      <View style={styles.coverMetaRow}>
-        <View style={styles.coverMetaCol}>
-          <Text style={styles.coverMetaLabel}>CREATED BY</Text>
-          <Text style={styles.coverMetaValue}>Arlo Radford</Text>
-          <Text style={styles.coverMetaSub}>Tui Media</Text>
-        </View>
-        <View style={styles.coverMetaCol}>
-          <Text style={styles.coverMetaLabel}>PREPARED FOR</Text>
-          <Text style={styles.coverMetaValue}>{form.contactPerson || form.clientName || 'Client'}</Text>
-          <Text style={styles.coverMetaSub}>{form.businessName || form.clientName}</Text>
-        </View>
-      </View>
-    </Page>
-  )
 }
 
 export default function TuiDocument({ template, form }: { template: string; form: FormData }): ReactElement<DocumentProps> {
@@ -247,18 +204,18 @@ export default function TuiDocument({ template, form }: { template: string; form
 
   return (
     <Document>
-      {isContract && <ContractCover form={form} documentNumber={documentNumber} />}
-
       <Page size="A4" style={styles.page}>
 
         {/* Header: title left, logo right, tops aligned. Repeats on every
             overflow page for Contract so a multi-page body stays oriented. */}
-        <View fixed={isContract} style={styles.headerGap}>
+        <View fixed={isContract} style={isContract ? styles.contractHeaderGap : styles.headerGap}>
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>{template}</Text>
             {businessLine ? <Text style={styles.headerClient}>{businessLine}</Text> : null}
-            {formattedDate ? <Text style={styles.headerDate}>{formattedDate}</Text> : null}
+            {formattedDate || (isContract && documentNumber) ? (
+              <Text style={styles.headerDate}>{[isContract ? documentNumber : '', formattedDate].filter(Boolean).join('   ')}</Text>
+            ) : null}
           </View>
           <TuiLogo />
         </View>
@@ -268,27 +225,29 @@ export default function TuiDocument({ template, form }: { template: string; form
 
         {/* Body */}
         <View>
-          {form.jobDescription ? (
+          {form.jobDescription && isContract ? (
+            <Text style={styles.contractParagraphBeforeHeading}>{renderInline(`**Project:** ${form.jobDescription}`)}</Text>
+          ) : form.jobDescription ? (
             <View>
               <Text style={styles.h1}>Project</Text>
               <Text style={styles.paragraphBeforeHeading}>{form.jobDescription}</Text>
             </View>
           ) : null}
 
-          {form.body ? renderBody(form.body) : null}
+          {form.body ? renderBody(form.body, isContract ? contractBody : defaultBody) : null}
         </View>
 
         {/* Approval / signature block */}
         <View wrap={false}>
           {isContract && (
             <View>
-              <Text style={styles.h1}>Approval</Text>
-              <Text style={styles.paragraph}>
+              <Text style={styles.contractH1}>Approval</Text>
+              <Text style={styles.contractParagraph}>
                 By signing below, both parties agree to the scope, terms and payment set out in this contract.
               </Text>
             </View>
           )}
-          <View style={styles.signatureBlock}>
+          <View style={isContract ? styles.contractSignatureBlock : styles.signatureBlock}>
             <View style={styles.signatureCol}>
               <View style={styles.signatureField}>
                 <View style={styles.signatureFieldLine} />

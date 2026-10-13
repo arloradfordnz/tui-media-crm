@@ -15,7 +15,7 @@ uses — so it shows up in `/dashboard/documents` and the client's
 ## The visual style is fixed — don't design it in chat
 
 The "same style every time" part is handled by code, not by you. The
-contract's look — plain white cover, black-and-white only, modest bold
+contract's look — no cover page, black-and-white only, modest bold
 section headings in Bricolage Grotesque, the approval/signature page — all
 lives in
 [`app/dashboard/documents/TuiPdfDocument.tsx`](../../../app/dashboard/documents/TuiPdfDocument.tsx),
@@ -54,7 +54,8 @@ platforms and payment schedule, and nothing that doesn't apply.
 
 Draft the `body` as numbered sections and clauses, as the brief describes
 (`# At a glance` summary first, then `# 1. The work` with clauses `1.1`, `1.2`
-and so on, each its own paragraph). Keep it to 700 to 1,000 words.
+and so on, each its own paragraph). Keep it to 550 to 850 words, so the whole PDF (signatures included) is 2 to
+3 pages.
 
 Do **not** add your own "Approval" section — the template always appends one
 automatically before the signature block, so writing one in the body would
@@ -79,8 +80,7 @@ Ask (or infer from the CRM) whatever you don't already know:
   names the main contact, and they sign unless the user says otherwise. Take
   these from the client record; ask the user for any that are missing, and pass
   them in the payload so the script saves them to the client record.
-- Project description (one line — goes in the "Project" field on the cover
-  and header)
+- Project description (one line — goes in the "Project" line in the header)
 - Shoot date, and the contract date
 - Whether the client is a **company or a sole trader** (or a partnership,
   trust or individual), their exact **legal name** (a company as registered,

@@ -119,4 +119,6 @@
 // (no definitions, no survival clause, ownership in two clauses, the legal bits
 // in four), and a draft over 1,100 words gets one automatic tightening pass
 // before it is saved. Revisions default to 2 rounds per video.
-export const APP_VERSION = '3.16.1'
+// 3.17.0 — contracts fit on 2 to 3 pages: no cover page, tighter type, and a
+// 550 to 850 word brief with a clause budget per section (6 pages before).
+export const APP_VERSION = '3.17.0'
