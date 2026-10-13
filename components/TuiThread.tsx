@@ -663,7 +663,7 @@ export default function TuiThread({
                     {thinking ? (
                       <div className="flex items-center gap-2.5">
                         <span className="tui-orb" aria-hidden="true" />
-                        <span className="text-xs tui-live-label tui-live-label--quiet">Thinking</span>
+                        <span className="text-xs tui-live-label tui-live-label--quiet" data-text="Thinking">Thinking</span>
                       </div>
                     ) : m.role === 'assistant' ? (
                       <span dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) || '&#8203;' }} />
@@ -821,7 +821,7 @@ function ReceiptRow({ receipt }: { receipt: Receipt }) {
       ) : (
         <Check className="w-3 h-3 shrink-0 tui-check-pop" />
       )}
-      <span className={`truncate${running ? ' tui-live-label' : ''}`}>{receipt.label}</span>
+      <span className={`truncate${running ? ' tui-live-label' : ''}`} data-text={running ? receipt.label : undefined}>{receipt.label}</span>
       {receipt.detail && (
         <span className="truncate" style={{ color: 'var(--text-tertiary)', opacity: 0.75 }}>
           · {receipt.detail}

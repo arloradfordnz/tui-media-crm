@@ -1118,23 +1118,55 @@ input, textarea, select, button { font-family: inherit; }
    sheen. All of it holds still under reduced-motion, which keeps the shapes so
    running and done still read differently. */
 
-/* Light passing through the text: a narrow bright band over the base colour,
-   not a full gradient, so the words stay readable the whole way through. */
+/* Light passing through the text. The label keeps its own colour; a copy of
+   the same words in bright ink, with a soft accent glow, sits on top
+   (::after, from data-text) and is revealed only under a narrow feathered
+   mask that glides across, then rests. Moving a mask over a second layer,
+   instead of sliding a gradient through background-clip:text, is what lets
+   the light actually glow: text-shadow does nothing on clipped text.
+   The mask is a short window (40% of the label) so the light reads as a
+   band passing through, not the whole word lighting up. */
 .tui-live-label {
-  background-image: linear-gradient(100deg, var(--accent) 38%, var(--text-primary) 50%, var(--accent) 62%);
-  background-size: 300% 100%;
-  background-position: 100% 0;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-  animation: tui-sheen 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  position: relative;
+  color: var(--accent);
 }
 .tui-live-label--quiet {
-  background-image: linear-gradient(100deg, var(--text-tertiary) 38%, var(--text-primary) 50%, var(--text-tertiary) 62%);
+  color: var(--text-tertiary);
 }
+.tui-live-label::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  color: var(--text-primary);
+  text-shadow:
+    0 0 5px rgba(110, 155, 247, 0.9),
+    0 0 14px rgba(110, 155, 247, 0.6);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 45%, #000 55%, transparent 100%);
+  mask-size: 40% 100%;
+  mask-repeat: no-repeat;
+  mask-position: -70% 0;
+  animation: tui-sheen 2.6s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+}
+/* Kept in its own rule: Lightning CSS merges a property with its -webkit-
+   twin inside one rule and keeps only the last (see AGENTS.md). Safari still
+   needs the prefixed mask. */
+.tui-live-label::after {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 45%, #000 55%, transparent 100%);
+  -webkit-mask-size: 40% 100%;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: -70% 0;
+}
+/* The window starts fully off the left edge and ends fully off the right
+   (with a 40% mask, -70% and 170% are both clear of the text), then rests
+   for the last third so each pass reads as one deliberate sweep. */
 @keyframes tui-sheen {
-  to { background-position: -100% 0; }
+  0%   { mask-position: -70% 0; -webkit-mask-position: -70% 0; }
+  65%  { mask-position: 170% 0; -webkit-mask-position: 170% 0; }
+  100% { mask-position: 170% 0; -webkit-mask-position: 170% 0; }
 }
 
 /* A running tool call: a dot that breathes, with a ring that leaves it. */
@@ -1243,12 +1275,12 @@ input, textarea, select, button { font-family: inherit; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tui-live-label,
+  .tui-live-label::after,
   .tui-run-dot, .tui-run-dot::after,
   .tui-search-orbit, .tui-search-ring,
   .tui-receipt-row, .tui-check-pop,
   .tui-orb, .tui-orb::after { animation: none; }
-  .tui-live-label { background-position: 40% 0; }
+  .tui-live-label::after { display: none; }
   .tui-search-ring, .tui-run-dot::after { opacity: 0; }
 }
 
