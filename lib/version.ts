@@ -98,4 +98,11 @@
 // allowed) and saves it. The manual contract maker and template are gone.
 // 3.15.1 — contract PDF: the gap under the header rule is the same on every
 // page, not just the ones that open with a heading.
-export const APP_VERSION = '3.15.1'
+// 3.15.2 — Tui's working text has a real light passing through it: a bright,
+// softly glowing band sweeps across the label and rests, instead of a
+// gradient that flickered past.
+// 3.15.3 — contract questions: Tui is told what every contract already
+// decides (notice, rollover, deposits, turnaround, invoicing and the rest) and
+// stops asking about them; any number of questions, with follow-ups when an
+// answer is unclear or "I don't know".
+export const APP_VERSION = '3.15.3'

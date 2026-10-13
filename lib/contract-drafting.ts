@@ -156,6 +156,24 @@ CHECK: any assumption he should check.
 
 No preamble before the contract.`
 
+// What every contract already decides, in plain words, for Tui to read before
+// it asks Arlo anything. These mirror FIRM POSITIONS and the defaults in the
+// brief above, so change both together. Tui must not ask about any of them
+// unless Arlo or the client has already said something different.
+export const SETTLED_CONTRACT_TERMS = [
+  'Ending: either side gives 14 days\' written notice (email is fine). There is no minimum term and no other notice period.',
+  'Rollover: a missed shoot rolls over only if Tui Media cancels or weather stops it; a client cancellation or no-show lapses the video; nothing rolls twice.',
+  'Deposits: one-off projects only. Monthly work never has a deposit.',
+  'Paid but undelivered videos at the end: Tui Media chooses to deliver or refund.',
+  'Shoot length: about 1 hour.',
+  'First edit: within 3 business days of the shoot.',
+  'Delivery and feedback: through the client portal, 2 business days to approve or give feedback, then a reminder, then approved 2 business days later.',
+  'Invoices: first one sent on signing (monthly work then monthly in advance), each due 14 days after it is sent.',
+  'Rescheduling: free with 24 hours\' notice.',
+  'Raw footage: sent on request once paid. Files kept 12 months.',
+  'No GST, liability cap, consumer law, privacy, confidentiality and disputes are standard clauses.',
+]
+
 export type ContractParties = {
   /** The name on file for the client, often a trading name. */
   clientName: string
