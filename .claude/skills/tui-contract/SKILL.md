@@ -43,7 +43,7 @@ account itself. No guarantees of results, no retainer, no lock-in.
 
 The rules for what a contract says (structure, rollover, ending the
 agreement, deposits, delivery and feedback through the client portal, the
-defaults for every blank, and the 3 to 4 page length) live in one place: `CONTRACT_DRAFTING_BRIEF` in
+defaults for every blank, and the short two-part shape) live in one place: `CONTRACT_DRAFTING_BRIEF` in
 [`lib/contract-drafting.ts`](../../../lib/contract-drafting.ts). Read it and
 follow it. Do not work from memory or from the old five-heading outline, and do
 not copy its rules into this file, so there is one version to keep right.
@@ -53,8 +53,8 @@ every contract for its own client and project: the real deliverables, dates,
 platforms and payment schedule, and nothing that doesn't apply.
 
 Draft the `body` as numbered sections and clauses, as the brief describes
-(`# 1. Parties`, then clauses `1.1`, `1.2` and so on, each its own paragraph).
-Keep it to 3 to 4 pages.
+(`# At a glance` summary first, then `# 1. The work` with clauses `1.1`, `1.2`
+and so on, each its own paragraph). Keep it to 700 to 1,000 words.
 
 Do **not** add your own "Approval" section — the template always appends one
 automatically before the signature block, so writing one in the body would
@@ -112,7 +112,7 @@ mentioned in passing.
   "entityType": "company",
   "contactPerson": "Jane Smith",
   "clientEmail": "jane@acme.co.nz",
-  "body": "# 1. Parties\n\n1.1 ...\n\n# 2. The work\n\n2.1 ...",
+  "body": "# At a glance\n\n**Fee:** ...\n\n# 1. The work\n\n1.1 ...",
   "documentNumber": null,
   "docName": null
 }

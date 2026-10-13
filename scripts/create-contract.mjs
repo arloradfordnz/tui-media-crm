@@ -20,7 +20,7 @@
 //   "shootDate": "2026-09-10",
 //   "jobDescription": "One short line describing the project",
 //   "location": "Nelson",
-//   "body": "# 1. Parties\n\n1.1 ...",   // required, drafted to lib/contract-drafting.ts
+//   "body": "# At a glance\n\n...\n\n# 1. The work\n\n1.1 ...",   // required, drafted to lib/contract-drafting.ts
 //   "documentNumber": "#142",   // optional — auto-assigned (next in sequence) if omitted
 //   "docName": "Contract - Acme Ltd"  // optional — defaults to "Contract - <clientName>"
 // }

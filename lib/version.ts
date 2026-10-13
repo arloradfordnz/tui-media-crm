@@ -105,4 +105,7 @@
 // decides (notice, rollover, deposits, turnaround, invoicing and the rest) and
 // stops asking about them; any number of questions, with follow-ups when an
 // answer is unclear or "I don't know".
-export const APP_VERSION = '3.15.3'
+// 3.15.4 — contracts open with an "At a glance" summary of the whole deal,
+// then 8 short plain sections: about 4 pages with the cover instead of 7,
+// keeping every clause that actually protects Tui Media.
+export const APP_VERSION = '3.15.4'
