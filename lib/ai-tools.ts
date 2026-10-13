@@ -6,7 +6,7 @@ import { getContentBacklog, parseJobMonth } from '@/lib/content-backlog'
 import { findDuplicateJobName } from '@/lib/job-naming'
 import { syncShootEvent, removeShootEvent } from '@/lib/job-calendar'
 import { nextDocumentNumber, unfilledPlaceholders } from '@/lib/document-templates'
-import { draftContract, reviseContract, type ContractParties } from '@/lib/contract-drafting'
+import { draftContract, reviseContract, SETTLED_CONTRACT_TERMS, type ContractParties } from '@/lib/contract-drafting'
 
 // Shared tool definitions + executor for every AI surface (dashboard chat,
 // SMS assistant). One tool set, one set of side effects — a job marked
@@ -1252,10 +1252,11 @@ export async function executeTool(
       return JSON.stringify({
         client: client.data,
         missing_client_details: missing,
+        already_in_every_contract: SETTLED_CONTRACT_TERMS,
         jobs: jobs.data ?? [],
         existing_contracts: contracts,
         recent_client_emails: emails.data ?? [],
-        guidance: 'Ask only about terms this does not settle. Use these real figures in your options. Ask for every missing_client_details field in the same popup (entity_type as company / sole trader options, the rest typed with no options), then save the answers with update_client before create_contract. If there is an unsigned contract for the same work, ask whether to revise it (update_contract) or start a new one.',
+        guidance: 'Never ask about anything in already_in_every_contract, or anything the record, jobs or emails answer: those are settled. Ask only about real gaps for this deal. Use these real figures in your options. Ask for every missing_client_details field in the same popup (entity_type as company / sole trader options, the rest typed with no options), then save the answers with update_client before create_contract. If there is an unsigned contract for the same work, ask whether to revise it (update_contract) or start a new one.',
       })
     }
 

@@ -101,4 +101,8 @@
 // 3.15.2 — Tui's working text has a real light passing through it: a bright,
 // softly glowing band sweeps across the label and rests, instead of a
 // gradient that flickered past.
-export const APP_VERSION = '3.15.2'
+// 3.15.3 — contract questions: Tui is told what every contract already
+// decides (notice, rollover, deposits, turnaround, invoicing and the rest) and
+// stops asking about them; any number of questions, with follow-ups when an
+// answer is unclear or "I don't know".
+export const APP_VERSION = '3.15.3'
