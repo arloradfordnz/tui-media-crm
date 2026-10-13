@@ -121,4 +121,6 @@
 // before it is saved. Revisions default to 2 rounds per video.
 // 3.17.0 — contracts fit on 2 to 3 pages: no cover page, tighter type, and a
 // 550 to 850 word brief with a clause budget per section (6 pages before).
-export const APP_VERSION = '3.17.0'
+// 3.17.1 — monthly contracts start the day both sign and have no end date,
+// instead of leaving a [start date] blank.
+export const APP_VERSION = '3.17.1'

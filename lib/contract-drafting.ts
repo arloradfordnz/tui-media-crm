@@ -71,7 +71,7 @@ Start with the summary, unnumbered, one fact per line as its own paragraph with 
 
 **Fee:** $900 a month, no GST, invoiced on signing and then monthly in advance, due in 14 days
 
-**Starts:** 1 November 2026, month to month with no minimum term
+**Starts:** 1 November 2026, month to month with no minimum term (or, if no start date was given: "the day both parties sign, month to month with no minimum term")
 
 **Ending:** either side, with 14 days' notice by email
 
@@ -136,13 +136,14 @@ Adapt the agreement to the deal, do not force one shape on everything:
 
 # THE FACTS AND THE DEFAULTS
 
-Use the facts you are given. NEVER invent a price, a deposit amount, a number of videos or photos, a specific date, the Client's legal name or who signs for them. Those are the only things that may stay as a square-bracketed blank, such as [fee] or [signatory name], and each one you leave must be listed in the notes. Every other gap is one Arlo has chosen to leave to you: fill it from the defaults below and NEVER leave a bracket for it.
+Use the facts you are given. NEVER invent a price, a deposit amount, a number of videos or photos, a specific calendar date (a start date for monthly work is not one: it is the day both parties sign unless the deal gives a date, so never leave [start date], and a monthly agreement has no end date, only the notice to end), the Client's legal name or who signs for them. Those are the only things that may stay as a square-bracketed blank, such as [fee] or [signatory name], and each one you leave must be listed in the notes. Every other gap is one Arlo has chosen to leave to you: fill it from the defaults below and NEVER leave a bracket for it.
 
 Order of authority: the terms of this deal first, then FIRM POSITIONS, then these defaults.
 
 Defaults, used only where the deal says nothing:
 
 - Revisions: 2 rounds per video.
+- Start date: for monthly work with no date given, the day both parties sign. No end date, only the notice to end.
 - Shoot length: about 1 hour.
 - Delivery turnaround: the first edit within 3 working days after the shoot.
 - Delivery: every edit and final video is delivered through the client portal, where the Client downloads it and approves it or leaves feedback.
