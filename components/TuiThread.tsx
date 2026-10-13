@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowUp, ExternalLink, Check, AlertTriangle, ShieldAlert, Search, ListChecks } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useMounted } from '@/lib/useMounted'
 import type { ThreadMessage } from '@/lib/tui/thread'
 import { decodeEvents, type AskQuestion } from '@/lib/tui/receipts'
 import AskSheet, { formatAnswers } from './AskSheet'
@@ -36,6 +35,14 @@ import { renderMarkdown } from './chat-markup'
 // mirrored into sessionStorage instead: it outlives a route change and a hard
 // reload, it is per tab, and it is gone when the tab closes, which is exactly
 // the lifetime a scratch pad should have.
+//
+// A turn also survives navigation, not just the words. The conversation lives
+// in a module-level store (liveStore, below), not in component state: a route
+// change unmounts this component but not the module, so a reply that is still
+// streaming keeps writing into the store while Arlo is on another page, and
+// whichever mount is showing that conversation picks it up live. It used to
+// write into an unmounted component's state, where it went nowhere, and the
+// next mount restored an empty "Thinking" bubble from mid-turn.
 
 type Receipt = { id: string; name?: string; label: string; state: 'running' | 'done' | 'failed'; detail?: string }
 type LinkOut = { path: string; label: string }
@@ -124,6 +131,42 @@ function toMessages(thread: ThreadMessage[]): Message[] {
   }))
 }
 
+// ── The live conversations ───────────────────────────────────────────────
+// One per store key, for the life of the tab's JS (client-side navigation
+// keeps it). Every write is mirrored to sessionStorage so a hard reload still
+// gets the words back.
+type Live = { messages: Message[]; loading: boolean }
+const liveState = new Map<string, Live>()
+const liveListeners = new Map<string, Set<() => void>>()
+
+function liveSet(key: string, patch: Partial<Live>) {
+  const next = { ...(liveState.get(key) ?? { messages: [], loading: false }), ...patch }
+  liveState.set(key, next)
+  if (patch.messages) writeStore(key, next.messages)
+  liveListeners.get(key)?.forEach((l) => l())
+}
+
+function liveSubscribe(key: string, listener: () => void) {
+  let set = liveListeners.get(key)
+  if (!set) liveListeners.set(key, (set = new Set()))
+  set.add(listener)
+  return () => { set.delete(listener) }
+}
+
+// A saved copy from before a hard reload can end mid-turn: the request died
+// with the page. Steps still spinning are marked unconfirmed, and an empty
+// placeholder bubble is dropped rather than left "Thinking" forever.
+function settleSaved(saved: Message[]): Message[] {
+  const out = saved.map((m) =>
+    m.receipts?.some((r) => r.state === 'running')
+      ? { ...m, receipts: m.receipts.map((r) => (r.state === 'running' ? { ...r, state: 'failed' as const, detail: 'not confirmed, check the record' } : r)) }
+      : m
+  )
+  const last = out[out.length - 1]
+  if (last && last.role === 'assistant' && !last.content.trim() && !last.receipts?.length && !last.ask && !last.confirms?.length) out.pop()
+  return out
+}
+
 export default function TuiThread({
   initialThread,
   variant = 'panel',
@@ -148,9 +191,7 @@ export default function TuiThread({
    */
   fill?: boolean
 }) {
-  const [messages, setMessages] = useState<Message[]>(() => toMessages(initialThread ?? []))
   const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
   const [hasChatted, setHasChatted] = useState(false)
   // The ask_arlo popup that is open, by its tool-call id.
   const [openAsk, setOpenAsk] = useState<string | null>(null)
@@ -162,35 +203,50 @@ export default function TuiThread({
   const seeded = ephemeral || initialThread !== undefined
   const storeKey = ephemeral ? 'panel' : 'shared'
 
-  // Restore whatever this tab was last saying.
-  //
-  // Not in the useState initialiser and not in an effect. This component is
-  // server-rendered, so reading sessionStorage during the hydration render
-  // would give the client different markup from the server's; doing it in an
-  // effect paints the empty thread for a frame first and is the cascading
-  // setState the lint rule is about. useMounted() is false through hydration
-  // and true from the render after it (lib/useMounted.ts), so this adjusts
-  // state during render exactly once, on the client, before anything paints.
-  //
-  // The saved copy wins over the server-seeded one when it is at least as
-  // long, because it is the same messages plus the receipts, links and pending
-  // approvals the server thread cannot carry. A genuinely longer server thread
-  // (something said on Telegram since) wins instead.
-  const mounted = useMounted()
-  const [restored, setRestored] = useState(false)
-  if (mounted && !restored) {
-    setRestored(true)
-    const saved = readStore(storeKey)
-    if (saved && saved.length >= messages.length) {
-      setMessages(saved)
-      setHasChatted(true)
+  // What the server rendered. Also the hydration snapshot, so the first client
+  // render matches the server's markup exactly.
+  const [seed] = useState<Live>(() => ({ messages: toMessages(initialThread ?? []), loading: false }))
+
+  // The live conversation for this key. Created on first client read from the
+  // tab's saved copy when that is at least as long as the server's seed
+  // (it is the same messages plus the receipts, links and pending approvals
+  // the server thread cannot carry), else from the seed. A genuinely longer
+  // server thread (something said on Telegram since) wins instead.
+  const getSnapshot = useCallback((): Live => {
+    let live = liveState.get(storeKey)
+    if (!live) {
+      const saved = readStore(storeKey)
+      const settled = saved ? settleSaved(saved) : null
+      live = { messages: settled && settled.length >= seed.messages.length ? settled : seed.messages, loading: false }
+      liveState.set(storeKey, live)
     }
+    return live
+  }, [storeKey, seed])
+  const subscribe = useCallback((l: () => void) => liveSubscribe(storeKey, l), [storeKey])
+  const live = useSyncExternalStore(subscribe, getSnapshot, () => seed)
+  const { messages, loading } = live
+
+  // Writes go to the store, never to this component, so a turn that is still
+  // streaming after a route change lands where the next mount can see it.
+  function setMessages(next: Message[] | ((prev: Message[]) => Message[])) {
+    const prev = getSnapshot().messages
+    liveSet(storeKey, { messages: typeof next === 'function' ? next(prev) : next })
   }
+  function setLoading(value: boolean) {
+    liveSet(storeKey, { loading: value })
+  }
+
+  // A conversation already alive in this tab is newer than the server's copy,
+  // unless the server has strictly more (Telegram), and nothing is mid-turn.
+  useEffect(() => {
+    const current = getSnapshot()
+    if (!current.loading && seed.messages.length > current.messages.length) liveSet(storeKey, { messages: seed.messages })
+  }, [getSnapshot, seed, storeKey])
 
   // Overlay-only: pull the shared thread once so ⌘K opens mid-conversation
   // rather than on a blank slate.
   useEffect(() => {
-    if (seeded || !restored) return
+    if (seeded) return
     let cancelled = false
     fetch('/api/ai/thread')
       .then((r) => (r.ok ? r.json() : null))
@@ -201,14 +257,8 @@ export default function TuiThread({
       })
       .catch(() => { /* an empty thread is a fine fallback */ })
     return () => { cancelled = true }
-  }, [seeded, restored])
-
-  // Mirror every change back out. Guarded on `restored` so the first render's
-  // seed cannot overwrite a longer saved conversation before it is read.
-  useEffect(() => {
-    if (!restored) return
-    writeStore(storeKey, messages)
-  }, [messages, restored, storeKey])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seeded])
 
   useEffect(() => {
     const el = scrollRef.current

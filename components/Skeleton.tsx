@@ -22,13 +22,17 @@ export function Line({ w = '100%', h = 12, r }: { w?: number | string; h?: numbe
 export function PageHeader({
   subtitle = false,
   actions = 0,
+  back = false,
 }: {
   subtitle?: boolean
   actions?: number
+  /** The "Back to X" link above the title, on the new-record forms. */
+  back?: boolean
 }) {
   return (
     <div className="page-header">
       <div className="page-header-left">
+        {back && <div style={{ marginBottom: 10 }}><Line w={110} h={16} /></div>}
         <Line w={180} h={28} />
         {subtitle && <div style={{ marginTop: 10 }}><Line w={260} h={14} /></div>}
       </div>
@@ -83,4 +87,26 @@ export function Rows({ count = 5, trailing = true }: { count?: number; trailing?
 /** A section heading above a block. */
 export function Heading({ w = 96 }: { w?: number }) {
   return <div style={{ marginBottom: 10 }}><Line w={w} h={13} /></div>
+}
+
+/** The "Back to X" link at the top of a record page. */
+export function BackLink() {
+  return <Line w={110} h={16} />
+}
+
+/** A card of paired 60px fields, the shape of every form in the app. */
+export function FormCard({ fields = 6, textarea = false, buttons = 0 }: { fields?: number; textarea?: boolean; buttons?: number }) {
+  return (
+    <div className="card space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {Array.from({ length: fields }).map((_, i) => <Line key={i} h={60} r={22} />)}
+      </div>
+      {textarea && <Line h={132} r={22} />}
+      {buttons > 0 && (
+        <div className="flex gap-3 flex-wrap">
+          {Array.from({ length: buttons }).map((_, i) => <Line key={i} w={140} h={44} r={999} />)}
+        </div>
+      )}
+    </div>
+  )
 }
