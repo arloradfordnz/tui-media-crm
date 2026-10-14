@@ -490,9 +490,9 @@ export const TOOLS: Anthropic.Tool[] = [
         engagement_type: { type: 'string', enum: ['video_ad_project', 'monthly_retainer', 'event_coverage', 'photography', 'other'], description: 'What kind of deal this is. Shapes the whole agreement.' },
         brief: {
           type: 'object',
-          description: 'Arlo\'s answer to every ask_arlo_questions item from prepare_contract, keyed by that question\'s key, word for word. Required: what, fee, payment, start, ownership, portfolio, standard_terms, special_requests; plus cancellation for a one-off project, photography or other, and cancellation and event_hours for event coverage. The drafter refuses to run until these are all answered.',
+          description: 'Arlo\'s answer to every ask_arlo_questions item from prepare_contract, keyed by that question\'s key, word for word. Required: what, fee, payment, travel, start, ownership, portfolio, standard_terms, special_requests; plus cancellation for a one-off project, photography or other, and cancellation and event_hours for event coverage. The drafter refuses to run until these are all answered.',
           properties: {
-            what: { type: 'string' }, fee: { type: 'string' }, payment: { type: 'string' }, start: { type: 'string' },
+            what: { type: 'string' }, fee: { type: 'string' }, payment: { type: 'string' }, travel: { type: 'string' }, start: { type: 'string' },
             ownership: { type: 'string' }, portfolio: { type: 'string' }, standard_terms: { type: 'string' },
             special_requests: { type: 'string' }, cancellation: { type: 'string' }, event_hours: { type: 'string' },
           },
@@ -559,11 +559,11 @@ export const TOOLS: Anthropic.Tool[] = [
         },
         brief: {
           type: 'object',
-          description: 'Arlo\'s answer to every ask_arlo_questions item from prepare_proposal, keyed by that question\'s key, word for word, plus anything relevant from a pasted email thread. Required: goal, audience, platforms, deliverables, filming, timeline, price, price_layout, payment_terms, inclusions, exclusions, angle, valid_for.',
+          description: 'Arlo\'s answer to every ask_arlo_questions item from prepare_proposal, keyed by that question\'s key, word for word, plus anything relevant from a pasted email thread. Required: goal, audience, platforms, deliverables, filming, timeline, price, price_layout, payment_terms, travel, inclusions, exclusions, angle, valid_for.',
           properties: {
             goal: { type: 'string' }, audience: { type: 'string' }, platforms: { type: 'string' }, deliverables: { type: 'string' },
             filming: { type: 'string' }, timeline: { type: 'string' }, price: { type: 'string' }, price_layout: { type: 'string' },
-            payment_terms: { type: 'string' }, inclusions: { type: 'string' }, exclusions: { type: 'string' }, angle: { type: 'string' },
+            payment_terms: { type: 'string' }, travel: { type: 'string' }, inclusions: { type: 'string' }, exclusions: { type: 'string' }, angle: { type: 'string' },
             valid_for: { type: 'string' }, extra_context: { type: 'string', description: 'Anything else from the thread or the client that should shape it.' },
           },
         },

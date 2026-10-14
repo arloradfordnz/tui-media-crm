@@ -83,7 +83,7 @@ Then these sections, numbered, in this order, with no more clauses than the numb
 
 # 2. Fees and payment (2 clauses)
 
-2.1 any deposit (one-off projects only), when invoices are sent and paid (bank transfer), and that expenses are payable only if agreed in writing first. 2.2 Tui Media may pause work while an invoice is overdue. The no-GST point is already in the summary: do not repeat it.
+2.1 any deposit (one-off projects only), when invoices are sent and paid (bank transfer), and that expenses are payable only if agreed in writing first. If the deal has a travel fee, this clause is where it is agreed in writing: one sentence naming the included places and the flat fee per shoot beyond them. 2.2 Tui Media may pause work while an invoice is overdue. The no-GST point is already in the summary: do not repeat it.
 
 # 3. Shoots and cancellations (2 clauses)
 

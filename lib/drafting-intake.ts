@@ -68,7 +68,7 @@ function isRetainer(client: ClientCtx, job?: JobCtx | null): boolean {
 
 export const PROPOSAL_REQUIRED_KEYS = [
   'goal', 'audience', 'platforms', 'deliverables', 'filming', 'timeline',
-  'price', 'price_layout', 'payment_terms', 'inclusions', 'exclusions', 'angle', 'valid_for',
+  'price', 'price_layout', 'payment_terms', 'travel', 'inclusions', 'exclusions', 'angle', 'valid_for',
 ] as const
 
 export function buildProposalIntake(client: ClientCtx, job: JobCtx | null, otherJobs: { id: string; name: string }[]): IntakeQuestion[] {
@@ -183,6 +183,16 @@ export function buildProposalIntake(client: ClientCtx, job: JobCtx | null, other
     ),
   })
   q.push({
+    key: 'travel',
+    question: `Travel: which places are included in the price, and what's the fee beyond that? (name the places)`,
+    options: opts(
+      { label: 'Nelson and Richmond included, +$30 a shoot beyond', detail: 'Flat fee, named zones' },
+      { label: 'Nelson only, +$30 a shoot beyond' },
+      { label: 'All of Nelson Tasman included', detail: 'No travel fee' },
+      { label: 'No travel fee at all' },
+    ),
+  })
+  q.push({
     key: 'inclusions',
     question: `What's included? Pick everything that applies.`,
     multi: true,
@@ -200,7 +210,6 @@ export function buildProposalIntake(client: ClientCtx, job: JobCtx | null, other
     multi: true,
     options: opts(
       { label: 'Ad spend (paid by the client)' },
-      { label: 'Travel outside Nelson' },
       { label: 'Extra revision rounds past 2' },
       { label: 'Nothing to add' },
     ),
@@ -229,7 +238,7 @@ export function buildProposalIntake(client: ClientCtx, job: JobCtx | null, other
 // ── Contracts ────────────────────────────────────────────────
 
 export const CONTRACT_REQUIRED_KEYS = [
-  'what', 'fee', 'payment', 'start', 'ownership', 'portfolio', 'standard_terms', 'special_requests',
+  'what', 'fee', 'payment', 'travel', 'start', 'ownership', 'portfolio', 'standard_terms', 'special_requests',
 ] as const
 
 export function contractRequiredKeys(engagement: string): string[] {
@@ -282,6 +291,16 @@ export function buildContractIntake(
       retainer ? { label: 'Monthly in advance, no deposit' } : { label: '50% deposit on signing, 50% on delivery' },
       !retainer && { label: '100% on signing' },
       !retainer && { label: '50% on signing, 50% before the shoot' },
+    ),
+  })
+  q.push({
+    key: 'travel',
+    question: `Travel: which places are included in the price, and what's the fee beyond that? (name the places)`,
+    options: opts(
+      { label: 'Nelson and Richmond included, +$30 a shoot beyond', detail: 'Flat fee, named zones' },
+      { label: 'Nelson only, +$30 a shoot beyond' },
+      { label: 'All of Nelson Tasman included', detail: 'No travel fee' },
+      { label: 'No travel fee at all' },
     ),
   })
   const shoot = niceDate(jobs.find((j) => j.shoot_date)?.shoot_date)

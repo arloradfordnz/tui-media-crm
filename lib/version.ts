@@ -155,4 +155,5 @@
 // shown, the headline reads "From $300 a month", and accepting does not set a
 // job price. The proposal editor's side panel now lines up with the page.
 // 3.23.1 — proposal editor: Save sits in the header instead of floating over the page, the Ask Tui tip is gone, spacing is one rhythm, and the PDF's next step is plain text.
-export const APP_VERSION = '3.23.1'
+// 3.24.0 — travel fees are asked in the proposal and contract intake (named places, flat fee beyond them) and written as a plain sentence in Payment terms and the contract's fees clause, not as a grey "Not included" footnote.
+export const APP_VERSION = '3.24.0'
