@@ -458,15 +458,15 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'create_document',
-    description: 'Create a new document template.',
+    description: 'Save a plain written document (a brief, notes) with the text you pass. NEVER use it for a proposal or a contract: proposals are made with prepare_proposal then create_proposal, contracts with prepare_contract then create_contract. Never call it with empty content.',
     input_schema: {
       type: 'object' as const,
       properties: {
         name: { type: 'string' },
         doc_type: { type: 'string', enum: ['contract', 'invoice', 'brief', 'other'] },
-        content: { type: 'string', description: 'Document body text' },
+        content: { type: 'string', description: 'The full document text. Required.' },
       },
-      required: ['name'],
+      required: ['name', 'content'],
     },
   },
   {
@@ -1402,6 +1402,13 @@ export async function executeTool(
     }
 
     case 'create_document': {
+      // A blank "Proposal" or "Contract" document is what a wrong turn used to
+      // leave behind: an empty row on the Documents page. Both have their own
+      // flow that gathers the facts first, so route them there.
+      const docName = String(input.name ?? '')
+      if (/proposal/i.test(docName)) return JSON.stringify({ error: 'Not saved. A proposal is not a document. Call prepare_proposal for the client and job, ask Arlo its questions in one ask_arlo popup, then create_proposal.' })
+      if (/contract|agreement/i.test(docName) || input.doc_type === 'contract') return JSON.stringify({ error: 'Not saved. A contract is not made here. Call prepare_contract for the client, ask Arlo its questions in one ask_arlo popup, then create_contract.' })
+      if (!String(input.content ?? '').trim()) return JSON.stringify({ error: 'Not saved: a document needs its text. Write the content and call this again.' })
       const { data, error } = await supabase.from('documents').insert({
         name: input.name as string,
         doc_type: (input.doc_type as string) || 'contract',
