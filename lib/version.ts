@@ -131,4 +131,6 @@
 // the links open the client or job. The invoice Send card is green and reads
 // "Email invoice INV-0168 ($200.00) to Sky Automotive" instead of showing an
 // id, and Tui no longer asks "want me to send it?" before showing it.
-export const APP_VERSION = '3.19.0'
+// 3.19.1 — the Tui thread stays pinned to the newest message instead of
+// sometimes ending just above it.
+export const APP_VERSION = '3.19.1'

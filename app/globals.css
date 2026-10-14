@@ -3693,7 +3693,7 @@ input, textarea, select, button { font-family: inherit; }
    The chat's scroll bar ran the full height of the card, flush against its
    edge, so its ends poked out past the rounded corners. The track now stops
    short of the corners and sits a few pixels in from the edge. */
-.tui-scroll { margin-right: 4px; }
+.tui-scroll { margin-right: 4px; overflow-anchor: none; }
 .tui-scroll::-webkit-scrollbar-track { margin-block: 18px; }
 textarea.field-input::-webkit-scrollbar-track { margin-block: 14px; }
 

@@ -260,9 +260,43 @@ export default function TuiThread({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seeded])
 
+  // Stay glued to the bottom of the thread. Scrolling only when `messages`
+  // changed was not enough: receipts resolving, the thinking dots collapsing,
+  // a confirm card or link chips appearing and fonts settling all change the
+  // height AFTER that effect ran, which left the newest text just below the
+  // fold. A MutationObserver re-pins on every one of those, and it stands down
+  // while Arlo has deliberately scrolled up to read something older.
+  const stickRef = useRef(true)
   useEffect(() => {
     const el = scrollRef.current
-    if (el) el.scrollTop = el.scrollHeight
+    if (!el) return
+    let frame = 0
+    const pin = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        if (stickRef.current) el.scrollTop = el.scrollHeight
+      })
+    }
+    const onScroll = () => {
+      stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    const mo = new MutationObserver(pin)
+    mo.observe(el, { childList: true, subtree: true, characterData: true, attributes: true })
+    pin()
+    return () => {
+      cancelAnimationFrame(frame)
+      el.removeEventListener('scroll', onScroll)
+      mo.disconnect()
+    }
+  }, [])
+
+  useEffect(() => {
+    // A new message from Arlo always jumps to the bottom, even if he had
+    // scrolled up before typing.
+    if (messages[messages.length - 1]?.role === 'user') stickRef.current = true
+    const el = scrollRef.current
+    if (el && stickRef.current) el.scrollTop = el.scrollHeight
   }, [messages])
 
   // Mutate only the in-flight assistant message, which is always the last one.
