@@ -148,4 +148,6 @@
 // 3.21.1 — redeploy of 3.21.0.
 // 3.22.0 — email templates removed from Settings. The nine client emails are
 // now written in Arlo's voice and live in lib/email.ts.
-export const APP_VERSION = '3.22.0'
+// 3.22.1 — Tui can no longer leave a blank "Proposal" or "Contract" document
+// on the Documents page; those requests go to the proposal and contract flows.
+export const APP_VERSION = '3.22.1'
