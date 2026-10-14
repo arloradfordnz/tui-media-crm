@@ -146,4 +146,6 @@
 // show in the client portal. The proposal drafter writes in Arlo's own voice,
 // learned from his sent emails.
 // 3.21.1 — redeploy of 3.21.0.
-export const APP_VERSION = '3.21.1'
+// 3.22.0 — email templates removed from Settings. The nine client emails are
+// now written in Arlo's voice and live in lib/email.ts.
+export const APP_VERSION = '3.22.0'

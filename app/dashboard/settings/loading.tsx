@@ -1,12 +1,12 @@
 import { Line, PageHeader } from '@/components/Skeleton'
 
 // Mirrors app/dashboard/settings/page.tsx: the title, the phone-only section
-// tiles, then eight stacked cards in the page's order: Profile, the sign-in
+// tiles, then seven stacked cards in the page's order: Profile, the sign-in
 // form, retainer invoicing, the iCloud calendar and push cards, portal
-// notifications, email templates, and the small App Info card at the end.
+// notifications, and the small App Info card at the end.
 const CARDS = [
   { fields: 3 }, { fields: 3 }, { fields: 1 }, { fields: 1 },
-  { fields: 2 }, { fields: 1 }, { fields: 3 }, { fields: 0 },
+  { fields: 2 }, { fields: 1 }, { fields: 0 },
 ]
 
 export default function SettingsLoading() {

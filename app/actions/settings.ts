@@ -69,25 +69,6 @@ export async function saveRetainerInvoiceDay(prevState: { error?: string; succes
   return saveAppSetting('retainer_invoice_day', String(day))
 }
 
-export async function saveEmailTemplate(prevState: { error?: string; success?: boolean } | undefined, formData: FormData) {
-  const type = formData.get('type') as string
-  const subject = formData.get('subject') as string
-  const body = formData.get('body') as string
-
-  if (!type || !subject || !body) return { error: 'All fields are required.' }
-
-  const supabase = await createServerSupabaseClient()
-  if (!(await getAuthUser())) return { error: 'Not authenticated.' }
-
-  const { error } = await supabase
-    .from('email_templates')
-    .upsert({ type, subject, body, updated_at: new Date().toISOString() }, { onConflict: 'type' })
-
-  if (error) return { error: error.message }
-
-  return { success: true }
-}
-
 // ── Portal self-view ─────────────────────────────────────────────────────────
 // Which IPs count as "Arlo, not a client" when someone opens a portal link.
 // See lib/admin-ip.ts — this is the allow-list it reads, and it lives in the

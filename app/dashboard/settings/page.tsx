@@ -1,6 +1,5 @@
 import { createServerSupabaseClient, getVerifiedUser } from '@/lib/supabase'
 import SettingsForm from './SettingsForm'
-import EmailTemplatesForm from './EmailTemplatesForm'
 import RetainerInvoiceSettings from './RetainerInvoiceSettings'
 import PortalNotificationSettings from './PortalNotificationSettings'
 import IcloudCalendarSettings from './IcloudCalendarSettings'
@@ -20,9 +19,8 @@ export default async function SettingsPage() {
 
   // The identity joins the Promise.all rather than gating it: the dashboard
   // layout has already resolved it for this request, so it costs nothing here.
-  const [user, templates, retainerInvoiceDay, adminIps, requestIp, icloudUrl, memories] = await Promise.all([
+  const [user, retainerInvoiceDay, adminIps, requestIp, icloudUrl, memories] = await Promise.all([
     getVerifiedUser(),
-    supabase.from('email_templates').select('id, type, subject, body, updated_at').order('type'),
     getAppSetting('retainer_invoice_day'),
     getAdminIps(),
     getRequestIp(),
@@ -105,9 +103,6 @@ export default async function SettingsPage() {
 
       {/* Portal self-view */}
       <PortalNotificationSettings currentIps={adminIps} requestIp={requestIp} />
-
-      {/* Email Templates */}
-      <EmailTemplatesForm templates={templates.data || []} />
 
       {/* App Info */}
       <div className="card">

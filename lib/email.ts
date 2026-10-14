@@ -226,65 +226,53 @@ function wrap(body: string, signoff = SIGNOFF, preheader?: string) {
 </html>`
 }
 
-// --- Default templates (fallback when DB has no custom entry) ---
+// --- Templates ---
+// Written in Arlo's voice (short, plain, first names, no hype). Edit them here.
+// Placeholders: {{clientName}} {{jobName}} {{round}} {{portalUrl}} {{proposalUrl}}
 
-const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }> = {
+const TEMPLATES: Record<string, { subject: string; body: string }> = {
   welcome: {
     subject: 'Welcome to Tui Media',
-    body: "Welcome to Tui Media! We're excited to have you on board and looking forward to bringing your vision to life.\n\nWe'll be in touch shortly to discuss your project and next steps. In the meantime, feel free to reach out if you have any questions.",
+    body: "Good to have you on board. I'll be in touch shortly to chat through your project and next steps.\n\nIf you've got any questions before then, just reply to hello@tuimedia.nz.",
   },
   proposal: {
-    subject: 'Proposal for {{jobName}} — Tui Media',
-    body: "We've put together a proposal for {{jobName}}. Click below to view the details and let us know if you'd like to proceed.",
+    subject: 'Proposal for {{jobName}}',
+    body: "I've put together a proposal for {{jobName}}. It's all in the link below, including pricing and what's covered.\n\nLet me know if you want to tweak anything.",
   },
   proposal_accepted: {
-    subject: 'Proposal accepted — {{jobName}}',
-    body: '{{clientName}} has accepted the proposal for {{jobName}}.\n\nThe job has been moved to Booked status.',
+    subject: 'Proposal accepted: {{jobName}}',
+    body: '{{clientName}} has accepted the proposal for {{jobName}}.\n\nThe job has been moved to Booked.',
   },
   delivery: {
-    subject: 'Your project is ready for review — {{jobName}}',
-    body: 'Your project for {{jobName}} is ready for review. Use the link below to take a look and share your feedback.',
+    subject: '{{jobName}} is ready to review',
+    body: "{{jobName}} is ready for you to watch. The link below has everything.\n\nLet me know what you think, and if anything needs changing just request a revision there.",
   },
   revision: {
-    subject: 'Revision request received — {{jobName}}',
-    body: "Your revision request (round {{round}}) for {{jobName}} has been received.\n\nWe'll get to work on the changes and send you an updated version soon.",
+    subject: 'Got your revisions for {{jobName}}',
+    body: "Thanks, I've got your revision request (round {{round}}) for {{jobName}}.\n\nI'll get onto the changes and send an updated version through.",
   },
   approval: {
-    subject: 'Delivery approved — {{jobName}}',
-    body: "Thank you for approving the delivery for {{jobName}}. We're glad you're happy with the result.\n\nYour final files will be prepared and delivered shortly.",
+    subject: '{{jobName}} approved',
+    body: "Awesome, thanks for approving {{jobName}}. Glad you're happy with it.\n\nI'll get your final files sorted and send them through shortly.",
   },
   revision_accepted: {
-    subject: 'Your revisions are underway — {{jobName}}',
-    body: "Good news — your revision request (round {{round}}) for {{jobName}} has been accepted and we're onto it now.\n\nWe'll send through the updated version as soon as it's ready.",
+    subject: 'Revisions underway for {{jobName}}',
+    body: "Your revision request (round {{round}}) for {{jobName}} is accepted and I'm onto it now.\n\nI'll send the updated version as soon as it's ready.",
   },
   revision_declined: {
-    subject: 'About your revision request — {{jobName}}',
-    body: "We've had a look at your revision request (round {{round}}) for {{jobName}} and unfortunately we won't be able to make these changes as part of this round.\n\nIf you'd like to talk it through, just get in touch and we'll sort something out.",
+    subject: 'About your revisions for {{jobName}}',
+    body: "I've been through your revision request (round {{round}}) for {{jobName}}. Some of it falls outside what's covered in this round, so I can't make those changes as part of it.\n\nHappy to chat it through, or I can quote the extras separately. Let me know.",
   },
   revision_reply: {
-    subject: 'A note about your revisions — {{jobName}}',
-    body: "We've left a note on your revision request (round {{round}}) for {{jobName}} — see below.",
+    subject: 'A note on your revisions for {{jobName}}',
+    body: "I've left a note on your revision request (round {{round}}) for {{jobName}}. See below.",
   },
 }
 
 // --- Template helpers ---
 
-async function getTemplate(type: string): Promise<{ subject: string; body: string }> {
-  try {
-    const supabase = getLogClient()
-    if (!supabase) return DEFAULT_TEMPLATES[type] || { subject: '', body: '' }
-
-    const { data } = await supabase
-      .from('email_templates')
-      .select('subject, body')
-      .eq('type', type)
-      .single()
-
-    if (data) return { subject: data.subject, body: data.body }
-  } catch {
-    // Fall through to default
-  }
-  return DEFAULT_TEMPLATES[type] || { subject: '', body: '' }
+function getTemplate(type: string): { subject: string; body: string } {
+  return TEMPLATES[type] || { subject: '', body: '' }
 }
 
 function replacePlaceholders(text: string, vars: Record<string, string>): string {
@@ -309,14 +297,13 @@ function heading(text: string): string {
 }
 
 function buildGreeting(clientName?: string): string {
-  const name = clientName ? ` ${esc(clientName)}` : ''
-  return heading(`Kia ora${name},`)
+  return heading(clientName ? `Hi ${esc(clientName)},` : 'Kia ora,')
 }
 
 // --- Email functions ---
 
 export async function sendPortalDeliveryEmail(to: string, clientName: string, jobName: string, portalUrl: string, clientId?: string, jobId?: string) {
-  const tpl = await getTemplate('delivery')
+  const tpl = getTemplate('delivery')
   const vars = { clientName, jobName, portalUrl }
   const subject = replacePlaceholders(tpl.subject, vars)
   const bodyText = replacePlaceholders(tpl.body, vars)
@@ -337,7 +324,7 @@ export async function sendPortalDeliveryEmail(to: string, clientName: string, jo
 }
 
 export async function sendApprovalConfirmationEmail(to: string, clientName: string, jobName: string, clientId?: string, jobId?: string) {
-  const tpl = await getTemplate('approval')
+  const tpl = getTemplate('approval')
   const vars = { clientName, jobName }
   const subject = replacePlaceholders(tpl.subject, vars)
   const bodyText = replacePlaceholders(tpl.body, vars)
@@ -356,7 +343,7 @@ export async function sendApprovalConfirmationEmail(to: string, clientName: stri
 }
 
 export async function sendRevisionRequestEmail(to: string, clientName: string, jobName: string, round: number, clientId?: string, jobId?: string) {
-  const tpl = await getTemplate('revision')
+  const tpl = getTemplate('revision')
   const vars = { clientName, jobName, round: String(round) }
   const subject = replacePlaceholders(tpl.subject, vars)
   const bodyText = replacePlaceholders(tpl.body, vars)
@@ -385,7 +372,7 @@ export async function sendRevisionResponseEmail(
   jobId?: string,
 ) {
   const type = response === 'reply' ? 'revision_reply' : `revision_${response}`
-  const tpl = await getTemplate(type)
+  const tpl = getTemplate(type)
   const vars = { clientName, jobName, round: String(round) }
   const subject = replacePlaceholders(tpl.subject, vars)
   const bodyText = replacePlaceholders(tpl.body, vars)
@@ -409,7 +396,7 @@ export async function sendRevisionResponseEmail(
 }
 
 export async function sendProposalEmail(to: string, clientName: string, jobName: string, proposalUrl: string, clientId?: string, jobId?: string) {
-  const tpl = await getTemplate('proposal')
+  const tpl = getTemplate('proposal')
   const vars = { clientName, jobName, proposalUrl }
   const subject = replacePlaceholders(tpl.subject, vars)
   const bodyText = replacePlaceholders(tpl.body, vars)
@@ -430,7 +417,7 @@ export async function sendProposalEmail(to: string, clientName: string, jobName:
 }
 
 export async function sendWelcomeEmail(to: string, clientName: string, clientId?: string) {
-  const tpl = await getTemplate('welcome')
+  const tpl = getTemplate('welcome')
   const vars = { clientName }
   const subject = replacePlaceholders(tpl.subject, vars)
   const bodyText = replacePlaceholders(tpl.body, vars)
@@ -853,7 +840,7 @@ export async function sendDeliveryReminderEmail(
 }
 
 export async function sendProposalAcceptedEmail(to: string, clientName: string, jobName: string, clientId?: string, jobId?: string) {
-  const tpl = await getTemplate('proposal_accepted')
+  const tpl = getTemplate('proposal_accepted')
   const vars = { clientName, jobName }
   const subject = replacePlaceholders(tpl.subject, vars)
   const bodyText = replacePlaceholders(tpl.body, vars)
