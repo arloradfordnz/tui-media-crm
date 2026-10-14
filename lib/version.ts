@@ -133,4 +133,10 @@
 // id, and Tui no longer asks "want me to send it?" before showing it.
 // 3.19.1 — the Tui thread stays pinned to the newest message instead of
 // sometimes ending just above it.
-export const APP_VERSION = '3.19.1'
+// 3.20.0 — Tui drafts proposals too, written by the same Opus drafter as
+// contracts and saved as a draft on the job. Both now start with one complete
+// popup built from the record (the same full checklist every time, what the CRM
+// knows as the first answer) and the drafter will not run until every answer
+// is in, so one prompt gets the document right the first time. Proposal edits
+// after that are free and instant, with no redraft.
+export const APP_VERSION = '3.20.0'

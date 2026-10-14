@@ -8,6 +8,8 @@ import { syncShootEvent, removeShootEvent } from '@/lib/job-calendar'
 import { nextDocumentNumber, unfilledPlaceholders } from '@/lib/document-templates'
 import { draftContract, reviseContract, SETTLED_CONTRACT_TERMS, type ContractParties } from '@/lib/contract-drafting'
 import { MEMORY_CATEGORY_KEYS, isMemoryCategory } from '@/lib/ai-memory'
+import { buildProposalIntake, buildContractIntake, PROPOSAL_REQUIRED_KEYS, contractRequiredKeys, missingBriefKeys, briefLines } from '@/lib/drafting-intake'
+import { draftProposal, type PriceLine } from '@/lib/proposal-drafting'
 
 // Shared tool definitions + executor for every AI surface (dashboard chat,
 // SMS assistant). One tool set, one set of side effects — a job marked
@@ -48,6 +50,7 @@ export const MUTATING_TOOLS = new Set([
   'create_event', 'update_event', 'delete_event',
   'create_document', 'delete_document',
   'create_contract', 'update_contract',
+  'create_proposal', 'update_proposal',
   'create_deliverable',
   'create_todo', 'complete_todo',
   'create_xero_invoice', 'approve_xero_invoice', 'send_xero_invoice', 'void_xero_invoice', 'delete_xero_invoice', 'update_xero_invoice', 'remove_xero_payment',
@@ -468,10 +471,12 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'prepare_contract',
-    description: 'Step one of every new contract: pulls everything already known about the deal for this client in one call (their record including retainer fee and videos per month, their jobs with quotes, dates and notes, any existing contracts and whether they are signed, recent client emails). Call it before asking Arlo anything, so your questions use the real figures and skip what is already settled.',
+    description: 'Step one of every new contract: pulls everything already known about the deal for this client (record, jobs with quotes and dates, existing contracts, recent emails) and returns ask_arlo_questions, the complete intake with the record\'s figures as the first options. Pass ask_arlo_questions to ask_arlo as ONE popup before drafting.',
     input_schema: {
       type: 'object' as const,
-      properties: { client_id: { type: 'string' } },
+      properties: {
+        client_id: { type: 'string' },
+      },
       required: ['client_id'],
     },
   },
@@ -483,7 +488,16 @@ export const TOOLS: Anthropic.Tool[] = [
       properties: {
         client_id: { type: 'string', description: 'Client UUID from the roster or search_clients.' },
         engagement_type: { type: 'string', enum: ['video_ad_project', 'monthly_retainer', 'event_coverage', 'photography', 'other'], description: 'What kind of deal this is. Shapes the whole agreement.' },
-        terms: { type: 'string', description: 'Every agreed fact about this deal, one per line: what is being made (how many, lengths, formats, platforms), shoot days and locations, dates and turnaround, the fee and how it is paid (deposit, schedule, due days), revisions, what happens to raw footage, ownership and portfolio use, rescheduling and cancellation, any minimum term for a retainer, anything Arlo or the client asked for specifically. Include Arlo\'s answers to your questions verbatim where they decide a term.' },
+        brief: {
+          type: 'object',
+          description: 'Arlo\'s answer to every ask_arlo_questions item from prepare_contract, keyed by that question\'s key, word for word. Required: what, fee, payment, start, ownership, portfolio, standard_terms, special_requests; plus cancellation for a one-off project, photography or other, and cancellation and event_hours for event coverage. The drafter refuses to run until these are all answered.',
+          properties: {
+            what: { type: 'string' }, fee: { type: 'string' }, payment: { type: 'string' }, start: { type: 'string' },
+            ownership: { type: 'string' }, portfolio: { type: 'string' }, standard_terms: { type: 'string' },
+            special_requests: { type: 'string' }, cancellation: { type: 'string' }, event_hours: { type: 'string' },
+          },
+        },
+        terms: { type: 'string', description: 'Any other agreed facts not in the brief, one per line (shoot locations, dates, platforms, things from a pasted email thread).' },
         client_is_business: { type: 'boolean', description: 'True if the client is a business buying for business purposes (most clients). False for an individual or family (a wedding, a private person), which changes the consumer-law clauses.' },
         client_legal_name: { type: 'string', description: 'Only to override the legal_name on the client record. Normally save it with update_client and leave this out.' },
         client_entity_type: { type: 'string', enum: ['company', 'sole_trader', 'partnership', 'other_entity', 'individual'], description: 'Only to override the entity_type on the client record.' },
@@ -494,7 +508,7 @@ export const TOOLS: Anthropic.Tool[] = [
         date: { type: 'string', description: 'Contract date, YYYY-MM-DD. Defaults to today.' },
         location: { type: 'string' },
       },
-      required: ['client_id', 'engagement_type', 'terms'],
+      required: ['client_id', 'engagement_type', 'brief'],
     },
   },
   {
@@ -515,8 +529,67 @@ export const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'prepare_proposal',
+    description: 'Step one of every proposal: pulls the client, the job (quote, dates, location, deliverables, notes), any existing proposal for it, and recent client emails, and returns ask_arlo_questions: the complete intake, the same checklist every time, with what the CRM already knows as the first option. Pass ask_arlo_questions to ask_arlo as ONE popup, then call create_proposal with every answer.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        client_id: { type: 'string' },
+        job_id: { type: 'string', description: 'The job this proposal is for, if known. Leave out and the intake asks which job.' },
+      },
+      required: ['client_id'],
+    },
+  },
+  {
+    name: 'create_proposal',
+    description: 'Draft and save a client-facing proposal for a job, written in one pass by the specialist drafter (takes up to a minute). Saved as a draft on the job and NOT sent. Call it once, only after ask_arlo has collected every answer from prepare_proposal: it refuses while any required brief item is missing. The prices are yours to pass as price_lines and are never changed by the drafter.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        job_id: { type: 'string' },
+        price_lines: {
+          type: 'array',
+          minItems: 1,
+          description: 'The priced lines exactly as agreed, NZD, no GST. One line for a single project fee, several if itemised or with add-ons. They must add up to the agreed price.',
+          items: {
+            type: 'object',
+            properties: { description: { type: 'string', description: 'Short working label, the drafter rewrites it for the client.' }, amount: { type: 'number' } },
+            required: ['description', 'amount'],
+          },
+        },
+        brief: {
+          type: 'object',
+          description: 'Arlo\'s answer to every ask_arlo_questions item from prepare_proposal, keyed by that question\'s key, word for word, plus anything relevant from a pasted email thread. Required: goal, audience, platforms, deliverables, filming, timeline, price, price_layout, payment_terms, inclusions, exclusions, angle, valid_for.',
+          properties: {
+            goal: { type: 'string' }, audience: { type: 'string' }, platforms: { type: 'string' }, deliverables: { type: 'string' },
+            filming: { type: 'string' }, timeline: { type: 'string' }, price: { type: 'string' }, price_layout: { type: 'string' },
+            payment_terms: { type: 'string' }, inclusions: { type: 'string' }, exclusions: { type: 'string' }, angle: { type: 'string' },
+            valid_for: { type: 'string' }, extra_context: { type: 'string', description: 'Anything else from the thread or the client that should shape it.' },
+          },
+        },
+        replace_existing: { type: 'boolean', description: 'True only if Arlo said to redraft over an existing unsent proposal for this job.' },
+      },
+      required: ['job_id', 'price_lines', 'brief'],
+    },
+  },
+  {
+    name: 'update_proposal',
+    description: 'Change an existing unsent proposal directly, without redrafting it (free and instant). Use for any edit Arlo asks for: a price, a line, the payment terms, an inclusion, a sentence in the cover note. Pass only the fields that change, written in full. Get the proposal_id from create_proposal or prepare_proposal.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        proposal_id: { type: 'string' },
+        cover_note: { type: 'string' },
+        services: { type: 'array', items: { type: 'object', properties: { description: { type: 'string' }, amount: { type: 'number' } }, required: ['description', 'amount'] } },
+        inclusions: { type: 'array', items: { type: 'string' } },
+        payment_terms: { type: 'string' },
+      },
+      required: ['proposal_id'],
+    },
+  },
+  {
     name: 'ask_arlo',
-    description: "Ask Arlo as many questions as the decision needs, answered by tapping an option in a popup instead of typing. A question only he can answer in his own words (a name, an email address, a phone number) has no options: he types it. Use it whenever you need decisions from him before acting, above all before drafting a contract. Make every question and option specific to this client and deal (use real names, the quoted price, the actual dates), put the option you would recommend first, and keep labels short. He can always type his own answer instead, so do not add an 'Other' option. Calling this ends your turn: his answers arrive as his next message. Say nothing else in the same turn beyond one short lead-in line.",
+    description: "Ask Arlo as many questions as the decision needs, answered by tapping an option in a popup instead of typing. A question only he can answer in his own words (a name, an email address, a phone number) has no options: he types it. Use it whenever you need decisions from him before acting, above all before drafting a contract or proposal, where prepare_contract / prepare_proposal hand you the complete question list to pass straight in. Make every question and option specific to this client and deal (use real names, the quoted price, the actual dates), put the option you would recommend first, and keep labels short. He can always type his own answer instead, so do not add an 'Other' option. Calling this ends your turn: his answers arrive as his next message. Say nothing else in the same turn beyond one short lead-in line.",
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -1366,14 +1439,19 @@ export async function executeTool(
       // the same popup as the terms and saved back to the client.
       const c = client.data as Record<string, unknown>
       const missing = ['legal_name', 'entity_type', 'contact_person', 'email', 'phone', 'location'].filter((k) => !c[k])
+      const questions = buildContractIntake(client.data, jobs.data ?? [], missing)
+      const unsigned = contracts.filter((k: { signed: boolean }) => !k.signed)
+      if (unsigned.length) {
+        questions.unshift({ key: 'existing', question: `There's an unsigned contract for ${client.data.name} from ${unsigned[0].created}. Revise that one or start fresh?`, options: [{ label: 'Revise the existing one' }, { label: 'Start a new contract' }] })
+      }
       return JSON.stringify({
         client: client.data,
-        missing_client_details: missing,
-        already_in_every_contract: SETTLED_CONTRACT_TERMS,
         jobs: jobs.data ?? [],
         existing_contracts: contracts,
         recent_client_emails: emails.data ?? [],
-        guidance: 'Never ask about anything in already_in_every_contract, or anything the record, jobs or emails answer: those are settled. Ask only about real gaps for this deal. Use these real figures in your options. Ask for every missing_client_details field in the same popup (entity_type as company / sole trader options, the rest typed with no options), then save the answers with update_client before create_contract. If there is an unsigned contract for the same work, ask whether to revise it (update_contract) or start a new one.',
+        already_in_every_contract: SETTLED_CONTRACT_TERMS,
+        ask_arlo_questions: questions,
+        guidance: 'Call ask_arlo ONCE with ask_arlo_questions as they are (you may sharpen the wording with names from the record or a pasted thread, and drop a question only if Arlo already answered it in this conversation). Do not add small questions of your own and do not split it into several popups. When the answers come back: save any client details with update_client, then call create_contract once with brief keyed by each question key, his answers word for word. If an answer is "Change some" or "Yes" with nothing typed, ask one short follow-up popup about just that before drafting.',
       })
     }
 
@@ -1381,8 +1459,15 @@ export async function executeTool(
       const { data: client, error: clientError } = await supabase.from('clients').select('id, name, legal_name, entity_type, contact_person, email, phone, location, portal_token').eq('id', input.client_id as string).single()
       if (clientError || !client) return JSON.stringify({ error: clientError ? dbErrorMessage(clientError) : 'No such client.' })
 
-      const terms = String(input.terms ?? '').trim()
-      if (!terms) return JSON.stringify({ error: 'Pass the agreed terms. Ask Arlo with ask_arlo first if you do not have them.' })
+      // One draft, built on a complete brief. Anything unanswered is asked
+      // first rather than left to a default that then needs a second draft.
+      const engagement = String(input.engagement_type ?? 'other')
+      const brief = (input.brief ?? {}) as Record<string, unknown>
+      const gaps = missingBriefKeys(brief, contractRequiredKeys(engagement))
+      if (gaps.length) {
+        return JSON.stringify({ error: `NOT drafted. The brief is missing: ${gaps.join(', ')}. Call prepare_contract, ask Arlo those questions in one ask_arlo popup, then call create_contract again with every answer in brief.` })
+      }
+      const terms = [briefLines(brief), String(input.terms ?? '').trim()].filter(Boolean).join('\n')
 
       // The parties clause and the signature block print these, so a guess
       // would put the wrong entity or person on a signed contract. They come
@@ -1752,6 +1837,110 @@ export async function executeTool(
         return JSON.stringify({ ...backlog, clients: matches })
       }
       return JSON.stringify(backlog)
+    }
+
+    // ── Proposals ───────────────────────────
+    case 'prepare_proposal': {
+      const clientId = input.client_id as string
+      const jobId = (input.job_id as string) || null
+      const [client, jobs, emails, job, existing] = await Promise.all([
+        supabase.from('clients').select('name, contact_person, email, location, status, client_category, monthly_retainer, shoots_per_month, videos_per_month, notes').eq('id', clientId).single(),
+        supabase.from('jobs').select('id, name, status, job_type, shoot_date, quote_value').eq('client_id', clientId).not('status', 'in', '("delivered","archived","handed_over")').order('created_at', { ascending: false }).limit(6),
+        supabase.from('client_emails').select('subject, heading, summary, received_at').eq('client_id', clientId).order('received_at', { ascending: false }).limit(5),
+        jobId ? supabase.from('jobs').select('id, name, job_type, status, shoot_date, shoot_location, quote_value, notes, deliverables(title)').eq('id', jobId).maybeSingle() : Promise.resolve({ data: null }),
+        jobId ? supabase.from('proposals').select('id, status, total_value, created_at').eq('job_id', jobId).maybeSingle() : Promise.resolve({ data: null }),
+      ])
+      if (client.error || !client.data) return JSON.stringify({ error: client.error ? dbErrorMessage(client.error) : 'No such client.' })
+      const prop = existing.data as { id: string; status: string; total_value: number } | null
+      if (prop && prop.status !== 'draft') {
+        return JSON.stringify({ error: `This job already has a proposal that was ${prop.status}. Tell Arlo; a sent proposal cannot be redrafted. Changes go through update_proposal only while it is a draft.`, proposal_id: prop.id })
+      }
+      const questions = buildProposalIntake(client.data, job.data, jobs.data ?? [])
+      if (prop) {
+        questions.unshift({ key: 'existing', question: `There's already a draft proposal on this job ($${prop.total_value}). Redraft it from scratch, or just edit it?`, options: [{ label: 'Redraft from scratch' }, { label: 'Just edit the existing one', detail: 'Free, no redraft' }] })
+      }
+      return JSON.stringify({
+        client: client.data,
+        job: job.data,
+        open_jobs: jobs.data ?? [],
+        existing_proposal: prop,
+        recent_client_emails: emails.data ?? [],
+        ask_arlo_questions: questions,
+        guidance: 'Call ask_arlo ONCE with ask_arlo_questions as they are (sharpen wording with names from the record or a pasted thread; drop a question only if Arlo already answered it in this conversation). Do not add small questions of your own and do not split it into several popups. When answers come back: if the job is new, create it with create_job first; if he chose "Just edit the existing one", use update_proposal instead. Otherwise call create_proposal once with brief keyed by each question key (his answers word for word) and price_lines that add up to the agreed price, laid out the way he chose. If an answer is unclear or says to type something but is blank, ask one short follow-up popup about only that, then draft.',
+      })
+    }
+
+    case 'create_proposal': {
+      const jobId = input.job_id as string
+      const brief = (input.brief ?? {}) as Record<string, unknown>
+      const gaps = missingBriefKeys(brief, PROPOSAL_REQUIRED_KEYS)
+      if (gaps.length) {
+        return JSON.stringify({ error: `NOT drafted. The brief is missing: ${gaps.join(', ')}. Call prepare_proposal, ask Arlo in one ask_arlo popup, then call create_proposal again with every answer in brief.` })
+      }
+      const priceLines = (Array.isArray(input.price_lines) ? input.price_lines : [])
+        .map((l: { description?: unknown; amount?: unknown }) => ({ description: String(l?.description ?? '').trim(), amount: Number(l?.amount) }))
+        .filter((l: PriceLine) => l.description && Number.isFinite(l.amount) && l.amount >= 0)
+      if (priceLines.length === 0) return JSON.stringify({ error: 'Pass price_lines with the agreed amounts. Never invent a price: ask Arlo if you do not have one.' })
+
+      const [{ data: job, error: jobError }, { data: existing }] = await Promise.all([
+        supabase.from('jobs').select('id, name, client_id, clients(name, contact_person)').eq('id', jobId).single(),
+        supabase.from('proposals').select('id, status').eq('job_id', jobId).maybeSingle(),
+      ])
+      if (jobError || !job) return JSON.stringify({ error: jobError ? dbErrorMessage(jobError) : 'No such job.' })
+      if (existing && existing.status !== 'draft') return JSON.stringify({ error: `This job's proposal was already ${existing.status}, so it cannot be redrafted.` })
+      if (existing && input.replace_existing !== true) {
+        return JSON.stringify({ error: 'This job already has a draft proposal. Ask Arlo whether to redraft it (call again with replace_existing true) or edit it with update_proposal.', proposal_id: existing.id })
+      }
+
+      const client = job.clients as unknown as { name: string; contact_person: string | null }
+      const today = new Date().toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'long', year: 'numeric' })
+      const drafted = await draftProposal({
+        clientName: client.name,
+        contactPerson: client.contact_person,
+        jobName: job.name,
+        priceLines,
+        brief: briefLines(brief),
+        today,
+      })
+      if ('error' in drafted) return JSON.stringify({ error: drafted.error })
+
+      const row = {
+        cover_note: drafted.coverNote,
+        services: JSON.stringify(drafted.services),
+        inclusions: drafted.inclusions.join('\n'),
+        payment_terms: drafted.paymentTerms,
+        total_value: drafted.total,
+        updated_at: new Date().toISOString(),
+      }
+      const saved = existing
+        ? await supabase.from('proposals').update(row).eq('id', existing.id).select('id').single()
+        : await supabase.from('proposals').insert({ job_id: jobId, ...row }).select('id').single()
+      if (saved.error || !saved.data) return JSON.stringify({ error: saved.error?.message || 'Could not save the proposal.' })
+      await supabase.from('activities').insert({ action: 'proposal_created', details: `Proposal drafted for "${job.name}"`, job_id: jobId, client_id: job.client_id })
+      return JSON.stringify({
+        success: true,
+        proposal: { id: saved.data.id, job_id: jobId, name: job.name, total: drafted.total },
+        drafter_notes: drafted.notes,
+        next: 'Saved as a draft, not sent. Tell Arlo in one or two lines it is drafted with the total, mention drafter_notes if they say anything, and offer to send it. Any edit he asks for is update_proposal, never another create_proposal.',
+      })
+    }
+
+    case 'update_proposal': {
+      const { data: prop, error: propError } = await supabase.from('proposals').select('id, status, job_id').eq('id', input.proposal_id as string).single()
+      if (propError || !prop) return JSON.stringify({ error: propError ? dbErrorMessage(propError) : 'No such proposal.' })
+      if (prop.status !== 'draft') return JSON.stringify({ error: `That proposal was already ${prop.status}, so it cannot be changed.` })
+      const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
+      if (typeof input.cover_note === 'string') updates.cover_note = input.cover_note
+      if (typeof input.payment_terms === 'string') updates.payment_terms = input.payment_terms
+      if (Array.isArray(input.inclusions)) updates.inclusions = (input.inclusions as string[]).join('\n')
+      if (Array.isArray(input.services)) {
+        const lines = (input.services as PriceLine[]).map((l) => ({ description: String(l.description), amount: Number(l.amount) || 0 }))
+        updates.services = JSON.stringify(lines)
+        updates.total_value = Math.round(lines.reduce((sum, l) => sum + l.amount, 0) * 100) / 100
+      }
+      const { error } = await supabase.from('proposals').update(updates).eq('id', prop.id)
+      if (error) return JSON.stringify({ error: error.message })
+      return JSON.stringify({ success: true, proposal: { id: prop.id, job_id: prop.job_id, name: 'Proposal' }, total: updates.total_value })
     }
 
     // ── Memory ──────────────────────────────

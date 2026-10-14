@@ -490,6 +490,7 @@ export async function POST(request: NextRequest) {
                 if (parsed.job?.id) send({ t: 'link', path: `/dashboard/jobs/${parsed.job.id}`, label: `View ${parsed.job.name || 'Job'}` })
                 if (parsed.document?.id) send({ t: 'link', path: `/dashboard/documents/${parsed.document.id}`, label: `View ${parsed.document.name || 'Document'}` })
                 if (parsed.event?.id) send({ t: 'link', path: `/dashboard/calendar`, label: 'View Calendar' })
+                if (parsed.proposal?.id && parsed.proposal?.job_id) send({ t: 'link', path: `/dashboard/jobs/${parsed.proposal.job_id}/proposal/${parsed.proposal.id}`, label: 'View proposal' })
               }
             } catch { /* not JSON or no link needed */ }
           }
