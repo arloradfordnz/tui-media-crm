@@ -12,7 +12,7 @@ export async function createProposal(jobId: string) {
 
   const { data: job } = await supabase
     .from('jobs')
-    .select('id, name, quote_value, client_id, clients(name, email)')
+    .select('id, name, quote_value, client_id, clients(name, email, contact_person)')
     .eq('id', jobId)
     .single()
 
@@ -23,17 +23,20 @@ export async function createProposal(jobId: string) {
     redirect(`/dashboard/jobs/${jobId}/proposal/${existing.id}`)
   }
 
-  const client = job.clients as unknown as { name: string; email: string | null }
+  const client = job.clients as unknown as { name: string; email: string | null; contact_person: string | null }
   const services = job.quote_value
     ? JSON.stringify([{ description: job.name, amount: job.quote_value }])
     : '[]'
 
   const { data: proposal, error } = await supabase.from('proposals').insert({
     job_id: jobId,
-    cover_note: `Dear ${client.name},\n\nThank you for choosing Tui Media. We're excited to work with you on this project. Please find our proposal below.`,
+    // A starting point in Arlo's own voice, for when he writes one by hand.
+    // Tui's drafted proposals replace all of this.
+    cover_note: `Hi ${client.contact_person?.split(' ')[0] || 'there'},\n\nThanks for having a chat about ${job.name}. Here's what I'd suggest, with the price and what's included below.\n\nHave a look through and let me know if you want to tweak anything. If it all looks good, tap Accept and I'll be in touch to lock in a date.\n\nCheers,\nArlo`,
     services,
     total_value: job.quote_value || 0,
-    inclusions: 'Full coverage as outlined\nProfessional editing & colour grading\nLicensed music where applicable\nTwo rounds of revisions\nFinal delivery via secure client portal',
+    inclusions: 'Filming on location\nEditing and colour grading\nLicensed music and captions\nTwo rounds of changes on each video\nFinal videos delivered through your client portal',
+    payment_terms: '50% deposit to lock in the shoot date, then the rest on delivery. Invoices are due within 14 days by bank transfer. Tui Media is not GST registered, so no GST is added. This price is good for 30 days.',
   }).select('id').single()
 
   if (error || !proposal) return { error: error?.message || 'Failed to create proposal.' }

@@ -19,7 +19,7 @@ Font.register({
 // Black and white only. Bricolage Grotesque (the website's typeface) on
 // plain white paper, signatures included; greys exist only for secondary
 // text and hairlines.
-const C = {
+export const C = {
   black: '#111111', // the website logo's black
   grey: '#6B6B6B',
   lgrey: '#E5E5E5',
@@ -106,7 +106,7 @@ type FormData = {
   documentNumber?: string
 }
 
-function TuiLogo({ fill = C.black }: { fill?: string }) {
+export function TuiLogo({ fill = C.black }: { fill?: string }) {
   return (
     <Svg width={110} height={23} viewBox="0 0 1280 264.55">
       <G>

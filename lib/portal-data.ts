@@ -23,7 +23,7 @@ export async function loadPortalData(client: PortalClient) {
   if (!supabase) return null
 
   // Jobs (with deliverables) and documents don't depend on each other.
-  const [{ data: jobs }, { data: documents }] = await Promise.all([
+  const [{ data: jobs }, { data: documents }, { data: proposals }] = await Promise.all([
     supabase
       .from('jobs')
       .select(`
@@ -42,6 +42,14 @@ export async function loadPortalData(client: PortalClient) {
       .select('id, name, doc_type, content, updated_at')
       .eq('client_id', client.id)
       .order('updated_at', { ascending: false }),
+    // Sent proposals only: a draft is still Arlo's to change. The inner join
+    // scopes them to this client's jobs.
+    supabase
+      .from('proposals')
+      .select('id, token, status, total_value, sent_at, responded_at, services, jobs!inner(name, client_id, shoot_date, shoot_location)')
+      .eq('jobs.client_id', client.id)
+      .neq('status', 'draft')
+      .order('sent_at', { ascending: false }),
   ])
 
   // Fresh presigned R2 URLs for every delivered file. file_name holds the R2
@@ -111,6 +119,22 @@ export async function loadPortalData(client: PortalClient) {
     // gets their own token passed as a prop rather than carried in the URL.
     portalToken: client.portal_token ?? '',
     jobs: jobsResolved,
+    proposals: (proposals ?? []).map((p) => {
+      const job = p.jobs as unknown as { name: string; shoot_date: string | null; shoot_location: string | null }
+      let lines = 0
+      try { lines = (JSON.parse(p.services || '[]') as unknown[]).length } catch { /* malformed */ }
+      return {
+        id: p.id,
+        token: p.token,
+        status: p.status as string,
+        total: Number(p.total_value) || 0,
+        sentAt: p.sent_at as string | null,
+        respondedAt: p.responded_at as string | null,
+        jobName: job.name,
+        shootDate: job.shoot_date,
+        lines,
+      }
+    }),
     documents: (documents ?? []).map((d) => ({
       id: d.id,
       name: d.name,

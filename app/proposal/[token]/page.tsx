@@ -11,7 +11,7 @@ const proposalByToken = cache(async (token: string) => {
   if (!supabase) return null
   const { data } = await supabase
     .from('proposals')
-    .select('id, job_id, token, status, cover_note, services, inclusions, payment_terms, total_value, sent_at, responded_at, created_at, jobs(name, job_type, shoot_date, shoot_location, clients(name))')
+    .select('id, job_id, token, status, cover_note, services, inclusions, payment_terms, total_value, sent_at, responded_at, created_at, jobs(name, job_type, shoot_date, shoot_location, clients(name, contact_person))')
     .eq('token', token)
     .single()
   return data ?? null
@@ -55,7 +55,7 @@ export default async function PublicProposalPage({ params }: { params: Promise<{
     )
   }
 
-  const job = proposal.jobs as unknown as { name: string; job_type: string | null; shoot_date: string | null; shoot_location: string | null; clients: { name: string } }
+  const job = proposal.jobs as unknown as { name: string; job_type: string | null; shoot_date: string | null; shoot_location: string | null; clients: { name: string; contact_person: string | null } }
 
   const proposalData = {
     id: proposal.id,
@@ -75,7 +75,7 @@ export default async function PublicProposalPage({ params }: { params: Promise<{
       jobType: job.job_type,
       shootDate: job.shoot_date,
       shootLocation: job.shoot_location,
-      client: { name: job.clients.name },
+      client: { name: job.clients.name, contactPerson: job.clients.contact_person },
     },
   }
 

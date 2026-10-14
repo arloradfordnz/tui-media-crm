@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation'
 import { approveDelivery, markViewed, markDownloaded, requestDeliverableRevision } from '@/app/actions/portal'
 import { signDocumentByClient, submitDocumentFeedback } from '@/app/actions/documents'
 import { renderDocBody } from '@/lib/markdown'
-import { statusLabel, statusBadgeClass, formatDate, firstName } from '@/lib/format'
+import { statusLabel, statusBadgeClass, formatDate, formatNZD, firstName } from '@/lib/format'
 import Image from 'next/image'
-import { Briefcase, FileText, Film, Image as ImageIcon, File, Music, Download, ChevronDown, ChevronRight, Check, MessageSquare, PenLine, Archive } from 'lucide-react'
+import { Briefcase, FileText, ScrollText, ArrowUpRight, Film, Image as ImageIcon, File, Music, Download, ChevronDown, ChevronRight, Check, MessageSquare, PenLine, Archive } from 'lucide-react'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
 
 type DeliveryFile = {
@@ -61,10 +61,23 @@ type Document = {
   updatedAt: string
 }
 
+type PortalProposal = {
+  id: string
+  token: string
+  status: string
+  total: number
+  sentAt: string | null
+  respondedAt: string | null
+  jobName: string
+  shootDate: string | null
+  lines: number
+}
+
 type PortalData = {
   client: { name: string; contactPerson: string | null }
   portalToken: string
   jobs: Job[]
+  proposals: PortalProposal[]
   documents: Document[]
 }
 
@@ -165,6 +178,46 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
             View your projects, deliverables, and documents below.
           </p>
         </div>
+
+        {/* Proposals come first: an open one is the only thing on this page
+            waiting on the client. */}
+        {data.proposals.length > 0 && (
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="stat-icon-bubble bubble-sm">
+                <ScrollText className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Proposals</h2>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+                  {data.proposals.some((p) => p.status === 'sent') ? 'Waiting on your answer' : `${data.proposals.length} proposal${data.proposals.length === 1 ? '' : 's'}`}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {data.proposals.map((p) => {
+                const waiting = p.status === 'sent'
+                return (
+                  <a key={p.id} href={`/proposal/${p.token}`} className={`portal-proposal${waiting ? ' is-waiting' : ''}`}>
+                    <div className="min-w-0 flex-1">
+                      <p className="portal-proposal-name">{p.jobName}</p>
+                      <p className="portal-proposal-meta">
+                        {waiting ? `Sent ${formatDate(p.sentAt)}` : `${statusLabel(p.status)} ${formatDate(p.respondedAt)}`}
+                        {p.shootDate ? ` · Shoot ${formatDate(p.shootDate)}` : ''}
+                      </p>
+                    </div>
+                    <div className="portal-proposal-right">
+                      <span className="portal-proposal-total">{formatNZD(p.total)}</span>
+                      {waiting
+                        ? <span className="btn-primary btn-sm">Review <ArrowUpRight className="w-3.5 h-3.5" /></span>
+                        : <span className={`badge ${statusBadgeClass(p.status)}`}>{statusLabel(p.status)}</span>}
+                    </div>
+                  </a>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         <div>
           <div className="flex items-center gap-3 mb-4">

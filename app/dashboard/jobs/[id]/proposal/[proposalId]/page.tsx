@@ -8,13 +8,13 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
 
   const { data: proposal } = await supabase
     .from('proposals')
-    .select('id, job_id, token, status, cover_note, services, inclusions, payment_terms, total_value, sent_at, responded_at, created_at, jobs(id, name, job_type, shoot_date, shoot_location, client_id, clients(id, name))')
+    .select('id, job_id, token, status, cover_note, services, inclusions, payment_terms, total_value, sent_at, responded_at, created_at, jobs(id, name, job_type, shoot_date, shoot_location, client_id, clients(id, name, contact_person, email))')
     .eq('id', proposalId)
     .single()
 
   if (!proposal || proposal.job_id !== id) notFound()
 
-  const job = proposal.jobs as unknown as { id: string; name: string; job_type: string | null; shoot_date: string | null; shoot_location: string | null; client_id: string; clients: { id: string; name: string } }
+  const job = proposal.jobs as unknown as { id: string; name: string; job_type: string | null; shoot_date: string | null; shoot_location: string | null; client_id: string; clients: { id: string; name: string; contact_person: string | null; email: string | null } }
 
   const proposalData = {
     id: proposal.id,
@@ -35,7 +35,7 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
       jobType: job.job_type,
       shootDate: job.shoot_date,
       shootLocation: job.shoot_location,
-      client: job.clients,
+      client: { id: job.clients.id, name: job.clients.name, contactPerson: job.clients.contact_person, email: job.clients.email },
     },
   }
 

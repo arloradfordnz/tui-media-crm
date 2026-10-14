@@ -2,13 +2,16 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { acceptProposal, declineProposal } from '@/app/actions/proposals'
-import { formatNZD, formatDate, statusLabel } from '@/lib/format'
 import Image from 'next/image'
-import { Check, X, MapPin, Calendar, CheckCircle2 } from 'lucide-react'
+import { Check, X, MapPin, Calendar, Download, CheckCircle2 } from 'lucide-react'
+import { acceptProposal, declineProposal } from '@/app/actions/proposals'
+import { formatNZD } from '@/lib/format'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
+import ProposalDocument, { parseServices, parseInclusions } from '@/components/ProposalDocument'
 
-type ServiceLine = { description: string; amount: number }
+// Written out in full: a client reads "14 October 2026", not "14/10/26".
+const formatDate = (iso: string | null | undefined) =>
+  iso ? new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'long', year: 'numeric' }) : ''
 
 type ProposalData = {
   id: string
@@ -21,12 +24,13 @@ type ProposalData = {
   totalValue: number
   sentAt: string | null
   respondedAt: string | null
+  createdAt: string
   job: {
     name: string
     jobType: string | null
     shootDate: string | null
     shootLocation: string | null
-    client: { name: string }
+    client: { name: string; contactPerson: string | null }
   }
 }
 
@@ -34,148 +38,138 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [confirmSpec, setConfirm] = useState<ConfirmSpec | null>(null)
+  const [downloading, setDownloading] = useState(false)
 
-  let services: ServiceLine[] = []
-  try { services = JSON.parse(proposal.services) } catch { /* empty */ }
+  const services = parseServices(proposal.services)
+  const inclusions = parseInclusions(proposal.inclusions)
+  const issued = proposal.sentAt || proposal.createdAt
+  const open = proposal.status === 'sent'
 
-  const inclusionLines = proposal.inclusions?.split('\n').filter((l) => l.trim()) || []
+  async function download() {
+    setDownloading(true)
+    try {
+      const { downloadProposalPdf } = await import('@/lib/proposal-pdf')
+      await downloadProposalPdf({
+        jobName: proposal.job.name,
+        clientName: proposal.job.client.name,
+        contactPerson: proposal.job.client.contactPerson,
+        shootDate: proposal.job.shootDate,
+        shootLocation: proposal.job.shootLocation,
+        coverNote: proposal.coverNote,
+        services,
+        inclusions,
+        paymentTerms: proposal.paymentTerms,
+        totalValue: proposal.totalValue,
+        issuedAt: issued,
+        status: proposal.status,
+        respondedAt: proposal.respondedAt,
+        url: window.location.href,
+      })
+    } catch (err) {
+      console.error('Proposal PDF failed:', err)
+    }
+    setDownloading(false)
+  }
 
   function handleAccept() {
     setConfirm({
       title: 'Accept this proposal?',
-      body: 'This confirms you would like to go ahead. We will be in touch to lock in dates and next steps.',
+      body: 'This lets Arlo know you want to go ahead. He will be in touch to lock in the dates, and a short contract follows.',
       confirmLabel: 'Accept proposal',
-      onConfirm: () =>
-        startTransition(async () => {
-          await acceptProposal(proposal.token)
-          router.refresh()
-        }),
+      onConfirm: () => startTransition(async () => {
+        await acceptProposal(proposal.token)
+        router.refresh()
+      }),
     })
   }
 
   function handleDecline() {
     setConfirm({
       title: 'Decline this proposal?',
-      body: 'Nothing is final — if the scope or budget is not quite right, reply to us and we can look at alternatives.',
+      body: 'Nothing is final. If the scope or price is not quite right, reply to Arlo and he can rework it.',
       confirmLabel: 'Decline',
       destructive: true,
-      onConfirm: () =>
-        startTransition(async () => {
-          await declineProposal(proposal.token)
-          router.refresh()
-        }),
+      onConfirm: () => startTransition(async () => {
+        await declineProposal(proposal.token)
+        router.refresh()
+      }),
     })
   }
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--bg-base)' }}>
-      {/* Header */}
-      <header className="py-6 px-6 flex items-center justify-center" style={{ borderBottom: '1px solid var(--bg-border)' }}>
-        <Image className="logo-light" src="/Primary_Black.svg" alt="Tui Media" width={140} height={29} />
-        <Image className="logo-dark" src="/Primary_White.svg" alt="Tui Media" width={140} height={29} />
+    <div className="prop-page">
+      <header className="prop-topbar">
+        <Image className="logo-light" src="/Primary_Black.svg" alt="Tui Media" width={124} height={26} />
+        <Image className="logo-dark" src="/Primary_White.svg" alt="Tui Media" width={124} height={26} />
+        <button type="button" onClick={download} disabled={downloading} className="btn-ghost btn-sm prop-topbar-dl">
+          <Download className="w-3.5 h-3.5" /> {downloading ? 'Preparing…' : 'PDF'}
+        </button>
       </header>
 
-      <div className="max-w-3xl mx-auto px-6 py-10 space-y-8 animate-fade-in">
-        {/* Cover Section */}
-        <div className="text-center space-y-3">
-          <p className="label">Proposal</p>
-          <h1 className="text-3xl font-semibold" style={{ letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>{proposal.job.name}</h1>
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Prepared for {proposal.job.client.name}</p>
-          <div className="flex items-center justify-center gap-4 mt-3 text-sm" style={{ color: 'var(--text-tertiary)' }}>
-            {proposal.job.shootDate && (
-              <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {formatDate(proposal.job.shootDate)}</span>
-            )}
-            {proposal.job.shootLocation && (
-              <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {proposal.job.shootLocation}</span>
-            )}
-            {proposal.job.jobType && (
-              <span>{statusLabel(proposal.job.jobType)}</span>
-            )}
+      <main className="prop-main animate-fade-in">
+        <div className="prop-hero">
+          <p className="prop-eyebrow">Proposal · {formatDate(issued)}</p>
+          <h1 className="prop-title">{proposal.job.name}</h1>
+          <p className="prop-for">Prepared for {proposal.job.client.contactPerson ? `${proposal.job.client.contactPerson}, ` : ''}{proposal.job.client.name}</p>
+          {(proposal.job.shootDate || proposal.job.shootLocation) && (
+            <div className="prop-meta">
+              {proposal.job.shootDate && <span><Calendar className="w-3.5 h-3.5" /> {formatDate(proposal.job.shootDate)}</span>}
+              {proposal.job.shootLocation && <span><MapPin className="w-3.5 h-3.5" /> {proposal.job.shootLocation}</span>}
+            </div>
+          )}
+          <div className="prop-hero-total">
+            <span>{formatNZD(proposal.totalValue)}</span>
+            <small>total, no GST</small>
           </div>
         </div>
 
-        {/* Status Banner */}
         {proposal.status === 'accepted' && (
-          <div className="alert alert-success" style={{ display: 'block', textAlign: 'center' }}>
-            <p className="text-sm font-medium" style={{ color: 'var(--success)' }}>This proposal has been accepted. Thank you!</p>
+          <div className="prop-banner prop-banner-ok">
+            <CheckCircle2 className="w-4 h-4" /> You accepted this on {formatDate(proposal.respondedAt)}. Arlo will be in touch to lock in the dates.
           </div>
         )}
         {proposal.status === 'declined' && (
-          <div className="alert alert-danger" style={{ display: 'block', textAlign: 'center' }}>
-            <p className="text-sm font-medium" style={{ color: 'var(--danger)' }}>This proposal has been declined.</p>
+          <div className="prop-banner prop-banner-muted">
+            You declined this on {formatDate(proposal.respondedAt)}. If you&apos;d like a different option, just reply to Arlo.
           </div>
         )}
 
-        {/* Cover Note */}
-        {proposal.coverNote && (
-          <div className="card">
-            <p className="text-sm whitespace-pre-line" style={{ color: 'var(--text-primary)', lineHeight: '1.7' }}>{proposal.coverNote}</p>
-          </div>
-        )}
-
-        {/* Services & Pricing */}
-        <div className="card">
-          <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Services &amp; Pricing</h3>
-          <div className="space-y-3">
-            {services.map((s, i) => (
-              <div key={i} className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{s.description}</span>
-                <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{formatNZD(s.amount)}</span>
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-between items-center pt-4 mt-2" style={{ borderTop: '2px solid var(--bg-border)' }}>
-            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Total</span>
-            <span className="text-2xl font-semibold" style={{ color: 'var(--accent)' }}>{formatNZD(proposal.totalValue)}</span>
-          </div>
+        <div className="prop-card">
+          <ProposalDocument body={{ coverNote: proposal.coverNote, services, inclusions, paymentTerms: proposal.paymentTerms, totalValue: proposal.totalValue }} />
         </div>
 
-        {/* What's Included */}
-        {inclusionLines.length > 0 && (
-          <div className="card">
-            <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>What&apos;s Included</h3>
-            <ul className="space-y-2">
-              {inclusionLines.map((line, i) => (
-                <li key={i} className="flex items-start gap-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--success)' }} />
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Payment Terms */}
-        {proposal.paymentTerms && (
-          <div className="card">
-            <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Payment Terms</h3>
-            <p className="text-sm whitespace-pre-line" style={{ color: 'var(--text-secondary)', lineHeight: '1.7' }}>{proposal.paymentTerms}</p>
-          </div>
-        )}
-
-        {/* Signature / Accept / Decline */}
-        {proposal.status === 'sent' && (
-          <div className="card space-y-4">
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Your Response</h3>
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              If you&apos;re happy with this proposal, click Accept to proceed. We&apos;ll be in touch with next steps.
-            </p>
-            <div className="flex gap-3">
+        {open && (
+          <div className="prop-card prop-respond">
+            <div>
+              <h2 className="prop-h">Happy with it?</h2>
+              <p className="prop-respond-copy">Accept and Arlo will be in touch to lock in the dates. If something isn&apos;t quite right, decline or just reply to his email.</p>
+            </div>
+            <div className="prop-respond-actions">
               <button onClick={handleAccept} disabled={isPending} className="btn-primary">
-                <Check className="w-4 h-4" /> {isPending ? 'Processing...' : 'Accept Proposal'}
+                <Check className="w-4 h-4" /> {isPending ? 'Saving…' : 'Accept proposal'}
               </button>
-              <button onClick={handleDecline} disabled={isPending} className="btn-secondary" style={{ color: 'var(--danger)' }}>
+              <button onClick={handleDecline} disabled={isPending} className="btn-secondary">
                 <X className="w-4 h-4" /> Decline
               </button>
             </div>
           </div>
         )}
 
-        {/* Footer */}
-        <div className="text-center pt-8 pb-4">
-          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>&copy; {new Date().getFullYear()} Tui Media &middot; New Zealand</p>
+        <footer className="prop-footer">
+          <span>Tui Media · Nelson, New Zealand</span>
+          <a href="mailto:hello@tuimedia.nz">hello@tuimedia.nz</a>
+        </footer>
+      </main>
+
+      {/* On a phone the decision stays in reach while reading. */}
+      {open && (
+        <div className="prop-mobile-bar">
+          <span className="prop-mobile-total">{formatNZD(proposal.totalValue)}</span>
+          <button onClick={handleAccept} disabled={isPending} className="btn-primary btn-sm">
+            <Check className="w-3.5 h-3.5" /> Accept
+          </button>
         </div>
-      </div>
+      )}
 
       <ConfirmSheet spec={confirmSpec} onClose={() => setConfirm(null)} />
     </div>

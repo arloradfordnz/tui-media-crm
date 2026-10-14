@@ -139,4 +139,10 @@
 // knows as the first answer) and the drafter will not run until every answer
 // is in, so one prompt gets the document right the first time. Proposal edits
 // after that are free and instant, with no redraft.
-export const APP_VERSION = '3.20.0'
+// 3.21.0 — proposals cleaned up end to end. The editor has Edit and "What the
+// client sees" tabs, a status card and Download PDF. The client's proposal page
+// reads like a letter with the price up top and a sticky Accept on phones, and
+// can be downloaded as a PDF laid out like the contract. Sent proposals now
+// show in the client portal. The proposal drafter writes in Arlo's own voice,
+// learned from his sent emails.
+export const APP_VERSION = '3.21.0'
