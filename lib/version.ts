@@ -154,4 +154,5 @@
 // $300 or 4 for $500) instead of adding every line into one total: no total is
 // shown, the headline reads "From $300 a month", and accepting does not set a
 // job price. The proposal editor's side panel now lines up with the page.
-export const APP_VERSION = '3.23.0'
+// 3.23.1 — proposal editor: Save sits in the header instead of floating over the page, the Ask Tui tip is gone, spacing is one rhythm, and the PDF's next step is plain text.
+export const APP_VERSION = '3.23.1'

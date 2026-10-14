@@ -65,8 +65,6 @@ const s = StyleSheet.create({
   bulletText: { flex: 1, fontSize: 9.5, lineHeight: 1.45 },
   excluded: { fontSize: 9, color: C.grey, marginTop: 6 },
 
-  accept: { marginTop: 4, padding: 14, borderWidth: 0.5, borderColor: C.lgrey, borderRadius: 4 },
-  acceptText: { fontSize: 9.5, lineHeight: 1.5, color: C.dgrey },
 
   footer: { position: 'absolute', bottom: 28, left: 60, right: 60, flexDirection: 'row', justifyContent: 'space-between', fontSize: 8.5, color: C.grey },
 })
@@ -154,9 +152,9 @@ export default function ProposalPdf({ p }: { p: ProposalPdfData }): ReactElement
           </View>
         ) : null}
 
-        <View style={s.accept} wrap={false}>
-          <Text style={[s.h1, { marginBottom: 4 }]}>{accepted ? 'Accepted' : 'Next step'}</Text>
-          <Text style={s.acceptText}>
+        <View style={s.section} wrap={false}>
+          <Text style={s.h1}>{accepted ? 'Accepted' : 'Next step'}</Text>
+          <Text style={s.para}>
             {accepted && p.respondedAt
               ? `${p.clientName} accepted this proposal on ${longDate(p.respondedAt)}. A contract follows to lock in the details.`
               : `To go ahead, accept the proposal online${p.url ? ` at ${p.url}` : ''} or reply to Arlo. A short contract follows to lock in the dates.`}

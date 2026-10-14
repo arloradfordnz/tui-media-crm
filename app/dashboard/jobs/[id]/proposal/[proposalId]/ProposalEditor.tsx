@@ -2,7 +2,7 @@
 
 import { useActionState, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Send, ExternalLink, Plus, Trash2, Copy, Check, Download, Sparkles } from 'lucide-react'
+import { ArrowLeft, Send, ExternalLink, Plus, Trash2, Copy, Check, Download, Save } from 'lucide-react'
 import { updateProposal, sendProposal } from '@/app/actions/proposals'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass } from '@/lib/format'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
@@ -146,8 +146,13 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
           <button type="button" onClick={download} disabled={downloading} className="btn-secondary">
             <Download className="w-4 h-4" /> {downloading ? 'Preparing…' : 'Download PDF'}
           </button>
+          {isDraft && dirty && (
+            <button type="submit" form="proposal-form" disabled={saving} className="btn-primary">
+              <Save className="w-4 h-4" /> {saving ? 'Saving…' : 'Save changes'}
+            </button>
+          )}
           {isDraft && (
-            <button type="button" onClick={handleSend} disabled={sending || dirty} className="btn-primary" title={dirty ? 'Save your changes first' : undefined}>
+            <button type="button" onClick={handleSend} disabled={sending || dirty} className={dirty ? 'btn-secondary' : 'btn-primary'} title={dirty ? 'Save your changes first' : undefined}>
               <Send className="w-4 h-4" /> {sending ? 'Sending…' : 'Send to client'}
             </button>
           )}
@@ -164,7 +169,7 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
       </div>
 
       <div className="prop-editor-grid">
-        <div className="space-y-4 min-w-0">
+        <div className="space-y-5 min-w-0">
           {tab === 'preview' ? (
             <div className="card prop-preview">
               <div className="prop-preview-head">
@@ -175,14 +180,14 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
               <ProposalDocument body={{ coverNote, services, inclusions: inclusionList, paymentTerms, totalValue: total, pricingMode, priceSuffix }} />
             </div>
           ) : (
-            <form action={action} onSubmit={() => setDirty(false)} className="space-y-4">
+            <form id="proposal-form" action={action} onSubmit={() => setDirty(false)} className="space-y-5">
               <input type="hidden" name="proposalId" value={proposal.id} />
               <input type="hidden" name="services" value={JSON.stringify(services)} />
               <input type="hidden" name="totalValue" value={total} />
               <input type="hidden" name="pricingMode" value={pricingMode} />
               <input type="hidden" name="priceSuffix" value={priceSuffix} />
 
-              <section className="card space-y-3">
+              <section className="card space-y-4">
                 <div>
                   <h3 className="prop-edit-h">Cover note</h3>
                   <p className="prop-edit-hint">The letter at the top. Keep it short and in your own words.</p>
@@ -190,7 +195,7 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
                 <textarea name="coverNote" rows={9} value={coverNote} onChange={(e) => { setCoverNote(e.target.value); touch() }} className="field-input" disabled={!isDraft} placeholder={`Hi ${proposal.job.client.contactPerson?.split(' ')[0] || 'there'},`} />
               </section>
 
-              <section className="card space-y-3">
+              <section className="card space-y-4">
                 <div>
                   <h3 className="prop-edit-h">Services and pricing</h3>
                   <p className="prop-edit-hint">NZD, no GST.</p>
@@ -240,7 +245,7 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
                 </div>
               </section>
 
-              <section className="card space-y-3">
+              <section className="card space-y-4">
                 <div>
                   <h3 className="prop-edit-h">What&apos;s included</h3>
                   <p className="prop-edit-hint">One item per line. Each becomes a tick in the proposal.</p>
@@ -248,7 +253,7 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
                 <textarea name="inclusions" rows={7} value={inclusions} onChange={(e) => { setInclusions(e.target.value); touch() }} className="field-input" disabled={!isDraft} />
               </section>
 
-              <section className="card space-y-3">
+              <section className="card space-y-4">
                 <div>
                   <h3 className="prop-edit-h">Payment terms</h3>
                   <p className="prop-edit-hint">Deposit, when the rest is due, and how long the price is good for.</p>
@@ -256,18 +261,7 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
                 <textarea name="paymentTerms" rows={4} value={paymentTerms} onChange={(e) => { setPaymentTerms(e.target.value); touch() }} className="field-input" disabled={!isDraft} />
               </section>
 
-              {/* Only there while there is something to save, so it never sits
-                  over the last card for nothing. */}
-              {isDraft && (dirty || saving || state?.error) && (
-                <div className="prop-save-bar">
-                  <span className="text-sm" style={{ color: state?.error ? 'var(--danger)' : 'var(--text-secondary)' }}>
-                    {state?.error ? state.error : 'Unsaved changes'}
-                  </span>
-                  <button type="submit" disabled={saving} className="btn-primary">
-                    {saving ? 'Saving…' : 'Save'}
-                  </button>
-                </div>
-              )}
+              {state?.error && <div className="alert alert-danger">{state.error}</div>}
             </form>
           )}
         </div>
@@ -295,7 +289,7 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
           </div>
 
           {!isDraft && (
-            <div className="card space-y-3">
+            <div className="card space-y-4">
               <span className="label">Client link</span>
               <code className="prop-link">{proposalUrl.replace(/^https?:\/\//, '')}</code>
               <div className="flex gap-2">
@@ -310,12 +304,6 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
             </div>
           )}
 
-          {isDraft && (
-            <div className="prop-tip">
-              <Sparkles className="w-4 h-4 shrink-0" />
-              <p>Ask Tui to change anything (&ldquo;make the deposit 30%&rdquo;) and it edits this draft directly, no redraft.</p>
-            </div>
-          )}
         </aside>
       </div>
 
