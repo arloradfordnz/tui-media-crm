@@ -157,4 +157,5 @@
 // 3.23.1 — proposal editor: Save sits in the header instead of floating over the page, the Ask Tui tip is gone, spacing is one rhythm, and the PDF's next step is plain text.
 // 3.24.0 — travel fees are asked in the proposal and contract intake (named places, flat fee beyond them) and written as a plain sentence in Payment terms and the contract's fees clause, not as a grey "Not included" footnote.
 // 3.24.1 — proposal Save and Send to client work from any tab and always say what happened (saved, sent, or why not). Send saves unsaved edits first; a failed email no longer looks like a failed send.
-export const APP_VERSION = '3.24.1'
+// 3.24.2 — proposals are listed on the Documents page with their status. Dates everywhere are read in NZ time, so a document made on the morning of the 14th no longer shows as the 13th. Blank documents cleared out.
+export const APP_VERSION = '3.24.2'

@@ -22,9 +22,19 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     .order('created_at', { ascending: false })
   if (params.clientId) query = query.eq('client_id', params.clientId)
   if (search) query = query.ilike('name', `%${search}%`)
-  const { data: docs } = await query
 
-  const rows = (docs ?? []).map((d) => {
+  // Proposals live in their own table (they have a page the client accepts on),
+  // but to Arlo they are paperwork like the rest, so they are listed here too.
+  let proposalQuery = supabase
+    .from('proposals')
+    .select('id, status, created_at, job_id, jobs!inner(id, name, client_id, clients(id, name))')
+    .order('created_at', { ascending: false })
+  if (params.clientId) proposalQuery = proposalQuery.eq('jobs.client_id', params.clientId)
+  if (search) proposalQuery = proposalQuery.ilike('jobs.name', `%${search}%`)
+
+  const [{ data: docs }, { data: proposals }] = await Promise.all([query, proposalQuery])
+
+  const docRows = (docs ?? []).map((d) => {
     let signed = false
     let isStructured = false
     try {
@@ -33,8 +43,13 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       signed = Boolean(form?.clientSignature)
     } catch { /* free text */ }
     const client = d.clients as unknown as { id: string; name: string } | null
-    return { ...d, client, signed, isStructured }
+    return { id: d.id, href: `/dashboard/documents/${d.id}`, name: d.name as string, doc_type: d.doc_type as string | null, created_at: d.created_at as string, client, signed, isStructured, proposalStatus: null as string | null }
   })
+  const proposalRows = (proposals ?? []).map((p) => {
+    const job = p.jobs as unknown as { id: string; name: string; clients: { id: string; name: string } | null }
+    return { id: p.id, href: `/dashboard/jobs/${p.job_id}/proposal/${p.id}`, name: `Proposal - ${job.name}`, doc_type: 'proposal', created_at: p.created_at as string, client: job.clients, signed: false, isStructured: false, proposalStatus: p.status as string }
+  })
+  const rows = [...docRows, ...proposalRows].sort((x, y) => y.created_at.localeCompare(x.created_at))
   const clientName = params.clientId ? rows[0]?.client?.name : null
 
   return (
@@ -43,7 +58,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
         <div className="page-header-left">
           <h1 className="page-title">Documents</h1>
           <p className="page-subtitle">
-            {clientName ? `Everything for ${clientName}.` : 'Every contract and document. Ask Tui to draft a new one.'}
+            {clientName ? `Everything for ${clientName}.` : 'Every proposal, contract and document. Ask Tui to draft a new one.'}
           </p>
         </div>
         <div className="page-header-actions">
@@ -59,7 +74,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
           <FileText className="w-10 h-10 empty-icon" />
           <p className="empty-title">No documents found</p>
           <p className="empty-description">
-            {search ? 'Try a different search.' : 'Ask Tui to draft a contract and it will appear here.'}
+            {search ? 'Try a different search.' : 'Ask Tui to draft a proposal or contract and it will appear here.'}
           </p>
         </div>
       ) : (
@@ -81,7 +96,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
                       <span className="avatar avatar-sm shrink-0" aria-hidden="true">
                         {d.client ? getInitials(d.client.name) : <FileText className="w-3.5 h-3.5" />}
                       </span>
-                      <Link href={`/dashboard/documents/${d.id}`} className="job-identity-text">
+                      <Link href={d.href} className="job-identity-text">
                         <span className="job-identity-client">{d.client?.name ?? 'No client'}</span>
                         <span className="job-identity-job">{d.name}</span>
                       </Link>
@@ -94,7 +109,11 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
                     {formatDate(d.created_at)}
                   </td>
                   <td className="px-4 py-4 text-right text-sm" data-role="trailing">
-                    {d.doc_type === 'contract' && d.isStructured ? (
+                    {d.proposalStatus ? (
+                      <span className={`badge ${d.proposalStatus === 'accepted' ? 'badge-success' : d.proposalStatus === 'declined' ? 'badge-danger' : 'badge-muted'}`}>
+                        {d.proposalStatus === 'sent' ? 'Awaiting answer' : statusLabel(d.proposalStatus)}
+                      </span>
+                    ) : d.doc_type === 'contract' && d.isStructured ? (
                       d.signed
                         ? <span className="badge badge-success">Signed</span>
                         : <span className="badge badge-muted">Awaiting signature</span>

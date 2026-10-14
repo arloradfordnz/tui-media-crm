@@ -5,23 +5,31 @@ export function formatNZD(amount: number): string {
   return `$${amount.toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+// Always read in New Zealand time. Rows are stored as UTC instants, and the
+// server runs in UTC, so with local getters a document made at 8am on the 14th
+// in Nelson (7pm on the 13th UTC) was shown as the 13th, and the same date
+// differed between the server render and the browser.
+const NZ_TZ = 'Pacific/Auckland'
+function nzParts(d: Date): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const p of new Intl.DateTimeFormat('en-NZ', { timeZone: NZ_TZ, day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true }).formatToParts(d)) {
+    out[p.type] = p.value
+  }
+  return out
+}
+
 export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return '—'
   const d = typeof date === 'string' ? new Date(date) : date
-  const dd = String(d.getDate()).padStart(2, '0')
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const yy = String(d.getFullYear()).slice(2)
-  return `${dd}/${mm}/${yy}`
+  const p = nzParts(d)
+  return `${p.day}/${p.month}/${p.year}`
 }
 
 export function formatDateTime(date: Date | string | null | undefined): string {
   if (!date) return '—'
   const d = typeof date === 'string' ? new Date(date) : date
-  const dd = String(d.getDate()).padStart(2, '0')
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const yy = String(d.getFullYear()).slice(2)
-  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  return `${dd}/${mm}/${yy} ${time}`
+  const p = nzParts(d)
+  return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute} ${String(p.dayPeriod ?? '').toLowerCase()}`.trim()
 }
 
 /**
