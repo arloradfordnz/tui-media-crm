@@ -1,10 +1,11 @@
 'use client'
 
 import { useActionState, useState } from 'react'
-import { createEvent, deleteEvent } from '@/app/actions/events'
+import { createEvent, deleteEvent, updateEventLinks } from '@/app/actions/events'
 import { statusLabel } from '@/lib/format'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Plus, X, Trash2, Calendar } from 'lucide-react'
+import Link from 'next/link'
+import { ChevronLeft, ChevronRight, Plus, X, Trash2, Calendar, Link2, Check } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import DatePicker from '@/components/DatePicker'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
@@ -30,12 +31,84 @@ type EventData = {
   endTime: string | null
   notes: string | null
   job: { id: string; name: string } | null
+  client: { id: string; name: string } | null
 }
 
-export default function CalendarView({ events, jobs, month, year, feedToken }: { events: EventData[]; jobs: { id: string; name: string }[]; month: number; year: number; feedToken: string | null }) {
+type JobOption = { id: string; name: string; client_id: string | null }
+type ClientOption = { id: string; name: string }
+
+// Client and job pickers that stay consistent: choosing a job fills in its
+// client, and choosing a client narrows the jobs to theirs. Used by both the
+// new-event form and the link editor on an existing event.
+function LinkPickers({ jobs, clients, initialClient = '', initialJob = '' }: { jobs: JobOption[]; clients: ClientOption[]; initialClient?: string; initialJob?: string }) {
+  const [clientId, setClientId] = useState(initialClient)
+  const [jobId, setJobId] = useState(initialJob)
+  const jobOptions = jobs.filter((j) => !clientId || j.client_id === clientId)
+  return (
+    <>
+      <Field label="Linked Client">
+        <CustomSelect
+          name="clientId"
+          placeholder="None"
+          searchable
+          value={clientId}
+          onChange={(v) => { setClientId(v); if (jobId && v && jobs.find((j) => j.id === jobId)?.client_id !== v) setJobId('') }}
+          options={[{ value: '', label: 'None' }, ...clients.map((c) => ({ value: c.id, label: c.name }))]}
+        />
+      </Field>
+      <Field label="Linked Job">
+        <CustomSelect
+          name="jobId"
+          placeholder="None"
+          searchable
+          value={jobId}
+          onChange={(v) => { setJobId(v); const owner = jobs.find((j) => j.id === v)?.client_id; if (owner) setClientId(owner) }}
+          options={[{ value: '', label: 'None' }, ...jobOptions.map((j) => ({ value: j.id, label: j.name }))]}
+        />
+      </Field>
+    </>
+  )
+}
+
+function LinkChips({ event }: { event: EventData }) {
+  if (!event.client && !event.job) return null
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+      {event.client && <Link href={`/dashboard/clients/${event.client.id}`} className="badge badge-accent">{event.client.name}</Link>}
+      {event.job && <Link href={`/dashboard/jobs/${event.job.id}`} className="badge badge-muted">{event.job.name}</Link>}
+    </div>
+  )
+}
+
+function EditLinks({ event, jobs, clients, onDone }: { event: EventData; jobs: JobOption[]; clients: ClientOption[]; onDone: () => void }) {
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  return (
+    <form
+      className="space-y-3 mt-2"
+      action={async (fd) => {
+        setSaving(true)
+        const res = await updateEventLinks(event.id, String(fd.get('clientId') ?? ''), String(fd.get('jobId') ?? ''))
+        setSaving(false)
+        if (res.error) setError(res.error)
+        else onDone()
+      }}
+    >
+      <LinkPickers jobs={jobs} clients={clients} initialClient={event.client?.id ?? ''} initialJob={event.job?.id ?? ''} />
+      {error && <p className="text-xs" style={{ color: 'var(--danger)' }}>{error}</p>}
+      <div className="flex gap-2">
+        <button type="submit" disabled={saving} className="btn-primary btn-sm"><Check className="w-3.5 h-3.5" /> {saving ? 'Saving…' : 'Save'}</button>
+        <button type="button" className="btn-ghost btn-sm" onClick={onDone}>Cancel</button>
+      </div>
+    </form>
+  )
+}
+
+export default function CalendarView({ events, jobs, clients, month, year, feedToken }: { events: EventData[]; jobs: JobOption[]; clients: ClientOption[]; month: number; year: number; feedToken: string | null }) {
   const router = useRouter()
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const [showModal, setShowModal] = useState(false)
+  const [editingLinks, setEditingLinks] = useState<string | null>(null)
   const [confirmSpec, setConfirm] = useState<ConfirmSpec | null>(null)
   const [state, action, pending] = useActionState(createEvent, undefined)
 
@@ -190,7 +263,7 @@ export default function CalendarView({ events, jobs, month, year, feedToken }: {
                       />
                       <span className="agenda-body">
                         <span className="agenda-title">{e.title}</span>
-                        {e.job && <span className="agenda-job">{e.job.name}</span>}
+                        {(e.client || e.job) && <span className="agenda-job">{[e.client?.name, e.job?.name].filter(Boolean).join(' · ')}</span>}
                       </span>
                     </button>
                   ))}
@@ -220,7 +293,18 @@ export default function CalendarView({ events, jobs, month, year, feedToken }: {
                     {e.startTime && <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{e.startTime}{e.endTime ? ` – ${e.endTime}` : ''}</span>}
                   </div>
                   {e.notes && <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>{e.notes}</p>}
-                  {e.job && <p className="text-xs mt-1" style={{ color: 'var(--accent)' }}>Job: {e.job.name}</p>}
+                  {editingLinks === e.id ? (
+                    <EditLinks event={e} jobs={jobs} clients={clients} onDone={() => setEditingLinks(null)} />
+                  ) : (
+                    <>
+                      <LinkChips event={e} />
+                      {e.eventType !== 'iphone' && (
+                        <button type="button" className="text-xs mt-1.5 inline-flex items-center gap-1" style={{ color: 'var(--text-tertiary)' }} onClick={() => setEditingLinks(e.id)}>
+                          <Link2 className="w-3 h-3" /> {e.client || e.job ? 'Change link' : 'Link to a client or job'}
+                        </button>
+                      )}
+                    </>
+                  )}
                 </div>
                 {/* Mirrored from the phone: it would be back on the next sync,
                     so the only real delete is on the phone. */}
@@ -278,14 +362,7 @@ export default function CalendarView({ events, jobs, month, year, feedToken }: {
                   <input name="endTime" type="time" className="field-input" />
       </Field>
               </div>
-              <Field label="Linked Job">
-                <CustomSelect
-                  name="jobId"
-                  placeholder="None"
-                  searchable
-                  options={[{ value: '', label: 'None' }, ...jobs.map((j) => ({ value: j.id, label: j.name }))]}
-                />
-      </Field>
+              <LinkPickers jobs={jobs} clients={clients} />
               <Field label="Notes">
                 <textarea name="notes" rows={2} className="field-input" />
       </Field>

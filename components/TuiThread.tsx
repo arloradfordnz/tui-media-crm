@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowUp, ExternalLink, Check, AlertTriangle, ShieldAlert, Search, ListChecks } from 'lucide-react'
+import { ArrowUp, ExternalLink, Check, AlertTriangle, ShieldAlert, Search, ListChecks, Send } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import type { ThreadMessage } from '@/lib/tui/thread'
@@ -46,7 +46,7 @@ import { renderMarkdown } from './chat-markup'
 
 type Receipt = { id: string; name?: string; label: string; state: 'running' | 'done' | 'failed'; detail?: string }
 type LinkOut = { path: string; label: string }
-type Confirm = { fingerprint: string; action: string }
+type Confirm = { fingerprint: string; action: string; tone?: 'go' | 'danger' }
 
 type Ask = { id: string; questions: AskQuestion[]; answered?: boolean }
 
@@ -458,7 +458,7 @@ export default function TuiThread({
             case 'confirm':
               patchLast((m) => ({
                 ...m,
-                confirms: [...(m.confirms ?? []), { fingerprint: ev.fingerprint, action: ev.action }],
+                confirms: [...(m.confirms ?? []), { fingerprint: ev.fingerprint, action: ev.action, tone: ev.tone }],
               }))
               break
             case 'link':
@@ -743,35 +743,43 @@ export default function TuiThread({
                   </div>
                 )}
 
-                {(m.confirms ?? []).map((c) => (
-                  <div
-                    key={c.fingerprint}
-                    className="rounded-xl px-3.5 py-3 space-y-2.5"
-                    style={{ background: 'var(--bg-elevated)', border: '1px solid var(--danger)' }}
-                  >
-                    <div className="flex gap-2">
-                      <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--danger)' }} />
-                      <p className="text-xs leading-relaxed" style={{ color: 'var(--text-primary)' }}>{c.action}</p>
+                {(m.confirms ?? []).map((c) => {
+                  // Green for a forward step (sending an invoice), red for
+                  // anything that destroys something.
+                  const go = c.tone === 'go'
+                  const tone = go ? 'var(--success)' : 'var(--danger)'
+                  return (
+                    <div
+                      key={c.fingerprint}
+                      className="rounded-xl px-3.5 py-3 space-y-3"
+                      style={{ background: 'var(--bg-elevated)', border: `1px solid ${tone}` }}
+                    >
+                      <div className="flex gap-2.5 items-start">
+                        {go
+                          ? <Send className="w-4 h-4 shrink-0 mt-0.5" style={{ color: tone }} />
+                          : <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" style={{ color: tone }} />}
+                        <p className="text-sm leading-snug" style={{ color: 'var(--text-primary)' }}>{c.action}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => approve(c)}
+                          disabled={loading}
+                          className="px-3.5 py-1.5 rounded-lg text-xs font-semibold"
+                          style={{ background: tone, color: 'var(--bg-base)' }}
+                        >
+                          {go ? 'Send' : 'Confirm'}
+                        </button>
+                        <button
+                          onClick={() => dismiss(c)}
+                          className="px-3.5 py-1.5 rounded-lg text-xs"
+                          style={{ background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--bg-border)' }}
+                        >
+                          Not now
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => approve(c)}
-                        disabled={loading}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium"
-                        style={{ background: 'var(--danger)', color: 'var(--bg-base)' }}
-                      >
-                        Confirm
-                      </button>
-                      <button
-                        onClick={() => dismiss(c)}
-                        className="px-3 py-1.5 rounded-lg text-xs"
-                        style={{ background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--bg-border)' }}
-                      >
-                        Not now
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
 
                 {runLinks.length > 0 && !loading && (
                   <div className="flex flex-wrap gap-1.5 justify-start">

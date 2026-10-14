@@ -18,7 +18,7 @@ export type TuiEvent =
   /** That tool call finished. `detail` is a short human summary of the result. */
   | { t: 'tool_done'; id: string; ok: boolean; detail?: string }
   /** A destructive tool was blocked pending explicit approval. */
-  | { t: 'confirm'; fingerprint: string; action: string }
+  | { t: 'confirm'; fingerprint: string; action: string; tone?: 'go' | 'danger' }
   /** An entity was created and is worth a jump-to button. */
   | { t: 'link'; path: string; label: string }
   /** Server data changed; the client should revalidate. */
@@ -97,6 +97,7 @@ const TOOL_VERBS: Record<string, string> = {
   complete_todo: 'Completing to-do',
   list_events: 'Reading calendar',
   create_event: 'Adding to calendar',
+  update_event: 'Updating calendar event',
   delete_event: 'Deleting event',
   list_documents: 'Reading documents',
   create_document: 'Creating document',

@@ -483,7 +483,7 @@ export async function POST(request: NextRequest) {
                   toolInput: block.input as Record<string, unknown>,
                   description: parsed.action ?? 'Confirm this action.',
                 }).catch(() => null)
-                send({ t: 'confirm', fingerprint: parsed.fingerprint, action: parsed.action ?? 'Confirm this action.' })
+                send({ t: 'confirm', fingerprint: parsed.fingerprint, action: parsed.action ?? 'Confirm this action.', tone: parsed.tone === 'go' ? 'go' : 'danger' })
               }
               if (parsed.success) {
                 if (parsed.client?.id) send({ t: 'link', path: `/dashboard/clients/${parsed.client.id}`, label: `View ${parsed.client.name || 'Client'}` })

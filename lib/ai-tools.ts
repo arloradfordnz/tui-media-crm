@@ -45,7 +45,7 @@ export const DASHBOARD_ONLY_TOOLS = new Set(['ask_arlo'])
 export const MUTATING_TOOLS = new Set([
   'create_client', 'update_client',
   'create_job', 'update_job', 'update_job_status', 'delete_job', 'toggle_task',
-  'create_event', 'delete_event',
+  'create_event', 'update_event', 'delete_event',
   'create_document', 'delete_document',
   'create_contract', 'update_contract',
   'create_deliverable',
@@ -91,18 +91,47 @@ export function toolFingerprint(name: string, input: Record<string, unknown>): s
   return createHash('sha256').update(payload).digest('hex').slice(0, 16)
 }
 
+// How the confirmation card is drawn. Sending an invoice is an ordinary
+// forward step Arlo asked for, so its card is green; the rest destroy
+// something and stay red.
+export function confirmTone(name: string): 'go' | 'danger' {
+  return name === 'send_xero_invoice' ? 'go' : 'danger'
+}
+
+const nzdFmt = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' })
+
 // Plain-English description of what is about to happen, so the confirmation
-// the user sees is about the act, not about a tool name.
-function describeAction(name: string, input: Record<string, unknown>): string {
+// the user sees is about the act, not about a tool name. Reads the record so
+// the card names the invoice, client and amount instead of showing an id.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function describeAction(name: string, input: Record<string, unknown>, supabase: any): Promise<string> {
   const id = (k: string) => String(input[k] ?? '')
+  const nameOf = async (table: string, col: string, key: string, fallback: string) => {
+    try {
+      const { data } = await supabase.from(table).select(col).eq('id', id(key)).maybeSingle()
+      return (data as Record<string, string> | null)?.[col] ? `"${(data as Record<string, string>)[col]}"` : fallback
+    } catch { return fallback }
+  }
+  const xeroInvoice = async () => {
+    try { return await getXeroInvoice(id('invoice_id')) } catch { return null }
+  }
+  const invoiceLabel = (inv: Awaited<ReturnType<typeof getXeroInvoice>>) =>
+    inv ? `invoice ${inv.InvoiceNumber}${inv.Contact?.Name ? ` for ${inv.Contact.Name}` : ''} (${nzdFmt.format(inv.Total)})` : 'this invoice'
+
   switch (name) {
-    case 'send_xero_invoice': return `Email Xero invoice ${id('invoice_id')} to the client. This approves it first if it is still a draft.`
-    case 'delete_job': return `Permanently delete job ${id('job_id')}, including its tasks and deliverables.`
-    case 'delete_event': return `Permanently delete calendar event ${id('event_id')}.`
-    case 'delete_document': return `Permanently delete document ${id('document_id')}.`
-    case 'void_xero_invoice': return `Void Xero invoice ${id('invoice_id')}. Xero has no un-void.`
-    case 'delete_xero_invoice': return `Permanently delete Xero invoice ${id('invoice_id')}.`
-    case 'remove_xero_payment': return `Remove Xero payment ${id('payment_id')}. This also un-reconciles the bank transaction it was matched to.`
+    case 'send_xero_invoice': {
+      const inv = await xeroInvoice()
+      if (!inv) return 'Email this invoice to the client.'
+      const to = inv.Contact?.Name ? ` to ${inv.Contact.Name}` : ' to the client'
+      const draft = inv.Status === 'DRAFT' ? ' It will be approved first.' : ''
+      return `Email invoice ${inv.InvoiceNumber} (${nzdFmt.format(inv.Total)})${to}.${draft}`
+    }
+    case 'delete_job': return `Delete ${await nameOf('jobs', 'name', 'job_id', 'this job')} with its tasks and deliverables. This can't be undone.`
+    case 'delete_event': return `Delete ${await nameOf('events', 'title', 'event_id', 'this event')} from the calendar.`
+    case 'delete_document': return `Delete ${await nameOf('documents', 'name', 'document_id', 'this document')}. This can't be undone.`
+    case 'void_xero_invoice': return `Void ${invoiceLabel(await xeroInvoice())}. Xero has no un-void.`
+    case 'delete_xero_invoice': return `Delete ${invoiceLabel(await xeroInvoice())}. This can't be undone.`
+    case 'remove_xero_payment': return 'Remove this Xero payment. The bank transaction it was matched to becomes unreconciled and needs matching again.'
     default: return `Run ${name}.`
   }
 }
@@ -364,9 +393,29 @@ export const TOOLS: Anthropic.Tool[] = [
         start_time: { type: 'string', description: 'Time in HH:MM format' },
         end_time: { type: 'string', description: 'Time in HH:MM format' },
         notes: { type: 'string' },
-        job_id: { type: 'string', description: 'Optional job ID to link this event to' },
+        job_id: { type: 'string', description: 'Optional job ID to link this event to. The client is filled in from the job.' },
+        client_id: { type: 'string', description: 'Optional client ID to link this event to when there is no job (a meeting with a client, say). Take it from the roster. Ignored if job_id is given.' },
       },
       required: ['title', 'date'],
+    },
+  },
+  {
+    name: 'update_event',
+    description: 'Change a calendar event: its title, date, times, notes, or which client and job it is linked to. Use list_events to find the id. To link an existing event to a client or job, pass client_id and/or job_id; pass an empty string to unlink.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        event_id: { type: 'string' },
+        title: { type: 'string' },
+        event_type: { type: 'string', enum: ['shoot', 'meeting', 'deadline', 'personal'] },
+        date: { type: 'string', description: 'ISO date (YYYY-MM-DD)' },
+        start_time: { type: 'string', description: 'HH:MM' },
+        end_time: { type: 'string', description: 'HH:MM' },
+        notes: { type: 'string' },
+        job_id: { type: 'string', description: 'Job to link, or "" to unlink. The client follows the job.' },
+        client_id: { type: 'string', description: 'Client to link, or "" to unlink. Ignored if job_id is set.' },
+      },
+      required: ['event_id'],
     },
   },
   {
@@ -845,9 +894,10 @@ export async function executeTool(
       return JSON.stringify({
         status: 'confirmation_required',
         fingerprint,
-        action: describeAction(name, input),
+        action: await describeAction(name, input, supabase),
+        tone: confirmTone(name),
         instruction:
-          'NOT executed. Tell Arlo exactly what you are about to do and ask him to confirm. Do not retry this tool until he has. ' +
+          'NOT executed yet. Arlo now has a button showing exactly what will happen, so do not restate it and never quote an id. Say one short line, like "Ready to send, tap Send.", and stop. Do not retry this tool until he has confirmed. ' +
           'Once he does confirm (he taps Confirm, or says yes), you MUST call this exact tool again with these exact arguments — that second call is the only thing that actually performs the action. Approving does not run it for you, and answering "sending it now" without making the call means nothing happens at all.',
       })
     }
@@ -1115,7 +1165,7 @@ export async function executeTool(
       const fromDate = (input.from_date as string) || new Date().toISOString().split('T')[0]
       const toDate = (input.to_date as string) || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
 
-      let query = supabase.from('events').select('id, title, event_type, date, start_time, end_time, notes, job_id, jobs(name)')
+      let query = supabase.from('events').select('id, title, event_type, date, start_time, end_time, notes, job_id, client_id, jobs(name), clients(name)')
         .gte('date', fromDate)
         .lte('date', toDate)
 
@@ -1131,10 +1181,10 @@ export async function executeTool(
       // booked ahead of time counts toward that client's month the same way a
       // shoot logged after the fact does.
       const eventJobId = (input.job_id as string) || null
-      let eventClientId: string | null = null
+      let eventClientId: string | null = (input.client_id as string) || null
       if (eventJobId) {
         const { data: parentJob } = await supabase.from('jobs').select('client_id').eq('id', eventJobId).maybeSingle()
-        eventClientId = (parentJob as { client_id: string | null } | null)?.client_id ?? null
+        eventClientId = (parentJob as { client_id: string | null } | null)?.client_id ?? eventClientId
       }
 
       const { data, error } = await supabase.from('events').insert({
@@ -1155,6 +1205,32 @@ export async function executeTool(
     // one month gets recorded at all: jobs.shoot_date holds exactly one date,
     // so a month job cannot represent two filming days. The event carries the
     // client directly for that reason.
+    case 'update_event': {
+      const updates: Record<string, unknown> = {}
+      if (input.title !== undefined) updates.title = String(input.title)
+      if (input.event_type !== undefined) updates.event_type = String(input.event_type)
+      if (input.date !== undefined) updates.date = new Date(input.date as string).toISOString()
+      if (input.start_time !== undefined) updates.start_time = (input.start_time as string) || null
+      if (input.end_time !== undefined) updates.end_time = (input.end_time as string) || null
+      if (input.notes !== undefined) updates.notes = (input.notes as string) || null
+      if (input.job_id !== undefined) {
+        const jobId = (input.job_id as string) || null
+        updates.job_id = jobId
+        if (jobId) {
+          const { data: parentJob } = await supabase.from('jobs').select('client_id').eq('id', jobId).maybeSingle()
+          if (parentJob?.client_id) updates.client_id = parentJob.client_id
+        } else if (input.client_id === undefined) {
+          updates.client_id = null
+        }
+      }
+      if (input.client_id !== undefined && updates.client_id === undefined) updates.client_id = (input.client_id as string) || null
+      if (Object.keys(updates).length === 0) return JSON.stringify({ error: 'Nothing to change.' })
+      const { data, error } = await supabase.from('events').update(updates).eq('id', input.event_id as string)
+        .select('id, title, date, job_id, client_id, jobs(name), clients(name)').single()
+      if (error) return JSON.stringify({ error: dbErrorMessage(error) })
+      return JSON.stringify({ success: true, event: data })
+    }
+
     case 'log_shoot': {
       const query = (input.client_name as string).trim()
       const { data: matches, error: clientError } = await supabase

@@ -126,4 +126,9 @@
 // 3.18.0 — Tui has a long-term memory: tell it how you work ("a reel takes me
 // an hour") and it remembers on the dashboard and Telegram. Settings → Memory
 // lists everything it knows, grouped, with edit, delete and add.
-export const APP_VERSION = '3.18.0'
+// 3.19.0 — calendar events link to a client and a job: pick them when adding
+// an event or change them on an existing one, Tui does the same by chat, and
+// the links open the client or job. The invoice Send card is green and reads
+// "Email invoice INV-0168 ($200.00) to Sky Automotive" instead of showing an
+// id, and Tui no longer asks "want me to send it?" before showing it.
+export const APP_VERSION = '3.19.0'

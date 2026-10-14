@@ -12,14 +12,15 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   const supabase = await createServerSupabaseClient()
 
-  const [{ data: events }, { data: jobs }] = await Promise.all([
+  const [{ data: events }, { data: jobs }, { data: clients }] = await Promise.all([
     supabase
       .from('events')
-      .select('id, title, event_type, date, start_time, end_time, notes, job_id, jobs(id, name)')
+      .select('id, title, event_type, date, start_time, end_time, notes, job_id, client_id, jobs(id, name), clients(id, name)')
       .gte('date', startDate)
       .lte('date', endDate)
       .order('start_time', { ascending: true }),
-    supabase.from('jobs').select('id, name').order('name', { ascending: true }),
+    supabase.from('jobs').select('id, name, client_id').order('name', { ascending: true }),
+    supabase.from('clients').select('id, name').order('name', { ascending: true }),
   ])
 
   // Normalise for CalendarView (expects camelCase)
@@ -33,12 +34,14 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     notes: e.notes,
     jobId: e.job_id,
     job: e.jobs as unknown as { id: string; name: string } | null,
+    client: e.clients as unknown as { id: string; name: string } | null,
   }))
 
   return (
     <CalendarView
       events={normalisedEvents}
       jobs={jobs ?? []}
+      clients={clients ?? []}
       month={month}
       year={year}
       feedToken={process.env.CALENDAR_FEED_SECRET ?? null}
