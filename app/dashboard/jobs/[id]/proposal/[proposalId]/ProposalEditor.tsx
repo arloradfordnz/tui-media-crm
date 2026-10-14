@@ -1,6 +1,7 @@
 'use client'
 
-import { useActionState, useState, useTransition } from 'react'
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Send, ExternalLink, Plus, Trash2, Copy, Check, Download, Save } from 'lucide-react'
 import { updateProposal, sendProposal } from '@/app/actions/proposals'
@@ -40,8 +41,12 @@ type ProposalData = {
 // sees, so a draft can be checked before it goes anywhere (the public link
 // only works once it has been sent).
 export default function ProposalEditor({ proposal }: { proposal: ProposalData }) {
-  const [state, action, saving] = useActionState(updateProposal, undefined)
+  const router = useRouter()
+  const [saving, startSave] = useTransition()
   const [sending, startSend] = useTransition()
+  // What the last save or send did, shown under the header so a click always
+  // has a visible result.
+  const [notice, setNotice] = useState<{ kind: 'ok' | 'error' | 'warn'; text: string } | null>(null)
   const [tab, setTab] = useState<'edit' | 'preview'>(proposal.status === 'draft' ? 'edit' : 'preview')
   const [services, setServices] = useState<ServiceLine[]>(() => parseServices(proposal.services))
   const [coverNote, setCoverNote] = useState(proposal.coverNote || '')
@@ -72,15 +77,60 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
     touch()
   }
 
+  // Saves from any tab: the data lives in state here, not in the form, so it
+  // does not matter whether the Edit tab is the one showing. Resolves true on
+  // success so Send can save first.
+  async function save(): Promise<boolean> {
+    const fd = new FormData()
+    fd.set('proposalId', proposal.id)
+    fd.set('coverNote', coverNote)
+    fd.set('services', JSON.stringify(services))
+    fd.set('inclusions', inclusions)
+    fd.set('paymentTerms', paymentTerms)
+    fd.set('totalValue', String(total))
+    fd.set('pricingMode', pricingMode)
+    fd.set('priceSuffix', priceSuffix)
+    try {
+      const res = await updateProposal(undefined, fd)
+      if (res && 'error' in res && res.error) { setNotice({ kind: 'error', text: res.error }); return false }
+      setDirty(false)
+      setNotice({ kind: 'ok', text: 'Saved.' })
+      return true
+    } catch {
+      setNotice({ kind: 'error', text: "Couldn't save. Check your connection and try again." })
+      return false
+    }
+  }
+
+  function handleSave() {
+    setNotice(null)
+    startSave(async () => { await save() })
+  }
+
   function handleSend() {
-    setConfirm({
+    setNotice(null)
+    const confirmAndSend = () => setConfirm({
       title: `Send this to ${proposal.job.client.name}?`,
       body: proposal.job.client.email
         ? `${proposal.job.client.email} gets an email with a link to view and accept it. Check the figures first, it can't be edited once sent.`
         : `There's no email on ${proposal.job.client.name}'s record, so it will be marked sent and you can share the link yourself.`,
       confirmLabel: 'Send proposal',
-      onConfirm: () => startSend(() => { sendProposal(proposal.id) }),
+      onConfirm: () => startSend(async () => {
+        try {
+          const res = await sendProposal(proposal.id)
+          if (res.error) { setNotice({ kind: 'error', text: res.error }); return }
+          setNotice(res.emailError
+            ? { kind: 'warn', text: `Sent, but the email to ${proposal.job.client.email} didn't go out. Copy the link below and send it yourself.` }
+            : { kind: 'ok', text: proposal.job.client.email ? `Sent to ${proposal.job.client.email}.` : 'Marked as sent. Copy the link below to share it.' })
+          router.refresh()
+        } catch {
+          setNotice({ kind: 'error', text: "Couldn't send. Refresh the page to check whether it went." })
+        }
+      }),
     })
+    // Unsaved edits are saved first, so what the client gets is what is on screen.
+    if (dirty) startSend(async () => { if (await save()) confirmAndSend() })
+    else confirmAndSend()
   }
 
   async function copyLink() {
@@ -147,17 +197,23 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
             <Download className="w-4 h-4" /> {downloading ? 'Preparing…' : 'Download PDF'}
           </button>
           {isDraft && dirty && (
-            <button type="submit" form="proposal-form" disabled={saving} className="btn-primary">
+            <button type="button" onClick={handleSave} disabled={saving || sending} className="btn-secondary">
               <Save className="w-4 h-4" /> {saving ? 'Saving…' : 'Save changes'}
             </button>
           )}
           {isDraft && (
-            <button type="button" onClick={handleSend} disabled={sending || dirty} className={dirty ? 'btn-secondary' : 'btn-primary'} title={dirty ? 'Save your changes first' : undefined}>
+            <button type="button" onClick={handleSend} disabled={sending || saving} className="btn-primary">
               <Send className="w-4 h-4" /> {sending ? 'Sending…' : 'Send to client'}
             </button>
           )}
         </div>
       </div>
+
+      {notice && (
+        <div className={`alert ${notice.kind === 'ok' ? 'alert-success' : notice.kind === 'warn' ? 'alert-warning' : 'alert-danger'}`} role="status">
+          {notice.text}
+        </div>
+      )}
 
       <div className="tab-pills" role="tablist">
         <button type="button" role="tab" aria-selected={tab === 'edit'} className={`tab-pill${tab === 'edit' ? ' active' : ''}`} onClick={() => setTab('edit')}>
@@ -170,7 +226,7 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
 
       <div className="prop-editor-grid">
         <div className="space-y-5 min-w-0">
-          {tab === 'preview' ? (
+          {tab === 'preview' && (
             <div className="card prop-preview">
               <div className="prop-preview-head">
                 <p className="prop-eyebrow">Proposal</p>
@@ -179,13 +235,9 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
               </div>
               <ProposalDocument body={{ coverNote, services, inclusions: inclusionList, paymentTerms, totalValue: total, pricingMode, priceSuffix }} />
             </div>
-          ) : (
-            <form id="proposal-form" action={action} onSubmit={() => setDirty(false)} className="space-y-5">
-              <input type="hidden" name="proposalId" value={proposal.id} />
-              <input type="hidden" name="services" value={JSON.stringify(services)} />
-              <input type="hidden" name="totalValue" value={total} />
-              <input type="hidden" name="pricingMode" value={pricingMode} />
-              <input type="hidden" name="priceSuffix" value={priceSuffix} />
+          )}
+          {tab === 'edit' && (
+            <div className="space-y-5">
 
               <section className="card space-y-4">
                 <div>
@@ -261,8 +313,7 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
                 <textarea name="paymentTerms" rows={4} value={paymentTerms} onChange={(e) => { setPaymentTerms(e.target.value); touch() }} className="field-input" disabled={!isDraft} />
               </section>
 
-              {state?.error && <div className="alert alert-danger">{state.error}</div>}
-            </form>
+            </div>
           )}
         </div>
 
