@@ -145,4 +145,5 @@
 // can be downloaded as a PDF laid out like the contract. Sent proposals now
 // show in the client portal. The proposal drafter writes in Arlo's own voice,
 // learned from his sent emails.
-export const APP_VERSION = '3.21.0'
+// 3.21.1 — redeploy of 3.21.0.
+export const APP_VERSION = '3.21.1'
