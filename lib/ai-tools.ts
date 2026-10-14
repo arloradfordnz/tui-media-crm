@@ -567,6 +567,8 @@ export const TOOLS: Anthropic.Tool[] = [
             valid_for: { type: 'string' }, extra_context: { type: 'string', description: 'Anything else from the thread or the client that should shape it.' },
           },
         },
+        pricing_mode: { type: 'string', enum: ['total', 'options'], description: 'total (default): the price lines are added together into one total. options: the lines are alternative packages and the client picks ONE (for example 2 videos a month for $300 or 4 for $500, chosen again each month). Use options whenever Arlo or the thread says the client picks between packages; then no total is shown.' },
+        price_suffix: { type: 'string', description: 'For options: what follows each price, usually "a month". Leave out for a one-off.' },
         replace_existing: { type: 'boolean', description: 'True only if Arlo said to redraft over an existing unsent proposal for this job.' },
       },
       required: ['job_id', 'price_lines', 'brief'],
@@ -583,6 +585,8 @@ export const TOOLS: Anthropic.Tool[] = [
         services: { type: 'array', items: { type: 'object', properties: { description: { type: 'string' }, amount: { type: 'number' } }, required: ['description', 'amount'] } },
         inclusions: { type: 'array', items: { type: 'string' } },
         payment_terms: { type: 'string' },
+        pricing_mode: { type: 'string', enum: ['total', 'options'], description: 'Switch between adding the lines together (total) and the client picking one package (options).' },
+        price_suffix: { type: 'string', description: 'For options, e.g. "a month".' },
       },
       required: ['proposal_id'],
     },
@@ -1884,6 +1888,8 @@ export async function executeTool(
       if (gaps.length) {
         return JSON.stringify({ error: `NOT drafted. The brief is missing: ${gaps.join(', ')}. Call prepare_proposal, ask Arlo in one ask_arlo popup, then call create_proposal again with every answer in brief.` })
       }
+      const pricingMode: 'total' | 'options' = input.pricing_mode === 'options' ? 'options' : 'total'
+      const priceSuffix = String(input.price_suffix ?? '').trim()
       const priceLines = (Array.isArray(input.price_lines) ? input.price_lines : [])
         .map((l: { description?: unknown; amount?: unknown }) => ({ description: String(l?.description ?? '').trim(), amount: Number(l?.amount) }))
         .filter((l: PriceLine) => l.description && Number.isFinite(l.amount) && l.amount >= 0)
@@ -1902,6 +1908,8 @@ export async function executeTool(
       const client = job.clients as unknown as { name: string; contact_person: string | null }
       const today = new Date().toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'long', year: 'numeric' })
       const drafted = await draftProposal({
+        pricingMode,
+        priceSuffix,
         clientName: client.name,
         contactPerson: client.contact_person,
         jobName: job.name,
@@ -1917,6 +1925,8 @@ export async function executeTool(
         inclusions: drafted.inclusions.join('\n'),
         payment_terms: drafted.paymentTerms,
         total_value: drafted.total,
+        pricing_mode: pricingMode,
+        price_suffix: pricingMode === 'options' ? priceSuffix || null : null,
         updated_at: new Date().toISOString(),
       }
       const saved = existing
@@ -1944,6 +1954,17 @@ export async function executeTool(
         const lines = (input.services as PriceLine[]).map((l) => ({ description: String(l.description), amount: Number(l.amount) || 0 }))
         updates.services = JSON.stringify(lines)
         updates.total_value = Math.round(lines.reduce((sum, l) => sum + l.amount, 0) * 100) / 100
+      }
+      if (input.pricing_mode === 'total' || input.pricing_mode === 'options') updates.pricing_mode = input.pricing_mode
+      if (typeof input.price_suffix === 'string') updates.price_suffix = input.price_suffix.trim() || null
+      // The stored figure follows the mode: the sum, or the cheapest package.
+      if (updates.pricing_mode || Array.isArray(input.services)) {
+        const { data: cur } = await supabase.from('proposals').select('services, pricing_mode').eq('id', prop.id).single()
+        const mode = (updates.pricing_mode as string) ?? cur?.pricing_mode
+        let lines: PriceLine[] = []
+        try { lines = Array.isArray(input.services) ? (input.services as PriceLine[]) : JSON.parse(cur?.services || '[]') } catch { /* keep empty */ }
+        const amounts = lines.map((l) => Number(l.amount) || 0)
+        if (amounts.length) updates.total_value = mode === 'options' ? Math.min(...amounts) : Math.round(amounts.reduce((a, b) => a + b, 0) * 100) / 100
       }
       const { error } = await supabase.from('proposals').update(updates).eq('id', prop.id)
       if (error) return JSON.stringify({ error: error.message })

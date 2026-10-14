@@ -5,12 +5,29 @@ import { formatNZD } from '@/lib/format'
 // is included and how to pay. Rendered on the public proposal page and in the
 // editor's preview, so what Arlo checks is exactly what the client sees.
 
+export type PricingMode = 'total' | 'options'
+
 export type ProposalBody = {
   coverNote: string | null
   services: { description: string; amount: number }[]
   inclusions: string[]
   paymentTerms: string | null
   totalValue: number
+  /** 'total' adds the lines up; 'options' means the client picks one. */
+  pricingMode?: PricingMode
+  /** What follows each amount, e.g. "a month". */
+  priceSuffix?: string | null
+}
+
+/** The figure that leads a proposal: the total, or "From $300 a month" when
+ *  the client is choosing between packages. */
+export function priceHeadline(mode: PricingMode | undefined, lines: { amount: number }[], total: number, suffix?: string | null): string {
+  const money = (n: number) => `$${Number(n).toLocaleString('en-NZ', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`
+  if (mode === 'options') {
+    const cheapest = lines.length ? Math.min(...lines.map((l) => l.amount)) : total
+    return `From ${money(cheapest)}${suffix ? ` ${suffix}` : ''}`
+  }
+  return formatNZD(total)
 }
 
 export function parseServices(raw: string | null | undefined): { description: string; amount: number }[] {
@@ -27,6 +44,7 @@ export function parseInclusions(raw: string | null | undefined): string[] {
 }
 
 export default function ProposalDocument({ body }: { body: ProposalBody }) {
+  const options = body.pricingMode === 'options'
   // "Not included: ..." is the drafter's last line. It is not a tick, so it
   // sits under the list as a plain note.
   const excluded = body.inclusions.filter((l) => /^not included/i.test(l))
@@ -41,19 +59,22 @@ export default function ProposalDocument({ body }: { body: ProposalBody }) {
       )}
 
       <section className="prop-section">
-        <h2 className="prop-h">Services and pricing</h2>
+        <h2 className="prop-h">{options ? 'Choose a package' : 'Services and pricing'}</h2>
+        {options && <p className="prop-options-note">Pick the one that suits{body.priceSuffix ? `, and you can change it ${body.priceSuffix.replace(/^a /, 'each ')}` : ''}.</p>}
         <div className="prop-lines">
           {body.services.map((s, i) => (
             <div key={i} className="prop-line">
               <span className="prop-line-desc">{s.description}</span>
-              <span className="prop-line-amount">{formatNZD(s.amount)}</span>
+              <span className="prop-line-amount">{formatNZD(s.amount)}{options && body.priceSuffix ? <small> {body.priceSuffix}</small> : null}</span>
             </div>
           ))}
         </div>
-        <div className="prop-total">
-          <span className="prop-total-label">Total</span>
-          <span className="prop-total-value">{formatNZD(body.totalValue)}</span>
-        </div>
+        {!options && (
+          <div className="prop-total">
+            <span className="prop-total-label">Total</span>
+            <span className="prop-total-value">{formatNZD(body.totalValue)}</span>
+          </div>
+        )}
         <p className="prop-total-note">NZD. Tui Media is not GST registered, so no GST is added.</p>
       </section>
 

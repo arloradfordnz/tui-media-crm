@@ -5,9 +5,8 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Check, X, MapPin, Calendar, Download, CheckCircle2 } from 'lucide-react'
 import { acceptProposal, declineProposal } from '@/app/actions/proposals'
-import { formatNZD } from '@/lib/format'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
-import ProposalDocument, { parseServices, parseInclusions } from '@/components/ProposalDocument'
+import ProposalDocument, { parseServices, parseInclusions, priceHeadline, type PricingMode } from '@/components/ProposalDocument'
 
 // Written out in full: a client reads "14 October 2026", not "14/10/26".
 const formatDate = (iso: string | null | undefined) =>
@@ -22,6 +21,8 @@ type ProposalData = {
   inclusions: string | null
   paymentTerms: string
   totalValue: number
+  pricingMode: PricingMode
+  priceSuffix: string | null
   sentAt: string | null
   respondedAt: string | null
   createdAt: string
@@ -44,6 +45,8 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
   const inclusions = parseInclusions(proposal.inclusions)
   const issued = proposal.sentAt || proposal.createdAt
   const open = proposal.status === 'sent'
+  const headline = priceHeadline(proposal.pricingMode, services, proposal.totalValue, proposal.priceSuffix)
+  const picks = proposal.pricingMode === 'options'
 
   async function download() {
     setDownloading(true)
@@ -60,6 +63,8 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
         inclusions,
         paymentTerms: proposal.paymentTerms,
         totalValue: proposal.totalValue,
+        pricingMode: proposal.pricingMode,
+        priceSuffix: proposal.priceSuffix,
         issuedAt: issued,
         status: proposal.status,
         respondedAt: proposal.respondedAt,
@@ -118,8 +123,8 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
             </div>
           )}
           <div className="prop-hero-total">
-            <span>{formatNZD(proposal.totalValue)}</span>
-            <small>total, no GST</small>
+            <span>{headline}</span>
+            <small>{picks ? 'pick a package, no GST' : 'total, no GST'}</small>
           </div>
         </div>
 
@@ -135,7 +140,7 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
         )}
 
         <div className="prop-card">
-          <ProposalDocument body={{ coverNote: proposal.coverNote, services, inclusions, paymentTerms: proposal.paymentTerms, totalValue: proposal.totalValue }} />
+          <ProposalDocument body={{ coverNote: proposal.coverNote, services, inclusions, paymentTerms: proposal.paymentTerms, totalValue: proposal.totalValue, pricingMode: proposal.pricingMode, priceSuffix: proposal.priceSuffix }} />
         </div>
 
         {open && (
@@ -164,7 +169,7 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
       {/* On a phone the decision stays in reach while reading. */}
       {open && (
         <div className="prop-mobile-bar">
-          <span className="prop-mobile-total">{formatNZD(proposal.totalValue)}</span>
+          <span className="prop-mobile-total">{headline}</span>
           <button onClick={handleAccept} disabled={isPending} className="btn-primary btn-sm">
             <Check className="w-3.5 h-3.5" /> Accept
           </button>

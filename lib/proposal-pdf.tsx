@@ -17,6 +17,8 @@ export type ProposalPdfData = {
   inclusions: string[]
   paymentTerms: string | null
   totalValue: number
+  pricingMode?: 'total' | 'options'
+  priceSuffix?: string | null
   /** ISO timestamp the proposal was sent, or created if not sent yet. */
   issuedAt: string
   status: string
@@ -53,6 +55,7 @@ const s = StyleSheet.create({
   rowDesc: { flex: 1, paddingRight: 16, fontSize: 9.5, lineHeight: 1.45 },
   rowAmount: { fontSize: 9.5, fontWeight: 600 },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 10 },
+  optionsNote: { fontSize: 9, color: C.grey, marginBottom: 6 },
   totalLabel: { fontSize: 10.5, fontWeight: 600 },
   totalValue: { fontSize: 14, fontWeight: 800 },
   totalNote: { fontSize: 8.5, color: C.grey, textAlign: 'right', marginTop: 2 },
@@ -110,17 +113,22 @@ export default function ProposalPdf({ p }: { p: ProposalPdfData }): ReactElement
         ) : null}
 
         <View style={s.section} wrap={false}>
-          <Text style={s.h1}>Services and pricing</Text>
+          <Text style={s.h1}>{p.pricingMode === 'options' ? 'Choose a package' : 'Services and pricing'}</Text>
+          {p.pricingMode === 'options' && (
+            <Text style={s.optionsNote}>Pick the one that suits{p.priceSuffix ? `, and you can change it ${p.priceSuffix.replace(/^a /, 'each ')}` : ''}.</Text>
+          )}
           {p.services.map((line, i) => (
             <View key={i} style={s.row}>
               <Text style={s.rowDesc}>{line.description}</Text>
-              <Text style={s.rowAmount}>{money(line.amount)}</Text>
+              <Text style={s.rowAmount}>{money(line.amount)}{p.pricingMode === 'options' && p.priceSuffix ? ` ${p.priceSuffix}` : ''}</Text>
             </View>
           ))}
-          <View style={s.totalRow}>
-            <Text style={s.totalLabel}>Total</Text>
-            <Text style={s.totalValue}>{money(p.totalValue)}</Text>
-          </View>
+          {p.pricingMode !== 'options' && (
+            <View style={s.totalRow}>
+              <Text style={s.totalLabel}>Total</Text>
+              <Text style={s.totalValue}>{money(p.totalValue)}</Text>
+            </View>
+          )}
           <Text style={s.totalNote}>NZD. Tui Media is not GST registered, so no GST is added.</Text>
         </View>
 

@@ -69,11 +69,19 @@ export async function draftProposal(opts: {
   priceLines: PriceLine[]
   brief: string
   today: string
+  /** 'options' means the price lines are packages the client chooses between. */
+  pricingMode?: 'total' | 'options'
+  priceSuffix?: string
 }): Promise<ProposalDraft> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) return { error: 'ANTHROPIC_API_KEY is not configured.' }
   const anthropic = new Anthropic({ apiKey })
-  const total = Math.round(opts.priceLines.reduce((s, l) => s + l.amount, 0) * 100) / 100
+  const options = opts.pricingMode === 'options'
+  // For a pick-one proposal there is no sum. The stored figure is the cheapest
+  // package, which the pages show as "From $X".
+  const total = options
+    ? Math.min(...opts.priceLines.map((l) => l.amount))
+    : Math.round(opts.priceLines.reduce((s, l) => s + l.amount, 0) * 100) / 100
 
   const user = `Write the proposal.
 
@@ -82,9 +90,11 @@ MAIN CONTACT: ${opts.contactPerson || 'not on record (address the business warml
 PROJECT: ${opts.jobName}
 TODAY: ${opts.today}
 
-PRICE LINES (fixed, in this order; write one description for each)
-${opts.priceLines.map((l, i) => `${i + 1}. ${l.description}: $${l.amount}`).join('\n')}
-TOTAL: $${total}
+${options
+  ? `PRICE LINES: THESE ARE PACKAGES THE CLIENT CHOOSES BETWEEN, NOT ITEMS ADDED TOGETHER. They pick one${opts.priceSuffix ? ` and are charged ${opts.priceSuffix}` : ''}, and can switch later. There is NO total: never write a total or add the amounts up. Write one description per package that makes the difference between them obvious (what each includes). In the cover note, say they can pick the one that suits${opts.priceSuffix ? ` ${opts.priceSuffix.replace(/^a /, 'each ')}` : ''}. In the payment terms, describe how the chosen package is billed instead of a deposit schedule over a total.`
+  : 'PRICE LINES (fixed, in this order; write one description for each)'}
+${opts.priceLines.map((l, i) => `${i + 1}. ${l.description}: $${l.amount}${options && opts.priceSuffix ? ` ${opts.priceSuffix}` : ''}`).join('\n')}
+${options ? '' : `TOTAL: $${total}`}
 
 THE BRIEF (confirmed by Arlo)
 ${opts.brief.trim()}`

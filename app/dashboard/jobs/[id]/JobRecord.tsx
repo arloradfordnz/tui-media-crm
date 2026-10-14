@@ -108,7 +108,7 @@ type JobData = {
   tasks: Task[]
   deliverables: { id: string; title: string; description: string | null; completed: boolean; deliveryFiles: { id: string; originalName: string; versionLabel: string; deliveryStatus: string; createdAt: string; fileUrl: string; personalNote: string | null }[] }[]
   revisions: { id: string; round: number; request: string; status: string; reply: string | null; createdAt: string }[]
-  proposals: { id: string; status: string; token: string; totalValue: number; sentAt: string | null; respondedAt: string | null; createdAt: string }[]
+  proposals: { id: string; status: string; token: string; totalValue: number; priceLabel: string | null; sentAt: string | null; respondedAt: string | null; createdAt: string }[]
   activities: { id: string; action: string; details: string | null; createdAt: string }[]
   timeEntries: TimeEntry[]
 }
@@ -660,7 +660,7 @@ export default function JobRecord({ job }: { job: JobData }) {
               {job.proposals.map((p) => (
                 <div key={p.id} className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{formatNZD(p.totalValue)}</p>
+                    <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{p.priceLabel ?? formatNZD(p.totalValue)}</p>
                     <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                       Created {formatDate(p.createdAt)}
                       {p.sentAt && ` · Sent ${formatDate(p.sentAt)}`}

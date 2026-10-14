@@ -54,6 +54,8 @@ export async function updateProposal(prevState: { error?: string } | undefined, 
   const inclusions = formData.get('inclusions') as string
   const paymentTerms = formData.get('paymentTerms') as string
   const totalValue = formData.get('totalValue') as string
+  const pricingMode = formData.get('pricingMode') === 'options' ? 'options' : 'total'
+  const priceSuffix = ((formData.get('priceSuffix') as string) || '').trim()
 
   const supabase = await createServerSupabaseClient()
   const { data: proposal } = await supabase.from('proposals').select('job_id').eq('id', proposalId).single()
@@ -65,6 +67,8 @@ export async function updateProposal(prevState: { error?: string } | undefined, 
     inclusions: inclusions || null,
     payment_terms: paymentTerms || '',
     total_value: totalValue ? parseFloat(totalValue) : 0,
+    pricing_mode: pricingMode,
+    price_suffix: priceSuffix || null,
   }).eq('id', proposalId)
 
   revalidatePath(`/dashboard/jobs/${proposal.job_id}`)
@@ -106,7 +110,7 @@ export async function acceptProposal(token: string) {
 
   const { data: proposal } = await supabase
     .from('proposals')
-    .select('id, job_id, total_value, status, jobs(id, name, client_id, clients(name, email))')
+    .select('id, job_id, total_value, status, pricing_mode, jobs(id, name, client_id, clients(name, email))')
     .eq('token', token)
     .single()
 
@@ -115,7 +119,10 @@ export async function acceptProposal(token: string) {
   const job = proposal.jobs as unknown as { id: string; name: string; client_id: string; clients: { name: string; email: string | null } }
 
   await supabase.from('proposals').update({ status: 'accepted', responded_at: new Date().toISOString() }).eq('id', proposal.id)
-  await supabase.from('jobs').update({ status: 'booked', quote_value: proposal.total_value }).eq('id', proposal.job_id)
+  // When the client is choosing between packages there is no single price to
+  // carry onto the job, so only the status moves.
+  const picksPackage = proposal.pricing_mode === 'options'
+  await supabase.from('jobs').update(picksPackage ? { status: 'booked' } : { status: 'booked', quote_value: proposal.total_value }).eq('id', proposal.job_id)
 
   await supabase.from('activities').insert({ action: 'proposal_accepted', details: `Proposal accepted for "${job.name}"`, job_id: proposal.job_id, client_id: job.client_id })
   await supabase.from('notifications').insert({ title: 'Proposal Accepted!', message: `${job.clients.name} accepted the proposal for "${job.name}"`, type: 'status_change', job_id: proposal.job_id, client_id: job.client_id })
@@ -128,7 +135,7 @@ export async function acceptProposal(token: string) {
   emitAssistantEvent(supabase, {
     kind: 'client_action',
     key: `client_action:proposal_accepted:${proposal.id}`,
-    subject: `${job.clients.name} accepted the proposal for ${job.name}${proposal.total_value ? ` ($${proposal.total_value})` : ''}`,
+    subject: `${job.clients.name} accepted the proposal for ${job.name}${proposal.total_value && !picksPackage ? ` ($${proposal.total_value})` : ''}`,
     severity: 'high',
     urgent: true,
     detail: { job_id: proposal.job_id, value: proposal.total_value },

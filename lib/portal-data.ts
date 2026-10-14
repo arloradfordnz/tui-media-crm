@@ -46,7 +46,7 @@ export async function loadPortalData(client: PortalClient) {
     // scopes them to this client's jobs.
     supabase
       .from('proposals')
-      .select('id, token, status, total_value, sent_at, responded_at, services, jobs!inner(name, client_id, shoot_date, shoot_location)')
+      .select('id, token, status, total_value, pricing_mode, price_suffix, sent_at, responded_at, services, jobs!inner(name, client_id, shoot_date, shoot_location)')
       .eq('jobs.client_id', client.id)
       .neq('status', 'draft')
       .order('sent_at', { ascending: false }),
@@ -128,6 +128,7 @@ export async function loadPortalData(client: PortalClient) {
         token: p.token,
         status: p.status as string,
         total: Number(p.total_value) || 0,
+        priceLabel: p.pricing_mode === 'options' ? `From $${Number(p.total_value).toLocaleString('en-NZ')}${p.price_suffix ? ` ${p.price_suffix}` : ''}` : null,
         sentAt: p.sent_at as string | null,
         respondedAt: p.responded_at as string | null,
         jobName: job.name,

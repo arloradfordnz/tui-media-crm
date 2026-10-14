@@ -6,7 +6,7 @@ import { ArrowLeft, Send, ExternalLink, Plus, Trash2, Copy, Check, Download, Spa
 import { updateProposal, sendProposal } from '@/app/actions/proposals'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass } from '@/lib/format'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
-import ProposalDocument, { parseServices, parseInclusions } from '@/components/ProposalDocument'
+import ProposalDocument, { parseServices, parseInclusions, priceHeadline, type PricingMode } from '@/components/ProposalDocument'
 
 type ServiceLine = { description: string; amount: number }
 
@@ -20,6 +20,8 @@ type ProposalData = {
   inclusions: string | null
   paymentTerms: string
   totalValue: number
+  pricingMode: PricingMode
+  priceSuffix: string | null
   sentAt: string | null
   respondedAt: string | null
   createdAt: string
@@ -45,6 +47,8 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
   const [coverNote, setCoverNote] = useState(proposal.coverNote || '')
   const [inclusions, setInclusions] = useState(proposal.inclusions || '')
   const [paymentTerms, setPaymentTerms] = useState(proposal.paymentTerms || '')
+  const [pricingMode, setPricingMode] = useState<PricingMode>(proposal.pricingMode)
+  const [priceSuffix, setPriceSuffix] = useState(proposal.priceSuffix || '')
   const [dirty, setDirty] = useState(false)
   const [copied, setCopied] = useState(false)
   const [downloading, setDownloading] = useState(false)
@@ -53,7 +57,13 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
   const isDraft = proposal.status === 'draft'
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
   const proposalUrl = `${baseUrl}/proposal/${proposal.token}`
-  const total = services.reduce((sum, s) => sum + (s.amount || 0), 0)
+  const options = pricingMode === 'options'
+  // Adding the lines up only makes sense when the client takes all of them.
+  // When they pick one, the stored figure is the cheapest, shown as "From".
+  const total = options
+    ? (services.length ? Math.min(...services.map((s) => s.amount || 0)) : 0)
+    : services.reduce((sum, s) => sum + (s.amount || 0), 0)
+  const headline = priceHeadline(pricingMode, services, total, priceSuffix)
   const inclusionList = parseInclusions(inclusions)
   const touch = () => { if (!dirty) setDirty(true) }
 
@@ -94,6 +104,8 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
         inclusions: inclusionList,
         paymentTerms,
         totalValue: total,
+        pricingMode,
+        priceSuffix,
         issuedAt: proposal.sentAt || new Date().toISOString(),
         status: proposal.status,
         respondedAt: proposal.respondedAt,
@@ -142,17 +154,17 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
         </div>
       </div>
 
+      <div className="tab-pills" role="tablist">
+        <button type="button" role="tab" aria-selected={tab === 'edit'} className={`tab-pill${tab === 'edit' ? ' active' : ''}`} onClick={() => setTab('edit')}>
+          {isDraft ? 'Edit' : 'Details'}
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'preview'} className={`tab-pill${tab === 'preview' ? ' active' : ''}`} onClick={() => setTab('preview')}>
+          What the client sees
+        </button>
+      </div>
+
       <div className="prop-editor-grid">
         <div className="space-y-4 min-w-0">
-          <div className="tab-pills" role="tablist">
-            <button type="button" role="tab" aria-selected={tab === 'edit'} className={`tab-pill${tab === 'edit' ? ' active' : ''}`} onClick={() => setTab('edit')}>
-              {isDraft ? 'Edit' : 'Details'}
-            </button>
-            <button type="button" role="tab" aria-selected={tab === 'preview'} className={`tab-pill${tab === 'preview' ? ' active' : ''}`} onClick={() => setTab('preview')}>
-              What the client sees
-            </button>
-          </div>
-
           {tab === 'preview' ? (
             <div className="card prop-preview">
               <div className="prop-preview-head">
@@ -160,13 +172,15 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
                 <h2 className="prop-title prop-title-sm">{proposal.job.name}</h2>
                 <p className="prop-for">Prepared for {proposal.job.client.contactPerson ? `${proposal.job.client.contactPerson}, ` : ''}{proposal.job.client.name}</p>
               </div>
-              <ProposalDocument body={{ coverNote, services, inclusions: inclusionList, paymentTerms, totalValue: total }} />
+              <ProposalDocument body={{ coverNote, services, inclusions: inclusionList, paymentTerms, totalValue: total, pricingMode, priceSuffix }} />
             </div>
           ) : (
             <form action={action} onSubmit={() => setDirty(false)} className="space-y-4">
               <input type="hidden" name="proposalId" value={proposal.id} />
               <input type="hidden" name="services" value={JSON.stringify(services)} />
               <input type="hidden" name="totalValue" value={total} />
+              <input type="hidden" name="pricingMode" value={pricingMode} />
+              <input type="hidden" name="priceSuffix" value={priceSuffix} />
 
               <section className="card space-y-3">
                 <div>
@@ -179,8 +193,24 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
               <section className="card space-y-3">
                 <div>
                   <h3 className="prop-edit-h">Services and pricing</h3>
-                  <p className="prop-edit-hint">NZD, no GST. One line for a single fee, or one per stage or add-on.</p>
+                  <p className="prop-edit-hint">NZD, no GST.</p>
                 </div>
+                <div className="prop-mode" role="radiogroup" aria-label="How the lines are priced">
+                  <button type="button" role="radio" aria-checked={!options} disabled={!isDraft} className={`prop-mode-opt${!options ? ' is-on' : ''}`} onClick={() => { setPricingMode('total'); touch() }}>
+                    <strong>Add together</strong>
+                    <span>The client gets every line. Shows a total.</span>
+                  </button>
+                  <button type="button" role="radio" aria-checked={options} disabled={!isDraft} className={`prop-mode-opt${options ? ' is-on' : ''}`} onClick={() => { setPricingMode('options'); touch() }}>
+                    <strong>Pick one</strong>
+                    <span>Each line is a package to choose from. No total.</span>
+                  </button>
+                </div>
+                {options && (
+                  <label className="prop-suffix">
+                    <span className="label">After each price</span>
+                    <input value={priceSuffix} onChange={(e) => { setPriceSuffix(e.target.value); touch() }} className="field-input" placeholder="a month" disabled={!isDraft} />
+                  </label>
+                )}
                 <div className="prop-edit-lines">
                   {services.map((s, i) => (
                     <div key={i} className="prop-edit-line">
@@ -204,8 +234,8 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
                     </button>
                   ) : <span />}
                   <div className="text-right">
-                    <span className="label">Total</span>
-                    <p className="text-xl font-semibold" style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{formatNZD(total)}</p>
+                    <span className="label">{options ? 'Shown as' : 'Total'}</span>
+                    <p className="text-xl font-semibold" style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{options ? headline : formatNZD(total)}</p>
                   </div>
                 </div>
               </section>
@@ -249,9 +279,9 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
               <span className={`badge ${statusBadgeClass(proposal.status)}`}>{statusLabel(proposal.status)}</span>
             </div>
             <div>
-              <span className="label">Total</span>
-              <p className="prop-aside-total">{formatNZD(total)}</p>
-              <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{services.length} line{services.length === 1 ? '' : 's'} · no GST</p>
+              <span className="label">{options ? 'Price' : 'Total'}</span>
+              <p className="prop-aside-total">{options ? <>From {formatNZD(total).replace('.00', '')}{priceSuffix ? <small> {priceSuffix}</small> : null}</> : headline}</p>
+              <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{options ? `${services.length} package${services.length === 1 ? '' : 's'}, client picks one` : `${services.length} line${services.length === 1 ? '' : 's'}`} · no GST</p>
             </div>
             <ol className="prop-timeline">
               {timeline.map((t) => (

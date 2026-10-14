@@ -26,7 +26,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
     // '*' keeps this working whether or not migration_revision_responses.sql
     // (reply / responded_at columns) has been run yet.
     supabase.from('revisions').select('*').eq('job_id', id).order('round', { ascending: true }),
-    supabase.from('proposals').select('id, status, token, total_value, sent_at, responded_at, created_at').eq('job_id', id).order('created_at', { ascending: false }),
+    supabase.from('proposals').select('id, status, token, total_value, pricing_mode, price_suffix, sent_at, responded_at, created_at').eq('job_id', id).order('created_at', { ascending: false }),
     supabase.from('activities').select('id, action, details, created_at').eq('job_id', id).order('created_at', { ascending: false }).limit(20),
     supabase.from('time_entries').select('id, description, category, started_at, ended_at, duration_seconds, billable, hourly_rate').eq('job_id', id).order('started_at', { ascending: false }),
   ])
@@ -112,6 +112,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
       status: p.status,
       token: p.token,
       totalValue: p.total_value,
+      priceLabel: p.pricing_mode === 'options' ? `From $${Number(p.total_value).toLocaleString('en-NZ')}${p.price_suffix ? ` ${p.price_suffix}` : ''}` : null,
       sentAt: p.sent_at,
       respondedAt: p.responded_at,
       createdAt: p.created_at,

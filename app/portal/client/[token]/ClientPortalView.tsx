@@ -66,6 +66,7 @@ type PortalProposal = {
   token: string
   status: string
   total: number
+  priceLabel: string | null
   sentAt: string | null
   respondedAt: string | null
   jobName: string
@@ -207,7 +208,7 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
                       </p>
                     </div>
                     <div className="portal-proposal-right">
-                      <span className="portal-proposal-total">{formatNZD(p.total)}</span>
+                      <span className="portal-proposal-total">{p.priceLabel ?? formatNZD(p.total)}</span>
                       {waiting
                         ? <span className="btn-primary btn-sm">Review <ArrowUpRight className="w-3.5 h-3.5" /></span>
                         : <span className={`badge ${statusBadgeClass(p.status)}`}>{statusLabel(p.status)}</span>}

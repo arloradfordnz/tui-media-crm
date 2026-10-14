@@ -150,4 +150,8 @@
 // now written in Arlo's voice and live in lib/email.ts.
 // 3.22.1 — Tui can no longer leave a blank "Proposal" or "Contract" document
 // on the Documents page; those requests go to the proposal and contract flows.
-export const APP_VERSION = '3.22.1'
+// 3.23.0 — proposals can offer packages to pick from (2 videos a month for
+// $300 or 4 for $500) instead of adding every line into one total: no total is
+// shown, the headline reads "From $300 a month", and accepting does not set a
+// job price. The proposal editor's side panel now lines up with the page.
+export const APP_VERSION = '3.23.0'

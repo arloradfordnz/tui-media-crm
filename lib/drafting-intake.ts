@@ -167,6 +167,7 @@ export function buildProposalIntake(client: ClientCtx, job: JobCtx | null, other
       { label: 'One project fee', detail: 'A single line, simplest to say yes to' },
       { label: 'Itemised by stage', detail: 'Strategy and script, filming, editing, ad management' },
       { label: 'Main fee plus optional add-ons' },
+      { label: 'Packages to pick one from', detail: 'Client chooses a package, no total shown' },
     ),
   })
   q.push({
