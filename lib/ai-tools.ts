@@ -7,6 +7,7 @@ import { findDuplicateJobName } from '@/lib/job-naming'
 import { syncShootEvent, removeShootEvent } from '@/lib/job-calendar'
 import { nextDocumentNumber, unfilledPlaceholders } from '@/lib/document-templates'
 import { draftContract, reviseContract, SETTLED_CONTRACT_TERMS, type ContractParties } from '@/lib/contract-drafting'
+import { MEMORY_CATEGORY_KEYS, isMemoryCategory } from '@/lib/ai-memory'
 
 // Shared tool definitions + executor for every AI surface (dashboard chat,
 // SMS assistant). One tool set, one set of side effects — a job marked
@@ -53,6 +54,7 @@ export const MUTATING_TOOLS = new Set([
   'log_shoot',
   'snooze_flag', 'resolve_flag',
   'add_subscription', 'update_subscription', 'cancel_subscription',
+  'remember', 'update_memory', 'forget',
 ])
 
 // ── Confirmation gate ────────────────────────────────────────
@@ -591,6 +593,45 @@ export const TOOLS: Anthropic.Tool[] = [
       type: 'object' as const,
       properties: { subscription_id: { type: 'string' } },
       required: ['subscription_id'],
+    },
+  },
+
+  // ── Memory ────────────────────────────────────
+  // Standing facts Arlo tells Tui, shown back to it in context on every turn
+  // and listed under Settings → Memory. See lib/ai-memory.ts.
+  {
+    name: 'remember',
+    description: 'Save a standing fact Arlo has told you so you still know it in future conversations: how long things take him ("a reel takes about 1 hour to edit"), rates, client preferences, how he likes things done. Use it whenever he tells you something like that, or says "remember". One short fact per call, written in third person as a plain statement. Check the memories already in your context first: if one covers it, use update_memory instead of saving a duplicate. Never save one-off tasks or dates (those are todos or events).',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        content: { type: 'string', description: 'The fact, one sentence, e.g. "A short-form reel takes Arlo about 1 hour to edit."' },
+        category: { type: 'string', enum: MEMORY_CATEGORY_KEYS, description: 'workflow = how long things take and how he works; pricing = rates and packages; client = about one specific client; preference = how he likes things done; business = gear, tools, the business itself.' },
+        client_id: { type: 'string', description: 'Only for a client memory: the client id from the roster.' },
+      },
+      required: ['content', 'category'],
+    },
+  },
+  {
+    name: 'update_memory',
+    description: 'Change a saved memory when Arlo corrects it ("actually reels take 90 minutes now"). The id is shown next to each memory in your context.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        memory_id: { type: 'string' },
+        content: { type: 'string' },
+        category: { type: 'string', enum: MEMORY_CATEGORY_KEYS },
+      },
+      required: ['memory_id'],
+    },
+  },
+  {
+    name: 'forget',
+    description: 'Delete a saved memory when Arlo says it is no longer true or asks you to forget it. The id is shown next to each memory in your context.',
+    input_schema: {
+      type: 'object' as const,
+      properties: { memory_id: { type: 'string' } },
+      required: ['memory_id'],
     },
   },
 
@@ -1635,6 +1676,50 @@ export async function executeTool(
         return JSON.stringify({ ...backlog, clients: matches })
       }
       return JSON.stringify(backlog)
+    }
+
+    // ── Memory ──────────────────────────────
+    case 'remember': {
+      const content = String(input.content ?? '').trim()
+      if (!content) return JSON.stringify({ error: 'Nothing to remember.' })
+      if (content.length > 500) return JSON.stringify({ error: 'Keep a memory to one short fact (under 500 characters).' })
+      const category = isMemoryCategory(input.category) ? input.category : 'preference'
+      const { data, error } = await supabase
+        .from('ai_memories')
+        .insert({ content, category, client_id: (input.client_id as string) || null, source: 'tui' })
+        .select('id, category, content')
+        .single()
+      if (error) return JSON.stringify({ error: dbErrorMessage(error) })
+      return JSON.stringify({ success: true, memory: data })
+    }
+
+    case 'update_memory': {
+      const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
+      if (input.content !== undefined) {
+        const content = String(input.content).trim()
+        if (!content || content.length > 500) return JSON.stringify({ error: 'A memory is one short fact, 1 to 500 characters.' })
+        updates.content = content
+      }
+      if (isMemoryCategory(input.category)) updates.category = input.category
+      const { data, error } = await supabase
+        .from('ai_memories')
+        .update(updates)
+        .eq('id', input.memory_id as string)
+        .select('id, category, content')
+        .single()
+      if (error) return JSON.stringify({ error: dbErrorMessage(error) })
+      return JSON.stringify({ success: true, memory: data })
+    }
+
+    case 'forget': {
+      const { data, error } = await supabase
+        .from('ai_memories')
+        .delete()
+        .eq('id', input.memory_id as string)
+        .select('content')
+        .single()
+      if (error) return JSON.stringify({ error: dbErrorMessage(error) })
+      return JSON.stringify({ success: true, forgot: data.content })
     }
 
     // ── Assistant flags ─────────────────────

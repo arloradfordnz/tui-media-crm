@@ -123,4 +123,7 @@
 // 550 to 850 word brief with a clause budget per section (6 pages before).
 // 3.17.1 — monthly contracts start the day both sign and have no end date,
 // instead of leaving a [start date] blank.
-export const APP_VERSION = '3.17.1'
+// 3.18.0 — Tui has a long-term memory: tell it how you work ("a reel takes me
+// an hour") and it remembers on the dashboard and Telegram. Settings → Memory
+// lists everything it knows, grouped, with edit, delete and add.
+export const APP_VERSION = '3.18.0'

@@ -28,6 +28,7 @@
 // token refresh and an IMAP login every single time.
 
 import { getContentBacklog } from '@/lib/content-backlog'
+import { listMemories, formatMemories } from '@/lib/ai-memory'
 
 export type ContextTier = 'micro' | 'standard'
 
@@ -69,7 +70,7 @@ export async function buildContext(
   })
 
   // ── micro: always ───────────────────────────────────────────
-  const [recentMessages, openTodos] = await Promise.all([
+  const [recentMessages, openTodos, memories] = await Promise.all([
     supabase
       .from('sms_messages')
       .select('direction, body, created_at')
@@ -81,6 +82,8 @@ export async function buildContext(
       .eq('completed', false)
       .order('due_date', { ascending: true, nullsFirst: false })
       .limit(10),
+    // Every tier: a standing fact matters just as much in a one-word reply.
+    listMemories(supabase).catch(() => []),
   ])
 
   const base: Record<string, unknown> = {
@@ -88,6 +91,7 @@ export async function buildContext(
     today: todayISO,
     current_time_nz: nowNZ,
     open_todos: openTodos?.data ?? [],
+    long_term_memory: formatMemories(memories) || 'nothing saved yet',
     recent_messages_last_12_oldest_first: (recentMessages?.data ?? []).slice().reverse(),
   }
 

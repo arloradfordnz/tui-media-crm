@@ -5,6 +5,8 @@ import RetainerInvoiceSettings from './RetainerInvoiceSettings'
 import PortalNotificationSettings from './PortalNotificationSettings'
 import IcloudCalendarSettings from './IcloudCalendarSettings'
 import IcloudPushSettings from './IcloudPushSettings'
+import MemorySettings from './MemorySettings'
+import { listMemories } from '@/lib/ai-memory'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { getCaldavConfig, STATUS_KEY } from '@/lib/icloud-push'
 import { APP_VERSION } from '@/lib/version'
@@ -18,13 +20,14 @@ export default async function SettingsPage() {
 
   // The identity joins the Promise.all rather than gating it: the dashboard
   // layout has already resolved it for this request, so it costs nothing here.
-  const [user, templates, retainerInvoiceDay, adminIps, requestIp, icloudUrl] = await Promise.all([
+  const [user, templates, retainerInvoiceDay, adminIps, requestIp, icloudUrl, memories] = await Promise.all([
     getVerifiedUser(),
     supabase.from('email_templates').select('id, type, subject, body, updated_at').order('type'),
     getAppSetting('retainer_invoice_day'),
     getAdminIps(),
     getRequestIp(),
     getAppSetting('icloud_calendar_url'),
+    listMemories(supabase).catch(() => null),
   ])
 
   // The password never leaves the server: the card is told only whether one is
@@ -80,6 +83,9 @@ export default async function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Tui's long-term memory */}
+      <MemorySettings memories={memories} />
 
       {/* Change Password */}
       <SettingsForm email={user?.email} />

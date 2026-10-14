@@ -16,6 +16,13 @@ export default function SettingsLoading() {
       <div className="settings-mobile-nav">
         {Array.from({ length: 5 }).map((_, i) => <Line key={i} h={44} r={14} />)}
       </div>
+      {/* Memory: heading, a grouped list, the add box. */}
+      <div className="card space-y-4">
+        <Line w={120} h={14} />
+        <Line w="80%" h={12} />
+        <Line h={120} r={18} />
+        <Line h={48} r={22} />
+      </div>
       {CARDS.map((c, i) => (
         <div key={i} className="card space-y-4">
           <Line w={120} h={14} />

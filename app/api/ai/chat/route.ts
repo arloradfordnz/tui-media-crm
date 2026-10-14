@@ -9,6 +9,7 @@ import { getContentBacklog, summariseBacklog } from '@/lib/content-backlog'
 import { encodeEvent, toolLabel, summariseResult, sanitiseAsk, type TuiEvent } from '@/lib/tui/receipts'
 import { recordPendingAction } from '@/lib/assistant-approvals'
 import { tidyPunctuation } from '@/lib/tui/text'
+import { listMemories, formatMemories } from '@/lib/ai-memory'
 
 // Dashboard surface of the Tui assistant. Same persona and same tool set as
 // the Telegram brain (lib/assistant-agent.ts) — this route just swaps the
@@ -78,6 +79,7 @@ async function getDynamicContext(supabase: ReturnType<typeof createServerSupabas
     { data: recentThread },
     backlog,
     { data: clientRoster },
+    memories,
   ] = await Promise.all([
     supabase.from('events').select('title, event_type, date, start_time').gte('date', todayISO).lte('date', weekFromNow).order('date').order('start_time').limit(7),
     supabase.from('jobs').select('name, status, clients(name)').not('status', 'in', '("delivered","archived")').order('created_at', { ascending: false }).limit(8),
@@ -87,6 +89,7 @@ async function getDynamicContext(supabase: ReturnType<typeof createServerSupabas
     supabase.from('sms_messages').select('direction, body, created_at').order('created_at', { ascending: false }).limit(8),
     getContentBacklog(supabase, now).catch(() => null),
     supabase.from('clients').select('id, name').order('name').limit(60),
+    listMemories(supabase).catch(() => []),
   ])
 
   const clientName = (j: { clients: unknown }) => (j.clients as { name: string } | null)?.name
@@ -115,6 +118,8 @@ async function getDynamicContext(supabase: ReturnType<typeof createServerSupabas
     lines.push(`Clients (id — name, use these IDs directly instead of calling search_clients): ${(clientRoster ?? []).map(c => `${c.id} — ${c.name}`).join(' | ')}`)
 
 
+  const memoryText = formatMemories(memories)
+  if (memoryText) lines.push(memoryText)
 
   if ((recentThread ?? []).length > 0)
     lines.push(`Recent thread with Arlo (oldest first, spans Telegram and this panel): ${(recentThread ?? []).slice().reverse().map(m => `${m.direction === 'inbound' ? 'Arlo' : 'You'}: ${m.body}`).join(' | ')}`)
