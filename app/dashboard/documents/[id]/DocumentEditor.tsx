@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Calendar, Check, Copy, Download, ExternalLink, Mail, MapPin, MessageSquare, Save, Trash2 } from 'lucide-react'
 import { formatDate } from '@/lib/format'
+import { keepScroll } from '@/lib/keep-scroll'
 import CustomSelect from '@/components/CustomSelect'
 import Field from '@/components/Field'
 import DatePicker from '@/components/DatePicker'
@@ -214,11 +215,12 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
   async function handleSave() {
     setNotice(null)
     setSaving(true)
-    if (await save()) {
-      setNotice({ kind: 'ok', text: 'Saved.' })
-      router.refresh()
-    }
+    const restore = keepScroll()
+    // No router.refresh(): the editor already holds what was saved, and a
+    // refresh re-rendered the page and threw the scroll back to the top.
+    if (await save()) setNotice({ kind: 'ok', text: 'Saved.' })
     setSaving(false)
+    restore()
   }
 
   async function handleDownload() {
@@ -253,6 +255,7 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
       confirmLabel: 'Send email',
       onConfirm: async () => {
         setEmailing(true)
+        const restore = keepScroll()
         // Saved first, so what the client opens is what is on screen.
         if (await save()) {
           try {
@@ -279,6 +282,7 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
           }
         }
         setEmailing(false)
+        restore()
       },
     })
   }

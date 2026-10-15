@@ -1562,7 +1562,7 @@ export async function executeTool(
         document_number: documentNumber,
         unfilled_blanks: unfilledPlaceholders(drafted.body),
         drafter_notes: drafted.notes,
-        note: 'Saved and visible in the client portal. Not emailed. If there are blanks, offer to fill them with ask_arlo and then update_contract on THIS document_id.',
+        note: 'Saved and visible in the client portal. Not emailed. Reply in two or three short sentences on how it is put together; a button to open it appears automatically, so do not recap the clauses, list the defaults or paste a link. If there are blanks, offer to fill them with ask_arlo and then update_contract on THIS document_id.',
       })
     }
 
@@ -1953,7 +1953,7 @@ export async function executeTool(
         success: true,
         proposal: { id: saved.data.id, job_id: jobId, name: job.name, total: drafted.total },
         drafter_notes: drafted.notes,
-        next: 'Saved as a draft, not sent. Tell Arlo in one or two lines it is drafted with the total, mention drafter_notes if they say anything, and offer to send it. Any edit he asks for is update_proposal, never another create_proposal.',
+        next: 'Saved as a draft, not sent. Tell Arlo in one or two short sentences how it is put together and that it is drafted. A button to open it appears automatically, so do not recap the document or paste a link. Mention drafter_notes only if something needs his call, and offer to send it. Any edit he asks for is update_proposal, never another create_proposal.',
       })
     }
 
