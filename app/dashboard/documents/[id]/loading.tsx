@@ -1,26 +1,30 @@
-import { BackLink, Line } from '@/components/Skeleton'
+import { BackLink, Line, PageHeader } from '@/components/Skeleton'
 
-// Mirrors app/dashboard/documents/[id]/DocumentEditor.tsx: back link, then the
-// editor card with its heading and template picker, the paired fields, the
-// body, and the Save, Download and Email buttons.
+// Mirrors DocumentEditor: back link, header with its actions, the tabs, then
+// the document card on the left and the status card on the right.
 export default function DocumentEditorLoading() {
   return (
     <div className="space-y-6 animate-fade-in">
       <BackLink />
-      <div className="card space-y-5">
-        <div className="flex items-center justify-between gap-3">
-          <Line w={130} h={20} />
-          <Line w={160} h={60} r={22} />
+      <PageHeader />
+      <Line w={220} h={30} r={999} />
+      <div className="prop-editor-grid">
+        <div className="card space-y-4">
+          <Line w={160} h={12} />
+          <Line w="50%" h={26} />
+          <Line w="35%" h={14} />
+          {[5, 3, 4, 3, 4].map((h, i) => (
+            <div key={i} className="space-y-2 pt-3">
+              <Line w={120} h={11} />
+              <Line h={h * 14} r={14} />
+            </div>
+          ))}
         </div>
-        <Line h={60} r={22} />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => <Line key={i} h={60} r={22} />)}
-        </div>
-        <Line h={132} r={22} />
-        <div className="flex gap-3 flex-wrap">
-          <Line w={168} h={44} r={999} />
-          <Line w={168} h={44} r={999} />
-          <Line w={168} h={44} r={999} />
+        <div className="prop-aside">
+          <div className="card space-y-4">
+            <Line w={80} h={12} />
+            <Line h={70} r={14} />
+          </div>
         </div>
       </div>
     </div>

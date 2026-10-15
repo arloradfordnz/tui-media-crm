@@ -6,7 +6,7 @@ import { getContentBacklog, parseJobMonth } from '@/lib/content-backlog'
 import { findDuplicateJobName } from '@/lib/job-naming'
 import { syncShootEvent, removeShootEvent } from '@/lib/job-calendar'
 import { nextDocumentNumber, unfilledPlaceholders } from '@/lib/document-templates'
-import { draftContract, reviseContract, SETTLED_CONTRACT_TERMS, type ContractParties } from '@/lib/contract-drafting'
+import { draftContract, reviseContract, quickEditContract, SETTLED_CONTRACT_TERMS, type ContractParties } from '@/lib/contract-drafting'
 import { MEMORY_CATEGORY_KEYS, isMemoryCategory } from '@/lib/ai-memory'
 import { buildProposalIntake, buildContractIntake, PROPOSAL_REQUIRED_KEYS, contractRequiredKeys, missingBriefKeys, briefLines } from '@/lib/drafting-intake'
 import { draftProposal, type PriceLine } from '@/lib/proposal-drafting'
@@ -513,12 +513,13 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'update_contract',
-    description: 'Change an existing contract that the client has not signed yet. For any wording or term change ("make payment 14 days", "add a clause about drone footage", "reschedule notice is 48 hours"), pass instructions and the drafter revises that same contract, changing only what was asked and keeping it consistent. Use this whenever Arlo is talking about a contract that already exists: never create a new one to make a change. Get the document_id from the contract you just made or from list_documents. Refuses once the client has signed.',
+    description: 'Change an existing contract that the client has not signed yet. For any wording or term change ("make payment 14 days", "reschedule notice is 48 hours", fill a [blank]), pass instructions: small changes are made as exact edits on a cheap model in seconds, and only a change too big for that (a new section, a restructure, a different kind of engagement) goes to the full drafter. Set redraft only when Arlo asks for that kind of big rewrite. Use this whenever Arlo is talking about a contract that already exists: never create a new one to make a change. Get the document_id from the contract you just made or from list_documents. Refuses once the client has signed.',
     input_schema: {
       type: 'object' as const,
       properties: {
         document_id: { type: 'string' },
         instructions: { type: 'string', description: 'The changes to make, in plain words, including any answers that fill a [blank] or change a default.' },
+        redraft: { type: 'boolean', description: 'True only for a big rewrite (new sections, restructuring, a different kind of engagement). Costs a full Opus redraft. Leave out for normal changes.' },
         client_is_business: { type: 'boolean', description: 'Defaults to true.' },
         job_description: { type: 'string' },
         shoot_date: { type: 'string', description: 'YYYY-MM-DD' },
@@ -1561,7 +1562,7 @@ export async function executeTool(
         document_number: documentNumber,
         unfilled_blanks: unfilledPlaceholders(drafted.body),
         drafter_notes: drafted.notes,
-        note: 'Saved and visible in the client portal. Not emailed. If there are blanks, offer to fill them with ask_arlo and then update_contract on THIS document_id.',
+        note: 'Saved and visible in the client portal. Not emailed. Reply in two or three short sentences on how it is put together; a button to open it appears automatically, so do not recap the clauses, list the defaults or paste a link. If there are blanks, offer to fill them with ask_arlo and then update_contract on THIS document_id.',
       })
     }
 
@@ -1576,17 +1577,31 @@ export async function executeTool(
       const form = { ...parsed.form }
       let notes = ''
       const instructions = typeof input.instructions === 'string' ? input.instructions.trim() : ''
+      // Small changes go through the cheap quick edit (exact find-and-replace,
+      // the rest of the contract untouched). Only a change it judges too big,
+      // or one Tui marks as a redraft, pays for the full Opus revision.
+      let method: 'quick edit' | 'full redraft' | null = null
       if (instructions) {
-        const today = new Date().toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'long', year: 'numeric' })
-        const revised = await reviseContract({
-          currentBody: String(form.body ?? ''),
-          instructions,
-          parties: { clientName: String(form.clientName ?? ''), clientIsBusiness: input.client_is_business !== false },
-          today,
-        })
-        if ('error' in revised) return JSON.stringify({ error: revised.error })
-        form.body = revised.body
-        notes = revised.notes
+        const currentBody = String(form.body ?? '')
+        const quick = input.redraft === true ? null : await quickEditContract({ currentBody, instructions })
+        if (quick && 'error' in quick) return JSON.stringify({ error: quick.error })
+        if (quick && 'body' in quick) {
+          form.body = quick.body
+          notes = quick.summary
+          method = 'quick edit'
+        } else {
+          const today = new Date().toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'long', year: 'numeric' })
+          const revised = await reviseContract({
+            currentBody,
+            instructions,
+            parties: { clientName: String(form.clientName ?? ''), clientIsBusiness: input.client_is_business !== false },
+            today,
+          })
+          if ('error' in revised) return JSON.stringify({ error: revised.error })
+          form.body = revised.body
+          notes = revised.notes
+          method = 'full redraft'
+        }
       }
       if (typeof input.job_description === 'string') form.jobDescription = input.job_description
       if (typeof input.shoot_date === 'string') form.shootDate = input.shoot_date
@@ -1595,7 +1610,7 @@ export async function executeTool(
 
       const { error } = await supabase.from('documents').update({ content: JSON.stringify({ ...parsed, form }) }).eq('id', doc.id)
       if (error) return JSON.stringify({ error: error.message })
-      return JSON.stringify({ success: true, document: { id: doc.id, name: doc.name }, unfilled_blanks: unfilledPlaceholders(String(form.body ?? '')), drafter_notes: notes })
+      return JSON.stringify({ success: true, document: { id: doc.id, name: doc.name }, unfilled_blanks: unfilledPlaceholders(String(form.body ?? '')), drafter_notes: notes, method })
     }
 
     case 'ask_arlo': {
@@ -1938,7 +1953,7 @@ export async function executeTool(
         success: true,
         proposal: { id: saved.data.id, job_id: jobId, name: job.name, total: drafted.total },
         drafter_notes: drafted.notes,
-        next: 'Saved as a draft, not sent. Tell Arlo in one or two lines it is drafted with the total, mention drafter_notes if they say anything, and offer to send it. Any edit he asks for is update_proposal, never another create_proposal.',
+        next: 'Saved as a draft, not sent. Tell Arlo in one or two short sentences how it is put together and that it is drafted. A button to open it appears automatically, so do not recap the document or paste a link. Mention drafter_notes only if something needs his call, and offer to send it. Any edit he asks for is update_proposal, never another create_proposal.',
       })
     }
 

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Send, ExternalLink, Plus, Trash2, Copy, Check, Download, Save } from 'lucide-react'
 import { updateProposal, sendProposal } from '@/app/actions/proposals'
+import { keepScroll } from '@/lib/keep-scroll'
 import { formatNZD, formatDate, statusLabel, statusBadgeClass } from '@/lib/format'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
 import ProposalDocument, { parseServices, parseInclusions, priceHeadline, type PricingMode } from '@/components/ProposalDocument'
@@ -104,7 +105,8 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
 
   function handleSave() {
     setNotice(null)
-    startSave(async () => { await save() })
+    const restore = keepScroll()
+    startSave(async () => { await save(); restore() })
   }
 
   function handleSend() {
@@ -116,6 +118,7 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
         : `There's no email on ${proposal.job.client.name}'s record, so it will be marked sent and you can share the link yourself.`,
       confirmLabel: 'Send proposal',
       onConfirm: () => startSend(async () => {
+        const restore = keepScroll()
         try {
           const res = await sendProposal(proposal.id)
           if (res.error) { setNotice({ kind: 'error', text: res.error }); return }
@@ -126,6 +129,7 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
         } catch {
           setNotice({ kind: 'error', text: "Couldn't send. Refresh the page to check whether it went." })
         }
+        restore()
       }),
     })
     // Unsaved edits are saved first, so what the client gets is what is on screen.
