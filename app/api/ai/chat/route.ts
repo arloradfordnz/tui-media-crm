@@ -6,7 +6,7 @@ import { TOOLS, MUTATING_TOOLS, executeTool } from '@/lib/ai-tools'
 import { WEB_SEARCH_TOOL_BASIC } from '@/lib/web-search'
 import { buildDashboardSystem } from '@/lib/assistant-persona'
 import { getContentBacklog, summariseBacklog } from '@/lib/content-backlog'
-import { encodeEvent, toolLabel, summariseResult, sanitiseAsk, type TuiEvent } from '@/lib/tui/receipts'
+import { encodeEvent, toolLabel, summariseResult, sanitiseAsk, buildRecall, type TuiEvent } from '@/lib/tui/receipts'
 import { recordPendingAction } from '@/lib/assistant-approvals'
 import { tidyPunctuation } from '@/lib/tui/text'
 import { listMemories, formatMemories } from '@/lib/ai-memory'
@@ -259,6 +259,13 @@ export async function POST(request: NextRequest) {
       }
 
       let mutated = false
+      // Every tool result this turn, kept so the client can return a digest of
+      // it with the next message (see buildRecall).
+      const recallLog: { name: string; input: Record<string, unknown>; result: string }[] = []
+      const sendRecall = () => {
+        const v = buildRecall(recallLog)
+        if (v) send({ t: 'recall', v })
+      }
       try {
         const currentMessages: Anthropic.MessageParam[] = [...apiMessages]
         let finalText = ''
@@ -405,6 +412,7 @@ export async function POST(request: NextRequest) {
                 await supabase.from('sms_messages').insert({ direction: 'outbound', body })
               })
             }
+            sendRecall()
             send({ t: 'done' })
             close()
             return
@@ -450,6 +458,7 @@ export async function POST(request: NextRequest) {
             if (!entry) continue
             const { block, result } = entry
             toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
+            recallLog.push({ name: block.name, input: block.input as Record<string, unknown>, result })
 
             const { ok, detail } = summariseResult(result)
 
@@ -525,6 +534,7 @@ export async function POST(request: NextRequest) {
                 })
               }
               if (mutated) send({ t: 'mutated' })
+              sendRecall()
               send({ t: 'done' })
               close()
               return
@@ -534,6 +544,7 @@ export async function POST(request: NextRequest) {
 
         send({ t: 'text', v: '\n\n(Reached maximum tool rounds.)' })
         if (mutated) send({ t: 'mutated' })
+        sendRecall()
         send({ t: 'done' })
         close()
       } catch (err) {
