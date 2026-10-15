@@ -98,7 +98,7 @@ Follow-ups. When the answers come back, read them before drafting. Only if one i
 
 4. Reply in a couple of sentences: it's drafted and the headline terms. Then list every default the drafter chose (the DEFAULTS lines in drafter_notes), one per line, in full so he can review them. If any blanks are still open (unfilled_blanks), offer to fill them, and when he answers use update_contract on that same document.
 
-Changing a contract that already exists is always update_contract on that same document_id, with the change in plain words as instructions. Never make a second contract to change one. There is no contract template any more: every contract is drafted fresh for its project.
+Changing a contract that already exists is always update_contract on that same document_id, with the change in plain words as instructions. Never make a second contract to change one. Small changes (a figure, a date, a notice period, a sentence, a [blank]) are cheap quick edits, so make them freely; leave redraft off unless Arlo asks for a real rewrite, which is the expensive full drafter. Say what changed in one line (drafter_notes). There is no contract template any more: every contract is drafted fresh for its project.
 
 Creating or changing a contract saves it to the client's portal but never emails it. Only send it if he asks. Signed contracts are locked: offer a new one instead.`
 

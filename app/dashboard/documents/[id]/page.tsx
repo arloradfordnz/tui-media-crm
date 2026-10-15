@@ -7,7 +7,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
   const supabase = await createServerSupabaseClient()
 
   const [{ data: doc }, { data: clients }] = await Promise.all([
-    supabase.from('documents').select('id, name, doc_type, content, client_id').eq('id', id).single(),
+    supabase.from('documents').select('id, name, doc_type, content, client_id, created_at').eq('id', id).single(),
     supabase.from('clients').select('id, name, contact_person, email, phone, location, portal_token').order('name', { ascending: true }),
   ])
 
@@ -15,7 +15,7 @@ export default async function DocumentDetailPage({ params }: { params: Promise<{
 
   return (
     <DocumentEditor
-      doc={{ id: doc.id, name: doc.name, docType: doc.doc_type, content: doc.content, clientId: doc.client_id ?? null }}
+      doc={{ id: doc.id, name: doc.name, docType: doc.doc_type, content: doc.content, clientId: doc.client_id ?? null, createdAt: doc.created_at }}
       clients={(clients ?? []).map((c) => ({ id: c.id, name: c.name, contactPerson: c.contact_person, email: c.email, phone: c.phone, location: c.location, portalToken: c.portal_token ?? null }))}
     />
   )

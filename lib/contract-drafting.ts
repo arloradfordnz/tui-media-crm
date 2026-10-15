@@ -348,3 +348,96 @@ THE CURRENT AGREEMENT
 ${opts.currentBody}`
   return keepWithinLength(await runDrafter(CONTRACT_DRAFTING_BRIEF, user))
 }
+
+// ── Quick edits ──────────────────────────────────────────────────────────────
+//
+// Most changes Arlo asks for after a draft are small: a figure, a date, a
+// notice period, a sentence reworded, a [blank] filled. Sending those through
+// reviseContract re-runs Opus over the whole brief and writes the whole
+// agreement out again, which costs real money every time and risks unasked
+// changes elsewhere. A quick edit asks a cheaper model (Sonnet 5.5 at low
+// effort) for exact find-and-replace pairs instead, and this code applies them,
+// so every other word of the agreement is untouched by construction.
+//
+// When the model judges the change too big for that (a new clause, a
+// restructured section, a different kind of engagement), or one of its edits
+// does not match the text exactly once, it reports back and update_contract
+// falls through to the full reviseContract.
+
+const QUICK_MODEL = 'claude-sonnet-5-5'
+
+const QUICK_EDIT_BRIEF = `You make small, exact edits to a Tui Media services agreement (New Zealand) that has already been drafted. You never rewrite it.
+
+You are given the current agreement and Arlo's change. Return find-and-replace edits:
+- "find" is text copied EXACTLY from the agreement (same characters, punctuation and **bold** markers), long enough to occur exactly once. Prefer a whole sentence or clause line.
+- "replace" is what goes there instead. Keep the agreement's style: plain New Zealand English, "Tui Media will", "the Client must", amounts as "$1,200", dates as "17 October 2026". Never use an em dash or en dash.
+- Also edit anything that must change with it to stay consistent, for example the At a glance summary when a clause's figure changes, or the clause that repeats it.
+- Change nothing that was not asked for.
+
+Set needs_redraft to true, with no edits, when the change cannot honestly be made as a few local edits: adding a new section or several new clauses, restructuring or renumbering, changing the kind of engagement (for example one-off to retainer), or rewriting most of a section. Give the reason in one short line. A single added sentence or clause at the end of an existing section is still a quick edit.
+
+In summary, say in one line what you changed.`
+
+const QUICK_EDIT_SCHEMA = {
+  type: 'object',
+  properties: {
+    needs_redraft: { type: 'boolean' },
+    reason: { type: 'string' },
+    edits: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { find: { type: 'string' }, replace: { type: 'string' } },
+        required: ['find', 'replace'],
+        additionalProperties: false,
+      },
+    },
+    summary: { type: 'string' },
+  },
+  required: ['needs_redraft', 'reason', 'edits', 'summary'],
+  additionalProperties: false,
+}
+
+export type QuickEditResult = { body: string; summary: string } | { needsRedraft: string } | { error: string }
+
+/** Make a small change to a contract as exact text edits on a cheap model. */
+export async function quickEditContract(opts: { currentBody: string; instructions: string }): Promise<QuickEditResult> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) return { error: 'ANTHROPIC_API_KEY is not configured.' }
+  const anthropic = new Anthropic({ apiKey })
+
+  try {
+    const message = await anthropic.beta.messages.create({
+      model: QUICK_MODEL,
+      max_tokens: 8000,
+      output_config: { effort: 'low', format: { type: 'json_schema', schema: QUICK_EDIT_SCHEMA } },
+      system: [{ type: 'text', text: QUICK_EDIT_BRIEF, cache_control: { type: 'ephemeral' } }],
+      messages: [{ role: 'user', content: `ARLO'S CHANGE\n${opts.instructions.trim()}\n\nTHE CURRENT AGREEMENT\n${opts.currentBody}` }],
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+    } as unknown as Parameters<typeof anthropic.beta.messages.create>[0]) as Anthropic.Beta.BetaMessage
+
+    // Anything short of a clean answer hands the change to the full drafter
+    // rather than failing it: the quick path is only ever an optimisation.
+    if (message.stop_reason !== 'end_turn') return { needsRedraft: `quick edit stopped (${message.stop_reason})` }
+    const text = message.content
+      .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text')
+      .map((b) => b.text)
+      .join('')
+    const out = JSON.parse(text) as { needs_redraft: boolean; reason: string; edits: { find: string; replace: string }[]; summary: string }
+    if (out.needs_redraft || !out.edits.length) return { needsRedraft: out.reason || 'the change is too big for a quick edit' }
+
+    let body = opts.currentBody
+    for (const e of out.edits) {
+      const at = body.indexOf(e.find)
+      if (!e.find || at === -1 || body.indexOf(e.find, at + 1) !== -1) {
+        return { needsRedraft: 'a quick edit did not match the text exactly once' }
+      }
+      body = body.slice(0, at) + e.replace + body.slice(at + e.find.length)
+    }
+    return { body: houseClean(body), summary: out.summary.trim() }
+  } catch (err) {
+    console.error('[contract-drafting] quick edit failed, falling back to a full revision:', err)
+    return { needsRedraft: 'the quick edit failed' }
+  }
+}

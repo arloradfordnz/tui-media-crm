@@ -3905,3 +3905,29 @@ textarea.field-input::-webkit-scrollbar-track { margin-block: 14px; }
 .prop-mode-opt:disabled { cursor: default; opacity: 0.7; }
 .prop-suffix { display: flex; flex-direction: column; gap: 6px; max-width: 280px; }
 .prop-aside-total small { font-size: var(--t-sm); font-weight: 400; letter-spacing: 0; color: var(--text-tertiary); }
+
+/* A saved document (a contract Tui drafted, a quote, a call sheet) read the way
+   a proposal reads: same card, same small-caps section headings, same hairline
+   rows. Rendered by components/DocumentBody.tsx. */
+.doc-body { display: flex; flex-direction: column; gap: 28px; max-width: 68ch; }
+.doc-section { display: flex; flex-direction: column; gap: 10px; }
+.doc-section > .prop-h { margin-bottom: 2px; }
+.doc-h3 { font-size: var(--t-md); font-weight: 600; color: var(--text-primary); margin-top: 6px; }
+.doc-para, .doc-clause { font-size: var(--t-md); line-height: 1.65; color: var(--text-secondary); }
+.doc-para strong, .doc-clause strong, .doc-fact dd strong { font-weight: 600; color: var(--text-primary); }
+.doc-clause { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 4px; }
+.doc-clause-num { color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.doc-facts { margin: 0; border-top: 1px solid var(--bg-border); }
+.doc-fact { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--bg-border); }
+.doc-fact dt { font-size: var(--t-sm); color: var(--text-tertiary); padding-top: 1px; }
+.doc-fact dd { margin: 0; font-size: var(--t-md); line-height: 1.5; color: var(--text-primary); }
+@media (max-width: 520px) { .doc-fact { grid-template-columns: 1fr; gap: 2px; } }
+.doc-approval { display: flex; flex-direction: column; gap: 10px; margin-top: 32px; padding-top: 28px; border-top: 1px solid var(--bg-border); max-width: 68ch; }
+.doc-sign { display: grid; grid-template-columns: 1fr; gap: 24px; margin-top: 12px; }
+@media (min-width: 640px) { .doc-sign { grid-template-columns: 1fr 1fr; gap: 36px; } }
+.doc-sign-line { min-height: 44px; display: flex; align-items: flex-end; padding-bottom: 6px; border-bottom: 1px solid var(--text-primary); font-size: var(--t-lg); font-weight: 600; color: var(--text-primary); }
+.doc-sign-line.is-empty { border-bottom: 1px dashed var(--bg-border); font-size: var(--t-sm); font-weight: 400; color: var(--text-tertiary); }
+.doc-sign-name { margin-top: 8px; font-size: var(--t-sm); font-weight: 600; color: var(--text-primary); }
+.doc-sign-meta { margin-top: 2px; font-size: var(--t-xs); color: var(--text-tertiary); }
+.doc-edit-body { min-height: 420px; line-height: 1.6; }
+.doc-delete { align-self: flex-start; color: var(--danger); }
