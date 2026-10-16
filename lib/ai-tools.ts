@@ -1,6 +1,6 @@
 import { createHash } from 'crypto'
 import Anthropic from '@anthropic-ai/sdk'
-import { fetchXeroContacts, createXeroInvoice, fetchOutstandingInvoices, approveXeroInvoice, emailXeroInvoice, voidXeroInvoice, deleteXeroInvoice, updateXeroInvoice, getXeroInvoice, deleteXeroPayment } from '@/lib/xero'
+import { fetchXeroContacts, createXeroContact, createXeroInvoice, fetchOutstandingInvoices, approveXeroInvoice, emailXeroInvoice, voidXeroInvoice, deleteXeroInvoice, updateXeroInvoice, getXeroInvoice, deleteXeroPayment } from '@/lib/xero'
 import { fetchRecentEmails, fetchUnreadEmails } from '@/lib/mail'
 import { getContentBacklog, parseJobMonth } from '@/lib/content-backlog'
 import { findDuplicateJobName } from '@/lib/job-naming'
@@ -55,7 +55,7 @@ export const MUTATING_TOOLS = new Set([
   'create_proposal', 'update_proposal',
   'create_deliverable',
   'create_todo', 'complete_todo',
-  'create_xero_invoice', 'approve_xero_invoice', 'send_xero_invoice', 'void_xero_invoice', 'delete_xero_invoice', 'update_xero_invoice', 'remove_xero_payment',
+  'create_xero_contact', 'create_xero_invoice', 'approve_xero_invoice', 'send_xero_invoice', 'void_xero_invoice', 'delete_xero_invoice', 'update_xero_invoice', 'remove_xero_payment',
   'log_shoot',
   'snooze_flag', 'resolve_flag',
   'add_subscription', 'update_subscription', 'cancel_subscription',
@@ -792,6 +792,21 @@ export const TOOLS: Anthropic.Tool[] = [
         search: { type: 'string', description: 'Name search term. Omit to list recent contacts.' },
       },
       required: [],
+    },
+  },
+  {
+    name: 'create_xero_contact',
+    description: 'Create a new contact in Xero so it can be invoiced. Search with list_xero_contacts first and only create one if there is no match, because Xero rejects a duplicate name. Returns the ContactID to pass to create_xero_invoice.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        name: { type: 'string', description: 'Contact name as it should appear on invoices (usually the business name)' },
+        email: { type: 'string', description: 'Email address invoices are sent to' },
+        phone: { type: 'string', description: 'Phone number' },
+        first_name: { type: 'string', description: 'Primary person first name' },
+        last_name: { type: 'string', description: 'Primary person last name' },
+      },
+      required: ['name'],
     },
   },
   {
@@ -1837,6 +1852,18 @@ export async function executeTool(
       const contacts = await fetchXeroContacts((input.search as string) || undefined)
       if (contacts === null) return JSON.stringify({ error: 'Xero is not connected. Ask the user to connect it from the Finance page.' })
       return JSON.stringify({ contacts: contacts.slice(0, 20).map((c) => ({ id: c.ContactID, name: c.Name, email: c.EmailAddress })) })
+    }
+
+    case 'create_xero_contact': {
+      const res = await createXeroContact({
+        name: input.name as string,
+        email: (input.email as string) || undefined,
+        phone: (input.phone as string) || undefined,
+        firstName: (input.first_name as string) || undefined,
+        lastName: (input.last_name as string) || undefined,
+      })
+      if (!res.ok) return JSON.stringify({ error: res.error })
+      return JSON.stringify({ success: true, contact: { id: res.data.ContactID, name: res.data.Name, email: res.data.EmailAddress } })
     }
 
     case 'create_xero_invoice': {

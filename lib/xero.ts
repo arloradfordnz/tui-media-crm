@@ -24,7 +24,7 @@ export const XERO_SCOPES = [
   'openid',
   'offline_access',
   'accounting.invoices',          // full read + write for invoices
-  'accounting.contacts.read',     // read contacts to pick invoice recipients
+  'accounting.contacts',          // read + write contacts (pick invoice recipients, create new ones)
   'accounting.settings',          // read + write for items/products
   'accounting.reports.profitandloss.read',
   'accounting.reports.banksummary.read',
@@ -269,7 +269,7 @@ export function friendlyXeroError(err: unknown): string {
     return err instanceof Error ? err.message : String(err ?? 'Unknown Xero error')
   }
   if (err.status === 401) return 'Xero rejected the token. Reconnect Xero from Settings.'
-  if (err.status === 403) return 'Xero says this app is not allowed to do that. The connection probably needs reauthorising with invoice write access.'
+  if (err.status === 403) return 'Xero says this app is not allowed to do that. The connection probably needs reauthorising (Settings → disconnect and reconnect Xero) to pick up the latest permissions.'
   try {
     const body = JSON.parse(err.body) as {
       Message?: string
@@ -1073,6 +1073,45 @@ export async function fetchXeroContacts(search?: string): Promise<XeroContact[] 
     return res.Contacts ?? []
   } catch {
     return null
+  }
+}
+
+export type XeroContactCreateInput = {
+  name: string
+  email?: string
+  phone?: string
+  firstName?: string
+  lastName?: string
+}
+
+/**
+ * Create a customer contact. Needs the `accounting.contacts` scope; a token
+ * issued before that scope was added gets a 403, which friendlyXeroError turns
+ * into a reconnect prompt. Xero rejects a duplicate Name with a 400, so look
+ * the name up with fetchXeroContacts first.
+ */
+export async function createXeroContact(input: XeroContactCreateInput): Promise<XeroWriteResult<XeroContact>> {
+  const account = await getValidXeroAccount()
+  if (!account || !account.account_id) return { ok: false, error: 'Xero is not connected. Reconnect it from Settings.' }
+
+  try {
+    const contact: Record<string, unknown> = { Name: input.name, IsCustomer: true }
+    if (input.email) contact.EmailAddress = input.email
+    if (input.firstName) contact.FirstName = input.firstName
+    if (input.lastName) contact.LastName = input.lastName
+    if (input.phone) contact.Phones = [{ PhoneType: 'DEFAULT', PhoneNumber: input.phone }]
+
+    const res = await xeroPost<{ Contacts?: XeroContact[] }>(
+      '/Contacts',
+      { Contacts: [contact] },
+      account.access_token,
+      account.account_id,
+    )
+    const created = res.Contacts?.[0]
+    if (!created?.ContactID) return { ok: false, error: 'Xero accepted the request but returned no contact.' }
+    return { ok: true, data: created }
+  } catch (err) {
+    return { ok: false, error: friendlyXeroError(err) }
   }
 }
 

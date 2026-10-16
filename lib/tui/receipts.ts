@@ -125,6 +125,7 @@ const TOOL_VERBS: Record<string, string> = {
   update_memory: 'Updating memory',
   forget: 'Forgetting that',
   list_xero_contacts: 'Reading Xero contacts',
+  create_xero_contact: 'Creating Xero contact',
   create_xero_invoice: 'Raising Xero invoice',
   list_xero_invoices: 'Reading Xero invoices',
   approve_xero_invoice: 'Approving Xero invoice',
