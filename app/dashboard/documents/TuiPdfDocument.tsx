@@ -2,6 +2,7 @@ import { Document, Page, Text, View, StyleSheet, Font, Svg, G, Path, Ellipse } f
 import type { DocumentProps } from '@react-pdf/renderer'
 import type { Style } from '@react-pdf/types'
 import { cloneElement, type ReactElement } from 'react'
+import { parseInline } from '@/lib/inline-markdown'
 
 // Bricolage Grotesque is Tui Media's brand typeface (see the site's
 // PALETTES.md / wireframe). These are static-weight TTFs pulled from the
@@ -127,17 +128,17 @@ export function TuiLogo({ fill = C.black }: { fill?: string }) {
   )
 }
 
+// Bricolage Grotesque has no italic, so an italic run is set in Helvetica's
+// oblique (bold oblique when it is also bold). Plain and bold runs are
+// unchanged. Registered fonts cannot be slanted by react-pdf itself.
 function renderInline(text: string): ReactElement[] {
-  const parts: ReactElement[] = []
-  const re = /\*\*(.+?)\*\*/g
-  let last = 0, m: RegExpExecArray | null, i = 0
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > last) parts.push(<Text key={i++}>{text.slice(last, m.index)}</Text>)
-    parts.push(<Text key={i++} style={{ fontFamily: 'Bricolage Grotesque', fontWeight: 600 }}>{m[1]}</Text>)
-    last = m.index + m[0].length
-  }
-  if (last < text.length) parts.push(<Text key={i++}>{text.slice(last)}</Text>)
-  return parts
+  return parseInline(text).map((run, i) => {
+    if (run.italic) {
+      return <Text key={i} style={{ fontFamily: run.bold ? 'Helvetica-BoldOblique' : 'Helvetica-Oblique' }}>{run.text}</Text>
+    }
+    if (run.bold) return <Text key={i} style={{ fontFamily: 'Bricolage Grotesque', fontWeight: 600 }}>{run.text}</Text>
+    return <Text key={i}>{run.text}</Text>
+  })
 }
 
 type BodyStyles = { paragraph: Style; paragraphBeforeHeading: Style; h1: Style; h3: Style }

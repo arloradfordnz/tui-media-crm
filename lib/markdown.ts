@@ -6,10 +6,13 @@
  *   ## Subheading   → <h3>
  *   ### Small head  → <h4>
  *   **bold**        → <strong>
+ *   *italic*        → <em>
  *
  * All untrusted input is HTML-escaped before any tags are inserted, so the
  * output is safe to feed into `dangerouslySetInnerHTML`.
  */
+
+import { inlineToHtml } from '@/lib/inline-markdown'
 
 export function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -17,7 +20,7 @@ export function escapeHtml(text: string): string {
 
 /** Inline-only: escape + bold. Use for short strings that mustn't break across lines. */
 export function renderInline(text: string): string {
-  return escapeHtml(text).replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
+  return inlineToHtml(text)
 }
 
 type DocBodyStyle = {
