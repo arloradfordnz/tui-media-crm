@@ -1,16 +1,17 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Calendar, Check, Copy, Download, ExternalLink, Lock, Mail, MapPin, MessageSquare, Save, Sparkles, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, Check, Copy, Download, ExternalLink, Lock, Mail, MessageSquare, Save, Trash2 } from 'lucide-react'
 import { formatDate } from '@/lib/format'
 import { keepScroll } from '@/lib/keep-scroll'
 import CustomSelect from '@/components/CustomSelect'
 import Field from '@/components/Field'
 import DatePicker from '@/components/DatePicker'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
-import DocumentBody from '@/components/DocumentBody'
+import DocumentSheet from '@/components/DocumentSheet'
+import ReviseTextarea from '@/components/ReviseTextarea'
 
 // One page for reading, tweaking and sending a saved document, laid out like
 // the proposal editor (jobs/[id]/proposal/[proposalId]/ProposalEditor.tsx):
@@ -49,7 +50,10 @@ export type DocFormShape = {
 }
 
 type Feedback = { message: string; createdAt: string; author: string }
-type DocData = { id: string; name: string; docType: string; content: string; clientId: string | null; createdAt: string }
+type DocData = {
+  id: string; name: string; docType: string; content: string; clientId: string | null; createdAt: string
+  sentAt: string | null; viewedAt: string | null; lastViewedAt: string | null; viewCount: number
+}
 
 const today = () => new Date().toISOString().split('T')[0]
 
@@ -70,13 +74,6 @@ const EMPTY_FORM: DocFormShape = {
 }
 
 // Written out in full, the way the client reads it.
-// A bare "2026-10-15" is a calendar date, so it is read and printed in UTC and
-// cannot slip a day; a full timestamp is shown as the day it was in NZ.
-const longDate = (iso: string | null | undefined) =>
-  !iso ? '' : iso.length === 10
-    ? new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-NZ', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' })
-    : new Date(iso).toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'long', year: 'numeric' })
-
 function parseContent(content: string): { template: string; form: DocFormShape; feedback: Feedback[]; signedAtISO: string } | null {
   if (!content) return null
   try {
@@ -149,6 +146,9 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
   const [downloading, setDownloading] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [copied, setCopied] = useState(false)
+  // Until it is sent, the client cannot see this document in their portal.
+  const [sentAt, setSentAt] = useState<string | null>(doc.sentAt)
+  const [publishing, setPublishing] = useState(false)
   const [confirmSpec, setConfirm] = useState<ConfirmSpec | null>(null)
 
   const isContract = template === 'Contract'
@@ -158,15 +158,6 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
   // the page does not offer one: no Edit tab, no Save, no Delete.
   const locked = isContract && isSigned
 
-  // "Revise with Tui": highlight part of the text in Edit, say what should
-  // change, and only that part is rewritten (app/api/documents/revise-section).
-  // The range is kept in state because the highlight itself disappears as soon
-  // as focus moves to the instruction box.
-  const bodyRef = useRef<HTMLTextAreaElement>(null)
-  const [sel, setSel] = useState<{ start: number; end: number } | null>(null)
-  const [reviseAsk, setReviseAsk] = useState('')
-  const [revising, setRevising] = useState(false)
-  const [reviseResult, setReviseResult] = useState<{ note: string; before: string } | { error: string } | null>(null)
   const client = clients.find((c) => c.id === selectedClientId) ?? null
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
   const portalUrl = client?.portalToken ? `${baseUrl}/portal/client/${client.portalToken}` : null
@@ -283,13 +274,15 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
                 template,
                 clientId: selectedClientId,
                 portalToken,
+                docId: doc.id,
               }),
             })
             if (!res.ok) {
               const data = await res.json().catch(() => ({}))
               setNotice({ kind: 'error', text: data.error || "The email didn't go out. Try again." })
             } else {
-              setNotice({ kind: 'ok', text: `Sent to ${form.clientEmail}.` })
+              setSentAt((prev) => prev ?? new Date().toISOString())
+              setNotice({ kind: 'ok', text: `Sent to ${form.clientEmail}. It is now in their portal.` })
             }
           } catch {
             setNotice({ kind: 'error', text: "The email didn't go out. Try again." })
@@ -301,98 +294,37 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
     })
   }
 
-  function trackSelection() {
-    const el = bodyRef.current
-    if (!el || revising) return
-    const { selectionStart: start, selectionEnd: end } = el
-    if (end > start && form.body.slice(start, end).trim()) {
-      setSel({ start, end })
-      setReviseResult(null)
-    } else if (document.activeElement === el) {
-      setSel(null)
-    }
-  }
-
-  async function handleRevise() {
-    if (!sel || !reviseAsk.trim()) return
-    setRevising(true)
-    setReviseResult(null)
-    const before = form.body
+  // Rewrites just the highlighted range (the floating box in ReviseTextarea).
+  async function reviseRange(range: { start: number; end: number }, instructions: string) {
     try {
       const res = await fetch('/api/documents/revise-section', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ document: before, start: sel.start, end: sel.end, instructions: reviseAsk }),
+        body: JSON.stringify({ document: form.body, start: range.start, end: range.end, instructions }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok || typeof data.revised !== 'string') {
-        setReviseResult({ error: data.error || "Couldn't revise that. Try again." })
-      } else {
-        const next = before.slice(0, sel.start) + data.revised + before.slice(sel.end)
-        update('body', next)
-        setReviseResult({ note: data.note || 'Revised.', before })
-        setReviseAsk('')
-        // Highlight the new wording so the change is easy to see.
-        const start = sel.start
-        const end = sel.start + data.revised.length
-        setSel(null)
-        requestAnimationFrame(() => {
-          const el = bodyRef.current
-          if (el) { el.focus({ preventScroll: true }); el.setSelectionRange(start, end) }
-        })
-      }
+      if (!res.ok || typeof data.revised !== 'string') return { error: data.error || "Couldn't revise that. Try again." }
+      return { revised: data.revised as string, note: String(data.note || '') }
     } catch {
-      setReviseResult({ error: "Couldn't reach Tui. Check your connection and try again." })
+      return { error: "Couldn't reach Tui. Check your connection and try again." }
     }
-    setRevising(false)
   }
 
-  function undoRevise() {
-    if (!reviseResult || !('before' in reviseResult)) return
-    update('body', reviseResult.before)
-    setReviseResult(null)
+  async function publishToPortal() {
+    setNotice(null)
+    setPublishing(true)
+    // Saved first, so what the client opens is what is on screen.
+    if (dirty && !(await save())) { setPublishing(false); return }
+    try {
+      const res = await fetch('/api/documents/publish', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ docId: doc.id }) })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) setNotice({ kind: 'error', text: data.error || "Couldn't publish it. Try again." })
+      else { setSentAt(data.sentAt || new Date().toISOString()); setNotice({ kind: 'ok', text: 'It is now in their portal. They have not been emailed.' }) }
+    } catch {
+      setNotice({ kind: 'error', text: "Couldn't publish it. Check your connection and try again." })
+    }
+    setPublishing(false)
   }
-
-  // The box, drawn in the right column on a wide screen and under the text on
-  // a phone, where the right column sits below a very long text box.
-  const revisePanel = !locked && tab === 'edit' && (sel || reviseResult) ? (
-    <div className="card space-y-3 doc-revise">
-      <div className="flex items-center gap-2">
-        <Sparkles className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-        <span className="label">Revise with Tui</span>
-      </div>
-      {sel && (
-        <>
-          <blockquote className="doc-revise-quote">{form.body.slice(sel.start, sel.end).trim()}</blockquote>
-          <textarea
-            rows={3}
-            value={reviseAsk}
-            onChange={(e) => setReviseAsk(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void handleRevise() } }}
-            className="field-input"
-            placeholder="What should change? e.g. make it 7 days, or say it more simply"
-            aria-label="What should change"
-            disabled={revising}
-          />
-          <div className="flex gap-2">
-            <button type="button" onClick={handleRevise} disabled={revising || !reviseAsk.trim()} className="btn-primary btn-sm flex-1">
-              <Sparkles className="w-3.5 h-3.5" /> {revising ? 'Revising…' : 'Revise this part'}
-            </button>
-            <button type="button" onClick={() => { setSel(null); setReviseAsk('') }} disabled={revising} className="btn-secondary btn-sm">Cancel</button>
-          </div>
-          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Only the highlighted part changes.</p>
-        </>
-      )}
-      {reviseResult && 'error' in reviseResult && <p className="text-sm" style={{ color: 'var(--danger)' }}>{reviseResult.error}</p>}
-      {reviseResult && 'note' in reviseResult && (
-        <>
-          <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{reviseResult.note}</p>
-          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>The new wording is highlighted. Save changes to keep it.</p>
-          <button type="button" onClick={undoRevise} className="btn-secondary btn-sm"><Undo2 className="w-3.5 h-3.5" /> Undo</button>
-        </>
-      )}
-    </div>
-  ) : null
 
   function handleDelete() {
     setConfirm({
@@ -419,6 +351,8 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
 
   const timeline = [
     { label: 'Drafted', at: doc.createdAt, done: true },
+    { label: 'Sent to client', at: sentAt, done: !!sentAt },
+    { label: doc.viewCount > 1 ? `Opened ${doc.viewCount} times` : 'Opened', at: doc.lastViewedAt || doc.viewedAt, done: !!doc.viewedAt },
     { label: 'Signed', at: parsed?.signedAtISO || null, done: isSigned },
   ]
 
@@ -477,44 +411,7 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
         <div className="space-y-5 min-w-0">
           {(tab === 'preview' || locked) && (
             <div className="card prop-preview">
-              <div className="prop-preview-head">
-                <p className="prop-eyebrow">{[template, form.documentNumber, longDate(form.date)].filter(Boolean).join(' · ')}</p>
-                <h2 className="prop-title prop-title-sm">{title}</h2>
-                {form.clientName && (
-                  <p className="prop-for">Prepared for {form.contactPerson ? `${form.contactPerson}, ` : ''}{form.clientName}</p>
-                )}
-                {(form.shootDate || form.location) && (
-                  <div className="prop-meta">
-                    {form.shootDate && <span><Calendar className="w-3.5 h-3.5" /> {longDate(form.shootDate)}</span>}
-                    {form.location && <span><MapPin className="w-3.5 h-3.5" /> {form.location}</span>}
-                  </div>
-                )}
-              </div>
-
-              {form.body
-                ? <DocumentBody body={form.body} />
-                : <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Nothing written yet. Ask Tui to draft it, or write it in Edit.</p>}
-
-              {isContract && (
-                <section className="doc-approval">
-                  <h2 className="prop-h">Approval</h2>
-                  <p className="doc-para">By signing below, both parties agree to the scope, terms and payment set out in this contract.</p>
-                  <div className="doc-sign">
-                    <div>
-                      <div className="doc-sign-line">Arlo Radford</div>
-                      <p className="doc-sign-name">Arlo Radford</p>
-                      <p className="doc-sign-meta">Tui Media</p>
-                    </div>
-                    <div>
-                      <div className={`doc-sign-line${isSigned ? '' : ' is-empty'}`}>{isSigned ? form.clientSignature : 'Awaiting signature'}</div>
-                      <p className="doc-sign-name">{form.contactPerson || form.clientName || 'Client'}</p>
-                      <p className="doc-sign-meta">
-                        {[form.contactPerson && form.clientName ? form.clientName : '', isSigned && form.clientSignedAt ? `Signed ${form.clientSignedAt}` : ''].filter(Boolean).join(' · ') || 'Client'}
-                      </p>
-                    </div>
-                  </div>
-                </section>
-              )}
+              <DocumentSheet template={template} form={form} title={title} emptyText="Nothing written yet. Ask Tui to draft it, or write it in Edit." />
             </div>
           )}
 
@@ -529,19 +426,12 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
                       : 'Start a line with # for a heading and **bold** a key term. A blank line starts a new paragraph.'}
                   </p>
                 </div>
-                <p className="doc-revise-tip"><Sparkles className="w-3.5 h-3.5" /> Highlight any part to have Tui revise just that part.</p>
-                <textarea
-                  ref={bodyRef}
-                  rows={22}
+                <ReviseTextarea
                   value={form.body}
-                  onChange={(e) => { update('body', e.target.value); setSel(null) }}
-                  onSelect={trackSelection}
-                  onMouseUp={trackSelection}
-                  onKeyUp={trackSelection}
+                  onChange={(next) => update('body', next)}
+                  onRevise={reviseRange}
                   className="field-input doc-edit-body"
-                  aria-label="Document text"
                 />
-                <div className="doc-revise-inline">{revisePanel}</div>
               </section>
 
               <section className="card space-y-4">
@@ -614,7 +504,6 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
         </div>
 
         <aside className="prop-aside">
-          <div className="doc-revise-side">{revisePanel}</div>
           <div className="card space-y-4">
             <div className="flex items-center justify-between">
               <span className="label">Status</span>
@@ -665,6 +554,20 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
             </div>
           )}
 
+          {!sentAt && (
+            <div className="card space-y-3">
+              <span className="label">Not sent yet</span>
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                {client ? `${client.name} can't see this in their portal until it's sent.` : 'Pick a client. It stays hidden from their portal until it is sent.'}
+              </p>
+              {client && (
+                <button type="button" onClick={publishToPortal} disabled={publishing || emailing || saving} className="btn-secondary btn-sm">
+                  {publishing ? 'Publishing…' : 'Show in portal without emailing'}
+                </button>
+              )}
+            </div>
+          )}
+
           {portalUrl && client && (
             <div className="card space-y-4">
               <span className="label">Client portal</span>
@@ -678,7 +581,7 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
                 </a>
               </div>
               <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                Shows in {client.name}&apos;s portal{isContract ? ', where they read and sign it' : ''}.
+                {sentAt ? `In ${client.name}'s portal` : `Hidden from ${client.name}'s portal until it's sent`}{sentAt && isContract ? ', where they read and sign it' : ''}.
               </p>
             </div>
           )}

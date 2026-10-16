@@ -6,6 +6,7 @@ import { createServerSupabaseClient } from '@/lib/supabase'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { sendProposalEmail, sendProposalAcceptedEmail } from '@/lib/email'
 import { emitAssistantEvent } from '@/lib/tui/events'
+import { isAdminViewing } from '@/lib/admin-ip'
 
 export async function createProposal(jobId: string) {
   const supabase = await createServerSupabaseClient()
@@ -193,4 +194,40 @@ export async function declineProposal(token: string) {
   })
 
   revalidatePath(`/dashboard/jobs/${proposal.job_id}`)
+}
+
+// The public proposal page calls this once it has rendered, so Arlo can see
+// when the client opened it (and how often). Arlo checking his own link is not
+// a view: isAdminViewing() recognises his session, his IPs and the cookie the
+// dashboard leaves. Only a sent or accepted proposal counts; a draft is never
+// shown to a client.
+export async function recordProposalView(token: string) {
+  const admin = createAdminClient()
+  if (!admin || !token) return
+  if (await isAdminViewing()) return
+
+  const { data: proposal } = await admin
+    .from('proposals')
+    .select('id, job_id, status, viewed_at, view_count, jobs(name, client_id, clients(name))')
+    .eq('token', token)
+    .single()
+  if (!proposal || (proposal.status !== 'sent' && proposal.status !== 'accepted')) return
+
+  const now = new Date().toISOString()
+  const first = !proposal.viewed_at
+  await admin.from('proposals').update({
+    viewed_at: proposal.viewed_at ?? now,
+    last_viewed_at: now,
+    view_count: (proposal.view_count ?? 0) + 1,
+  }).eq('id', proposal.id)
+
+  // Only the first open is worth telling Arlo about; after that it is in the
+  // proposal's timeline.
+  if (first) {
+    const job = proposal.jobs as unknown as { name: string; client_id: string; clients: { name: string } | null }
+    await Promise.all([
+      admin.from('activities').insert({ action: 'proposal_viewed', details: `${job.clients?.name ?? 'The client'} opened the proposal for "${job.name}"`, job_id: proposal.job_id, client_id: job.client_id }),
+      admin.from('notifications').insert({ title: 'Proposal opened', message: `${job.clients?.name ?? 'The client'} opened the proposal for "${job.name}"`, type: 'proposal_viewed', job_id: proposal.job_id, client_id: job.client_id }),
+    ])
+  }
 }

@@ -41,6 +41,8 @@ export async function loadPortalData(client: PortalClient) {
       .from('documents')
       .select('id, name, doc_type, content, updated_at')
       .eq('client_id', client.id)
+      // Not until it has been sent (emailed or published from the document page).
+      .not('sent_at', 'is', null)
       .order('updated_at', { ascending: false }),
     // Sent proposals only: a draft is still Arlo's to change. The inner join
     // scopes them to this client's jobs.

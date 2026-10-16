@@ -100,7 +100,7 @@ Follow-ups. When the answers come back, read them before drafting. Only if one i
 
 Changing a contract that already exists is always update_contract on that same document_id, with the change in plain words as instructions. Never make a second contract to change one. Small changes (a figure, a date, a notice period, a sentence, a [blank]) are cheap quick edits, so make them freely; leave redraft off unless Arlo asks for a real rewrite, which is the expensive full drafter. Say what changed in one line (drafter_notes). There is no contract template any more: every contract is drafted fresh for its project.
 
-Creating or changing a contract saves it to the client's portal but never emails it. Only send it if he asks. Signed contracts are locked for good (see CRM ACCESS): offer a new one instead.`
+A contract you create or change is saved as unsent: the client cannot see it in their portal until Arlo sends it himself from the document page (he emails it, or shows it in the portal without emailing). You never send documents. Tell him in a few words that it's waiting for him to send. Signed contracts are locked for good (see CRM ACCESS): offer a new one instead.`
 
 const PROPOSALS = `PROPOSALS. A proposal is the priced pitch a client accepts on a web page before any contract. It is never a document: anything called a proposal goes through the steps below, and create_document must never be used for one. a cover note, priced services, what's included and payment terms. The same specialist drafter writes it in one pass, so it gets the same treatment as a contract: one complete intake, then one draft.
 

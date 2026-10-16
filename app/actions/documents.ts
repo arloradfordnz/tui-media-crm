@@ -104,12 +104,13 @@ export async function signDocumentByClient(
   // Authorise: the document's client must match the client the portal token belongs to.
   // Public page (no login) so read with the service role; both reads are independent.
   const [docRes, clientRes] = await Promise.all([
-    admin.from('documents').select('id, name, content, client_id').eq('id', docId).single(),
+    admin.from('documents').select('id, name, content, client_id, sent_at').eq('id', docId).single(),
     admin.from('clients').select('id, name, email').eq('portal_token', portalToken).single(),
   ])
   const doc = docRes.data
   const client = clientRes.data
-  if (!doc) return { error: 'Document not found.' }
+  // A document that has not been sent is not in the portal, so it cannot be signed from it either.
+  if (!doc || !doc.sent_at) return { error: 'Document not found.' }
   if (!client || client.id !== doc.client_id) return { error: 'Not authorised to sign this document.' }
 
   // Parse existing content, merge signature into the form
@@ -199,12 +200,12 @@ export async function submitDocumentFeedback(
   if (!admin) return { error: 'Server misconfigured — feedback cannot be saved.' }
 
   const [docRes, clientRes] = await Promise.all([
-    admin.from('documents').select('id, name, content, client_id').eq('id', docId).single(),
+    admin.from('documents').select('id, name, content, client_id, sent_at').eq('id', docId).single(),
     admin.from('clients').select('id, name').eq('portal_token', portalToken).single(),
   ])
   const doc = docRes.data
   const client = clientRes.data
-  if (!doc) return { error: 'Document not found.' }
+  if (!doc || !doc.sent_at) return { error: 'Document not found.' }
   if (!client || client.id !== doc.client_id) return { error: 'Not authorised.' }
 
   type Feedback = { message: string; createdAt: string; author: string }

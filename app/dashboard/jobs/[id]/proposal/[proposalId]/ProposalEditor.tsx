@@ -27,6 +27,9 @@ type ProposalData = {
   sentAt: string | null
   respondedAt: string | null
   createdAt: string
+  viewedAt: string | null
+  lastViewedAt: string | null
+  viewCount: number
   job: {
     id: string
     name: string
@@ -174,6 +177,7 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
   const timeline = [
     { label: 'Drafted', at: proposal.createdAt, done: true },
     { label: 'Sent', at: proposal.sentAt, done: !!proposal.sentAt },
+    { label: proposal.viewCount > 1 ? `Opened ${proposal.viewCount} times` : 'Opened', at: proposal.lastViewedAt || proposal.viewedAt, done: !!proposal.viewedAt },
     {
       label: proposal.status === 'declined' ? 'Declined' : 'Accepted',
       at: proposal.respondedAt,

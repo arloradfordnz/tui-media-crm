@@ -1,8 +1,8 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
-import { formatDate, getInitials, statusLabel } from '@/lib/format'
 import { FileText } from 'lucide-react'
 import Link from 'next/link'
 import SearchInput from '@/components/SearchInput'
+import DocumentsTable from './DocumentsTable'
 
 // Every document, newest first, as a list. The generator that used to fill
 // this page is gone: contracts are drafted by Tui (create_contract), each one
@@ -18,7 +18,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
 
   let query = supabase
     .from('documents')
-    .select('id, name, doc_type, content, created_at, client_id, clients(id, name)')
+    .select('id, name, doc_type, content, created_at, client_id, sent_at, viewed_at, clients(id, name)')
     .order('created_at', { ascending: false })
   if (params.clientId) query = query.eq('client_id', params.clientId)
   if (search) query = query.ilike('name', `%${search}%`)
@@ -27,7 +27,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
   // but to Arlo they are paperwork like the rest, so they are listed here too.
   let proposalQuery = supabase
     .from('proposals')
-    .select('id, status, created_at, job_id, jobs!inner(id, name, client_id, clients(id, name))')
+    .select('id, status, created_at, job_id, viewed_at, jobs!inner(id, name, client_id, clients(id, name))')
     .order('created_at', { ascending: false })
   if (params.clientId) proposalQuery = proposalQuery.eq('jobs.client_id', params.clientId)
   if (search) proposalQuery = proposalQuery.ilike('jobs.name', `%${search}%`)
@@ -43,11 +43,11 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
       signed = Boolean(form?.clientSignature)
     } catch { /* free text */ }
     const client = d.clients as unknown as { id: string; name: string } | null
-    return { id: d.id, href: `/dashboard/documents/${d.id}`, name: d.name as string, doc_type: d.doc_type as string | null, created_at: d.created_at as string, client, signed, isStructured, proposalStatus: null as string | null }
+    return { id: d.id, href: `/dashboard/documents/${d.id}`, name: d.name as string, doc_type: d.doc_type as string | null, created_at: d.created_at as string, client, signed, isStructured, proposalStatus: null as string | null, viewedAt: (d.viewed_at as string | null) ?? null, sentAt: (d.sent_at as string | null) ?? null }
   })
   const proposalRows = (proposals ?? []).map((p) => {
     const job = p.jobs as unknown as { id: string; name: string; clients: { id: string; name: string } | null }
-    return { id: p.id, href: `/dashboard/jobs/${p.job_id}/proposal/${p.id}`, name: `Proposal - ${job.name}`, doc_type: 'proposal', created_at: p.created_at as string, client: job.clients, signed: false, isStructured: false, proposalStatus: p.status as string }
+    return { id: p.id, href: `/dashboard/jobs/${p.job_id}/proposal/${p.id}`, name: `Proposal - ${job.name}`, doc_type: 'proposal', created_at: p.created_at as string, client: job.clients, signed: false, isStructured: false, proposalStatus: p.status as string, viewedAt: (p.viewed_at as string | null) ?? null, sentAt: null as string | null }
   })
   const rows = [...docRows, ...proposalRows].sort((x, y) => y.created_at.localeCompare(x.created_at))
   const clientName = params.clientId ? rows[0]?.client?.name : null
@@ -78,52 +78,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
           </p>
         </div>
       ) : (
-        <div className="card-flush">
-          <table className="w-full record-table">
-            <thead>
-              <tr>
-                <th className="table-header text-left">Client &amp; Document</th>
-                <th className="table-header text-left">Type</th>
-                <th className="table-header text-left">Created</th>
-                <th className="table-header text-right">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((d) => (
-                <tr key={d.id} className="table-row">
-                  <td className="px-4 py-4" data-role="primary">
-                    <div className="job-identity">
-                      <span className="avatar avatar-sm shrink-0" aria-hidden="true">
-                        {d.client ? getInitials(d.client.name) : <FileText className="w-3.5 h-3.5" />}
-                      </span>
-                      <Link href={d.href} className="job-identity-text">
-                        <span className="job-identity-client">{d.client?.name ?? 'No client'}</span>
-                        <span className="job-identity-job">{d.name}</span>
-                      </Link>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4" data-role="secondary">
-                    {d.doc_type && <span className="badge badge-muted">{statusLabel(d.doc_type)}</span>}
-                  </td>
-                  <td className="px-4 py-4 text-sm" data-role="secondary" style={{ color: 'var(--text-secondary)' }}>
-                    {formatDate(d.created_at)}
-                  </td>
-                  <td className="px-4 py-4 text-right text-sm" data-role="trailing">
-                    {d.proposalStatus ? (
-                      <span className={`badge ${d.proposalStatus === 'accepted' ? 'badge-success' : d.proposalStatus === 'declined' ? 'badge-danger' : 'badge-muted'}`}>
-                        {d.proposalStatus === 'sent' ? 'Awaiting answer' : statusLabel(d.proposalStatus)}
-                      </span>
-                    ) : d.doc_type === 'contract' && d.isStructured ? (
-                      d.signed
-                        ? <span className="badge badge-success">Signed</span>
-                        : <span className="badge badge-muted">Awaiting signature</span>
-                    ) : <span className="cell-empty">—</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DocumentsTable rows={rows} />
       )}
     </div>
   )
