@@ -502,7 +502,7 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'create_contract',
-    description: "Draft and save a complete, lawyer-grade contract for a client. A specialist drafter writes the whole agreement from the terms you pass (it takes up to a minute or two), tailored to this deal, under New Zealand law, following Arlo's contract rules. It is saved into the CRM and shows in the client's portal. It is NOT emailed. Before calling, settle the commercial terms with Arlo using ask_arlo; pass every agreed fact in terms. Never invent a price, deposit, quantity, date, legal name or signatory. Every other gap (shoot length, turnaround, feedback and approval periods, invoice timing, reschedule notice, raw footage timing, storage period) the drafter fills with a default and lists in drafter_notes for Arlo to review.",
+    description: "Draft and save a complete, lawyer-grade contract for a client. A specialist drafter writes the whole agreement from the terms you pass (it takes up to a minute or two), tailored to this deal, under New Zealand law, following Arlo's contract rules. It is saved into the CRM as unsent: the client cannot see it in their portal until Arlo sends it from the document page. It is NOT emailed. Before calling, settle the commercial terms with Arlo using ask_arlo; pass every agreed fact in terms. Never invent a price, deposit, quantity, date, legal name or signatory. Every other gap (shoot length, turnaround, feedback and approval periods, invoice timing, reschedule notice, raw footage timing, storage period) the drafter fills with a default and lists in drafter_notes for Arlo to review.",
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -1643,7 +1643,7 @@ export async function executeTool(
         document_number: documentNumber,
         unfilled_blanks: unfilledPlaceholders(drafted.body),
         drafter_notes: drafted.notes,
-        note: 'Saved and visible in the client portal. Not emailed. Reply in two or three short sentences on how it is put together; a button to open it appears automatically, so do not recap the clauses, list the defaults or paste a link. If there are blanks, offer to fill them with ask_arlo and then update_contract on THIS document_id.',
+        note: 'Saved, but not sent: the client cannot see it in their portal until Arlo sends it from the document page (the link under your message). Not emailed. Reply in two or three short sentences on how it is put together; a button to open it appears automatically, so do not recap the clauses, list the defaults or paste a link. If there are blanks, offer to fill them with ask_arlo and then update_contract on THIS document_id.',
       })
     }
 

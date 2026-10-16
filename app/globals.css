@@ -3945,14 +3945,22 @@ textarea.field-input::-webkit-scrollbar-track { margin-block: 14px; }
 .doc-sign-meta { margin-top: 2px; font-size: var(--t-xs); color: var(--text-tertiary); }
 .doc-edit-body { min-height: 420px; line-height: 1.6; }
 .doc-delete { align-self: flex-start; color: var(--danger); }
-/* "Revise with Tui" box: in the sticky right column on a wide screen, under the
-   text box on a narrower one, where the right column is below the document. */
-.doc-revise-side, .doc-revise-inline { display: contents; }
-@media (min-width: 1024px) { .doc-revise-inline { display: none; } }
-@media (max-width: 1023px) { .doc-revise-side { display: none; } }
-.doc-revise { box-shadow: inset 0 0 0 1px var(--accent); }
-.doc-revise-quote { margin: 0; padding: 8px 12px; border-left: 2px solid var(--accent); border-radius: var(--r-sm); background: var(--bg-elevated); font-size: var(--t-sm); line-height: 1.5; color: var(--text-secondary); max-height: 140px; overflow-y: auto; white-space: pre-line; }
-.doc-revise-tip { display: flex; align-items: center; gap: 6px; font-size: var(--t-xs); color: var(--text-tertiary); }
+/* Ask Tui, on the document text itself: a soft highlight over the selection and
+   a small bar under it (components/ReviseTextarea.tsx). */
+.revise-wrap { position: relative; }
+.revise-mark { position: absolute; inset: 0; overflow: hidden; pointer-events: none; border-radius: inherit; }
+.revise-mark mark { background: color-mix(in srgb, var(--accent) 28%, transparent); color: transparent; border-radius: 3px; }
+.revise-bar { scroll-margin-bottom: 130px; position: absolute; z-index: 5; padding: 6px; border-radius: 14px; background: var(--bg-elevated); box-shadow: 0 0 0 1px var(--bg-border), 0 8px 24px rgba(0, 0, 0, 0.28); animation: revise-in 140ms ease-out; }
+@keyframes revise-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.revise-row { display: flex; align-items: center; gap: 8px; padding: 0 4px 0 8px; min-height: 32px; }
+.revise-input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: var(--text-primary); font-size: var(--t-sm); padding: 6px 0; }
+.revise-input::placeholder { color: var(--text-tertiary); }
+.revise-send { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 999px; border: 0; cursor: pointer; background: var(--accent); color: var(--on-accent); flex-shrink: 0; }
+.revise-send:disabled { opacity: 0.35; cursor: default; }
+.revise-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 999px; border: 0; background: transparent; color: var(--text-secondary); cursor: pointer; flex-shrink: 0; }
+.revise-icon-btn:hover { background: var(--bg-surface); color: var(--text-primary); }
+.revise-note { flex: 1; min-width: 0; font-size: var(--t-sm); color: var(--text-primary); }
+.revise-error { margin: 2px 8px 4px 30px; font-size: var(--t-xs); color: var(--danger); }
 .doc-locked { display: inline-flex; align-items: center; gap: 8px; font-size: var(--t-sm); color: var(--text-secondary); }
 
 /* Client portal: a document card. Name and status on one line, the actions on

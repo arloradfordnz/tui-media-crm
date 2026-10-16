@@ -300,8 +300,8 @@ export async function recordDocumentView(docId: string, portalToken: string) {
   if (!client) return
   if (await isAdminViewing()) return
 
-  const { data: doc } = await admin.from('documents').select('id, name, client_id, viewed_at, view_count').eq('id', docId).single()
-  if (!doc || doc.client_id !== client.id) return
+  const { data: doc } = await admin.from('documents').select('id, name, client_id, viewed_at, view_count, sent_at').eq('id', docId).single()
+  if (!doc || !doc.sent_at || doc.client_id !== client.id) return
 
   const now = new Date().toISOString()
   await admin.from('documents').update({
