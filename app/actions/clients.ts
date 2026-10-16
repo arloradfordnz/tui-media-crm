@@ -7,6 +7,7 @@ import { createServerSupabaseClient } from '@/lib/supabase'
 import { getAuthUser } from '@/lib/supabase-admin'
 import { CUSTOMER_VALUE_OPTIONS, AD_SPEND_OPTIONS, approxFor } from '@/lib/application-fields'
 import { sendWelcomeEmail } from '@/lib/email'
+import { deleteClientAndLeftovers } from '@/lib/client-delete'
 
 // Service-role client that bypasses RLS. Used for cleanup on tables where the
 // user's auth session doesn't have UPDATE/DELETE policies (e.g. email_logs).
@@ -191,37 +192,11 @@ export async function deleteClient(clientId: string): Promise<{ error?: string }
     return { error: 'Missing SUPABASE_SERVICE_ROLE_KEY — set it in Vercel env vars so the server can delete clients.' }
   }
 
-  // email_logs.client_id FK has no ON DELETE action, and email_logs has RLS
-  // with no UPDATE policy, so the refs are nulled first.
-  const { error: logErr } = await admin.from('email_logs').update({ client_id: null }).eq('client_id', clientId)
-  if (logErr) {
-    console.error('[deleteClient] email_logs cleanup failed:', logErr)
-    return { error: `Couldn't clear email logs for this client: ${logErr.message}` }
+  const result = await deleteClientAndLeftovers(admin, clientId)
+  if (result.error) {
+    console.error('[deleteClient] failed:', result.error)
+    return { error: result.error }
   }
-
-  // Collect what has to be cleaned up BEFORE deleting the client: documents are
-  // ON DELETE SET NULL (unfindable by client_id afterwards), and the portal
-  // login's link row cascades away with the client.
-  const [{ data: docRows }, { data: loginRows }] = await Promise.all([
-    admin.from('documents').select('id').eq('client_id', clientId),
-    admin.from('client_users').select('user_id').eq('client_id', clientId),
-  ])
-  const docIds = (docRows ?? []).map((d) => d.id)
-  const loginIds = (loginRows ?? []).map((r) => r.user_id as string)
-
-  const { data: removed, error } = await admin.from('clients').delete().eq('id', clientId).select('id')
-  if (error) {
-    console.error('[deleteClient] failed:', error)
-    return { error: error.message }
-  }
-  if (!removed?.length) return { error: 'That client no longer exists. Refresh the page.' }
-
-  // Cleanup after the delete succeeded, so a failed delete never strips a
-  // client of their documents. The portal login goes too: left behind, it
-  // could still sign in, and the same email could never be invited again.
-  if (docIds.length > 0) await admin.from('documents').delete().in('id', docIds)
-  await admin.from('notifications').delete().eq('client_id', clientId)
-  await Promise.all(loginIds.map((id) => admin.auth.admin.deleteUser(id)))
 
   revalidatePath('/dashboard/clients')
   redirect('/dashboard/clients')

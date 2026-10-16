@@ -3931,3 +3931,12 @@ textarea.field-input::-webkit-scrollbar-track { margin-block: 14px; }
 .doc-sign-meta { margin-top: 2px; font-size: var(--t-xs); color: var(--text-tertiary); }
 .doc-edit-body { min-height: 420px; line-height: 1.6; }
 .doc-delete { align-self: flex-start; color: var(--danger); }
+/* "Revise with Tui" box: in the sticky right column on a wide screen, under the
+   text box on a narrower one, where the right column is below the document. */
+.doc-revise-side, .doc-revise-inline { display: contents; }
+@media (min-width: 1024px) { .doc-revise-inline { display: none; } }
+@media (max-width: 1023px) { .doc-revise-side { display: none; } }
+.doc-revise { box-shadow: inset 0 0 0 1px var(--accent); }
+.doc-revise-quote { margin: 0; padding: 8px 12px; border-left: 2px solid var(--accent); border-radius: var(--r-sm); background: var(--bg-elevated); font-size: var(--t-sm); line-height: 1.5; color: var(--text-secondary); max-height: 140px; overflow-y: auto; white-space: pre-line; }
+.doc-revise-tip { display: flex; align-items: center; gap: 6px; font-size: var(--t-xs); color: var(--text-tertiary); }
+.doc-locked { display: inline-flex; align-items: center; gap: 8px; font-size: var(--t-sm); color: var(--text-secondary); }
