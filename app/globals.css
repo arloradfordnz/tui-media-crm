@@ -3944,6 +3944,19 @@ textarea.field-input::-webkit-scrollbar-track { margin-block: 14px; }
 .doc-sign-name { margin-top: 8px; font-size: var(--t-sm); font-weight: 600; color: var(--text-primary); }
 .doc-sign-meta { margin-top: 2px; font-size: var(--t-xs); color: var(--text-tertiary); }
 .doc-edit-body { min-height: 420px; line-height: 1.6; }
+/* The document editor: shown as the document reads (components/RichDocEditor.tsx).
+   Same type as the preview, so Edit and "What the client sees" feel like one thing. */
+.rich-doc { min-height: 420px; height: auto; outline: none; white-space: normal; overflow-wrap: anywhere; cursor: text; font-size: var(--t-md); line-height: 1.7; color: var(--text-primary); }
+.rich-doc[data-empty] > p:first-child::before { content: attr(data-placeholder); color: var(--text-tertiary); pointer-events: none; }
+.rich-doc[data-empty]::before { content: none; }
+.rich-doc p { margin: 0 0 12px; }
+.rich-doc p:last-child { margin-bottom: 0; }
+.rich-doc h2 { margin: 26px 0 10px; font-size: var(--t-xs); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary); line-height: 1.4; }
+.rich-doc h3 { margin: 20px 0 8px; font-size: var(--t-md); font-weight: 600; color: var(--text-primary); line-height: 1.4; }
+.rich-doc > :first-child { margin-top: 0; }
+.rich-doc strong, .rich-doc b { font-weight: 600; }
+.rich-doc em, .rich-doc i { font-style: italic; }
+.rich-doc ::selection { background: color-mix(in srgb, var(--accent) 38%, transparent); }
 .doc-delete { align-self: flex-start; color: var(--danger); }
 /* Ask Tui, on the document text itself: a soft highlight over the selection and
    a small bar under it (components/ReviseTextarea.tsx). */
@@ -3962,7 +3975,10 @@ textarea.field-input::-webkit-scrollbar-track { margin-block: 14px; }
 }
 @keyframes revise-in { from { opacity: 0; scale: 0.97; } to { opacity: 1; scale: 1; } }
 @media (prefers-reduced-motion: reduce) { .revise-bar { transition: none; animation: none; } }
-.revise-row { display: flex; align-items: center; gap: 8px; padding: 0 3px 0 9px; min-height: 34px; }
+.revise-row { display: flex; align-items: center; gap: 6px; padding: 0 3px 0 4px; min-height: 34px; }
+.revise-fmt { display: flex; align-items: center; gap: 1px; flex-shrink: 0; }
+.revise-divider { width: 1px; height: 18px; background: var(--bg-border); margin: 0 4px 0 2px; flex-shrink: 0; }
+.revise-icon-btn.is-on { background: var(--accent-muted, var(--bg-surface)); color: var(--accent); }
 .revise-spark { width: 14px; height: 14px; flex-shrink: 0; color: var(--accent); }
 .revise-row.is-busy .revise-spark { animation: revise-pulse 1s ease-in-out infinite; }
 @keyframes revise-pulse { 50% { opacity: 0.35; } }
