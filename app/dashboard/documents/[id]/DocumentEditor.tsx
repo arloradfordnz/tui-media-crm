@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Calendar, Check, Copy, Download, ExternalLink, Mail, MapPin, MessageSquare, Save, Trash2 } from 'lucide-react'
+import { ArrowLeft, Calendar, Check, Copy, Download, ExternalLink, Lock, Mail, MapPin, MessageSquare, Save, Sparkles, Trash2, Undo2 } from 'lucide-react'
 import { formatDate } from '@/lib/format'
 import { keepScroll } from '@/lib/keep-scroll'
 import CustomSelect from '@/components/CustomSelect'
@@ -153,6 +153,20 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
 
   const isContract = template === 'Contract'
   const isSigned = !!form.clientSignature
+  // A signed contract is the record of what the client agreed to. The database
+  // refuses any change to it (20261016_0001_lock_accepted_and_signed.sql), so
+  // the page does not offer one: no Edit tab, no Save, no Delete.
+  const locked = isContract && isSigned
+
+  // "Revise with Tui": highlight part of the text in Edit, say what should
+  // change, and only that part is rewritten (app/api/documents/revise-section).
+  // The range is kept in state because the highlight itself disappears as soon
+  // as focus moves to the instruction box.
+  const bodyRef = useRef<HTMLTextAreaElement>(null)
+  const [sel, setSel] = useState<{ start: number; end: number } | null>(null)
+  const [reviseAsk, setReviseAsk] = useState('')
+  const [revising, setRevising] = useState(false)
+  const [reviseResult, setReviseResult] = useState<{ note: string; before: string } | { error: string } | null>(null)
   const client = clients.find((c) => c.id === selectedClientId) ?? null
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
   const portalUrl = client?.portalToken ? `${baseUrl}/portal/client/${client.portalToken}` : null
@@ -287,6 +301,99 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
     })
   }
 
+  function trackSelection() {
+    const el = bodyRef.current
+    if (!el || revising) return
+    const { selectionStart: start, selectionEnd: end } = el
+    if (end > start && form.body.slice(start, end).trim()) {
+      setSel({ start, end })
+      setReviseResult(null)
+    } else if (document.activeElement === el) {
+      setSel(null)
+    }
+  }
+
+  async function handleRevise() {
+    if (!sel || !reviseAsk.trim()) return
+    setRevising(true)
+    setReviseResult(null)
+    const before = form.body
+    try {
+      const res = await fetch('/api/documents/revise-section', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document: before, start: sel.start, end: sel.end, instructions: reviseAsk }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || typeof data.revised !== 'string') {
+        setReviseResult({ error: data.error || "Couldn't revise that. Try again." })
+      } else {
+        const next = before.slice(0, sel.start) + data.revised + before.slice(sel.end)
+        update('body', next)
+        setReviseResult({ note: data.note || 'Revised.', before })
+        setReviseAsk('')
+        // Highlight the new wording so the change is easy to see.
+        const start = sel.start
+        const end = sel.start + data.revised.length
+        setSel(null)
+        requestAnimationFrame(() => {
+          const el = bodyRef.current
+          if (el) { el.focus({ preventScroll: true }); el.setSelectionRange(start, end) }
+        })
+      }
+    } catch {
+      setReviseResult({ error: "Couldn't reach Tui. Check your connection and try again." })
+    }
+    setRevising(false)
+  }
+
+  function undoRevise() {
+    if (!reviseResult || !('before' in reviseResult)) return
+    update('body', reviseResult.before)
+    setReviseResult(null)
+  }
+
+  // The box, drawn in the right column on a wide screen and under the text on
+  // a phone, where the right column sits below a very long text box.
+  const revisePanel = !locked && tab === 'edit' && (sel || reviseResult) ? (
+    <div className="card space-y-3 doc-revise">
+      <div className="flex items-center gap-2">
+        <Sparkles className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+        <span className="label">Revise with Tui</span>
+      </div>
+      {sel && (
+        <>
+          <blockquote className="doc-revise-quote">{form.body.slice(sel.start, sel.end).trim()}</blockquote>
+          <textarea
+            rows={3}
+            value={reviseAsk}
+            onChange={(e) => setReviseAsk(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void handleRevise() } }}
+            className="field-input"
+            placeholder="What should change? e.g. make it 7 days, or say it more simply"
+            aria-label="What should change"
+            disabled={revising}
+          />
+          <div className="flex gap-2">
+            <button type="button" onClick={handleRevise} disabled={revising || !reviseAsk.trim()} className="btn-primary btn-sm flex-1">
+              <Sparkles className="w-3.5 h-3.5" /> {revising ? 'Revising…' : 'Revise this part'}
+            </button>
+            <button type="button" onClick={() => { setSel(null); setReviseAsk('') }} disabled={revising} className="btn-secondary btn-sm">Cancel</button>
+          </div>
+          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Only the highlighted part changes.</p>
+        </>
+      )}
+      {reviseResult && 'error' in reviseResult && <p className="text-sm" style={{ color: 'var(--danger)' }}>{reviseResult.error}</p>}
+      {reviseResult && 'note' in reviseResult && (
+        <>
+          <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{reviseResult.note}</p>
+          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>The new wording is highlighted. Save changes to keep it.</p>
+          <button type="button" onClick={undoRevise} className="btn-secondary btn-sm"><Undo2 className="w-3.5 h-3.5" /> Undo</button>
+        </>
+      )}
+    </div>
+  ) : null
+
   function handleDelete() {
     setConfirm({
       title: `Delete ${docName || 'this document'}?`,
@@ -336,7 +443,7 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
           <button type="button" onClick={handleDownload} disabled={downloading} className="btn-secondary">
             <Download className="w-4 h-4" /> {downloading ? 'Preparing…' : 'Download PDF'}
           </button>
-          {dirty && (
+          {dirty && !locked && (
             <button type="button" onClick={handleSave} disabled={saving || emailing} className="btn-secondary">
               <Save className="w-4 h-4" /> {saving ? 'Saving…' : 'Save changes'}
             </button>
@@ -353,18 +460,22 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
         </div>
       )}
 
-      <div className="tab-pills" role="tablist">
-        <button type="button" role="tab" aria-selected={tab === 'edit'} className={`tab-pill${tab === 'edit' ? ' active' : ''}`} onClick={() => setTab('edit')}>
-          Edit
-        </button>
-        <button type="button" role="tab" aria-selected={tab === 'preview'} className={`tab-pill${tab === 'preview' ? ' active' : ''}`} onClick={() => setTab('preview')}>
-          What the client sees
-        </button>
-      </div>
+      {locked ? (
+        <p className="doc-locked"><Lock className="w-3.5 h-3.5" /> Signed by {form.clientSignature}, so this contract is locked and can&apos;t be changed.</p>
+      ) : (
+        <div className="tab-pills" role="tablist">
+          <button type="button" role="tab" aria-selected={tab === 'edit'} className={`tab-pill${tab === 'edit' ? ' active' : ''}`} onClick={() => setTab('edit')}>
+            Edit
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'preview'} className={`tab-pill${tab === 'preview' ? ' active' : ''}`} onClick={() => setTab('preview')}>
+            What the client sees
+          </button>
+        </div>
+      )}
 
       <div className="prop-editor-grid">
         <div className="space-y-5 min-w-0">
-          {tab === 'preview' && (
+          {(tab === 'preview' || locked) && (
             <div className="card prop-preview">
               <div className="prop-preview-head">
                 <p className="prop-eyebrow">{[template, form.documentNumber, longDate(form.date)].filter(Boolean).join(' · ')}</p>
@@ -407,7 +518,7 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
             </div>
           )}
 
-          {tab === 'edit' && (
+          {tab === 'edit' && !locked && (
             <div className="space-y-5">
               <section className="card space-y-4">
                 <div>
@@ -418,10 +529,19 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
                       : 'Start a line with # for a heading and **bold** a key term. A blank line starts a new paragraph.'}
                   </p>
                 </div>
-                {isSigned && (
-                  <p className="alert alert-warning text-sm">{form.clientSignature} has already signed this. Changing the wording now changes what they agreed to.</p>
-                )}
-                <textarea rows={22} value={form.body} onChange={(e) => update('body', e.target.value)} className="field-input doc-edit-body" aria-label="Document text" />
+                <p className="doc-revise-tip"><Sparkles className="w-3.5 h-3.5" /> Highlight any part to have Tui revise just that part.</p>
+                <textarea
+                  ref={bodyRef}
+                  rows={22}
+                  value={form.body}
+                  onChange={(e) => { update('body', e.target.value); setSel(null) }}
+                  onSelect={trackSelection}
+                  onMouseUp={trackSelection}
+                  onKeyUp={trackSelection}
+                  className="field-input doc-edit-body"
+                  aria-label="Document text"
+                />
+                <div className="doc-revise-inline">{revisePanel}</div>
               </section>
 
               <section className="card space-y-4">
@@ -494,6 +614,7 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
         </div>
 
         <aside className="prop-aside">
+          <div className="doc-revise-side">{revisePanel}</div>
           <div className="card space-y-4">
             <div className="flex items-center justify-between">
               <span className="label">Status</span>
@@ -562,9 +683,9 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
             </div>
           )}
 
-          <button type="button" onClick={handleDelete} disabled={deleting} className="btn-ghost btn-sm doc-delete">
+          {!locked && <button type="button" onClick={handleDelete} disabled={deleting} className="btn-ghost btn-sm doc-delete">
             <Trash2 className="w-3.5 h-3.5" /> {deleting ? 'Deleting…' : 'Delete document'}
-          </button>
+          </button>}
         </aside>
       </div>
 

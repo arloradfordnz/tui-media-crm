@@ -10,6 +10,8 @@ import { draftContract, reviseContract, quickEditContract, SETTLED_CONTRACT_TERM
 import { MEMORY_CATEGORY_KEYS, isMemoryCategory } from '@/lib/ai-memory'
 import { buildProposalIntake, buildContractIntake, PROPOSAL_REQUIRED_KEYS, contractRequiredKeys, missingBriefKeys, briefLines } from '@/lib/drafting-intake'
 import { draftProposal, type PriceLine } from '@/lib/proposal-drafting'
+import { createAdminClient } from '@/lib/supabase-admin'
+import { deleteClientAndLeftovers } from '@/lib/client-delete'
 
 // Shared tool definitions + executor for every AI surface (dashboard chat,
 // SMS assistant). One tool set, one set of side effects — a job marked
@@ -48,7 +50,7 @@ export const MUTATING_TOOLS = new Set([
   'create_client', 'update_client',
   'create_job', 'update_job', 'update_job_status', 'delete_job', 'toggle_task',
   'create_event', 'update_event', 'delete_event',
-  'create_document', 'delete_document',
+  'create_document', 'delete_document', 'delete_client', 'crm_write',
   'create_contract', 'update_contract',
   'create_proposal', 'update_proposal',
   'create_deliverable',
@@ -71,14 +73,16 @@ export const MUTATING_TOOLS = new Set([
 // lose the data. This gate lives at the executor, below the model, so no
 // wording in any prompt can route around it.
 export const CONFIRM_TOOLS = new Set([
-  // Emailing an invoice leaves the building. It is not destructive, but it is
-  // the one write here that a client sees, and an invoice sent to the wrong
+  // Only actions that reach OUTSIDE the CRM wait for Arlo's button. Inside the
+  // CRM Tui may do anything he could do himself, deletes included (Arlo asked
+  // for that, 16 October 2026); what must never change, an accepted proposal
+  // or a signed contract, is locked in the database instead
+  // (20261016_0001_lock_accepted_and_signed.sql), which no tool can get past.
+  //
+  // Emailing an invoice leaves the building, and an invoice sent to the wrong
   // contact or for the wrong amount costs more to walk back than a deleted
   // row does. Arlo presses the button, not the model.
   'send_xero_invoice',
-  'delete_job',
-  'delete_event',
-  'delete_document',
   'void_xero_invoice',
   'delete_xero_invoice',
   'remove_xero_payment',
@@ -106,15 +110,8 @@ const nzdFmt = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZ
 // Plain-English description of what is about to happen, so the confirmation
 // the user sees is about the act, not about a tool name. Reads the record so
 // the card names the invoice, client and amount instead of showing an id.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function describeAction(name: string, input: Record<string, unknown>, supabase: any): Promise<string> {
+async function describeAction(name: string, input: Record<string, unknown>): Promise<string> {
   const id = (k: string) => String(input[k] ?? '')
-  const nameOf = async (table: string, col: string, key: string, fallback: string) => {
-    try {
-      const { data } = await supabase.from(table).select(col).eq('id', id(key)).maybeSingle()
-      return (data as Record<string, string> | null)?.[col] ? `"${(data as Record<string, string>)[col]}"` : fallback
-    } catch { return fallback }
-  }
   const xeroInvoice = async () => {
     try { return await getXeroInvoice(id('invoice_id')) } catch { return null }
   }
@@ -129,9 +126,6 @@ async function describeAction(name: string, input: Record<string, unknown>, supa
       const draft = inv.Status === 'DRAFT' ? ' It will be approved first.' : ''
       return `Email invoice ${inv.InvoiceNumber} (${nzdFmt.format(inv.Total)})${to}.${draft}`
     }
-    case 'delete_job': return `Delete ${await nameOf('jobs', 'name', 'job_id', 'this job')} with its tasks and deliverables. This can't be undone.`
-    case 'delete_event': return `Delete ${await nameOf('events', 'title', 'event_id', 'this event')} from the calendar.`
-    case 'delete_document': return `Delete ${await nameOf('documents', 'name', 'document_id', 'this document')}. This can't be undone.`
     case 'void_xero_invoice': return `Void ${invoiceLabel(await xeroInvoice())}. Xero has no un-void.`
     case 'delete_xero_invoice': return `Delete ${invoiceLabel(await xeroInvoice())}. This can't be undone.`
     case 'remove_xero_payment': return 'Remove this Xero payment. The bank transaction it was matched to becomes unreconciled and needs matching again.'
@@ -143,6 +137,32 @@ export type ExecuteToolOptions = {
   /** Fingerprints the user has explicitly approved this turn. */
   approvals?: string[]
 }
+
+// ── Direct CRM access (crm_read / crm_write) ─────────────────
+// Everything Arlo keeps in the CRM, so Tui can read and change any of it, not
+// only the parts that have a dedicated tool. Deliberately listed rather than
+// "every table": integration secrets, connected accounts, portal logins,
+// app settings (admin IPs, calendar links), caches and the assistant's own
+// bookkeeping are infrastructure, not CRM data, and stay out of reach.
+export const CRM_READ_TABLES = [
+  'clients', 'jobs', 'job_tasks', 'deliverables', 'revisions', 'proposals', 'documents',
+  'events', 'todos', 'notes', 'gear', 'time_entries', 'subscriptions', 'business_info',
+  'social_links', 'email_templates', 'job_templates', 'template_tasks', 'template_deliverables',
+  'files', 'delivery_files', 'activities', 'notifications', 'client_emails', 'email_logs',
+  'sms_messages', 'ai_memories', 'assistant_flags', 'business_health_reports',
+]
+// Jobs, events and proposals are left to their own tools, which keep the
+// iCloud calendar, the client portal and the send/accept flow in step. Client
+// deletes go through delete_client, which also removes the portal login.
+// Files are left alone because their rows point at stored uploads.
+export const CRM_WRITE_TABLES = [
+  'clients', 'job_tasks', 'deliverables', 'revisions', 'documents', 'todos', 'notes', 'gear',
+  'time_entries', 'subscriptions', 'business_info', 'social_links', 'email_templates',
+  'job_templates', 'template_tasks', 'template_deliverables', 'activities', 'notifications',
+]
+// Never handed back, whatever the table.
+const HIDDEN_COLUMNS = ['password_hash']
+const COLUMN = /^[a-z_][a-z0-9_]*$/
 
 export const TOOLS: Anthropic.Tool[] = [
   // ── Clients ───────────────────────────────────
@@ -939,6 +959,67 @@ export const TOOLS: Anthropic.Tool[] = [
       required: ['key'],
     },
   },
+  {
+    name: 'get_document',
+    description: 'Read a saved document in full: a contract (its whole text, parties, dates, whether and when the client signed, any feedback they left) or any other document. Use it whenever Arlo asks what a contract or document says. Signed contracts are readable but locked.',
+    input_schema: {
+      type: 'object' as const,
+      properties: { document_id: { type: 'string', description: 'From list_documents or crm_read.' } },
+      required: ['document_id'],
+    },
+  },
+  {
+    name: 'get_proposal',
+    description: 'Read proposals in full: cover note, price lines, inclusions, payment terms, status (draft, sent, accepted, declined) and when it was sent and answered. Pass proposal_id for one, or job_id / client_id for all of theirs. Accepted proposals are readable but locked.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        proposal_id: { type: 'string' },
+        job_id: { type: 'string' },
+        client_id: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'delete_client',
+    description: 'Delete a client with their documents, notifications and portal login. Their jobs go with them. Refused if they have a signed contract or an accepted proposal, because those are locked.',
+    input_schema: {
+      type: 'object' as const,
+      properties: { client_id: { type: 'string' } },
+      required: ['client_id'],
+    },
+  },
+  {
+    name: 'crm_read',
+    description: `Read any part of the CRM directly, for anything the other tools do not cover or when you need more columns or rows than they give. Returns rows from one table, newest first unless order_by says otherwise. Tables: ${CRM_READ_TABLES.join(', ')}.`,
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        table: { type: 'string', enum: CRM_READ_TABLES },
+        filters: { type: 'object', description: 'Exact matches, column to value, e.g. {"job_id": "...", "completed": false}. A null value matches empty.' },
+        search: { type: 'object', description: 'A text search on one column, e.g. {"column": "title", "text": "drone"}.', properties: { column: { type: 'string' }, text: { type: 'string' } } },
+        columns: { type: 'string', description: 'Comma-separated columns to return. Defaults to all.' },
+        order_by: { type: 'string', description: 'Column to sort by. Defaults to created_at where the table has it.' },
+        ascending: { type: 'boolean' },
+        limit: { type: 'number', description: 'Up to 200. Defaults to 50.' },
+      },
+      required: ['table'],
+    },
+  },
+  {
+    name: 'crm_write',
+    description: `Change anything in the CRM that the other tools do not cover: add, edit or delete notes, gear, time entries, revisions, deliverables, job tasks, to-dos, business info, social links, email and job templates, notifications, activities, subscriptions, client fields, and documents that are not signed contracts. Prefer the dedicated tool where one exists (update_job, update_client, create_event, update_proposal, update_contract) because those keep the calendar, the portal and the drafter in step; jobs, events and proposals are only changed through them. Read a row first with crm_read if you need its columns. Accepted proposals and signed contracts are locked and every write to them is refused. Tables: ${CRM_WRITE_TABLES.join(', ')}.`,
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        table: { type: 'string', enum: CRM_WRITE_TABLES },
+        action: { type: 'string', enum: ['insert', 'update', 'delete'] },
+        id: { type: 'string', description: 'The row id, for update and delete.' },
+        values: { type: 'object', description: 'Column to value, for insert and update.' },
+      },
+      required: ['table', 'action'],
+    },
+  },
 ]
 
 // ── Tool Executor ──────────────────────────────────────────────────────────────
@@ -972,7 +1053,7 @@ export async function executeTool(
       return JSON.stringify({
         status: 'confirmation_required',
         fingerprint,
-        action: await describeAction(name, input, supabase),
+        action: await describeAction(name, input),
         tone: confirmTone(name),
         instruction:
           'NOT executed yet. Arlo now has a button showing exactly what will happen, so do not restate it and never quote an id. Say one short line, like "Ready to send, tap Send.", and stop. Do not retry this tool until he has confirmed. ' +
@@ -2049,6 +2130,117 @@ export async function executeTool(
         .eq('key', input.key as string)
       if (error) return JSON.stringify({ error: `Could not resolve that flag: ${error.message}` })
       return JSON.stringify({ success: true, key: input.key })
+    }
+
+    case 'get_document': {
+      const { data: doc, error } = await supabase.from('documents').select('id, name, doc_type, content, client_id, created_at, updated_at, clients(name)').eq('id', input.document_id as string).single()
+      if (error || !doc) return JSON.stringify({ error: error ? dbErrorMessage(error) : 'No such document.' })
+      let parsed: { template?: string; form?: Record<string, unknown>; feedback?: unknown } | null = null
+      try { parsed = JSON.parse(doc.content) } catch { /* free text */ }
+      const form = parsed?.form ?? null
+      const signed = Boolean(form?.clientSignature)
+      return JSON.stringify({
+        document: {
+          id: doc.id, name: doc.name, type: doc.doc_type, client: (doc.clients as unknown as { name: string } | null)?.name ?? null,
+          created_at: doc.created_at, updated_at: doc.updated_at,
+          template: parsed?.template ?? null,
+          text: form ? form.body ?? '' : doc.content,
+          details: form ? { project: form.jobDescription, client_name: form.clientName, contact: form.contactPerson, date: form.date, shoot_date: form.shootDate, location: form.location, number: form.documentNumber } : null,
+          signed, signed_by: form?.clientSignature || null, signed_at: form?.clientSignedAtISO || form?.clientSignedAt || null,
+          feedback: parsed?.feedback ?? [],
+          locked: signed,
+        },
+      })
+    }
+
+    case 'get_proposal': {
+      let q = supabase.from('proposals').select('id, job_id, status, cover_note, services, inclusions, payment_terms, total_value, pricing_mode, price_suffix, sent_at, responded_at, created_at, jobs!inner(name, client_id, clients(name))').order('created_at', { ascending: false })
+      if (input.proposal_id) q = q.eq('id', input.proposal_id as string)
+      else if (input.job_id) q = q.eq('job_id', input.job_id as string)
+      else if (input.client_id) q = q.eq('jobs.client_id', input.client_id as string)
+      else return JSON.stringify({ error: 'Pass proposal_id, job_id or client_id.' })
+      const { data, error } = await q.limit(20)
+      if (error) return JSON.stringify({ error: dbErrorMessage(error) })
+      const proposals = (data ?? []).map((p: Record<string, unknown>) => {
+        const job = p.jobs as { name: string; clients: { name: string } | null }
+        let services: unknown = []
+        try { services = JSON.parse(String(p.services || '[]')) } catch { /* leave empty */ }
+        return { ...p, jobs: undefined, job: job?.name, client: job?.clients?.name ?? null, services, locked: p.status === 'accepted' }
+      })
+      return JSON.stringify({ proposals })
+    }
+
+    case 'delete_client': {
+      const admin = createAdminClient()
+      if (!admin) return JSON.stringify({ error: 'The server is missing its service key, so clients can only be deleted from the client page.' })
+      const result = await deleteClientAndLeftovers(admin, input.client_id as string)
+      if (result.error) return JSON.stringify({ error: result.error })
+      return JSON.stringify({ success: true })
+    }
+
+    case 'crm_read': {
+      const table = String(input.table ?? '')
+      if (!CRM_READ_TABLES.includes(table)) return JSON.stringify({ error: `crm_read cannot read "${table}". Tables: ${CRM_READ_TABLES.join(', ')}.` })
+      const columns = typeof input.columns === 'string' && input.columns.trim()
+        ? input.columns.split(',').map((c) => c.trim()).filter((c) => COLUMN.test(c) && !HIDDEN_COLUMNS.includes(c))
+        : null
+      let q = supabase.from(table).select(columns?.length ? columns.join(', ') : '*')
+      const filters = (input.filters && typeof input.filters === 'object' ? input.filters : {}) as Record<string, unknown>
+      for (const [col, val] of Object.entries(filters)) {
+        if (!COLUMN.test(col)) return JSON.stringify({ error: `"${col}" is not a column name.` })
+        q = val === null ? q.is(col, null) : q.eq(col, val)
+      }
+      const search = input.search as { column?: string; text?: string } | undefined
+      if (search?.column && search.text) {
+        if (!COLUMN.test(search.column)) return JSON.stringify({ error: `"${search.column}" is not a column name.` })
+        q = q.ilike(search.column, `%${search.text.replace(/[\\%_]/g, (c) => '\\' + c)}%`)
+      }
+      const limit = Math.min(Math.max(Number(input.limit) || 50, 1), 200)
+      const orderBy = typeof input.order_by === 'string' && COLUMN.test(input.order_by) ? input.order_by : null
+      let { data, error } = await (orderBy ? q.order(orderBy, { ascending: input.ascending === true }) : q.order('created_at', { ascending: false })).limit(limit)
+      // Not every table has created_at; read it unsorted rather than fail.
+      if (error && !orderBy && /created_at/.test(error.message)) {
+        const retry = await supabase.from(table).select(columns?.length ? columns.join(', ') : '*').limit(limit)
+        data = retry.data; error = retry.error
+      }
+      if (error) return JSON.stringify({ error: dbErrorMessage(error) })
+      const rows = (data ?? []).map((r: Record<string, unknown>) => {
+        const out = { ...r }
+        for (const h of HIDDEN_COLUMNS) delete out[h]
+        return out
+      })
+      return JSON.stringify({ table, count: rows.length, rows })
+    }
+
+    case 'crm_write': {
+      const table = String(input.table ?? '')
+      if (!CRM_WRITE_TABLES.includes(table)) {
+        const hint = table === 'jobs' ? ' Use update_job, update_job_status or delete_job.'
+          : table === 'events' ? ' Use create_event, update_event or delete_event.'
+          : table === 'proposals' ? ' Use create_proposal or update_proposal.'
+          : ''
+        return JSON.stringify({ error: `crm_write cannot change "${table}".${hint}` })
+      }
+      const action = String(input.action ?? '')
+      const id = typeof input.id === 'string' ? input.id : ''
+      const values = (input.values && typeof input.values === 'object' ? input.values : {}) as Record<string, unknown>
+      for (const col of Object.keys(values)) {
+        if (!COLUMN.test(col) || col === 'id') return JSON.stringify({ error: `"${col}" cannot be written.` })
+      }
+      if (action === 'delete' && table === 'clients') return JSON.stringify({ error: 'Use delete_client, which also removes their portal login and documents.' })
+      if ((action === 'update' || action === 'delete') && !id) return JSON.stringify({ error: `${action} needs the row id. Find it with crm_read first.` })
+      if (action !== 'delete' && !Object.keys(values).length) return JSON.stringify({ error: 'Pass the values to write.' })
+
+      let result
+      if (action === 'insert') result = await supabase.from(table).insert(values).select().single()
+      else if (action === 'update') result = await supabase.from(table).update(values).eq('id', id).select().single()
+      else if (action === 'delete') result = await supabase.from(table).delete().eq('id', id).select('id')
+      else return JSON.stringify({ error: 'action must be insert, update or delete.' })
+      if (result.error) return JSON.stringify({ error: dbErrorMessage(result.error) })
+      if (action === 'delete' && !(result.data as unknown[] | null)?.length) return JSON.stringify({ error: 'Nothing was deleted: no row has that id.' })
+      const row = action === 'delete' ? null : { ...(result.data as Record<string, unknown>) }
+      if (row) for (const h of HIDDEN_COLUMNS) delete row[h]
+      return JSON.stringify({ success: true, table, action, row })
     }
 
     default:
