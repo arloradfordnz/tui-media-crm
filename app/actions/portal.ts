@@ -289,3 +289,31 @@ export async function markDownloaded(deliveryFileId: string, jobId: string, port
     sendAdminFileDownloadedEmail(clientRel?.name || 'Your client', job.name, fileName, jobId, job.client_id),
   ])
 }
+
+// A client opening a document in their portal (the card is expanded). Records
+// the first and latest view so the document page and the Documents list can
+// show it, and tells Arlo the first time. His own visits do not count.
+export async function recordDocumentView(docId: string, portalToken: string) {
+  const admin = createAdminClient()
+  if (!admin) return
+  const client = await resolveClient(admin, portalToken)
+  if (!client) return
+  if (await isAdminViewing()) return
+
+  const { data: doc } = await admin.from('documents').select('id, name, client_id, viewed_at, view_count').eq('id', docId).single()
+  if (!doc || doc.client_id !== client.id) return
+
+  const now = new Date().toISOString()
+  await admin.from('documents').update({
+    viewed_at: doc.viewed_at ?? now,
+    last_viewed_at: now,
+    view_count: (doc.view_count ?? 0) + 1,
+  }).eq('id', doc.id)
+
+  if (!doc.viewed_at) {
+    await Promise.all([
+      admin.from('activities').insert({ action: 'document_viewed', details: `${client.name} opened "${doc.name}"`, client_id: client.id }),
+      admin.from('notifications').insert({ title: 'Document opened', message: `${client.name} opened "${doc.name}"`, type: 'document_viewed', client_id: client.id }),
+    ])
+  }
+}

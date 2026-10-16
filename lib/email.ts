@@ -824,19 +824,54 @@ export async function sendDeliveryReminderEmail(
   clientName: string,
   jobName: string,
   portalUrl: string,
-  daysSinceViewed: number,
+  daysSinceViewed: number | null,
   clientId?: string,
   jobId?: string,
 ) {
   const subject = `Just checking in — ${jobName}`
+  // Two versions: they opened it and went quiet, or it has not been opened yet.
+  const opener = daysSinceViewed === null
+    ? `Just a nudge. Your video for <span style="color:${C.ink};">${esc(jobName)}</span> is in your portal, ready for you to watch.`
+    : `Just a nudge. You had a look at your video for <span style="color:${C.ink};">${esc(jobName)}</span> ${daysSinceViewed <= 1 ? 'a day' : `${daysSinceViewed} days`} ago and haven't had a chance to come back to it yet.`
   const html = wrap(`
     ${buildGreeting(clientName)}
-    <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0 0 16px;">Just a nudge. You had a look at your project for <span style="color:${C.ink};">${esc(jobName)}</span> ${daysSinceViewed === 1 ? 'a day' : `${daysSinceViewed} days`} ago and haven't had a chance to come back to it yet.</p>
+    <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0 0 16px;">${opener}</p>
     <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">No rush at all. Whenever you're ready, you can approve it or send through any feedback straight from the portal.</p>
     ${button(portalUrl, 'Open your portal')}
     <p style="color:${C.muted};font-size:13px;line-height:1.5;margin:16px 0 0;">If anything's unclear or you'd rather talk it through, email <a href="mailto:hello@tuimedia.nz" style="color:${C.ink};text-decoration:underline;">hello@tuimedia.nz</a>.</p>
   `)
   await send({ to, subject, html, type: 'delivery_reminder', clientId, jobId })
+}
+
+// Two days after a proposal went out with no answer (app/api/portal-reminders).
+export async function sendProposalFollowUpEmail(to: string, clientName: string, jobName: string, proposalUrl: string, opened: boolean, clientId?: string, jobId?: string) {
+  const subject = `Following up on your proposal — ${jobName}`
+  const opener = opened
+    ? `Just following up on the proposal for <span style="color:${C.ink};">${esc(jobName)}</span>. I know it's one more thing on the list, so I wanted to check whether you had any questions about it.`
+    : `Just making sure the proposal for <span style="color:${C.ink};">${esc(jobName)}</span> reached you. It's ready whenever you have a moment to look.`
+  const html = wrap(`
+    ${buildGreeting(clientName)}
+    <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0 0 16px;">${opener}</p>
+    <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">If it looks right you can accept it on the page. If the scope or price isn't quite right, just reply and I can rework it.</p>
+    ${button(proposalUrl, 'View the proposal')}
+    ${plainLink(proposalUrl)}
+  `)
+  await send({ to, subject, html, type: 'proposal_follow_up', clientId, jobId })
+}
+
+// Two days after a contract was emailed and not signed (app/api/portal-reminders).
+export async function sendContractFollowUpEmail(to: string, clientName: string, docName: string, portalUrl: string, opened: boolean, clientId?: string) {
+  const subject = `Following up — ${docName}`
+  const opener = opened
+    ? `Just following up on <span style="color:${C.ink};">${esc(docName)}</span>. Once it's signed we can lock in the dates and get started.`
+    : `Just making sure <span style="color:${C.ink};">${esc(docName)}</span> reached you. It's in your portal, ready to read and sign.`
+  const html = wrap(`
+    ${buildGreeting(clientName)}
+    <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0 0 16px;">${opener}</p>
+    <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">You can sign it online in a minute, or download a copy as a PDF. If anything needs changing, leave a note on it or reply to this email.</p>
+    ${button(portalUrl, 'Read and sign')}
+  `)
+  await send({ to, subject, html, type: 'contract_follow_up', clientId })
 }
 
 export async function sendProposalAcceptedEmail(to: string, clientName: string, jobName: string, clientId?: string, jobId?: string) {

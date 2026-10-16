@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Calendar, Check, Copy, Download, ExternalLink, Lock, Mail, MapPin, MessageSquare, Save, Sparkles, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, Check, Copy, Download, ExternalLink, Lock, Mail, MessageSquare, Save, Sparkles, Trash2, Undo2 } from 'lucide-react'
 import { formatDate } from '@/lib/format'
 import { keepScroll } from '@/lib/keep-scroll'
 import CustomSelect from '@/components/CustomSelect'
 import Field from '@/components/Field'
 import DatePicker from '@/components/DatePicker'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
-import DocumentBody from '@/components/DocumentBody'
+import DocumentSheet from '@/components/DocumentSheet'
 
 // One page for reading, tweaking and sending a saved document, laid out like
 // the proposal editor (jobs/[id]/proposal/[proposalId]/ProposalEditor.tsx):
@@ -49,7 +49,10 @@ export type DocFormShape = {
 }
 
 type Feedback = { message: string; createdAt: string; author: string }
-type DocData = { id: string; name: string; docType: string; content: string; clientId: string | null; createdAt: string }
+type DocData = {
+  id: string; name: string; docType: string; content: string; clientId: string | null; createdAt: string
+  sentAt: string | null; viewedAt: string | null; lastViewedAt: string | null; viewCount: number
+}
 
 const today = () => new Date().toISOString().split('T')[0]
 
@@ -70,13 +73,6 @@ const EMPTY_FORM: DocFormShape = {
 }
 
 // Written out in full, the way the client reads it.
-// A bare "2026-10-15" is a calendar date, so it is read and printed in UTC and
-// cannot slip a day; a full timestamp is shown as the day it was in NZ.
-const longDate = (iso: string | null | undefined) =>
-  !iso ? '' : iso.length === 10
-    ? new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-NZ', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' })
-    : new Date(iso).toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'long', year: 'numeric' })
-
 function parseContent(content: string): { template: string; form: DocFormShape; feedback: Feedback[]; signedAtISO: string } | null {
   if (!content) return null
   try {
@@ -283,6 +279,7 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
                 template,
                 clientId: selectedClientId,
                 portalToken,
+                docId: doc.id,
               }),
             })
             if (!res.ok) {
@@ -419,6 +416,8 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
 
   const timeline = [
     { label: 'Drafted', at: doc.createdAt, done: true },
+    { label: 'Emailed', at: doc.sentAt, done: !!doc.sentAt },
+    { label: doc.viewCount > 1 ? `Opened ${doc.viewCount} times` : 'Opened', at: doc.lastViewedAt || doc.viewedAt, done: !!doc.viewedAt },
     { label: 'Signed', at: parsed?.signedAtISO || null, done: isSigned },
   ]
 
@@ -477,44 +476,7 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
         <div className="space-y-5 min-w-0">
           {(tab === 'preview' || locked) && (
             <div className="card prop-preview">
-              <div className="prop-preview-head">
-                <p className="prop-eyebrow">{[template, form.documentNumber, longDate(form.date)].filter(Boolean).join(' · ')}</p>
-                <h2 className="prop-title prop-title-sm">{title}</h2>
-                {form.clientName && (
-                  <p className="prop-for">Prepared for {form.contactPerson ? `${form.contactPerson}, ` : ''}{form.clientName}</p>
-                )}
-                {(form.shootDate || form.location) && (
-                  <div className="prop-meta">
-                    {form.shootDate && <span><Calendar className="w-3.5 h-3.5" /> {longDate(form.shootDate)}</span>}
-                    {form.location && <span><MapPin className="w-3.5 h-3.5" /> {form.location}</span>}
-                  </div>
-                )}
-              </div>
-
-              {form.body
-                ? <DocumentBody body={form.body} />
-                : <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Nothing written yet. Ask Tui to draft it, or write it in Edit.</p>}
-
-              {isContract && (
-                <section className="doc-approval">
-                  <h2 className="prop-h">Approval</h2>
-                  <p className="doc-para">By signing below, both parties agree to the scope, terms and payment set out in this contract.</p>
-                  <div className="doc-sign">
-                    <div>
-                      <div className="doc-sign-line">Arlo Radford</div>
-                      <p className="doc-sign-name">Arlo Radford</p>
-                      <p className="doc-sign-meta">Tui Media</p>
-                    </div>
-                    <div>
-                      <div className={`doc-sign-line${isSigned ? '' : ' is-empty'}`}>{isSigned ? form.clientSignature : 'Awaiting signature'}</div>
-                      <p className="doc-sign-name">{form.contactPerson || form.clientName || 'Client'}</p>
-                      <p className="doc-sign-meta">
-                        {[form.contactPerson && form.clientName ? form.clientName : '', isSigned && form.clientSignedAt ? `Signed ${form.clientSignedAt}` : ''].filter(Boolean).join(' · ') || 'Client'}
-                      </p>
-                    </div>
-                  </div>
-                </section>
-              )}
+              <DocumentSheet template={template} form={form} title={title} emptyText="Nothing written yet. Ask Tui to draft it, or write it in Edit." />
             </div>
           )}
 

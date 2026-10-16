@@ -2034,6 +2034,20 @@ input, textarea, select, button { font-family: inherit; }
   .record-table td[data-role="secondary"]:empty { display: none; }
 }
 
+/* Documents list: the state badge with "Opened 2 days ago" under it. */
+.docs-status { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.docs-opened { font-size: var(--t-xs); color: var(--text-tertiary); white-space: nowrap; }
+.docs-opened.is-opened { color: var(--text-secondary); }
+.docs-type { font-size: var(--t-sm); color: var(--text-secondary); }
+td.docs-opened-cell { display: none; }
+@media (max-width: 1024px) {
+  .docs-type { font-size: inherit; color: inherit; }
+  .docs-table td[data-role="primary"] { flex: 1 1 0; }
+  .docs-table td.docs-opened-cell { display: block; }
+  .docs-table td[data-role="trailing"] .docs-opened { display: none; }
+  .docs-table .docs-no-status { display: none; }
+}
+
 /* ── Calendar: two projections of one month ───────────────────
    Grid on desktop, agenda list on the phone. Both are rendered; this
    toggle decides which one is shown. */
@@ -3940,3 +3954,18 @@ textarea.field-input::-webkit-scrollbar-track { margin-block: 14px; }
 .doc-revise-quote { margin: 0; padding: 8px 12px; border-left: 2px solid var(--accent); border-radius: var(--r-sm); background: var(--bg-elevated); font-size: var(--t-sm); line-height: 1.5; color: var(--text-secondary); max-height: 140px; overflow-y: auto; white-space: pre-line; }
 .doc-revise-tip { display: flex; align-items: center; gap: 6px; font-size: var(--t-xs); color: var(--text-tertiary); }
 .doc-locked { display: inline-flex; align-items: center; gap: 8px; font-size: var(--t-sm); color: var(--text-secondary); }
+
+/* Client portal: a document card. Name and status on one line, the actions on
+   their own row underneath, so on a phone the buttons never squeeze the name
+   down to a letter. Opened, it shows the same sheet as the document page. */
+.portal-doc-head { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; }
+.portal-doc-title { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.portal-doc-name { font-size: var(--t-md); font-weight: 600; color: var(--text-primary); overflow-wrap: anywhere; }
+.portal-doc-meta { font-size: var(--t-xs); color: var(--text-tertiary); }
+.portal-doc-badge { align-self: flex-start; margin-top: 6px; }
+.portal-doc-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-left: 28px; }
+.portal-doc-open { margin-top: 18px; padding-top: 22px; border-top: 1px solid var(--bg-border); display: flex; flex-direction: column; gap: 16px; }
+@media (max-width: 520px) {
+  .portal-doc-actions { padding-left: 0; }
+  .portal-doc-actions > * { flex: 1; }
+}

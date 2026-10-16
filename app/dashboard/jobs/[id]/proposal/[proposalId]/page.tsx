@@ -8,7 +8,7 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
 
   const { data: proposal } = await supabase
     .from('proposals')
-    .select('id, job_id, token, status, cover_note, services, inclusions, payment_terms, total_value, pricing_mode, price_suffix, sent_at, responded_at, created_at, jobs(id, name, job_type, shoot_date, shoot_location, client_id, clients(id, name, contact_person, email))')
+    .select('id, job_id, token, status, cover_note, services, inclusions, payment_terms, total_value, pricing_mode, price_suffix, sent_at, responded_at, created_at, viewed_at, last_viewed_at, view_count, jobs(id, name, job_type, shoot_date, shoot_location, client_id, clients(id, name, contact_person, email))')
     .eq('id', proposalId)
     .single()
 
@@ -30,6 +30,9 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
     priceSuffix: (proposal.price_suffix as string | null) ?? null,
     sentAt: proposal.sent_at,
     respondedAt: proposal.responded_at,
+    viewedAt: (proposal.viewed_at as string | null) ?? null,
+    lastViewedAt: (proposal.last_viewed_at as string | null) ?? null,
+    viewCount: (proposal.view_count as number | null) ?? 0,
     createdAt: proposal.created_at,
     job: {
       id: job.id,

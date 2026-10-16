@@ -1,10 +1,10 @@
 'use client'
 
-import { useActionState, useEffect, useState } from 'react'
+import { useActionState, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { approveDelivery, markViewed, markDownloaded, requestDeliverableRevision } from '@/app/actions/portal'
+import { approveDelivery, markViewed, markDownloaded, requestDeliverableRevision, recordDocumentView } from '@/app/actions/portal'
 import { signDocumentByClient, submitDocumentFeedback } from '@/app/actions/documents'
-import { renderDocBody } from '@/lib/markdown'
+import DocumentSheet from '@/components/DocumentSheet'
 import { statusLabel, statusBadgeClass, formatDate, formatNZD, firstName } from '@/lib/format'
 import Image from 'next/image'
 import { Briefcase, FileText, ScrollText, ArrowUpRight, Film, Image as ImageIcon, File, Music, Download, ChevronDown, ChevronRight, Check, MessageSquare, PenLine, Archive } from 'lucide-react'
@@ -253,16 +253,16 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
                       ) : (
                         <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
                       )}
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{job.name}</h3>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <span className={`badge ${clientStatus(job.status).badge}`}>{clientStatus(job.status).label}</span>
                           {job.jobType && <span className="badge badge-muted">{statusLabel(job.jobType)}</span>}
                           {job.shootDate && <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{formatDate(job.shootDate)}</span>}
                         </div>
                       </div>
                       {allFiles.length > 0 && (
-                        <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{allFiles.length} file{allFiles.length !== 1 ? 's' : ''}</span>
+                        <span className="text-xs shrink-0 whitespace-nowrap" style={{ color: 'var(--text-tertiary)' }}>{allFiles.length} file{allFiles.length !== 1 ? 's' : ''}</span>
                       )}
                     </button>
 
@@ -543,6 +543,14 @@ function RevisionPanel({ deliverable, portalToken }: { deliverable: Deliverable;
 function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string }) {
   const router = useRouter()
   const [expanded, setExpanded] = useState(false)
+  // Opening a document is what Arlo sees as "Opened" on the document page.
+  // Recorded once per visit; the server ignores his own views.
+  const viewRecorded = useRef(false)
+  useEffect(() => {
+    if (!expanded || viewRecorded.current) return
+    viewRecorded.current = true
+    void recordDocumentView(doc.id, portalToken)
+  }, [expanded, doc.id, portalToken])
   const [generating, setGenerating] = useState(false)
   const [signing, setSigning] = useState(false)
   const [signatureInput, setSignatureInput] = useState('')
@@ -615,14 +623,18 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
     }
   }, [signState, router])
 
+  // Free-text documents (a brief, notes) have no structured form, so they are
+  // shown and printed as a plain document with their text as the body.
+  const sheetTemplate = parsed?.template ?? 'Document'
+  const sheetForm = parsed?.form ?? { body: doc.content ?? '' }
+
   async function handleDownload() {
-    if (!parsed) return
     setGenerating(true)
     try {
       const { pdf } = await import('@react-pdf/renderer')
       const { default: TuiDocument } = await import('@/app/dashboard/documents/TuiPdfDocument')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const blob = await pdf(TuiDocument({ template: parsed.template, form: parsed.form }) as any).toBlob()
+      const blob = await pdf(TuiDocument({ template: sheetTemplate, form: { clientName: '', clientEmail: '', clientPhone: '', businessName: 'Tui Media', date: '', jobDescription: '', shootDate: '', location: '', ...sheetForm } }) as any).toBlob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -636,60 +648,38 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
   }
 
   return (
-    <div className="card">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <button onClick={() => setExpanded((v) => !v)} className="flex items-center gap-3 text-left flex-1 min-w-0">
-          {expanded ? (
-            <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
-          ) : (
-            <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+    <div className="card portal-doc">
+      <button onClick={() => setExpanded((v) => !v)} className="portal-doc-head" aria-expanded={expanded}>
+        <FileText className="w-4 h-4 shrink-0" style={{ color: 'var(--accent)' }} />
+        <span className="portal-doc-title">
+          <span className="portal-doc-name">{doc.name}</span>
+          <span className="portal-doc-meta">{statusLabel(doc.docType)} · {formatDate(doc.updatedAt)}</span>
+          {doc.docType === 'contract' && parsed && (
+            <span className={`badge ${isSigned ? 'badge-success' : 'badge-warning'} portal-doc-badge`}>{isSigned ? 'Signed' : 'Needs your signature'}</span>
           )}
-          <FileText className="w-4 h-4 shrink-0" style={{ color: 'var(--accent)' }} />
-          <div className="min-w-0">
-            <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{doc.name}</p>
-            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-              {statusLabel(doc.docType)} · {formatDate(doc.updatedAt)}
-              {isSigned && <> · <span style={{ color: 'var(--accent)' }}>Signed {parsed?.form.clientSignedAt}</span></>}
-            </p>
-          </div>
+        </span>
+        {expanded
+          ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+          : <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />}
+      </button>
+      <div className="portal-doc-actions">
+        {canSign && (
+          <button onClick={() => { setExpanded(true); setSigning(true) }} className="btn-primary btn-sm">
+            <PenLine className="w-3.5 h-3.5" /> Sign
+          </button>
+        )}
+        <button onClick={handleDownload} disabled={generating} className="btn-secondary btn-sm">
+          <Download className="w-3.5 h-3.5" /> {generating ? 'Preparing…' : 'Download PDF'}
         </button>
-        <div className="flex items-center gap-2">
-          {canSign && (
-            <button onClick={() => { setExpanded(true); setSigning(true) }} className="btn-primary btn-sm">
-              <PenLine className="w-3.5 h-3.5" /> Sign
-            </button>
-          )}
-          {parsed && (
-            <button onClick={handleDownload} disabled={generating} className="btn-secondary btn-sm">
-              <Download className="w-3.5 h-3.5" /> {generating ? 'Generating...' : 'Download PDF'}
-            </button>
-          )}
-        </div>
       </div>
 
       {expanded && (
-        <div className="mt-4 space-y-3" style={{ borderTop: '1px solid var(--bg-border)', paddingTop: '16px' }}>
+        <div className="portal-doc-open">
           {parsed ? (
-            <div className="space-y-3 text-sm" style={{ color: 'var(--text-primary)' }}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {parsed.form.clientName && <PreviewField label="Client" value={parsed.form.clientName} />}
-                {parsed.form.contactPerson && <PreviewField label="Contact" value={parsed.form.contactPerson} />}
-                {parsed.form.businessName && <PreviewField label="Prepared by" value={parsed.form.businessName} />}
-                {parsed.form.date && <PreviewField label="Date" value={parsed.form.date} />}
-                {parsed.form.shootDate && <PreviewField label="Shoot Date" value={parsed.form.shootDate} />}
-                {parsed.form.location && <PreviewField label="Location" value={parsed.form.location} />}
-                {parsed.form.jobDescription && <PreviewField label="Job" value={parsed.form.jobDescription} />}
+            <div className="space-y-4 text-sm" style={{ color: 'var(--text-primary)' }}>
+              <div className="portal-doc-sheet">
+                <DocumentSheet template={sheetTemplate} form={sheetForm} title={parsed.form.jobDescription || doc.name} />
               </div>
-              {parsed.form.body && (
-                <div className="rounded-lg p-3" style={{ background: 'var(--bg-elevated)' }}>
-                  <p className="label mb-2">Content</p>
-                  <div
-                    className="whitespace-pre-wrap text-sm"
-                    style={{ color: 'var(--text-primary)', lineHeight: 1.7 }}
-                    dangerouslySetInnerHTML={{ __html: renderDocBody(parsed.form.body) }}
-                  />
-                </div>
-              )}
 
               {isSigned && (
                 <div className="rounded-lg p-4 flex items-start gap-3" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)' }}>
@@ -805,19 +795,12 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
               )}
             </div>
           ) : (
-            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Preview not available for this document.</p>
+            <div className="portal-doc-sheet">
+              <DocumentSheet template={sheetTemplate} form={sheetForm} title={doc.name} />
+            </div>
           )}
         </div>
       )}
-    </div>
-  )
-}
-
-function PreviewField({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="label mb-1">{label}</p>
-      <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{value}</p>
     </div>
   )
 }

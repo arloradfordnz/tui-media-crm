@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Check, X, MapPin, Calendar, Download, CheckCircle2 } from 'lucide-react'
-import { acceptProposal, declineProposal } from '@/app/actions/proposals'
+import { acceptProposal, declineProposal, recordProposalView } from '@/app/actions/proposals'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
 import ProposalDocument, { parseServices, parseInclusions, priceHeadline, type PricingMode } from '@/components/ProposalDocument'
 
@@ -40,6 +40,9 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
   const [isPending, startTransition] = useTransition()
   const [confirmSpec, setConfirm] = useState<ConfirmSpec | null>(null)
   const [downloading, setDownloading] = useState(false)
+
+  // Lets Arlo see when the client opened it. The server ignores his own views.
+  useEffect(() => { void recordProposalView(proposal.token) }, [proposal.token])
 
   const services = parseServices(proposal.services)
   const inclusions = parseInclusions(proposal.inclusions)
