@@ -58,6 +58,9 @@ type Message = {
   confirms?: Confirm[]
   /** Questions Tui asked with tap-to-answer options (ask_arlo). */
   ask?: Ask
+  /** What the tools returned during this turn. Never shown; sent back with the
+   *  next message so Tui still knows what it read. */
+  recall?: string
 }
 
 export type TuiVariant = 'panel' | 'page' | 'overlay'
@@ -115,7 +118,10 @@ function mergeRoles(msgs: Message[]): { role: 'user' | 'assistant'; content: str
     const asked = m.ask
       ? m.ask.questions.map((q) => `${q.question} (options: ${q.options.map((o) => o.label).join(' / ')})`).join('\n')
       : ''
-    const content = [m.content.trim(), asked].filter(Boolean).join('\n\n')
+    // What the tools returned that turn. Without it, the lookup Tui just did
+    // is gone by the next question and it has to do it all again.
+    const recalled = m.recall ? `[Looked up earlier in this chat, still current unless something has been changed since:\n${m.recall}]` : ''
+    const content = [m.content.trim(), asked, recalled].filter(Boolean).join('\n\n')
     if (!content) continue
     const last = out[out.length - 1]
     if (last && last.role === m.role) last.content += `\n\n${content}`
@@ -511,6 +517,9 @@ export default function TuiThread({
               // occasional second call in one turn costs nothing visible.
               didMutate = true
               router.refresh()
+              break
+            case 'recall':
+              patchLast((m) => ({ ...m, recall: ev.v }))
               break
             case 'error':
               failed = ev.v

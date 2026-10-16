@@ -26,6 +26,10 @@ export type TuiEvent =
   /** Tui is asking Arlo to choose. Rendered as a tap-to-answer popup; his
    *  answers come back as his next message. Ends the turn. */
   | { t: 'ask'; id: string; questions: AskQuestion[] }
+  /** What the tools returned this turn, for the client to hand back with the
+   *  next message. Only the prose of a reply survives in the thread, so
+   *  without this everything Tui just read is forgotten by the next question. */
+  | { t: 'recall'; v: string }
   /** The turn failed. Terminal. */
   | { t: 'error'; v: string }
   /** The turn is complete. Terminal. */
@@ -160,6 +164,30 @@ export function toolLabel(name: string, input: Record<string, unknown>): string 
     }
   }
   return verb
+}
+
+// ── Recall ──────────────────────────────────────────────────────────────────
+// The chat history is sent back as plain strings, so a turn's tool calls and
+// their results vanish the moment it ends. This builds the digest that goes
+// back in their place: one line per call, the result trimmed. Bounded per
+// result and per turn, because it rides along on every later request.
+const RECALL_PER_RESULT = 2500
+const RECALL_PER_TURN = 9000
+
+export function buildRecall(entries: { name: string; input: Record<string, unknown>; result: string }[]): string {
+  const lines: string[] = []
+  let used = 0
+  for (const e of entries) {
+    // Confirmation stubs and failures are not knowledge worth carrying.
+    if (e.result.includes('"confirmation_required"')) continue
+    const args = JSON.stringify(e.input)
+    const body = e.result.length > RECALL_PER_RESULT ? `${e.result.slice(0, RECALL_PER_RESULT)}…(trimmed)` : e.result
+    const line = `${e.name}(${args.length > 300 ? args.slice(0, 300) + '…' : args}) → ${body}`
+    if (used + line.length > RECALL_PER_TURN) break
+    used += line.length
+    lines.push(line)
+  }
+  return lines.join('\n')
 }
 
 // A one-line human summary of what came back, from the JSON the executor
