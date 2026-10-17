@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { deliveryKeysFor, deleteDeliveryObjects } from '@/lib/r2-cleanup'
 
 // Deleting a client is more than one row: email logs point at it with no ON
 // DELETE action, its documents are only SET NULL (and would be left behind,
@@ -24,9 +25,14 @@ export async function deleteClientAndLeftovers(admin: SupabaseClient, clientId: 
   const docIds = (docRows ?? []).map((d) => d.id as string)
   const loginIds = (loginRows ?? []).map((r) => r.user_id as string)
 
+  const keys = await deliveryKeysFor(admin, { clientId })
+
   const { data: removed, error } = await admin.from('clients').delete().eq('id', clientId).select('id')
   if (error) return { error: error.message }
   if (!removed?.length) return { error: 'That client no longer exists.' }
+
+  // The delivery_files rows cascaded away; the R2 objects did not.
+  await deleteDeliveryObjects(keys)
 
   // Cleanup after the delete succeeded, so a failed delete never strips a
   // client of their documents.

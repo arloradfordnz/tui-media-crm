@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   if (!(await getAuthUser())) return unauthorizedResponse()
   const supabase = await createServerSupabaseClient()
-  const { fileId } = await request.json()
+  const { fileId, notify = true } = await request.json()
 
   if (!fileId) {
     return Response.json({ error: 'fileId is required.' }, { status: 400 })
@@ -68,6 +68,10 @@ export async function PATCH(request: NextRequest) {
   if (error) {
     return Response.json({ error: error.message }, { status: 500 })
   }
+
+  // A multi-file upload sends one email for the batch, not one per file: the
+  // browser passes notify:false for all but the last file.
+  if (!notify) return Response.json({ file: record })
 
   // Fire the client email + activity/notification records (best-effort; don't block the response on failure).
   try {
