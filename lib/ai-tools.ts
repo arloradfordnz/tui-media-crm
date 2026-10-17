@@ -12,6 +12,7 @@ import { buildProposalIntake, buildContractIntake, PROPOSAL_REQUIRED_KEYS, contr
 import { draftProposal, type PriceLine } from '@/lib/proposal-drafting'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { deleteClientAndLeftovers } from '@/lib/client-delete'
+import { deliveryKeysFor, deleteDeliveryObjects } from '@/lib/r2-cleanup'
 
 // Shared tool definitions + executor for every AI surface (dashboard chat,
 // SMS assistant). One tool set, one set of side effects — a job marked
@@ -1293,8 +1294,10 @@ export async function executeTool(
       // Before the row goes — events.job_id is ON DELETE SET NULL, so the
       // shoot would otherwise survive its job as an orphan on the calendar.
       await removeShootEvent(supabase, input.job_id as string)
+      const keys = await deliveryKeysFor(supabase, { jobId: input.job_id as string })
       const { error } = await supabase.from('jobs').delete().eq('id', input.job_id as string)
       if (error) return JSON.stringify({ error: dbErrorMessage(error) })
+      await deleteDeliveryObjects(keys)
       return JSON.stringify({ success: true })
     }
 

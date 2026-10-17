@@ -6,6 +6,7 @@ import { createServerSupabaseClient } from '@/lib/supabase'
 import { sendRevisionResponseEmail } from '@/lib/email'
 import { findDuplicateJobName, type DuplicateJobMatch } from '@/lib/job-naming'
 import { syncShootEvent, removeShootEvent } from '@/lib/job-calendar'
+import { deliveryKeysFor, deleteDeliveryObjects } from '@/lib/r2-cleanup'
 
 export async function createJob(
   prevState: { error?: string; duplicate?: DuplicateJobMatch } | undefined,
@@ -263,7 +264,10 @@ export async function deleteJob(jobId: string) {
   // the job would otherwise leave its shoot on the calendar detached from
   // anything, with no way to tell what it was for.
   await removeShootEvent(supabase, jobId)
-  await supabase.from('jobs').delete().eq('id', jobId)
+  const keys = await deliveryKeysFor(supabase, { jobId })
+  const { error } = await supabase.from('jobs').delete().eq('id', jobId)
+  // Only clear storage once the rows are really gone.
+  if (!error) await deleteDeliveryObjects(keys)
   revalidatePath('/dashboard/jobs')
   revalidatePath('/dashboard/calendar')
   revalidatePath('/dashboard')
