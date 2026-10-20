@@ -565,12 +565,18 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
   const [feedbackInput, setFeedbackInput] = useState('')
   const [fbState, fbAction, fbPending] = useActionState(submitDocumentFeedback, undefined)
 
-  useEffect(() => {
+  // Reset the form during render when a new successful result arrives (React's
+  // "adjust state when a value changes" pattern), and refresh in an effect.
+  const [handledFb, setHandledFb] = useState(fbState)
+  if (fbState !== handledFb) {
+    setHandledFb(fbState)
     if (fbState?.success) {
       setFeedbackInput('')
       setFeedbackOpen(false)
-      router.refresh()
     }
+  }
+  useEffect(() => {
+    if (fbState?.success) router.refresh()
   }, [fbState, router])
 
   const parsed = (() => {
@@ -620,13 +626,17 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
   const isSigned = !!parsed?.form.clientSignature
   const canSign = !!parsed && doc.docType === 'contract' && !isSigned
 
-  useEffect(() => {
+  const [handledSign, setHandledSign] = useState(signState)
+  if (signState !== handledSign) {
+    setHandledSign(signState)
     if (signState?.success) {
       setSigning(false)
       setSignatureInput('')
-      // Refresh to show the signed state and pick up updated content
-      router.refresh()
     }
+  }
+  useEffect(() => {
+    // Refresh to show the signed state and pick up updated content
+    if (signState?.success) router.refresh()
   }, [signState, router])
 
   // Free-text documents (a brief, notes) have no structured form, so they are
