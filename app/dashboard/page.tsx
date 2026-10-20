@@ -7,6 +7,7 @@ import { getAttention, type AttentionItem, type WeekEvent } from '@/lib/attentio
 import { CheckCircle2, Plus, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import Greeting from './Greeting'
+import MarkDoneButton from './MarkDoneButton'
 import MoneyPanel, { MoneyPanelSkeleton } from './MoneyPanel'
 import SubscriptionsPanel, { getSubscriptions } from './SubscriptionsPanel'
 import TuiThread from '@/components/TuiThread'
@@ -202,9 +203,12 @@ function AttentionRow({ item }: { item: AttentionItem }) {
         <span className="attention-sentence">{item.sentence}</span>
         {item.meta && <span className="attention-meta">{item.meta}</span>}
       </div>
-      <Link href={item.action.href} className="btn-ghost attention-action">
-        {item.action.label}
-      </Link>
+      <div className="attention-actions">
+        {item.doneEmailId && <MarkDoneButton emailId={item.doneEmailId} />}
+        <Link href={item.action.href} className="btn-ghost attention-action">
+          {item.action.label}
+        </Link>
+      </div>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { getAuthUser } from '@/lib/supabase-admin'
 
 /**
  * Instagram Login OAuth callback. Three-step exchange per the 2026 docs:
@@ -9,6 +10,10 @@ import { createServerSupabaseClient } from '@/lib/supabase'
  *      `connected_accounts`.
  */
 export async function GET(req: NextRequest) {
+  // Only Arlo connects an account. The start route already checks this; the
+  // callback is reachable on its own, so it checks too.
+  if (!(await getAuthUser())) return NextResponse.redirect(new URL('/login', req.url))
+
   const url = new URL(req.url)
   const code = url.searchParams.get('code')
   const state = url.searchParams.get('state')

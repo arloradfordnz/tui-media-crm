@@ -843,6 +843,19 @@ export async function sendDeliveryReminderEmail(
   await send({ to, subject, html, type: 'delivery_reminder', clientId, jobId })
 }
 
+// A retainer client with no shoot planned for the month (app/api/portal-reminders).
+export async function sendShootPlanningReminderEmail(to: string, clientName: string, monthName: string, clientId?: string) {
+  const subject = `Let's plan your ${monthName} shoot`
+  const html = wrap(`
+    ${buildGreeting(clientName)}
+    <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0 0 16px;">We don't have a shoot booked in for <span style="color:${C.ink};">${esc(monthName)}</span> yet, and I'd like to get it locked in so your content for the month stays on track.</p>
+    <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">Reply with a couple of days that suit you and I'll confirm one, or tell me if you'd rather skip this month.</p>
+    ${button('mailto:hello@tuimedia.nz?subject=' + encodeURIComponent(`${monthName} shoot`), 'Pick a date')}
+    <p style="color:${C.muted};font-size:13px;line-height:1.5;margin:16px 0 0;">Or email <a href="mailto:hello@tuimedia.nz" style="color:${C.ink};text-decoration:underline;">hello@tuimedia.nz</a> any time.</p>
+  `)
+  await send({ to, subject, html, type: 'shoot_reminder', clientId })
+}
+
 // Two days after a proposal went out with no answer (app/api/portal-reminders).
 export async function sendProposalFollowUpEmail(to: string, clientName: string, jobName: string, proposalUrl: string, opened: boolean, clientId?: string, jobId?: string) {
   const subject = `Following up on your proposal — ${jobName}`
@@ -921,6 +934,38 @@ export async function sendClientAccountSetupEmail({
     `,
       SIGNOFF,
       'Choose a password to finish setting up your portal.'
+    ),
+  })
+}
+
+/** Login for the marketing team member: approved videos to view and download. */
+export async function sendMarketerAccountSetupEmail({
+  to,
+  name,
+  setupUrl,
+  reset,
+}: {
+  to: string
+  name: string
+  setupUrl: string
+  reset?: boolean
+}) {
+  await send({
+    to,
+    subject: reset ? 'Reset your Tui Media password' : 'Your Tui Media login',
+    type: reset ? 'password_reset' : 'account_setup',
+    rethrow: true,
+    html: wrap(
+      `
+      ${buildGreeting(name)}
+      <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0 0 16px;">${reset ? 'Choose a new password for your Tui Media login.' : 'You now have a Tui Media login. It opens the library of approved videos, ready to watch and download for marketing.'}</p>
+      <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">Choose a password to ${reset ? 'finish' : 'get started'}.</p>
+      ${button(setupUrl, 'Choose a password')}
+      <p style="color:${C.faint};font-size:13px;line-height:1.55;margin:16px 0 0;">This link works once. If it has run out, press “Forgot your password?” at <a href="${APP_URL}/portal/login" style="color:${C.faint};text-decoration:underline;">${APP_URL.replace(/^https?:\/\//, '')}/portal/login</a> for a fresh one.</p>
+      ${plainLink(setupUrl)}
+    `,
+      SIGNOFF,
+      'Choose a password to finish setting up your login.'
     ),
   })
 }

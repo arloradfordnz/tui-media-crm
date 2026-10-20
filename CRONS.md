@@ -7,7 +7,7 @@ daylight saving), so the offsets below are what actually matters.
 |---|---|---|---|
 | `/api/weekly-briefing` | Sun 19:00 | **Mon 7:00am** | The week's email briefing |
 | `/api/business-health/refresh` | 20:00 daily | 8:00am | Cached business-health figures |
-| `/api/portal-reminders` | 22:00 daily | 10:00am | Nudges clients sitting on deliveries |
+| `/api/portal-reminders` | 22:00 daily | 10:00am | Nudges clients sitting on deliveries, unsigned paperwork, and retainer clients with no shoot booked (5th–26th of the month, weekly) |
 | `/api/health/integrations` | 19:15 daily | 7:15am | Xero/IMAP connectivity, and the only thing that texts unprompted |
 | `/api/storage/retention` | 14:30 daily | 2:30am | Deletes old delivered files from R2 so the free 10 GB never fills |
 

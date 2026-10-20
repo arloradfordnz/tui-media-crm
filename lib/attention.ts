@@ -31,6 +31,8 @@ export type AttentionItem = {
   action: { label: string; href: string }
   /** Short muted qualifier: a date, an amount, a count. */
   meta?: string
+  /** Set when the row can be dismissed by hand (client emails): its client_emails id. */
+  doneEmailId?: string
 }
 
 export type WeekEvent = {
@@ -266,6 +268,7 @@ export async function getAttention(
       sentence: `${e.clients?.name ?? 'A client'} ${e.heading}`,
       action: { label: 'Open client', href: `/dashboard/clients/${e.client_id}` },
       meta: waiting <= 0 ? 'emailed today' : `emailed ${plural(waiting, 'day')} ago`,
+      doneEmailId: e.id,
     })
   }
 

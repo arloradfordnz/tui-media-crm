@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { sendClientAccountSetupEmail, sendClientPasswordResetEmail } from '@/lib/email'
+import { sendClientAccountSetupEmail, sendClientPasswordResetEmail, sendMarketerAccountSetupEmail } from '@/lib/email'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
 
@@ -31,7 +31,15 @@ export async function emailPortalPasswordLink(
     name,
     clientId,
     kind,
-  }: { email: string; name: string; clientId: string; kind: 'setup' | 'reset' },
+    audience = 'client',
+  }: {
+    email: string
+    name: string
+    /** Absent for a marketer, who belongs to no client. */
+    clientId?: string
+    kind: 'setup' | 'reset'
+    audience?: 'client' | 'marketer'
+  },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   // A recovery link, not an invite link: invite links are refused for users
   // that already exist, and a re-send or a reset is exactly that.
@@ -44,8 +52,12 @@ export async function emailPortalPasswordLink(
   const url = `${APP_URL}/portal/setup?${params}`
 
   try {
-    const send = kind === 'setup' ? sendClientAccountSetupEmail : sendClientPasswordResetEmail
-    await send({ to: email, clientName: name, setupUrl: url, clientId })
+    if (audience === 'marketer') {
+      await sendMarketerAccountSetupEmail({ to: email, name, setupUrl: url, reset: kind === 'reset' })
+    } else {
+      const send = kind === 'setup' ? sendClientAccountSetupEmail : sendClientPasswordResetEmail
+      await send({ to: email, clientName: name, setupUrl: url, clientId })
+    }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Could not send the email.' }
   }

@@ -27,6 +27,7 @@ export default async function PortalMePage() {
     const user = await getVerifiedUser()
     if (!user) redirect('/portal/login')
     if (user.app_metadata?.role === 'admin') redirect('/dashboard')
+    if (user.app_metadata?.role === 'marketer') redirect('/marketing')
     redirect('/portal/login?error=account')
   }
 
