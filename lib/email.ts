@@ -843,6 +843,19 @@ export async function sendDeliveryReminderEmail(
   await send({ to, subject, html, type: 'delivery_reminder', clientId, jobId })
 }
 
+// A retainer client with no shoot planned for the month (app/api/portal-reminders).
+export async function sendShootPlanningReminderEmail(to: string, clientName: string, monthName: string, clientId?: string) {
+  const subject = `Let's plan your ${monthName} shoot`
+  const html = wrap(`
+    ${buildGreeting(clientName)}
+    <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0 0 16px;">We don't have a shoot booked in for <span style="color:${C.ink};">${esc(monthName)}</span> yet, and I'd like to get it locked in so your content for the month stays on track.</p>
+    <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">Reply with a couple of days that suit you and I'll confirm one, or tell me if you'd rather skip this month.</p>
+    ${button('mailto:hello@tuimedia.nz?subject=' + encodeURIComponent(`${monthName} shoot`), 'Pick a date')}
+    <p style="color:${C.muted};font-size:13px;line-height:1.5;margin:16px 0 0;">Or email <a href="mailto:hello@tuimedia.nz" style="color:${C.ink};text-decoration:underline;">hello@tuimedia.nz</a> any time.</p>
+  `)
+  await send({ to, subject, html, type: 'shoot_reminder', clientId })
+}
+
 // Two days after a proposal went out with no answer (app/api/portal-reminders).
 export async function sendProposalFollowUpEmail(to: string, clientName: string, jobName: string, proposalUrl: string, opened: boolean, clientId?: string, jobId?: string) {
   const subject = `Following up on your proposal — ${jobName}`
