@@ -60,6 +60,15 @@ type JobCtx = {
   deliverables?: { title: string }[]
 }
 
+/** A proposal already made for this client's work, which the contract builds on. */
+export type ProposalCtx = {
+  status: string
+  job: string
+  total: number
+  lines: string[]
+  paymentTerms: string
+}
+
 function isRetainer(client: ClientCtx, job?: JobCtx | null): boolean {
   return client.client_category === 'retainer' || /content|retainer/i.test(job?.name ?? '') || !!client.monthly_retainer
 }
@@ -261,6 +270,7 @@ export function buildContractIntake(
   client: ClientCtx,
   jobs: JobCtx[],
   missingClientDetails: string[],
+  proposal?: ProposalCtx | null,
 ): IntakeQuestion[] {
   const who = client.name
   const retainer = isRetainer(client, jobs[0])
@@ -271,6 +281,7 @@ export function buildContractIntake(
     key: 'what',
     question: `What is ${who} getting under this contract? Videos, lengths, platforms.`,
     options: opts(
+      proposal && proposal.lines.length > 0 && { label: `As in the ${proposal.status} proposal for ${proposal.job}`.slice(0, 80), detail: proposal.lines.join('; ').slice(0, 120) },
       retainer && client.videos_per_month && { label: `${client.videos_per_month} videos a month, as on record` },
       quoted && { label: `As in the "${quoted.name}" job`.slice(0, 80) },
       retainer ? { label: '4 vertical videos a month, 15 to 45s each' } : { label: '1 x 45s ad + 3 x 15s cut-downs, 1 month of ads managed' },
@@ -280,14 +291,17 @@ export function buildContractIntake(
     key: 'fee',
     question: `The fee${retainer ? ' per month' : ''}?`,
     options: opts(
+      proposal && proposal.total > 0 && { label: `${nzd(proposal.total)}, as in the ${proposal.status} proposal`.slice(0, 80) },
       retainer && client.monthly_retainer && { label: `${nzd(client.monthly_retainer)} a month, as on record` },
       quoted?.quote_value && { label: `${nzd(quoted.quote_value)}, as quoted for ${quoted.name}`.slice(0, 80) },
+      proposal && proposal.total > 0 && { label: 'Different from the proposal', detail: 'Type the fee' },
     ),
   })
   q.push({
     key: 'payment',
     question: `How is it paid?`,
     options: opts(
+      proposal?.paymentTerms && { label: 'Same payment terms as the proposal', detail: proposal.paymentTerms.slice(0, 120) },
       retainer ? { label: 'Monthly in advance, no deposit' } : { label: '50% deposit on signing, 50% on delivery' },
       !retainer && { label: '100% on signing' },
       !retainer && { label: '50% on signing, 50% before the shoot' },
