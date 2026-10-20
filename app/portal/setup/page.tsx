@@ -39,7 +39,8 @@ export default async function PortalSetupPage({
 
   // No token: a signed-in client changing their password.
   const user = await getVerifiedUser()
-  if (!user || user.app_metadata?.role !== 'client') redirect('/portal/login')
+  const role = user?.app_metadata?.role
+  if (!user || (role !== 'client' && role !== 'marketer')) redirect('/portal/login')
 
   return (
     <PortalAuthShell title="Change your password" intro={`For ${user.email}.`}>

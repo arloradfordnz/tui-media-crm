@@ -5,6 +5,7 @@ import PortalNotificationSettings from './PortalNotificationSettings'
 import IcloudCalendarSettings from './IcloudCalendarSettings'
 import IcloudPushSettings from './IcloudPushSettings'
 import MemorySettings from './MemorySettings'
+import MarketerSettings, { type MarketerRow } from './MarketerSettings'
 import { listMemories } from '@/lib/ai-memory'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { getCaldavConfig, STATUS_KEY } from '@/lib/icloud-push'
@@ -37,6 +38,16 @@ export default async function SettingsPage() {
         admin.from('kv_cache').select('value').eq('key', STATUS_KEY).maybeSingle(),
       ])
     : [null, null]
+
+  const { data: authList } = admin ? await admin.auth.admin.listUsers({ perPage: 1000 }) : { data: null }
+  const marketers: MarketerRow[] = (authList?.users ?? [])
+    .filter((u) => u.app_metadata?.role === 'marketer')
+    .map((u) => ({
+      id: u.id,
+      email: u.email ?? '',
+      name: (u.user_metadata?.name as string | undefined) ?? '',
+      lastSignInAt: u.last_sign_in_at ?? null,
+    }))
 
   return (
     <div className="space-y-6">
@@ -84,6 +95,9 @@ export default async function SettingsPage() {
 
       {/* Tui's long-term memory */}
       <MemorySettings memories={memories} />
+
+      {/* Marketing login */}
+      <MarketerSettings marketers={marketers} />
 
       {/* Change Password */}
       <SettingsForm email={user?.email} />

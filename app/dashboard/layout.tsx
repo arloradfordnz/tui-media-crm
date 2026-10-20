@@ -4,6 +4,7 @@ import { after } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { syncIcloudIfStale } from '@/lib/icloud-calendar'
 import { hasAdminClaim, isClientAccount } from '@/lib/client-auth'
+import { getVerifiedRole } from '@/lib/supabase'
 import DashboardShell from './DashboardShell'
 
 export const metadata: Metadata = {
@@ -32,6 +33,7 @@ export const metadata: Metadata = {
 // at an empty dashboard.
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   if (await isClientAccount()) redirect('/portal/me')
+  if ((await getVerifiedRole()) === 'marketer') redirect('/marketing')
 
   // The admin claim has to be in the TOKEN, not just on the account, because
   // that is where is_admin() reads it from. A token minted before the role was

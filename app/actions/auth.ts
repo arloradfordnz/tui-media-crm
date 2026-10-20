@@ -12,12 +12,13 @@ export async function login(prevState: { error?: string } | undefined, formData:
   }
 
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
     return { error: 'Invalid email or password.' }
   }
 
+  if (data.user?.app_metadata?.role === 'marketer') redirect('/marketing')
   redirect('/dashboard')
 }
 

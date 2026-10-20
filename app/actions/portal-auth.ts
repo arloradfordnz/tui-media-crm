@@ -7,6 +7,8 @@ import { emailPortalPasswordLink } from '@/lib/portal-setup-link'
 import { checkPassword } from '@/lib/password-strength'
 import { breachCount } from '@/lib/pwned'
 
+const isPortalRole = (r: unknown) => r === 'client' || r === 'marketer'
+
 export type SetPasswordState =
   | {
       error?: string
@@ -42,18 +44,20 @@ export async function setPortalPassword(_prev: SetPasswordState, formData: FormD
   }
 
   const supabase = await createServerSupabaseClient()
+  let role: string | undefined
 
   if (token) {
     const { data, error } = await supabase.auth.verifyOtp({ type: 'recovery', token_hash: token })
     if (error || !data.user) {
       return { error: 'That link has expired or has already been used.', expired: true }
     }
-    // These links are only ever minted for client accounts. Anything else is
-    // not ours to finish here.
-    if (data.user.app_metadata?.role !== 'client') {
+    // These links are only ever minted for client and marketer accounts.
+    // Anything else is not ours to finish here.
+    if (!isPortalRole(data.user.app_metadata?.role)) {
       await supabase.auth.signOut()
       return { error: 'That link isn’t for a portal account.', expired: true }
     }
+    role = data.user.app_metadata?.role
     // The email address is only known now. The link is spent, so a retry has
     // to run on the session it created.
     if (!checkPassword(password, [data.user.email]).ok) {
@@ -61,12 +65,13 @@ export async function setPortalPassword(_prev: SetPasswordState, formData: FormD
     }
   } else {
     const user = await getVerifiedUser()
-    if (!user || user.app_metadata?.role !== 'client') {
+    if (!user || !isPortalRole(user.app_metadata?.role)) {
       return { error: 'Your session has ended. Sign in again, or ask for a fresh link.', expired: true }
     }
     if (!checkPassword(password, [user.email]).ok) {
       return { error: 'Don’t use your name or email address in your password.' }
     }
+    role = user.app_metadata?.role
   }
 
   const { error } = await supabase.auth.updateUser({ password })
@@ -76,7 +81,7 @@ export async function setPortalPassword(_prev: SetPasswordState, formData: FormD
     return { error: error.message, verified: true }
   }
 
-  redirect('/portal/me')
+  redirect(role === 'marketer' ? '/marketing' : '/portal/me')
 }
 
 export type ResetRequestState = { sent?: boolean; error?: string } | undefined
@@ -113,9 +118,20 @@ export async function requestPortalPasswordReset(
   // has no lookup by email.
   const { data: list } = await admin.auth.admin.listUsers({ perPage: 1000 })
   const user = list?.users.find(
-    (u) => u.email?.toLowerCase() === email && u.app_metadata?.role === 'client',
+    (u) => u.email?.toLowerCase() === email && isPortalRole(u.app_metadata?.role),
   )
   if (!user) return { sent: true }
+
+  if (user.app_metadata?.role === 'marketer') {
+    const sent = await emailPortalPasswordLink(admin, {
+      email,
+      name: (user.user_metadata?.name as string | undefined) ?? '',
+      kind: 'reset',
+      audience: 'marketer',
+    })
+    if (!sent.ok) console.error('[portal reset]', sent.error)
+    return { sent: true }
+  }
 
   // client_users, not the token's claim, decides which client this is.
   const { data: link } = await admin

@@ -925,6 +925,38 @@ export async function sendClientAccountSetupEmail({
   })
 }
 
+/** Login for the marketing team member: approved videos to view and download. */
+export async function sendMarketerAccountSetupEmail({
+  to,
+  name,
+  setupUrl,
+  reset,
+}: {
+  to: string
+  name: string
+  setupUrl: string
+  reset?: boolean
+}) {
+  await send({
+    to,
+    subject: reset ? 'Reset your Tui Media password' : 'Your Tui Media login',
+    type: reset ? 'password_reset' : 'account_setup',
+    rethrow: true,
+    html: wrap(
+      `
+      ${buildGreeting(name)}
+      <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0 0 16px;">${reset ? 'Choose a new password for your Tui Media login.' : 'You now have a Tui Media login. It opens the library of approved videos, ready to watch and download for marketing.'}</p>
+      <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">Choose a password to ${reset ? 'finish' : 'get started'}.</p>
+      ${button(setupUrl, 'Choose a password')}
+      <p style="color:${C.faint};font-size:13px;line-height:1.55;margin:16px 0 0;">This link works once. If it has run out, press “Forgot your password?” at <a href="${APP_URL}/portal/login" style="color:${C.faint};text-decoration:underline;">${APP_URL.replace(/^https?:\/\//, '')}/portal/login</a> for a fresh one.</p>
+      ${plainLink(setupUrl)}
+    `,
+      SIGNOFF,
+      'Choose a password to finish setting up your login.'
+    ),
+  })
+}
+
 /** The client asked for this from the portal's sign-in page. */
 export async function sendClientPasswordResetEmail({
   to,
