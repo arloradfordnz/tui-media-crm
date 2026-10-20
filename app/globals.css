@@ -2274,6 +2274,11 @@ td.docs-opened-cell { display: none; }
 .attention-sentence { font-size: var(--t-md); color: var(--text-primary); }
 .attention-meta { font-size: var(--t-xs); color: var(--text-tertiary); }
 .attention-action { flex: 0 0 auto; }
+/* Holds the row's action and, on client emails, the Mark-done tick. Left
+   unpositioned on purpose: on mobile the action link's ::after stretches over
+   the whole row, and that needs the row (not this box) as its reference. */
+.attention-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.attention-done { position: relative; z-index: 1; flex: 0 0 auto; padding: 0 8px; }
 
 @media (max-width: 768px) {
   .today-row { flex-wrap: wrap; gap: 6px 10px; }
@@ -2299,7 +2304,7 @@ td.docs-opened-cell { display: none; }
     margin-top: 7px;
   }
   .attention-body { grid-area: body; }
-  .attention-action { grid-area: action; justify-self: end; }
+  .attention-actions { grid-area: action; justify-self: end; }
 }
 
 /* ── Portal media band ────────────────────────────────────────
