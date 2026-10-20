@@ -337,6 +337,7 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
 
 function FileCard({ file, jobId, portalToken, onApprove }: { file: DeliveryFile; jobId: string; portalToken: string; onApprove: (fileId: string, jobId: string) => void }) {
   const kind = file.fileUrl && file.fileUrl.includes('vimeo') ? 'vimeo' : fileKind(file.mimeType, file.originalName)
+  const router = useRouter()
   const canApprove = file.deliveryStatus === 'sent' || file.deliveryStatus === 'viewed'
 
   function handleDownload() {
@@ -352,7 +353,7 @@ function FileCard({ file, jobId, portalToken, onApprove }: { file: DeliveryFile;
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
-    markDownloaded(file.id, jobId, portalToken).catch(() => {})
+    markDownloaded(file.id, jobId, portalToken).then((r) => { if (r && r.approved) router.refresh() }).catch(() => {})
   }
 
   return (
@@ -453,6 +454,11 @@ function FileCard({ file, jobId, portalToken, onApprove }: { file: DeliveryFile;
           <button onClick={handleDownload} className="btn-secondary btn-sm">
             <Download className="w-3.5 h-3.5" /> Download
           </button>
+        )}
+        {canApprove && kind === 'video' && (file.downloadUrl || file.fileUrl) && (
+          <p className="text-xs w-full" style={{ color: 'var(--text-tertiary)' }}>
+            Downloading this video counts as approving it. Want changes first? Request a revision instead.
+          </p>
         )}
         {canApprove && (
           <button onClick={() => onApprove(file.id, jobId)} className="btn-primary btn-sm">

@@ -34,24 +34,26 @@ async function authorizeJob(admin: Admin, jobId: string, clientId: string) {
   return job
 }
 
-export async function approveDelivery(deliveryFileId: string, jobId: string, portalToken: string) {
-  const admin = createAdminClient()
-  if (!admin) return { error: 'Server misconfigured.' }
+type ApprovalFile = { id: string; original_name: string; share_token: string; delivery_status: string }
 
-  const client = await resolveClient(admin, portalToken)
-  if (!client) return { error: 'Not authorised.' }
-  const job = await authorizeJob(admin, jobId, client.id)
-  if (!job) return { error: 'Not authorised.' }
-
-  // Make sure the file actually belongs to this job before touching it.
-  const { data: file } = await admin
-    .from('delivery_files')
-    .select('id, original_name, share_token, delivery_status, deliverables(job_id)')
-    .eq('id', deliveryFileId)
-    .single()
-  const fileJobId = (file?.deliverables as unknown as { job_id: string } | null)?.job_id
-  if (!file || fileJobId !== jobId) return { error: 'Not authorised.' }
-
+/**
+ * Mark a delivered file approved and tell everyone who needs to know.
+ *
+ * Shared by the Approve button and by a client downloading a video without
+ * approving it, which Arlo treats as the same thing: you do not take the file
+ * away if you are not happy with it. `how` only changes the wording Arlo sees.
+ */
+async function finishApproval(
+  admin: Admin,
+  { client, job, file, jobId, how }: {
+    client: NonNullable<Awaited<ReturnType<typeof resolveClient>>>
+    job: NonNullable<Awaited<ReturnType<typeof authorizeJob>>>
+    file: ApprovalFile
+    jobId: string
+    how: 'client' | 'download'
+  },
+) {
+  const deliveryFileId = file.id
   await admin.from('delivery_files').update({
     delivery_status: 'approved',
     approved_at: new Date().toISOString(),
@@ -62,8 +64,8 @@ export async function approveDelivery(deliveryFileId: string, jobId: string, por
 
   await Promise.all([
     admin.from('jobs').update({ status: 'approved' }).eq('id', jobId),
-    admin.from('activities').insert({ action: 'delivery_approved', details: 'Client approved delivery', job_id: jobId, client_id: job.client_id }),
-    admin.from('notifications').insert({ title: 'Delivery Approved', message: `Client approved a cut for "${job.name}"`, type: 'approved', job_id: jobId, client_id: job.client_id }),
+    admin.from('activities').insert({ action: 'delivery_approved', details: how === 'download' ? 'Delivery approved automatically: the client downloaded it' : 'Client approved delivery', job_id: jobId, client_id: job.client_id }),
+    admin.from('notifications').insert({ title: 'Delivery Approved', message: how === 'download' ? `Client downloaded a cut for "${job.name}", so it was approved automatically` : `Client approved a cut for "${job.name}"`, type: 'approved', job_id: jobId, client_id: job.client_id }),
   ])
 
   const adminViewing = await isAdminViewing()
@@ -94,10 +96,31 @@ export async function approveDelivery(deliveryFileId: string, jobId: string, por
   emitAssistantEvent(admin, {
     kind: 'client_action',
     key: `client_action:approved:${deliveryFileId}`,
-    subject: `${clientRel.name} approved a cut on ${job.name}`,
+    subject: `${clientRel.name} ${how === 'download' ? 'downloaded (and so approved)' : 'approved'} a cut on ${job.name}`,
     severity: 'low',
     detail: { job_id: jobId, file: fileName },
   })
+}
+
+export async function approveDelivery(deliveryFileId: string, jobId: string, portalToken: string) {
+  const admin = createAdminClient()
+  if (!admin) return { error: 'Server misconfigured.' }
+
+  const client = await resolveClient(admin, portalToken)
+  if (!client) return { error: 'Not authorised.' }
+  const job = await authorizeJob(admin, jobId, client.id)
+  if (!job) return { error: 'Not authorised.' }
+
+  // Make sure the file actually belongs to this job before touching it.
+  const { data: file } = await admin
+    .from('delivery_files')
+    .select('id, original_name, share_token, delivery_status, deliverables(job_id)')
+    .eq('id', deliveryFileId)
+    .single()
+  const fileJobId = (file?.deliverables as unknown as { job_id: string } | null)?.job_id
+  if (!file || fileJobId !== jobId) return { error: 'Not authorised.' }
+
+  await finishApproval(admin, { client, job, file: { ...file, id: deliveryFileId }, jobId, how: 'client' })
 
   revalidatePath('/portal/')
   return { success: true }
@@ -260,7 +283,11 @@ export async function markViewed(deliveryFileId: string, jobId: string, portalTo
   ])
 }
 
-export async function markDownloaded(deliveryFileId: string, jobId: string, portalToken: string) {
+const VIDEO_FILE = /\.(mp4|mov|m4v|webm|mkv)$/i
+
+// Returns { approved: true } when this download also approved the video, so the
+// portal can refresh the card.
+export async function markDownloaded(deliveryFileId: string, jobId: string, portalToken: string): Promise<{ approved?: boolean } | void> {
   const admin = createAdminClient()
   if (!admin) return
 
@@ -271,7 +298,7 @@ export async function markDownloaded(deliveryFileId: string, jobId: string, port
 
   const { data: file } = await admin
     .from('delivery_files')
-    .select('original_name, deliverables(job_id)')
+    .select('id, original_name, share_token, delivery_status, mime_type, archived_at, deliverables(job_id)')
     .eq('id', deliveryFileId)
     .single()
   const fileJobId = (file?.deliverables as unknown as { job_id: string } | null)?.job_id
@@ -281,13 +308,26 @@ export async function markDownloaded(deliveryFileId: string, jobId: string, port
   // Don't notify when the studio owner is the one downloading.
   if (adminViewing) return
 
+  // Taking a video away with you counts as signing it off: someone unhappy
+  // with a cut asks for changes instead. Only a video that is still awaiting a
+  // decision, so a photo, a PDF or an already-approved cut changes nothing.
+  const isVideo = !!file.mime_type?.startsWith('video/') || VIDEO_FILE.test(file.original_name || '')
+  const awaitingDecision = file.delivery_status === 'sent' || file.delivery_status === 'viewed'
+  const autoApprove = isVideo && awaitingDecision && !file.archived_at
+  if (autoApprove) {
+    await finishApproval(admin, { client, job, file: { id: deliveryFileId, original_name: file.original_name, share_token: file.share_token, delivery_status: file.delivery_status }, jobId, how: 'download' })
+    revalidatePath('/portal/')
+  }
+
   const fileName = file.original_name || 'a delivery file'
   const clientRel = job.clients as unknown as { name: string } | null
   await Promise.all([
     admin.from('activities').insert({ action: 'delivery_downloaded', details: `Client downloaded "${fileName}"`, job_id: jobId, client_id: job.client_id }),
     admin.from('notifications').insert({ title: 'File Downloaded', message: `Client downloaded "${fileName}" for "${job.name}"`, type: 'delivery_downloaded', job_id: jobId, client_id: job.client_id }),
-    sendAdminFileDownloadedEmail(clientRel?.name || 'Your client', job.name, fileName, jobId, job.client_id),
+    // The approval email already says it was downloaded; a second one is noise.
+    autoApprove ? Promise.resolve() : sendAdminFileDownloadedEmail(clientRel?.name || 'Your client', job.name, fileName, jobId, job.client_id),
   ])
+  return autoApprove ? { approved: true } : undefined
 }
 
 // A client opening a document in their portal (the card is expanded). Records
