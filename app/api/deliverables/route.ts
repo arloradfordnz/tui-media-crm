@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { getAuthUser, unauthorizedResponse } from '@/lib/supabase-admin'
+import { deliveryKeysFor, deleteDeliveryObjects } from '@/lib/r2-cleanup'
 import { NextRequest } from 'next/server'
 
 export async function POST(request: NextRequest) {
@@ -44,7 +45,9 @@ export async function DELETE(request: NextRequest) {
     return Response.json({ error: 'ID is required.' }, { status: 400 })
   }
 
+  const keys = await deliveryKeysFor(supabase, { deliverableId: id })
   const { error } = await supabase.from('deliverables').delete().eq('id', id)
   if (error) return Response.json({ error: error.message }, { status: 500 })
+  await deleteDeliveryObjects(keys)
   return Response.json({ ok: true })
 }

@@ -139,6 +139,7 @@ export default function JobRecord({ job }: { job: JobData }) {
   const toast = useToast()
   const [uploadingFor, setUploadingFor] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadBatch, setUploadBatch] = useState({ index: 0, total: 0 })
   const [uploadStage, setUploadStage] = useState<'idle' | 'preparing' | 'uploading' | 'finalising'>('idle')
   type UploadedFile = { id: string; originalName: string; versionLabel: string; deliveryStatus: string; createdAt: string; fileUrl: string; personalNote: string | null }
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, UploadedFile[]>>(() => {
@@ -186,8 +187,22 @@ export default function JobRecord({ job }: { job: JobData }) {
     })
   }
 
-  async function handleFileUpload(deliverableId: string, file: File, versionLabel: string, notes: string) {
+  // Files go up one after another, not in parallel: each is a multi-hundred-MB
+  // PUT, and running them together just splits the same uplink while making
+  // every progress bar meaningless. The client is emailed once, on the last.
+  async function handleFileUpload(deliverableId: string, files: File[], versionLabel: string, notes: string) {
     setUploadingFor(deliverableId)
+    for (let i = 0; i < files.length; i++) {
+      setUploadBatch({ index: i + 1, total: files.length })
+      await uploadOne(deliverableId, files[i], versionLabel, notes, i === files.length - 1)
+    }
+    setUploadBatch({ index: 0, total: 0 })
+    setUploadingFor(null)
+    setUploadStage('idle')
+    setUploadProgress(0)
+  }
+
+  async function uploadOne(deliverableId: string, file: File, versionLabel: string, notes: string, notify: boolean) {
     setUploadStage('preparing')
     setUploadProgress(0)
     let fileId: string | null = null
@@ -233,7 +248,7 @@ export default function JobRecord({ job }: { job: JobData }) {
       const doneRes = await fetch('/api/deliverables/upload', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileId }),
+        body: JSON.stringify({ fileId, notify }),
       })
       const done = await doneRes.json()
       if (!doneRes.ok || !done.file) throw new Error(done.error || 'Failed to finalise upload')
@@ -252,7 +267,7 @@ export default function JobRecord({ job }: { job: JobData }) {
       }))
     } catch (e) {
       console.error('[upload]', e)
-      toast({ tone: 'error', title: 'Upload failed', detail: (e as Error).message })
+      toast({ tone: 'error', title: `Upload failed: ${file.name}`, detail: (e as Error).message })
       if (fileId) {
         fetch('/api/deliverables/upload', {
           method: 'DELETE',
@@ -261,9 +276,6 @@ export default function JobRecord({ job }: { job: JobData }) {
         }).catch(() => {})
       }
     }
-    setUploadingFor(null)
-    setUploadStage('idle')
-    setUploadProgress(0)
   }
 
   async function handleStatusChange_file(fileId: string, deliverableId: string, newStatus: string) {
@@ -590,6 +602,7 @@ export default function JobRecord({ job }: { job: JobData }) {
                     uploading={uploadingFor === d.id}
                     progress={uploadingFor === d.id ? uploadProgress : 0}
                     stage={uploadingFor === d.id ? uploadStage : 'idle'}
+                    batch={uploadingFor === d.id ? uploadBatch : { index: 0, total: 0 }}
                     onUpload={handleFileUpload}
                   />
                 </div>
@@ -832,9 +845,9 @@ const VERSION_LABELS = [
   { value: 'raw_files', label: 'Raw Files' },
 ]
 
-function DeliverableUploadForm({ deliverableId, uploading, progress, stage, onUpload }: { deliverableId: string; uploading: boolean; progress: number; stage: 'idle' | 'preparing' | 'uploading' | 'finalising'; onUpload: (id: string, file: File, version: string, notes: string) => void }) {
+function DeliverableUploadForm({ deliverableId, uploading, progress, stage, batch, onUpload }: { deliverableId: string; uploading: boolean; progress: number; stage: 'idle' | 'preparing' | 'uploading' | 'finalising'; batch: { index: number; total: number }; onUpload: (id: string, files: File[], version: string, notes: string) => void }) {
   const [expanded, setExpanded] = useState(false)
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
   const [version, setVersion] = useState('first_cut')
   const [notes, setNotes] = useState('')
   const [dragging, setDragging] = useState(false)
@@ -854,20 +867,20 @@ function DeliverableUploadForm({ deliverableId, uploading, progress, stage, onUp
   const [wasUploading, setWasUploading] = useState(uploading)
   if (uploading !== wasUploading) {
     setWasUploading(uploading)
-    if (!uploading) { setFile(null); setNotes(''); setExpanded(false) }
+    if (!uploading) { setFiles([]); setNotes(''); setExpanded(false) }
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!file || uploading) return
-    onUpload(deliverableId, file, version, notes)
+    if (!files.length || uploading) return
+    onUpload(deliverableId, files, version, notes)
   }
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
     setDragging(false)
-    const dropped = e.dataTransfer.files[0]
-    if (dropped) setFile(dropped)
+    const dropped = Array.from(e.dataTransfer.files)
+    if (dropped.length) setFiles(dropped)
   }
 
   if (!expanded) {
@@ -888,7 +901,7 @@ function DeliverableUploadForm({ deliverableId, uploading, progress, stage, onUp
         onDrop={handleDrop}
         className="upload-drop"
         style={{
-          borderColor: dragging ? 'var(--accent)' : file ? 'var(--success)' : undefined,
+          borderColor: dragging ? 'var(--accent)' : files.length ? 'var(--success)' : undefined,
           background: dragging ? 'var(--accent-muted)' : undefined,
           cursor: 'pointer',
           minHeight: 72,
@@ -897,29 +910,36 @@ function DeliverableUploadForm({ deliverableId, uploading, progress, stage, onUp
         <input
           ref={inputRef}
           type="file"
+          multiple
           className="sr-only"
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
+          onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
         />
-        {file ? (
-          <div className="flex items-center gap-2">
-            <FileVideo className="w-4 h-4 shrink-0" style={{ color: 'var(--success)' }} />
-            <span className="text-sm truncate" style={{ color: 'var(--text-primary)', maxWidth: 240 }}>{file.name}</span>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setFile(null) }}
-              style={{ color: 'var(--text-tertiary)', marginLeft: 'auto' }}
-            >
-              <X className="w-4 h-4" />
-            </button>
+        {files.length ? (
+          <div className="space-y-1.5 w-full">
+            {files.map((f, i) => (
+              <div key={`${f.name}-${i}`} className="flex items-center gap-2">
+                <FileVideo className="w-4 h-4 shrink-0" style={{ color: 'var(--success)' }} />
+                <span className="text-sm truncate" style={{ color: 'var(--text-primary)', maxWidth: 240 }}>{f.name}</span>
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={(e) => { e.stopPropagation(); setFiles((prev) => prev.filter((_, j) => j !== i)) }}
+                  style={{ color: 'var(--text-tertiary)', marginLeft: 'auto' }}
+                  aria-label={`Remove ${f.name}`}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="flex flex-col items-center gap-1 text-center pointer-events-none">
             <Upload className="w-5 h-5" style={{ color: 'var(--text-tertiary)' }} />
             <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
               {coarsePointer ? (
-                <span style={{ color: 'var(--accent)' }}>Choose a file</span>
+                <span style={{ color: 'var(--accent)' }}>Choose files</span>
               ) : (
-                <>Drop file here or <span style={{ color: 'var(--accent)' }}>browse</span></>
+                <>Drop files here or <span style={{ color: 'var(--accent)' }}>browse</span></>
               )}
             </p>
             <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Any file type</p>
@@ -940,7 +960,7 @@ function DeliverableUploadForm({ deliverableId, uploading, progress, stage, onUp
           <div className="flex items-center justify-between text-xs" style={{ color: 'var(--text-secondary)' }}>
             <span>
               {stage === 'preparing' && 'Preparing upload...'}
-              {stage === 'uploading' && `Uploading${file ? ` ${file.name}` : ''}`}
+              {stage === 'uploading' && `Uploading${batch.total > 1 ? ` ${batch.index} of ${batch.total}` : ''}${files[batch.index - 1] ? ` ${files[batch.index - 1].name}` : ''}`}
               {stage === 'finalising' && 'Finalising...'}
             </span>
             <span style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{progress}%</span>
@@ -958,10 +978,10 @@ function DeliverableUploadForm({ deliverableId, uploading, progress, stage, onUp
         </div>
       )}
       <div className="flex gap-2">
-        <button type="submit" disabled={!file || uploading} className="btn-primary btn-sm">
-          <Upload className="w-3.5 h-3.5" /> {uploading ? 'Uploading...' : 'Upload'}
+        <button type="submit" disabled={!files.length || uploading} className="btn-primary btn-sm">
+          <Upload className="w-3.5 h-3.5" /> {uploading ? 'Uploading...' : files.length > 1 ? `Upload ${files.length} files` : 'Upload'}
         </button>
-        <button type="button" disabled={uploading} onClick={() => { setExpanded(false); setFile(null) }} className="btn-secondary btn-sm">Cancel</button>
+        <button type="button" disabled={uploading} onClick={() => { setExpanded(false); setFiles([]) }} className="btn-secondary btn-sm">Cancel</button>
       </div>
     </form>
   )
