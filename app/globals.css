@@ -3059,9 +3059,14 @@ td.docs-opened-cell { display: none; }
   /* The money card fills the column's spare height, and inside it the chart
      and the transactions list split that height 3 : 2 (both from a zero
      basis), so a taller right column grows both rather than just one. */
-  .money-fill { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-  .money-fill > .card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-  .money-fill .money-mini-fill { flex: 3 1 0; display: flex; flex-direction: column; min-height: 0; }
+  /* No min-height: 0 on these three. The chart is drawn absolutely into a
+     slot with a 200px floor, so when the right column is short the flex
+     chain would shrink the box below the figures + 200px and the chart
+     spilled out over the footnote and the transactions under it. Left at
+     auto, the floor holds and the column grows instead. */
+  .money-fill { flex: 1; display: flex; flex-direction: column; }
+  .money-fill > .card { flex: 1; display: flex; flex-direction: column; }
+  .money-fill .money-mini-fill { flex: 3 1 0; display: flex; flex-direction: column; }
   .money-fill .money-chart-slot { flex: 1; height: auto; min-height: 200px; }
   .tx-fill { flex: 2 1 0; display: flex; flex-direction: column; min-height: calc(40px + 29px + 3 * 37px); }
   .tx-fill .tx-slot { flex: 1; height: auto; min-height: 0; }
