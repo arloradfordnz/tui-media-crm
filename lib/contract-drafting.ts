@@ -103,7 +103,7 @@ The FIRM POSITIONS on ending, nothing more. The 14 days' notice is in the summar
 
 # 7. General (3 clauses)
 
-7.1 no guarantee of views, sales or other results; each party's liability is capped at the fees paid or payable and excludes indirect loss and lost profits, except where the law does not allow it. 7.2 the CGA/FTA business clause as ONE sentence (name the Acts and sections, say both are in trade and it is fair and reasonable), or for an individual the consumer clause. 7.3 one sentence folding in the rest: Tui Media is an independent contractor; neither party is liable for delay outside its control; this is the whole agreement and changes must be in writing; disputes are talked through first, then mediation in Nelson; New Zealand law applies; it can be signed electronically. Advertising terms, only if Tui Media is running ads, go in 1.1 as a few words (ad spend paid by the Client direct to the platform, the Client owns the ad account).
+7.1 no guarantee of views, sales or other results; each party's liability is capped (the fee for a one-off job, or the fees paid in the 3 months before the claim for monthly work) and excludes indirect loss and lost profits, except where the law does not allow it. 7.2 the CGA/FTA business clause as ONE sentence (name the Acts and sections, say both are in trade and it is fair and reasonable), or for an individual the consumer clause. 7.3 one sentence folding in the rest: Tui Media is an independent contractor; neither party is liable for delay outside its control; this is the whole agreement and changes must be in writing; disputes are talked through first, then mediation in Nelson; New Zealand law applies; it can be signed electronically. Advertising terms, only if Tui Media is running ads, go in 1.1 as a few words (ad spend paid by the Client direct to the platform, the Client owns the ad account).
 
 # FIRM POSITIONS
 
@@ -131,7 +131,7 @@ Adapt the agreement to the deal, do not force one shape on everything:
 
 - One-off video ad project: the five stages (strategise, script, film, edit, launch and manage), a single project fee, one month of ad management priced into the fee, full handover at the end (raw footage, final edits, the ad account), no retainer and no lock-in.
 - Monthly content retainer: a monthly fee and no deposit, the number of videos and shoot days per month, the rollover rules above, a start date, any minimum term, and the notice to end it under FIRM POSITIONS.
-- Event coverage: the date, start and finish times, hours of coverage, overtime rate if any, turnaround (for example a same-day edit), weather and venue access, and crowd consent signage.
+- Event coverage: a one-off job, never a retainer, even when the Client also has a monthly retainer with Tui Media (this agreement covers only the event). Name the event, its date, start and finish times and venue in the At a glance summary. Then the hours of coverage and any overtime rate; what is delivered (for example a highlight film and short social clips) and when (for example a social clip the same day and the highlight within 7 days); the deposit holding the date and what happens to it if the Client cancels or the event is postponed or called off (postponed: the deposit moves to the new date if Tui Media is free; cancelled: per the deal); that the Client arranges venue access, any accreditation and crowd consent signage; and what happens if weather or the venue stops filming. No rollover clause, no monthly wording, no notice-to-end clause (the agreement ends when the work is delivered and paid; keep only the serious-breach right to end early).
 - Anything else: draft from first principles using the same structure.
 
 # THE FACTS AND THE DEFAULTS
@@ -156,6 +156,22 @@ Defaults, used only where the deal says nothing:
 - Storage period: Tui Media keeps the raw and final files for 12 months after final delivery.
 
 For pure boilerplate that is not a commercial decision (governing law, independent contractor, entire agreement, electronic signature, the liability structure above), draft the standard protective position yourself.
+
+# USING THE BACKGROUND
+
+You may also get BACKGROUND FROM THE CRM: the job record, its notes and deliverables, and summaries of the Client's emails. Use it for specifics the agreed terms leave general (the event's name, venue and date, the actual videos, what the Client asked for) so the contract describes this job and not a generic one. The agreed terms always win: if the background disagrees with them, follow the terms and say so under CHECK. Production notes are not contract terms: brand colours, music style, trending audio, captions, who to tag, shot lists and creative ideas stay out of the agreement (at most "made in line with the Client's brand"). Never copy a figure from the background that the terms do not confirm; list it under CHECK instead.
+
+# CHECK BEFORE YOU FINISH
+
+Read your draft once as the Client's lawyer would, and fix these before you output it:
+
+- The kind of engagement is right all the way through. A one-off job has no monthly wording, rollover or notice period; a retainer has no deposit.
+- Every date, time, amount and quantity matches the terms, and the summary and the clauses agree.
+- The same words for the same thing throughout: always "working days" (never "business days"), always the same name for the videos, the fee and the Client.
+- The signatory is a full name. If you only have a first name, use it and say under CHECK that the full name is needed before signing.
+- The main contact's email belongs to the main contact. If the email looks like someone else's (a different first name), say so under CHECK.
+- Liability is capped at a figure that is fixed: for a one-off job, the fee for this agreement; for monthly work, the fees paid in the 3 months before the claim (never an open-ended "fees paid or payable").
+- Nothing is promised that the terms did not agree (an extra video, a turnaround, a free revision).
 
 # HOW IT MUST READ
 
@@ -195,8 +211,10 @@ export const SETTLED_CONTRACT_TERMS = [
   'Paid but undelivered videos at the end: Tui Media chooses to deliver or refund.',
   'Revisions: 2 rounds per video.',
   'Shoot length: about 1 hour.',
-  'First edit: within 3 business days of the shoot.',
-  'Delivery and feedback: through the client portal, 2 business days to approve or give feedback, then a reminder, then approved 2 business days later.',
+  'First edit: within 3 working days of the shoot (events: per the turnaround question).',
+  'Delivery and feedback: through the client portal, 2 working days to approve or give feedback, then a reminder, then approved 2 working days later.',
+  'Ownership: the Client owns the final videos once paid; raw footage sent on request.',
+  'Portfolio: Tui Media may show the work unless the Client says no.',
   'Invoices: first one sent on signing (monthly work then monthly in advance), each due 14 days after it is sent.',
   'Rescheduling: free with 24 hours\' notice.',
   'Raw footage: sent on request once paid. Files kept 12 months.',
@@ -309,6 +327,8 @@ ${draft.body}`)
 export async function draftContract(opts: {
   parties: ContractParties
   terms: string
+  /** The job record and client email summaries, for specifics. See USING THE BACKGROUND. */
+  background?: string
   today: string
 }): Promise<DraftResult> {
   const p = opts.parties
@@ -331,7 +351,10 @@ THE PARTIES
 ${facts}
 
 THE DEAL (agreed terms, from Arlo)
-${opts.terms.trim()}`
+${opts.terms.trim()}${opts.background?.trim() ? `
+
+BACKGROUND FROM THE CRM (context only, the agreed terms win)
+${opts.background.trim()}` : ''}`
   return keepWithinLength(await runDrafter(CONTRACT_DRAFTING_BRIEF, user))
 }
 

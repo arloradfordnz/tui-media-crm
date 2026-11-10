@@ -69,8 +69,10 @@ export type ProposalCtx = {
   paymentTerms: string
 }
 
+// Decided by the job when there is one (see classifyEngagement): a one-off
+// event for a client who also has a retainer is still a one-off.
 function isRetainer(client: ClientCtx, job?: JobCtx | null): boolean {
-  return client.client_category === 'retainer' || /content|retainer/i.test(job?.name ?? '') || !!client.monthly_retainer
+  return classifyEngagement(job ?? null, client) === 'monthly_retainer'
 }
 
 // ── Proposals ────────────────────────────────────────────────
@@ -245,56 +247,161 @@ export function buildProposalIntake(client: ClientCtx, job: JobCtx | null, other
 }
 
 // ── Contracts ────────────────────────────────────────────────
+//
+// A contract is for ONE job, and its shape comes from that job. It used to be
+// decided from the client: anyone who had ever had a retainer got retainer
+// questions, so a one-off event for a retainer client (Team Bainbridge's
+// "Heave For Hospice") was asked about monthly videos and rollover. The job
+// decides now, and the client's retainer only counts when there is no job.
 
-export const CONTRACT_REQUIRED_KEYS = [
-  'what', 'fee', 'payment', 'travel', 'start', 'ownership', 'portfolio', 'standard_terms', 'special_requests',
-] as const
+export type Engagement = 'video_ad_project' | 'monthly_retainer' | 'event_coverage' | 'photography' | 'other'
+
+export const ENGAGEMENT_LABEL: Record<Engagement, string> = {
+  event_coverage: 'One-off event',
+  monthly_retainer: 'Monthly content retainer',
+  video_ad_project: 'One-off video ad project',
+  photography: 'Photography job',
+  other: 'Other one-off job',
+}
+
+const EVENT_RE = /\b(event|expo|festival|wedding|conference|gala|awards?|launch party|concert|fundraiser|tournament|race|show|wrap video|highlight)\b/i
+const RETAINER_RE = /\b(monthly|retainer|content (trial|month)|(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* content)\b/i
+
+/** What kind of contract this job needs, from the job first. */
+export function classifyEngagement(job: JobCtx | null, client: ClientCtx): Engagement {
+  if (job) {
+    const text = `${job.name} ${job.notes ?? ''}`
+    if (job.job_type === 'event' || job.job_type === 'wedding' || EVENT_RE.test(job.name)) return 'event_coverage'
+    if (RETAINER_RE.test(job.name)) return 'monthly_retainer'
+    if (/photo/i.test(`${job.job_type ?? ''} ${job.name}`)) return 'photography'
+    if (job.job_type === 'social_media' && /content/i.test(job.name)) return 'monthly_retainer'
+    if (/\bads?\b|campaign/i.test(text) || job.job_type === 'commercial' || job.job_type === 'marketing') return 'video_ad_project'
+    return 'other'
+  }
+  return client.client_category === 'retainer' || client.monthly_retainer ? 'monthly_retainer' : 'video_ad_project'
+}
+
+// Ownership and portfolio used to be asked every time and answered the same
+// way every time. They are settled terms now, confirmed with the rest in
+// standard_terms, and create_contract fills them in.
+export const CONTRACT_DEFAULT_BRIEF: Record<string, string> = {
+  ownership: 'Client owns the final videos once paid (copyright assigned on payment in full)',
+  portfolio: 'Tui Media may show the work in its portfolio and socials unless the Client says no',
+}
 
 export function contractRequiredKeys(engagement: string): string[] {
-  const keys: string[] = [...CONTRACT_REQUIRED_KEYS]
-  if (engagement === 'video_ad_project' || engagement === 'photography' || engagement === 'other') keys.push('cancellation')
-  if (engagement === 'event_coverage') keys.push('cancellation', 'event_hours')
-  return keys
+  const common = ['what', 'fee', 'payment', 'travel', 'standard_terms', 'special_requests']
+  if (engagement === 'monthly_retainer') return [...common, 'start']
+  if (engagement === 'event_coverage') return [...common, 'event_details', 'event_hours', 'turnaround', 'cancellation']
+  return [...common, 'start', 'cancellation']
 }
 
 const CLIENT_DETAIL_QUESTIONS: Record<string, (who: string) => IntakeQuestion> = {
   entity_type: (who) => ({ key: 'entity_type', question: `Is ${who} a company or a sole trader?`, options: [{ label: 'Company' }, { label: 'Sole trader' }, { label: 'Partnership' }, { label: 'Private individual' }] }),
   legal_name: (who) => ({ key: 'legal_name', question: `${who}'s exact legal name? (the registered company name, or the owner's full name for a sole trader)`, options: [] }),
-  contact_person: (who) => ({ key: 'contact_person', question: `Who signs for ${who}, and their role?`, options: [] }),
+  contact_person: (who) => ({ key: 'contact_person', question: `Who signs for ${who}? Full name and role.`, options: [] }),
   email: (who) => ({ key: 'email', question: `${who}'s email for the contract?`, options: [] }),
   phone: (who) => ({ key: 'phone', question: `${who}'s phone number?`, options: [] }),
   location: (who) => ({ key: 'location', question: `Where is ${who} based? (town or address)`, options: [] }),
 }
 
+const TRAVEL_Q: IntakeQuestion = {
+  key: 'travel',
+  question: `Travel: which places are included in the price, and what's the fee beyond that? (name the places)`,
+  options: opts(
+    { label: 'Nelson and Richmond included, +$30 a shoot beyond', detail: 'Flat fee, named zones' },
+    { label: 'Nelson only, +$30 a shoot beyond' },
+    { label: 'All of Nelson Tasman included', detail: 'No travel fee' },
+    { label: 'No travel fee at all' },
+  ),
+}
+
 export function buildContractIntake(
   client: ClientCtx,
-  jobs: JobCtx[],
+  job: JobCtx | null,
+  engagement: Engagement,
   missingClientDetails: string[],
   proposal?: ProposalCtx | null,
 ): IntakeQuestion[] {
   const who = client.name
-  const retainer = isRetainer(client, jobs[0])
-  const quoted = jobs.find((j) => j.quote_value)
-  const q: IntakeQuestion[] = missingClientDetails.map((k) => CLIENT_DETAIL_QUESTIONS[k]?.(who)).filter((x): x is IntakeQuestion => !!x)
+  const retainer = engagement === 'monthly_retainer'
+  const event = engagement === 'event_coverage'
+  const deliverablesOnRecord = (job?.deliverables ?? []).map((d) => d.title).filter(Boolean)
+  const shoot = niceDate(job?.shoot_date)
+  const q: IntakeQuestion[] = []
+
+  // First, so a wrong guess is caught before anything else is answered. If
+  // Arlo picks a different kind, Tui rebuilds the intake for that kind.
+  const others = (Object.keys(ENGAGEMENT_LABEL) as Engagement[]).filter((e) => e !== engagement)
+  q.push({
+    key: 'engagement',
+    question: `What kind of contract is this${job ? ` (for "${job.name}"${shoot ? `, ${shoot}` : ''})` : ''}?`,
+    options: opts(
+      { label: ENGAGEMENT_LABEL[engagement], detail: 'From the job' },
+      ...others.slice(0, 3).map((e) => ({ label: ENGAGEMENT_LABEL[e] })),
+    ),
+  })
+
+  q.push(...missingClientDetails.map((k) => CLIENT_DETAIL_QUESTIONS[k]?.(who)).filter((x): x is IntakeQuestion => !!x))
+
+  if (event) {
+    q.push({
+      key: 'event_details',
+      question: `The event: name, date, start and finish times, and venue?`,
+      options: opts(
+        (shoot || job?.shoot_location) && { label: [job?.name, shoot, job?.shoot_location].filter(Boolean).join(', ').slice(0, 80), detail: 'From the job. Type times if you have them' },
+        // A lone option turns the question into a typed one (see opts), which
+        // would hide what the job already knows.
+        (shoot || job?.shoot_location) && { label: 'Different details', detail: 'Type them' },
+      ),
+    })
+    q.push({
+      key: 'event_hours',
+      question: `Hours of coverage, and overtime if it runs over?`,
+      options: opts(
+        { label: '4 hours, $150/hr overtime' },
+        { label: '6 hours, $150/hr overtime' },
+        { label: 'Whole event, no overtime', detail: 'Fixed fee whatever it runs to' },
+      ),
+    })
+  }
 
   q.push({
     key: 'what',
-    question: `What is ${who} getting under this contract? Videos, lengths, platforms.`,
+    question: event
+      ? `What does ${who} get from the event?`
+      : `What is ${who} getting? Videos, lengths, platforms.`,
     options: opts(
       proposal && proposal.lines.length > 0 && { label: `As in the ${proposal.status} proposal for ${proposal.job}`.slice(0, 80), detail: proposal.lines.join('; ').slice(0, 120) },
+      deliverablesOnRecord.length > 0 && { label: `As on the job: ${deliverablesOnRecord.slice(0, 3).join(', ')}`.slice(0, 80) },
       retainer && client.videos_per_month && { label: `${client.videos_per_month} videos a month, as on record` },
-      quoted && { label: `As in the "${quoted.name}" job`.slice(0, 80) },
-      retainer ? { label: '4 vertical videos a month, 15 to 45s each' } : { label: '1 x 45s ad + 3 x 15s cut-downs, 1 month of ads managed' },
+      event && { label: '2 to 3 min highlight film + 3 short socials' },
+      event && { label: 'Highlight film + wrap video', detail: 'A recap of the whole event' },
+      retainer && { label: '4 vertical videos a month, 15 to 45s each' },
+      engagement === 'video_ad_project' && { label: '1 x 45s ad + 3 x 15s cut-downs, 1 month of ads managed' },
     ),
   })
+
+  if (event) {
+    q.push({
+      key: 'turnaround',
+      question: `When is it delivered?`,
+      options: opts(
+        { label: 'Highlight within 7 days' },
+        { label: 'A social clip the same day, highlight within 7 days' },
+        { label: 'Within 14 days' },
+      ),
+    })
+  }
+
   q.push({
     key: 'fee',
     question: `The fee${retainer ? ' per month' : ''}?`,
     options: opts(
       proposal && proposal.total > 0 && { label: `${nzd(proposal.total)}, as in the ${proposal.status} proposal`.slice(0, 80) },
+      job?.quote_value && { label: `${nzd(job.quote_value)}, as quoted for ${job.name}`.slice(0, 80) },
       retainer && client.monthly_retainer && { label: `${nzd(client.monthly_retainer)} a month, as on record` },
-      quoted?.quote_value && { label: `${nzd(quoted.quote_value)}, as quoted for ${quoted.name}`.slice(0, 80) },
-      proposal && proposal.total > 0 && { label: 'Different from the proposal', detail: 'Type the fee' },
+      { label: 'A different fee', detail: 'Type it' },
     ),
   })
   q.push({
@@ -302,71 +409,45 @@ export function buildContractIntake(
     question: `How is it paid?`,
     options: opts(
       proposal?.paymentTerms && { label: 'Same payment terms as the proposal', detail: proposal.paymentTerms.slice(0, 120) },
-      retainer ? { label: 'Monthly in advance, no deposit' } : { label: '50% deposit on signing, 50% on delivery' },
+      retainer && { label: 'Monthly in advance, no deposit' },
+      !retainer && { label: '50% deposit on signing, 50% on delivery', detail: event ? 'Deposit holds the date' : undefined },
       !retainer && { label: '100% on signing' },
-      !retainer && { label: '50% on signing, 50% before the shoot' },
+      !retainer && { label: 'Full amount on delivery' },
     ),
   })
-  q.push({
-    key: 'travel',
-    question: `Travel: which places are included in the price, and what's the fee beyond that? (name the places)`,
-    options: opts(
-      { label: 'Nelson and Richmond included, +$30 a shoot beyond', detail: 'Flat fee, named zones' },
-      { label: 'Nelson only, +$30 a shoot beyond' },
-      { label: 'All of Nelson Tasman included', detail: 'No travel fee' },
-      { label: 'No travel fee at all' },
-    ),
-  })
-  const shoot = niceDate(jobs.find((j) => j.shoot_date)?.shoot_date)
-  q.push({
-    key: 'start',
-    question: `When does it start?`,
-    options: opts(
-      { label: 'The day both sign' },
-      { label: 'The 1st of next month' },
-      shoot && { label: `Shoot on ${shoot}` },
-    ),
-  })
-  q.push({
-    key: 'ownership',
-    question: `Who owns the finished videos?`,
-    options: opts(
-      { label: 'Client owns them once paid', detail: 'Copyright assigned on payment in full' },
-      { label: 'Licence for their own channels', detail: 'Tui Media keeps copyright' },
-    ),
-  })
-  q.push({
-    key: 'portfolio',
-    question: `Can Tui Media show the work in its portfolio and socials?`,
-    options: opts(
-      { label: 'Yes, unless they say no' },
-      { label: 'Only with their permission' },
-      { label: 'No, keep it private' },
-    ),
-  })
-  q.push({
-    key: 'cancellation',
-    question: `If ${who} cancels a one-off job, what happens to the deposit?`,
-    options: opts(
-      { label: 'Kept if cancelled within 7 days', detail: 'Refunded before that' },
-      { label: 'Always kept, it secures the date' },
-      { label: 'Refunded less costs spent' },
-    ),
-  })
-  q.push({
-    key: 'event_hours',
-    question: `For an event: hours of coverage and overtime rate?`,
-    options: opts(
-      { label: '4 hours, $150/hr overtime' },
-      { label: '6 hours, $150/hr overtime' },
-      { label: '8 hours, $150/hr overtime' },
-    ),
-  })
+  q.push(TRAVEL_Q)
+
+  if (!event) {
+    q.push({
+      key: 'start',
+      question: retainer ? `When does it start?` : `When is the shoot?`,
+      options: opts(
+        shoot && !retainer && { label: `${shoot}, as on the job` },
+        { label: 'The day both sign' },
+        retainer && { label: 'The 1st of next month' },
+        !retainer && { label: 'A date to agree after signing' },
+      ),
+    })
+  }
+  if (!retainer) {
+    q.push({
+      key: 'cancellation',
+      question: event
+        ? `If ${who} cancels or the event is called off, what happens to the deposit?`
+        : `If ${who} cancels, what happens to the deposit?`,
+      options: opts(
+        { label: 'Kept if cancelled within 14 days', detail: 'Refunded before that' },
+        { label: 'Always kept, it secures the date' },
+        event && { label: 'Moved to a new date if the event is postponed' },
+        { label: 'Refunded less costs spent' },
+      ),
+    })
+  }
   q.push({
     key: 'standard_terms',
-    question: `Keep the standard terms? 14 days' notice to end, 2 revision rounds, ~1 hr shoots, first edit in 3 days, invoices due in 14 days, free reschedule with 24 hrs' notice.`,
+    question: `Keep the standard terms? They own the videos once paid, Tui Media can show them in its portfolio, 2 revision rounds, invoices due in 14 days${retainer ? ", 14 days' notice to end" : ''}.`,
     options: opts(
-      { label: 'Keep all the standard terms', detail: '2 revision rounds, 14 days notice, invoices due in 14 days, and the rest' },
+      { label: 'Keep all the standard terms' },
       { label: 'Change some', detail: 'Type what to change' },
     ),
   })
@@ -378,10 +459,7 @@ export function buildContractIntake(
       { label: 'Yes', detail: 'Type it' },
     ),
   })
-  // Drop what cannot apply: a retainer has no deposit to forfeit, and only an
-  // event has coverage hours.
-  const isEvent = jobs.some((j) => /event|wedding|expo|conference/i.test(`${j.job_type ?? ''} ${j.name}`))
-  return q.filter((x) => (x.key !== 'cancellation' || !retainer) && (x.key !== 'event_hours' || isEvent))
+  return q
 }
 
 /** Required keys the brief does not answer. Blank, "?" and "don't know" count as missing. */

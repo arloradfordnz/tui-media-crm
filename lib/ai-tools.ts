@@ -9,7 +9,7 @@ import { syncShootEvent, removeShootEvent } from '@/lib/job-calendar'
 import { nextDocumentNumber, unfilledPlaceholders } from '@/lib/document-templates'
 import { draftContract, reviseContract, quickEditContract, SETTLED_CONTRACT_TERMS, type ContractParties } from '@/lib/contract-drafting'
 import { MEMORY_CATEGORY_KEYS, isMemoryCategory } from '@/lib/ai-memory'
-import { buildProposalIntake, buildContractIntake, type ProposalCtx, PROPOSAL_REQUIRED_KEYS, contractRequiredKeys, missingBriefKeys, briefLines } from '@/lib/drafting-intake'
+import { buildProposalIntake, buildContractIntake, classifyEngagement, CONTRACT_DEFAULT_BRIEF, type Engagement, type ProposalCtx, PROPOSAL_REQUIRED_KEYS, contractRequiredKeys, missingBriefKeys, briefLines } from '@/lib/drafting-intake'
 import { draftProposal, type PriceLine } from '@/lib/proposal-drafting'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { deleteClientAndLeftovers } from '@/lib/client-delete'
@@ -534,11 +534,13 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'prepare_contract',
-    description: 'Step one of every new contract: pulls everything already known about the deal for this client (record, jobs with quotes and dates, existing contracts, their proposals including accepted ones, recent emails) and returns ask_arlo_questions, the complete intake with the record\'s figures as the first options. Pass ask_arlo_questions to ask_arlo as ONE popup before drafting.',
+    description: 'Step one of every new contract: pulls everything already known about the deal (the client record, the job the contract is for with its notes and deliverables, existing contracts, proposals including accepted ones, and the actual emails with the client) and returns engagement_type (what kind of contract the job needs) and ask_arlo_questions, the intake for that kind of contract with what is on record as the first options. Pass ask_arlo_questions to ask_arlo as ONE popup before drafting.',
     input_schema: {
       type: 'object' as const,
       properties: {
         client_id: { type: 'string' },
+        job_id: { type: 'string', description: 'The job this contract is for (search_jobs). Pass it whenever you know it: the contract is shaped by the job, so a one-off event for a client who also has a retainer is drafted as an event. Without it, the client\'s most recent open job is used.' },
+        engagement_type: { type: 'string', enum: ['video_ad_project', 'monthly_retainer', 'event_coverage', 'photography', 'other'], description: 'Only when Arlo has said what kind it is, or corrected the detected kind in the popup. Otherwise it is worked out from the job.' },
       },
       required: ['client_id'],
     },
@@ -560,6 +562,7 @@ export const TOOLS: Anthropic.Tool[] = [
             special_requests: { type: 'string' }, cancellation: { type: 'string' }, event_hours: { type: 'string' },
           },
         },
+        job_id: { type: 'string', description: 'The focus_job id from prepare_contract. The drafter reads the job\'s notes, deliverables and dates, and the client\'s recent emails, as background.' },
         proposal_id: { type: 'string', description: 'When the contract follows a proposal (accepted, sent or draft), its id from prepare_contract. The drafter then works from the proposal\'s exact services, prices, inclusions and payment terms. Works on accepted proposals.' },
         terms: { type: 'string', description: 'Any other agreed facts not in the brief, one per line (shoot locations, dates, platforms, things from a pasted email thread).' },
         client_is_business: { type: 'boolean', description: 'True if the client is a business buying for business purposes (most clients). False for an individual or family (a wedding, a private person), which changes the consumer-law clauses.' },
@@ -1606,14 +1609,32 @@ export async function executeTool(
       const clientId = input.client_id as string
       const [client, jobs, docs, emails, proposalRes] = await Promise.all([
         supabase.from('clients').select('name, legal_name, entity_type, contact_person, email, phone, location, status, client_category, monthly_retainer, shoots_per_month, videos_per_month, retainer_paused_from, notes').eq('id', clientId).single(),
-        supabase.from('jobs').select('id, name, status, job_type, shoot_date, shoot_location, quote_value, notes').eq('client_id', clientId).order('created_at', { ascending: false }).limit(8),
+        supabase.from('jobs').select('id, name, status, job_type, shoot_date, shoot_location, quote_value, notes, deliverables(title)').eq('client_id', clientId).order('created_at', { ascending: false }).limit(8),
         supabase.from('documents').select('id, name, created_at, content').eq('client_id', clientId).eq('doc_type', 'contract').order('created_at', { ascending: false }).limit(5),
         supabase.from('client_emails').select('subject, heading, summary, received_at').eq('client_id', clientId).order('received_at', { ascending: false }).limit(5),
         // Every proposal for this client's jobs, accepted ones included: a
         // contract is often the paperwork that follows an accepted proposal.
-        supabase.from('proposals').select('id, status, cover_note, services, inclusions, payment_terms, total_value, pricing_mode, sent_at, responded_at, created_at, jobs!inner(name, client_id)').eq('jobs.client_id', clientId).order('created_at', { ascending: false }).limit(6),
+        supabase.from('proposals').select('id, status, cover_note, services, inclusions, payment_terms, total_value, pricing_mode, sent_at, responded_at, created_at, job_id, jobs!inner(name, client_id)').eq('jobs.client_id', clientId).order('created_at', { ascending: false }).limit(6),
       ])
       if (client.error || !client.data) return JSON.stringify({ error: client.error ? dbErrorMessage(client.error) : 'No such client.' })
+
+      // The contract is for one job, and that job decides its shape. Arlo's
+      // pick, else the most recent job still in progress, else the newest.
+      type JobRow = { id: string; name: string; status: string; job_type: string | null; shoot_date: string | null; shoot_location: string | null; quote_value: number | null; notes: string | null; deliverables: { title: string }[] }
+      const jobList = (jobs.data ?? []) as JobRow[]
+      const DONE = ['delivered', 'archived', 'handed_over']
+      const focus = (input.job_id ? jobList.find((j) => j.id === input.job_id) : null)
+        ?? jobList.find((j) => !DONE.includes(j.status))
+        ?? jobList[0]
+        ?? null
+      const engagement = ((input.engagement_type as Engagement | undefined) || classifyEngagement(focus, client.data)) as Engagement
+
+      // What was actually said, not just the one-line summaries: the emails
+      // with this client in the inbox, read-only. Best effort, so a slow or
+      // unreachable mailbox costs the emails, not the contract.
+      const inbox = client.data.email
+        ? await readInboxEmails({ search: client.data.email, limit: 4 }).catch(() => [])
+        : []
       const contracts = (docs.data ?? []).map((d: { id: string; name: string; created_at: string; content: string }) => {
         let form: Record<string, unknown> = {}
         try { form = JSON.parse(d.content)?.form ?? {} } catch { /* free text */ }
@@ -1637,25 +1658,32 @@ export async function executeTool(
       // Prefill from the proposal the deal is most likely built on: accepted,
       // then sent, then a draft. Declined ones are shown but never prefilled.
       const rank = (s: string) => ['accepted', 'sent', 'draft'].indexOf(s)
-      const basis = proposals.filter((x) => rank(x.status) >= 0).sort((a, b) => rank(a.status) - rank(b.status))[0]
+      // A proposal for the focus job first, whatever its status rank.
+      const forJob = (proposalRes.data ?? []).filter((r: { job_id?: string }) => focus && r.job_id === focus.id).map((r: { id: string }) => r.id)
+      const basis = proposals
+        .filter((x) => rank(x.status) >= 0)
+        .sort((a, b) => Number(forJob.includes(b.proposal_id)) - Number(forJob.includes(a.proposal_id)) || rank(a.status) - rank(b.status))[0]
       const proposalCtx: ProposalCtx | null = basis
         ? { status: basis.status, job: basis.job, total: basis.total, lines: basis.lines.map((l) => l.description).filter(Boolean), paymentTerms: basis.payment_terms }
         : null
-      const questions = buildContractIntake(client.data, jobs.data ?? [], missing, proposalCtx)
+      const questions = buildContractIntake(client.data, focus, engagement, missing, proposalCtx)
       const unsigned = contracts.filter((k: { signed: boolean }) => !k.signed)
       if (unsigned.length) {
         questions.unshift({ key: 'existing', question: `There's an unsigned contract for ${client.data.name} from ${unsigned[0].created}. Revise that one or start fresh?`, options: [{ label: 'Revise the existing one' }, { label: 'Start a new contract' }] })
       }
       return JSON.stringify({
+        engagement_type: engagement,
+        focus_job: focus,
         client: client.data,
-        jobs: jobs.data ?? [],
+        other_jobs: jobList.filter((j) => j.id !== focus?.id).map(({ id, name, status, shoot_date }) => ({ id, name, status, shoot_date })),
         existing_contracts: contracts,
         recent_client_emails: emails.data ?? [],
+        inbox_emails_with_client: inbox.map((e) => ({ subject: e.subject, from: e.from, date: e.date?.slice(0, 10), text: e.text.slice(0, 1500) })),
         proposals,
         proposal_note: proposals.length ? 'These are this client\'s proposals, accepted ones included (read-only, locked but fully usable as source material). When the contract follows a proposal, pass its proposal_id to create_contract so the drafter works from its exact scope, prices and payment terms, and the first option in the questions already reflects it.' : undefined,
         already_in_every_contract: SETTLED_CONTRACT_TERMS,
         ask_arlo_questions: questions,
-        guidance: 'Call ask_arlo ONCE with ask_arlo_questions as they are (you may sharpen the wording with names from the record or a pasted thread, and drop a question only if Arlo already answered it in this conversation). Do not add small questions of your own and do not split it into several popups. When the answers come back: save any client details with update_client, then call create_contract once with brief keyed by each question key, his answers word for word. If an answer is "Change some" or "Yes" with nothing typed, ask one short follow-up popup about just that before drafting.',
+        guidance: 'The contract is for focus_job and is shaped as engagement_type. If that is the wrong job, call prepare_contract again with the right job_id before asking anything. Read inbox_emails_with_client and the job notes, and sharpen the questions with what they settle (dates, times, venue, deliverables, what the client asked for). Call ask_arlo ONCE with ask_arlo_questions as they are (you may sharpen the wording with names from the record or a pasted thread, and drop a question only if Arlo already answered it in this conversation). Do not add small questions of your own and do not split it into several popups. When the answers come back: save any client details with update_client, then call create_contract once with job_id (focus_job.id), engagement_type, and brief keyed by each question key, his answers word for word. If his answer to engagement names a different kind from engagement_type, call prepare_contract again with that engagement_type and ask only the questions that are new, before drafting. If an answer is "Change some" or "Yes" with nothing typed, ask one short follow-up popup about just that before drafting.',
       })
     }
 
@@ -1666,7 +1694,12 @@ export async function executeTool(
       // One draft, built on a complete brief. Anything unanswered is asked
       // first rather than left to a default that then needs a second draft.
       const engagement = String(input.engagement_type ?? 'other')
-      const brief = (input.brief ?? {}) as Record<string, unknown>
+      // Ownership and portfolio are settled terms, confirmed in standard_terms,
+      // so they are filled here unless Arlo said something different. The
+      // engagement answer is already engagement_type, so it is not a term.
+      const { engagement: _kind, ...given } = (input.brief ?? {}) as Record<string, unknown>
+      void _kind
+      const brief: Record<string, unknown> = { ...CONTRACT_DEFAULT_BRIEF, ...given }
       const gaps = missingBriefKeys(brief, contractRequiredKeys(engagement))
       if (gaps.length) {
         return JSON.stringify({ error: `NOT drafted. The brief is missing: ${gaps.join(', ')}. Call prepare_contract, ask Arlo those questions in one ask_arlo popup, then call create_contract again with every answer in brief.` })
@@ -1693,6 +1726,24 @@ export async function executeTool(
         ].filter(Boolean).join('\n')
       }
       const terms = [briefLines(brief), String(input.terms ?? '').trim(), proposalBlock].filter(Boolean).join('\n')
+
+      // Background: the job and what the client has said, so specifics (the
+      // event name, venue, dates, what they asked for) come from the record
+      // instead of a retelling. The agreed terms above always win over it.
+      const [jobRes, mailRes] = await Promise.all([
+        input.job_id
+          ? supabase.from('jobs').select('name, job_type, shoot_date, shoot_location, quote_value, notes, deliverables(title)').eq('id', input.job_id as string).eq('client_id', client.id).maybeSingle()
+          : Promise.resolve({ data: null }),
+        supabase.from('client_emails').select('heading, summary, received_at').eq('client_id', client.id).order('received_at', { ascending: false }).limit(6),
+      ])
+      const bgJob = jobRes.data as { name: string; job_type: string | null; shoot_date: string | null; shoot_location: string | null; quote_value: number | null; notes: string | null; deliverables: { title: string }[] | null } | null
+      const background = [
+        bgJob && `The job: "${bgJob.name}"${bgJob.job_type ? ` (${bgJob.job_type})` : ''}${bgJob.shoot_date ? `, shoot or event date ${bgJob.shoot_date.slice(0, 10)}` : ''}${bgJob.shoot_location ? `, at ${bgJob.shoot_location}` : ''}${bgJob.quote_value ? `, quoted $${bgJob.quote_value}` : ''}`,
+        bgJob?.deliverables?.length ? `Deliverables on the job: ${bgJob.deliverables.map((d) => d.title).join('; ')}` : '',
+        bgJob?.notes ? `Job notes: ${bgJob.notes.slice(0, 1500)}` : '',
+        ...((mailRes.data ?? []) as { heading: string; summary: string | null; received_at: string }[])
+          .map((e) => `Client email ${e.received_at.slice(0, 10)}: ${e.heading}${e.summary ? `. ${e.summary}` : ''}`),
+      ].filter(Boolean).join('\n')
 
       // The parties clause and the signature block print these, so a guess
       // would put the wrong entity or person on a signed contract. They come
@@ -1729,6 +1780,7 @@ export async function executeTool(
           clientIsBusiness: input.client_is_business !== false,
         },
         terms: `Engagement type: ${String(input.engagement_type ?? 'other').replace(/_/g, ' ')}\n${terms}`,
+        background,
         today,
       })
       if ('error' in drafted) return JSON.stringify({ error: drafted.error })
