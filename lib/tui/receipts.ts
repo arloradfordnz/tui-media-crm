@@ -136,6 +136,7 @@ const TOOL_VERBS: Record<string, string> = {
   remove_xero_payment: 'Removing Xero payment',
   update_xero_invoice: 'Updating Xero invoice',
   list_recent_emails: 'Reading recent email',
+  read_emails: 'Reading email',
   get_content_backlog: 'Checking retainer backlog',
   snooze_flag: 'Snoozing that',
   resolve_flag: 'Marking that resolved',

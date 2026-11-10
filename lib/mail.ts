@@ -360,6 +360,51 @@ export async function fetchInboxForClientSync(
   })
 }
 
+/** Inbox messages WITH their text, for when Arlo asks Tui to read or summarise
+ *  mail. Newest first. Optional `search` matches subject or sender. Uses the
+ *  same read-only lock and BODY.PEEK download as the client sync, so nothing
+ *  here marks a message \\Seen. Text is returned to the caller and never stored. */
+export async function readInboxEmails(opts: { limit?: number; search?: string; unreadOnly?: boolean } = {}): Promise<(EmailSummary & { text: string })[]> {
+  const limit = Math.min(Math.max(opts.limit ?? 5, 1), 10)
+  const needle = opts.search?.toLowerCase().trim()
+  const result = await withClient(async (client) => {
+    const found: { uid: number; summary: EmailSummary; structure?: StructureNode }[] = []
+    const lock = await client.getMailboxLock('INBOX', { readOnly: true })
+    const out: (EmailSummary & { text: string })[] = []
+    try {
+      const total = (await client.status('INBOX', { messages: true })).messages ?? 0
+      if (total === 0) return out
+      const start = Math.max(1, total - 150 + 1)
+      for await (const msg of client.fetch(`${start}:${total}`, {
+        uid: true, envelope: true, flags: true, bodyStructure: true, headers: BULK_HEADERS,
+      })) {
+        const raw = msg.headers?.toString('utf8').toLowerCase() ?? ''
+        const summary: EmailSummary = {
+          subject: msg.envelope?.subject ?? '(no subject)',
+          from: msg.envelope?.from?.[0]?.address ?? msg.envelope?.from?.[0]?.name ?? 'unknown',
+          date: msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : null,
+          unread: !msg.flags?.has('\\Seen'),
+          flagged: !!msg.flags?.has('\\Flagged'),
+          bulk: BULK_HEADERS.some((h) => raw.includes(`${h}:`)),
+          to: [],
+        }
+        if (opts.unreadOnly && !summary.unread) continue
+        if (needle && !`${summary.subject} ${summary.from}`.toLowerCase().includes(needle)) continue
+        found.push({ uid: msg.uid, summary, structure: msg.bodyStructure as StructureNode | undefined })
+      }
+      // Bodies after the envelope loop: imapflow can't run a second command mid-fetch.
+      for (const h of found.reverse().slice(0, limit)) {
+        const part = pickTextPart(h.structure)
+        out.push({ ...h.summary, text: part ? await readPartText(client, h.uid, part) : '' })
+      }
+    } finally {
+      lock.release()
+    }
+    return out
+  })
+  return result ?? []
+}
+
 /** True only if login actually succeeds — used by the daily heartbeat to report real connectivity, not just "no results". */
 export async function checkMailConnection(): Promise<boolean> {
   const result = await withClient(async () => true)
