@@ -3965,13 +3965,14 @@ textarea.field-input::-webkit-scrollbar-track { margin-block: 14px; }
    rows. Rendered by components/DocumentBody.tsx. */
 .doc-body { display: flex; flex-direction: column; gap: 28px; max-width: 68ch; }
 .doc-section { display: flex; flex-direction: column; gap: 10px; }
-.doc-section > .prop-h { margin-bottom: 2px; }
+.doc-section > .prop-h, .doc-approval > .prop-h { font-size: var(--t-lg); font-weight: 600; letter-spacing: -0.01em; text-transform: none; color: var(--text-primary); margin-bottom: 2px; }
 .doc-h3 { font-size: var(--t-md); font-weight: 600; color: var(--text-primary); margin-top: 6px; }
 .doc-para, .doc-clause { font-size: var(--t-md); line-height: 1.65; color: var(--text-secondary); }
 .doc-para strong, .doc-clause strong, .doc-fact dd strong { font-weight: 600; color: var(--text-primary); }
 .doc-clause { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 4px; }
 .doc-clause-num { color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
 .doc-facts { margin: 0; border-top: 1px solid var(--bg-border); }
+.doc-fact:last-child { border-bottom: 0; }
 .doc-fact { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--bg-border); }
 .doc-fact dt { font-size: var(--t-sm); color: var(--text-tertiary); padding-top: 1px; }
 .doc-fact dd { margin: 0; font-size: var(--t-md); line-height: 1.5; color: var(--text-primary); }
@@ -4018,17 +4019,52 @@ textarea.field-input::-webkit-scrollbar-track { margin-block: 14px; }
 .revise-error { margin: 2px 8px 4px 31px; font-size: var(--t-xs); color: var(--danger); }
 .doc-locked { display: inline-flex; align-items: center; gap: 8px; font-size: var(--t-sm); color: var(--text-secondary); }
 
-/* Client portal: a document card. Name and status on one line, the actions on
-   their own row underneath, so on a phone the buttons never squeeze the name
-   down to a letter. Opened, it shows the same sheet as the document page. */
-.portal-doc-head { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; }
-.portal-doc-title { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.portal-doc-name { font-size: var(--t-md); font-weight: 600; color: var(--text-primary); overflow-wrap: anywhere; }
+/* Client portal: a document. Closed, it is one quiet row (icon, name, date,
+   status). Opened, the contract sits on its own sheet of paper, and signing
+   happens at the end of it, where the reader finishes, not above the text. */
+.portal-doc { background: var(--bg-surface); border-radius: var(--r-xl); contain: layout style; transition: box-shadow var(--dur-fast) ease; }
+.portal-doc.is-open { box-shadow: inset 0 0 0 1px var(--bg-border); }
+.portal-doc-head { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto auto; grid-template-areas: 'icon title status chev'; align-items: center; column-gap: 14px; width: 100%; padding: 18px 20px; text-align: left; border-radius: var(--r-xl); cursor: pointer; }
+.portal-doc-icon { grid-area: icon; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: var(--r-sm); background: var(--bg-elevated); color: var(--accent); }
+.portal-doc-title { grid-area: title; display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.portal-doc-name { font-size: var(--t-lg); font-weight: 600; letter-spacing: -0.01em; color: var(--text-primary); overflow-wrap: anywhere; }
 .portal-doc-meta { font-size: var(--t-xs); color: var(--text-tertiary); }
-.portal-doc-badge { align-self: flex-start; margin-top: 6px; }
-.portal-doc-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-left: 28px; }
-.portal-doc-open { margin-top: 18px; padding-top: 22px; border-top: 1px solid var(--bg-border); display: flex; flex-direction: column; gap: 16px; }
-@media (max-width: 520px) {
-  .portal-doc-actions { padding-left: 0; }
-  .portal-doc-actions > * { flex: 1; }
+.portal-doc-status { grid-area: status; justify-self: start; display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0; padding: 5px 11px; border-radius: 999px; font-size: var(--t-xs); font-weight: 600; white-space: nowrap; }
+.portal-doc-status::before { content: ''; width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+.portal-doc-status.is-pending { color: var(--warning); background: color-mix(in srgb, var(--warning) 13%, transparent); }
+.portal-doc-status.is-done { color: var(--success); background: color-mix(in srgb, var(--success) 13%, transparent); }
+.portal-doc-chevron { grid-area: chev; width: 16px; height: 16px; flex-shrink: 0; color: var(--text-tertiary); transition: transform var(--dur-fast) ease; }
+.portal-doc.is-open .portal-doc-chevron { transform: rotate(180deg); }
+.portal-doc-open { display: flex; flex-direction: column; gap: 14px; padding: 0 12px 12px; }
+.portal-doc-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 8px; font-size: var(--t-sm); color: var(--text-tertiary); }
+.portal-paper { background: var(--bg-base); border-radius: var(--r-lg); padding: clamp(22px, 5vw, 44px); }
+.portal-paper .doc-body, .portal-paper .doc-approval { max-width: none; }
+
+.portal-sign { display: flex; flex-direction: column; gap: 18px; padding: clamp(20px, 4vw, 28px); border-radius: var(--r-lg); background: var(--bg-elevated); }
+.portal-sign-title { font-size: var(--t-h3); font-weight: 600; letter-spacing: -0.02em; color: var(--text-primary); }
+.portal-sign-copy { margin-top: 4px; font-size: var(--t-md); line-height: 1.55; color: var(--text-secondary); max-width: 52ch; }
+.portal-sign-field { display: flex; flex-direction: column; gap: 8px; }
+.portal-sign-input { width: 100%; background: transparent; border: 0; border-bottom: 1px solid var(--text-tertiary); border-radius: 0; padding: 6px 0 10px; font-size: 26px; font-weight: 600; letter-spacing: -0.01em; color: var(--text-primary); outline: none; transition: border-color var(--dur-fast) ease; }
+.portal-sign-input::placeholder { color: var(--text-tertiary); font-weight: 400; opacity: 0.6; }
+.portal-sign-input:focus { border-bottom-color: var(--accent); }
+.portal-sign-rule { font-size: var(--t-xs); color: var(--text-tertiary); }
+.portal-sign-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.portal-signed { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: var(--r-lg); background: color-mix(in srgb, var(--success) 10%, transparent); }
+.portal-signed-tick { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 999px; background: var(--success); color: var(--bg-base); }
+.portal-signed-title { font-size: var(--t-md); font-weight: 600; color: var(--text-primary); }
+.portal-signed-meta { margin-top: 2px; font-size: var(--t-xs); color: var(--text-tertiary); overflow-wrap: anywhere; }
+
+.portal-feedback { display: flex; flex-direction: column; gap: 8px; padding: 4px 8px 0; }
+.portal-feedback-label { font-size: var(--t-xs); font-weight: 600; color: var(--text-tertiary); }
+.portal-feedback-item { padding: 12px 14px; border-radius: var(--r-md); background: var(--bg-elevated); }
+.portal-feedback-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 4px; font-size: var(--t-xs); color: var(--text-tertiary); }
+.portal-feedback-head span:first-child { font-weight: 600; color: var(--text-primary); }
+.portal-feedback-item p { font-size: var(--t-md); line-height: 1.5; color: var(--text-primary); white-space: pre-wrap; }
+.portal-feedback-form { display: flex; flex-direction: column; gap: 10px; padding: 4px 8px 8px; }
+
+@media (max-width: 560px) {
+  .portal-doc-head { grid-template-columns: 40px minmax(0, 1fr) auto; grid-template-areas: 'icon title chev' '. status .'; row-gap: 10px; padding: 16px; }
+  .portal-doc-open { padding: 0 8px 8px; }
+  .portal-sign-actions > * { flex: 1; }
 }

@@ -48,9 +48,9 @@ Every agreement follows the rules in this brief, but it is written for this clie
 
 The client is usually a small business in Nelson. A long contract scares them off, makes them ask whether they need a lawyer, and protects Tui Media no better than a short one. A good lawyer's short agreement covers every risk in a few words each. So:
 
-- The whole document, signatures included, must fit on 2 to 3 A4 pages. That means the body is 550 to 850 words. This is a hard limit, not a target: count before you finish, and if you are over 850, cut until you are under. A draft over 900 words is sent back to be shortened.
-- It opens with a short "At a glance" summary, so the client sees the whole deal before any legal wording. Then 7 short sections, each with the clause budget given under HOW TO STRUCTURE IT.
-- One sentence per clause where possible, two at most. Never write a clause that only repeats the law or common sense.
+- The whole document, signatures included, must fit on 2 A4 pages. That means the body is 400 to 600 words. This is a hard limit, not a target: count before you finish, and if you are over 600, cut until you are under. A draft over 650 words is sent back to be shortened. Shorter is better whenever nothing protective is lost.
+- It opens with a short "At a glance" summary, so the client sees the whole deal before any legal wording. Then 7 short sections, each with the clause budget given under HOW TO STRUCTURE IT (14 clauses in all, at most).
+- One sentence per clause, about 35 words at most. Two sentences only where a FIRM POSITION genuinely needs them. Never write a clause that only repeats the law or common sense, and never explain why a term exists.
 - Never restate in a clause a fact the summary already gives (the fee, the parties, the contact, the notice period). The summary is part of the agreement: clauses add only the rules around those facts.
 - No definitions section and no definitions inside clauses. Never define "Business Day" or anything else everyone understands. Write "working days". Use plain words ("the videos", "the fee").
 - No housekeeping a court implies anyway: no survival clause, no severability clause, no notices clause beyond the main contact line in the summary, no counterparts clause beyond the words "can be signed electronically".
@@ -77,33 +77,33 @@ Start with the summary, unnumbered, one fact per line as its own paragraph with 
 
 Then these sections, numbered, in this order, with no more clauses than the number given. Leave one out only if it genuinely does not apply.
 
-# 1. The work (4 clauses)
+# 1. The work (3 clauses)
 
-1.1 what Tui Media will make: the videos, lengths, formats, platforms, the shoot length and place, and the stages for a one-off project. 1.2 delivery of the first edit through the client portal, the revision rounds (a round is one set of changes to the existing edit; a new idea or reshoot is extra work), the feedback period and deemed approval, all in two sentences. 1.3 what is not included, and that extra work is quoted and agreed in writing first. 1.4 the Client gives access to the location, people and products, and dates move if the Client is late with access, feedback or payment.
+1.1 what Tui Media will make: the videos, lengths, formats, platforms, the shoot length and place, and the stages for a one-off project. 1.2 delivery of the first edit through the client portal, the revision rounds (a round is one set of changes to the existing edit; a new idea or reshoot is extra work), the feedback period and deemed approval, all in two sentences. 1.3 what is not included and that extra work is quoted first; the Client gives access to the location, people and products, and dates move if the Client is late with access, feedback or payment.
 
 # 2. Fees and payment (2 clauses)
 
 2.1 any deposit (one-off projects only), when invoices are sent and paid (bank transfer), and that expenses are payable only if agreed in writing first. If the deal has a travel fee, this clause is where it is agreed in writing: one sentence naming the included places and the flat fee per shoot beyond them. 2.2 Tui Media may pause work while an invoice is overdue. The no-GST point is already in the summary: do not repeat it.
 
-# 3. Shoots and cancellations (2 clauses)
+# 3. Shoots and cancellations (1 clause)
 
-3.1 reschedule notice. 3.2 the rollover rules from FIRM POSITIONS in as few sentences as hold them all (or, for a one-off project, what happens to a cancelled shoot and to a deposit).
+3.1 reschedule notice and the rollover rules from FIRM POSITIONS in as few words as hold them all (or, for a one-off project, what happens to a cancelled shoot and to a deposit).
 
 # 4. Ownership (2 clauses)
 
 4.1 on payment of the fee for that work, copyright in the final videos passes to the Client (or a licence, if that is the deal); Tui Media keeps the raw footage but sends it on request once paid, and the Client may use it for its own business. 4.2 Tui Media may show the work in its portfolio unless the Client asks in writing for it to be left out; licensed music and stock are for the agreed use only; Tui Media consents to the Client editing the videos without credit.
 
-# 5. Responsibilities (2 clauses)
+# 5. Responsibilities (1 clause)
 
-5.1 the Client gets permission from staff, customers and anyone else filmed at its premises (Privacy Act 2020), has the right to anything it supplies, and tells Tui Media about site hazards (Health and Safety at Work Act 2015); Tui Media may stop filming if a site is unsafe and uses footage of people only for this agreement. 5.2 both keep the other's business information confidential; files are kept for the storage period and Tui Media is not a backup service.
+5.1 the Client gets permission from anyone filmed at its premises (Privacy Act 2020), has the right to anything it supplies, and tells Tui Media about site hazards (Health and Safety at Work Act 2015); Tui Media may stop filming if a site is unsafe. Confidentiality and the storage period go in 7.3.
 
-# 6. Ending the agreement (3 clauses)
+# 6. Ending the agreement (2 clauses)
 
-The FIRM POSITIONS on ending, nothing more. The 14 days' notice is in the summary, so 6.1 only adds that the agreement ends when the notice expires, and the serious breach right.
+The FIRM POSITIONS on ending, nothing more. The 14 days' notice is in the summary, so 6.1 only adds the serious breach right, and 6.2 covers payment for work done and the deliver-or-refund choice.
 
 # 7. General (3 clauses)
 
-7.1 no guarantee of views, sales or other results; each party's liability is capped (the fee for a one-off job, or the fees paid in the 3 months before the claim for monthly work) and excludes indirect loss and lost profits, except where the law does not allow it. 7.2 the CGA/FTA business clause as ONE sentence (name the Acts and sections, say both are in trade and it is fair and reasonable), or for an individual the consumer clause. 7.3 one sentence folding in the rest: Tui Media is an independent contractor; neither party is liable for delay outside its control; this is the whole agreement and changes must be in writing; disputes are talked through first, then mediation in Nelson; New Zealand law applies; it can be signed electronically. Advertising terms, only if Tui Media is running ads, go in 1.1 as a few words (ad spend paid by the Client direct to the platform, the Client owns the ad account).
+7.1 no guarantee of views, sales or other results; each party's liability is capped (the fee for a one-off job, or the fees paid in the 3 months before the claim for monthly work) and excludes indirect loss and lost profits, except where the law does not allow it. 7.2 the CGA/FTA business clause as ONE sentence (name the Acts and sections, say both are in trade and it is fair and reasonable), or for an individual the consumer clause. 7.3 one or two sentences folding in the rest: both keep the other's business information confidential; files are kept for the storage period; Tui Media is an independent contractor; neither party is liable for delay outside its control; this is the whole agreement and changes must be in writing; disputes are talked through first, then mediation in Nelson; New Zealand law applies; it can be signed electronically. Advertising terms, only if Tui Media is running ads, go in 1.1 as a few words (ad spend paid by the Client direct to the platform, the Client owns the ad account).
 
 # FIRM POSITIONS
 
@@ -293,13 +293,14 @@ async function runDrafter(system: string, user: string): Promise<DraftResult> {
 }
 
 // A real retainer (Marty's Meats) came back at about 1,450 words and 6 pages,
-// which is too much to put in front of a small Nelson business. The brief now
-// asks for 550 to 850 words, which with the signatures is 2 to 3 A4 pages, and
+// which is too much to put in front of a small Nelson business. 550 to 850
+// words was still too long for Arlo (November 2026), so the brief now asks for
+// 400 to 600 words, which with the signatures is 2 A4 pages, and
 // the limit is enforced here as well: a draft over the ceiling gets one
 // tightening pass before it is saved. If that pass fails, the longer draft is
 // kept rather than losing the contract altogether. The chat route allows 300s,
 // which covers two passes.
-const WORD_CEILING = 950
+const WORD_CEILING = 680
 
 function wordCount(text: string): number {
   return text.split(/\s+/).filter(Boolean).length
@@ -309,7 +310,7 @@ async function keepWithinLength(draft: DraftResult): Promise<DraftResult> {
   if ('error' in draft) return draft
   const words = wordCount(draft.body)
   if (words <= WORD_CEILING) return draft
-  const tightened = await runDrafter(CONTRACT_DRAFTING_BRIEF, `This agreement is ${words} words. The limit is 850, so that it fits on 2 to 3 pages. Shorten it to between 550 and 850 words.
+  const tightened = await runDrafter(CONTRACT_DRAFTING_BRIEF, `This agreement is ${words} words. The limit is 600, so that it fits on 2 pages. Shorten it to between 400 and 600 words.
 
 Keep the At a glance summary, every FIRM POSITION, every number and name, and everything LENGTH AND SHAPE says must never be cut. Cut by merging clauses, shortening wording, keeping to the clause budgets, and removing anything the brief says to leave out (definitions, survival and housekeeping clauses, facts the summary already gives, repetition). Do not drop a protection. Keep the same section headings and renumber clauses so they run in order.
 

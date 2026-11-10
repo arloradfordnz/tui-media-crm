@@ -4,7 +4,7 @@ import { useActionState, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { approveDelivery, markViewed, markDownloaded, requestDeliverableRevision, recordDocumentView } from '@/app/actions/portal'
 import { signDocumentByClient, submitDocumentFeedback } from '@/app/actions/documents'
-import DocumentSheet from '@/components/DocumentSheet'
+import DocumentSheet, { longDate } from '@/components/DocumentSheet'
 import { statusLabel, statusBadgeClass, formatDate, formatNZD, firstName } from '@/lib/format'
 import Image from 'next/image'
 import { Briefcase, FileText, ScrollText, ArrowUpRight, Film, Image as ImageIcon, File, Music, Download, ChevronDown, ChevronRight, Check, MessageSquare, PenLine, Archive } from 'lucide-react'
@@ -558,7 +558,6 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
     void recordDocumentView(doc.id, portalToken)
   }, [expanded, doc.id, portalToken])
   const [generating, setGenerating] = useState(false)
-  const [signing, setSigning] = useState(false)
   const [signatureInput, setSignatureInput] = useState('')
   const [signState, signAction, signPending] = useActionState(signDocumentByClient, undefined)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
@@ -629,10 +628,7 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
   const [handledSign, setHandledSign] = useState(signState)
   if (signState !== handledSign) {
     setHandledSign(signState)
-    if (signState?.success) {
-      setSigning(false)
-      setSignatureInput('')
-    }
+    if (signState?.success) setSignatureInput('')
   }
   useEffect(() => {
     // Refresh to show the signed state and pick up updated content
@@ -663,157 +659,138 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
     setGenerating(false)
   }
 
+  const docLabel = parsed?.template ?? statusLabel(doc.docType)
+  const status = doc.docType === 'contract' && parsed
+    ? (isSigned ? { label: 'Signed', tone: 'is-done' } : { label: 'Needs your signature', tone: 'is-pending' })
+    : null
+  const signedWhen = parsed?.form.clientSignedAtISO
+    ? new Date(parsed.form.clientSignedAtISO).toLocaleString('en-NZ', {
+        day: 'numeric', month: 'long', year: 'numeric',
+        hour: 'numeric', minute: '2-digit',
+        timeZone: 'Pacific/Auckland', timeZoneName: 'short',
+      })
+    : parsed?.form.clientSignedAt ?? ''
+
   return (
-    <div className="card portal-doc">
+    <div className={`portal-doc${expanded ? ' is-open' : ''}`}>
       <button onClick={() => setExpanded((v) => !v)} className="portal-doc-head" aria-expanded={expanded}>
-        <FileText className="w-4 h-4 shrink-0" style={{ color: 'var(--accent)' }} />
+        <span className="portal-doc-icon"><FileText className="w-4 h-4" /></span>
         <span className="portal-doc-title">
           <span className="portal-doc-name">{doc.name}</span>
-          <span className="portal-doc-meta">{statusLabel(doc.docType)} · {formatDate(doc.updatedAt)}</span>
-          {doc.docType === 'contract' && parsed && (
-            <span className={`badge ${isSigned ? 'badge-success' : 'badge-warning'} portal-doc-badge`}>{isSigned ? 'Signed' : 'Needs your signature'}</span>
-          )}
+          <span className="portal-doc-meta">{docLabel} · Updated {longDate(doc.updatedAt)}</span>
         </span>
-        {expanded
-          ? <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
-          : <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />}
+        {status && <span className={`portal-doc-status ${status.tone}`}>{status.label}</span>}
+        <ChevronDown className="portal-doc-chevron" />
       </button>
-      <div className="portal-doc-actions">
-        {canSign && (
-          <button onClick={() => { setExpanded(true); setSigning(true) }} className="btn-primary btn-sm">
-            <PenLine className="w-3.5 h-3.5" /> Sign
-          </button>
-        )}
-        <button onClick={handleDownload} disabled={generating} className="btn-secondary btn-sm">
-          <Download className="w-3.5 h-3.5" /> {generating ? 'Preparing…' : 'Download PDF'}
-        </button>
-      </div>
 
       {expanded && (
         <div className="portal-doc-open">
-          {parsed ? (
-            <div className="space-y-4 text-sm" style={{ color: 'var(--text-primary)' }}>
-              <div className="portal-doc-sheet">
-                <DocumentSheet template={sheetTemplate} form={sheetForm} title={parsed.form.jobDescription || doc.name} />
+          <div className="portal-doc-toolbar">
+            <span>{canSign ? 'Read it through, then sign at the bottom.' : isSigned ? 'Signed and binding. A copy is below.' : 'Your copy'}</span>
+            <button onClick={handleDownload} disabled={generating} className="btn-ghost btn-sm">
+              <Download className="w-3.5 h-3.5" /> {generating ? 'Preparing…' : 'PDF'}
+            </button>
+          </div>
+
+          <article className="portal-paper">
+            <DocumentSheet template={sheetTemplate} form={sheetForm} title={parsed ? (parsed.form.jobDescription || doc.name) : doc.name} />
+          </article>
+
+          {isSigned && parsed && (
+            <div className="portal-signed">
+              <span className="portal-signed-tick"><Check className="w-4 h-4" /></span>
+              <div className="min-w-0">
+                <p className="portal-signed-title">Signed by {parsed.form.clientSignature}</p>
+                {/* The audit trail is the thing that makes this defensible,
+                    so it is shown rather than merely stored: who, exactly
+                    when (to the minute, with timezone), and from where. */}
+                <p className="portal-signed-meta">
+                  {[signedWhen, parsed.form.clientSignedIp && `IP ${parsed.form.clientSignedIp}`].filter(Boolean).join(' · ')}
+                </p>
               </div>
+            </div>
+          )}
 
-              {isSigned && (
-                <div className="rounded-lg p-4 flex items-start gap-3" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)' }}>
-                  <Check className="w-4 h-4 shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
-                  <div>
-                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Signed by {parsed.form.clientSignature}</p>
-                    {/* The audit trail is the thing that makes this defensible,
-                        so it is shown rather than merely stored: who, exactly
-                        when (to the minute, with timezone), and from where. */}
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-                      {parsed.form.clientSignedAtISO
-                        ? new Date(parsed.form.clientSignedAtISO).toLocaleString('en-NZ', {
-                            day: 'numeric', month: 'long', year: 'numeric',
-                            hour: 'numeric', minute: '2-digit',
-                            timeZone: 'Pacific/Auckland', timeZoneName: 'short',
-                          })
-                        : parsed.form.clientSignedAt}
-                    </p>
-                    {parsed.form.clientSignedIp && (
-                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-                        IP {parsed.form.clientSignedIp}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {parsed.feedback && parsed.feedback.length > 0 && (
-                <div className="space-y-2">
-                  <p className="label">Your feedback</p>
-                  {parsed.feedback.map((fb, i) => (
-                    <div key={i} className="rounded-lg p-3" style={{ background: 'var(--bg-elevated)' }}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <MessageSquare className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
-                        <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{fb.author}</span>
-                        <span className="text-xs ml-auto" style={{ color: 'var(--text-tertiary)' }}>{formatDate(fb.createdAt)}</span>
-                      </div>
-                      <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{fb.message}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {!feedbackOpen ? (
-                <button onClick={() => setFeedbackOpen(true)} className="btn-secondary btn-sm">
-                  <MessageSquare className="w-3.5 h-3.5" /> Leave feedback
+          {canSign && parsed && (
+            <form action={signAction} className="portal-sign">
+              <input type="hidden" name="docId" value={doc.id} />
+              <input type="hidden" name="portalToken" value={portalToken} />
+              <div>
+                <h3 className="portal-sign-title">Sign this {parsed.template.toLowerCase() || 'document'}</h3>
+                <p className="portal-sign-copy">Type your full name below. By signing, you confirm you have read and agree to the terms above.</p>
+              </div>
+              {/* A typed name on a signing rule, not a handwriting face: a
+                  script font imitating ink invites "did they actually write
+                  that", and the honest answer is no. A typed name that looks
+                  typed, above a printed audit trail, is what holds up. */}
+              <label className="portal-sign-field">
+                <input
+                  name="signature"
+                  value={signatureInput}
+                  onChange={(e) => setSignatureInput(e.target.value)}
+                  placeholder="Your full name"
+                  className="portal-sign-input"
+                  autoComplete="name"
+                />
+                <span className="portal-sign-rule">Signature · {longDate(new Date().toISOString())}</span>
+              </label>
+              {signState?.error && <p className="text-xs" style={{ color: 'var(--danger)' }}>{signState.error}</p>}
+              <div className="portal-sign-actions">
+                <button type="submit" disabled={signPending || !signatureInput.trim()} className="btn-primary">
+                  <PenLine className="w-4 h-4" /> {signPending ? 'Signing…' : 'Sign contract'}
                 </button>
-              ) : (
-                <form action={fbAction} className="rounded-lg p-4 space-y-3" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)' }}>
-                  <input type="hidden" name="docId" value={doc.id} />
-                  <input type="hidden" name="portalToken" value={portalToken} />
-                  <label className="label block">Your feedback</label>
-                  <textarea
-                    name="message"
-                    rows={4}
-                    required
-                    value={feedbackInput}
-                    onChange={(e) => setFeedbackInput(e.target.value)}
-                    className="field-input w-full"
-                    placeholder="Questions, suggested changes, or anything else you'd like to flag about this document..."
-                  />
-                  {fbState?.error && <p className="text-xs" style={{ color: 'var(--danger)' }}>{fbState.error}</p>}
-                  <div className="flex gap-2">
-                    <button type="submit" disabled={fbPending || !feedbackInput.trim()} className="btn-primary btn-sm">
-                      {fbPending ? 'Sending...' : 'Send feedback'}
-                    </button>
-                    <button type="button" onClick={() => { setFeedbackOpen(false); setFeedbackInput('') }} className="btn-secondary btn-sm">Cancel</button>
-                  </div>
-                </form>
-              )}
+                {!feedbackOpen && (
+                  <button type="button" onClick={() => setFeedbackOpen(true)} className="btn-secondary">
+                    <MessageSquare className="w-4 h-4" /> Ask a question
+                  </button>
+                )}
+              </div>
+            </form>
+          )}
 
-              {canSign && signing && (
-                <form action={signAction} className="rounded-lg p-4 space-y-3" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--bg-border)' }}>
-                  <input type="hidden" name="docId" value={doc.id} />
-                  <input type="hidden" name="portalToken" value={portalToken} />
-                  <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                    Type your full name to sign this {parsed.template.toLowerCase() || 'document'}. By signing, you confirm you have read and agree to the terms above.
-                  </p>
-                  <input
-                    name="signature"
-                    value={signatureInput}
-                    onChange={(e) => setSignatureInput(e.target.value)}
-                    placeholder="Your full name"
-                    className="input w-full"
-                    autoComplete="off"
-                    autoFocus
-                  />
-                  {signatureInput && (
-                    <div className="signature-preview">
-                      {/* Rendered as a typed name on a signing rule, not in a
-                          handwriting face. A script font imitating ink is the
-                          weaker artefact of the two: it invites the question
-                          "did they actually write that", and the honest answer
-                          is no — they typed it. A typed name that looks typed,
-                          sitting above a printed audit trail, is what actually
-                          holds up. */}
-                      <p className="signature-name">{signatureInput}</p>
-                      <p className="signature-rule-label">Signature</p>
-                    </div>
-                  )}
-                  {signState?.error && (
-                    <p className="text-xs" style={{ color: 'var(--danger)' }}>{signState.error}</p>
-                  )}
-                  <div className="flex gap-2">
-                    <button type="submit" disabled={signPending || !signatureInput.trim()} className="btn-primary btn-sm">
-                      <Check className="w-3.5 h-3.5" /> {signPending ? 'Signing...' : 'Sign Document'}
-                    </button>
-                    <button type="button" onClick={() => { setSigning(false); setSignatureInput('') }} className="btn-secondary btn-sm">
-                      Cancel
-                    </button>
+          {(parsed?.feedback.length ?? 0) > 0 && (
+            <div className="portal-feedback">
+              <p className="portal-feedback-label">Your notes to Tui Media</p>
+              {parsed!.feedback.map((fb, i) => (
+                <div key={i} className="portal-feedback-item">
+                  <div className="portal-feedback-head">
+                    <span>{fb.author}</span>
+                    <span>{formatDate(fb.createdAt)}</span>
                   </div>
-                </form>
-              )}
+                  <p>{fb.message}</p>
+                </div>
+              ))}
             </div>
-          ) : (
-            <div className="portal-doc-sheet">
-              <DocumentSheet template={sheetTemplate} form={sheetForm} title={doc.name} />
-            </div>
+          )}
+
+          {feedbackOpen ? (
+            <form action={fbAction} className="portal-feedback-form">
+              <input type="hidden" name="docId" value={doc.id} />
+              <input type="hidden" name="portalToken" value={portalToken} />
+              <label className="portal-feedback-label" htmlFor={`fb-${doc.id}`}>Ask a question or suggest a change</label>
+              <textarea
+                id={`fb-${doc.id}`}
+                name="message"
+                rows={3}
+                required
+                autoFocus
+                value={feedbackInput}
+                onChange={(e) => setFeedbackInput(e.target.value)}
+                className="field-input w-full"
+                placeholder={canSign ? "Anything you'd like to check or change before signing…" : "Anything you'd like to flag about this document…"}
+              />
+              {fbState?.error && <p className="text-xs" style={{ color: 'var(--danger)' }}>{fbState.error}</p>}
+              <div className="flex gap-2">
+                <button type="submit" disabled={fbPending || !feedbackInput.trim()} className="btn-primary btn-sm">
+                  {fbPending ? 'Sending…' : 'Send'}
+                </button>
+                <button type="button" onClick={() => { setFeedbackOpen(false); setFeedbackInput('') }} className="btn-ghost btn-sm">Cancel</button>
+              </div>
+            </form>
+          ) : !canSign && (
+            <button onClick={() => setFeedbackOpen(true)} className="btn-ghost btn-sm self-start">
+              <MessageSquare className="w-3.5 h-3.5" /> Ask a question
+            </button>
           )}
         </div>
       )}
