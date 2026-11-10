@@ -7,7 +7,7 @@ import { getAttention, type AttentionItem, type WeekEvent } from '@/lib/attentio
 import { CheckCircle2, Plus, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import Greeting from './Greeting'
-import MarkDoneButton from './MarkDoneButton'
+import RowControls from './RowControls'
 import MoneyPanel, { MoneyPanelSkeleton } from './MoneyPanel'
 import SubscriptionsPanel, { getSubscriptions } from './SubscriptionsPanel'
 import TuiThread from '@/components/TuiThread'
@@ -144,7 +144,7 @@ export default async function DashboardPage() {
               <div className="today-empty">
                 <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--success)' }} />
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  Nothing booked this week, and nothing overdue or stalled. Genuinely clear.
+                  Nothing booked this week and nothing waiting on you.
                 </p>
               </div>
             ) : null}
@@ -204,7 +204,7 @@ function AttentionRow({ item }: { item: AttentionItem }) {
         {item.meta && <span className="attention-meta">{item.meta}</span>}
       </div>
       <div className="attention-actions">
-        {item.doneEmailId && <MarkDoneButton emailId={item.doneEmailId} />}
+        <RowControls itemKey={item.key} taskId={item.doneTaskId} emailId={item.doneEmailId} />
         <Link href={item.action.href} className="btn-ghost attention-action">
           {item.action.label}
         </Link>

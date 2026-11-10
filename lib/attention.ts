@@ -33,7 +33,18 @@ export type AttentionItem = {
   meta?: string
   /** Set when the row can be dismissed by hand (client emails): its client_emails id. */
   doneEmailId?: string
+  /** Set on overdue task rows: Done ticks the task itself. */
+  doneTaskId?: string
+  /** id plus a version of the thing it is about. Done and Snooze are stored
+   *  against this, so a Done holds only until that thing changes. See
+   *  supabase/migrations/20261110_0002_attention_dismissals.sql. */
+  key: string
 }
+
+// Past this, a quiet lead, a stalled job or an unanswered proposal is not news.
+// It has been on the list for two weeks already and been passed over, so it
+// drops off rather than becoming furniture. Tui still knows about it.
+const SHELF_LIFE_DAYS = 21
 
 export type WeekEvent = {
   id: string
@@ -101,6 +112,8 @@ export async function getAttention(
   const shootWindow5d = new Date(now.getTime() + 5 * 86400000).toISOString().slice(0, 10)
   const staleProposal4d = new Date(now.getTime() - 4 * 86400000).toISOString()
   const handoverWindow7d = new Date(now.getTime() + 7 * 86400000).toISOString()
+  const shelfLife = new Date(now.getTime() - SHELF_LIFE_DAYS * 86400000).toISOString()
+  const deadlineCutoff = new Date(now.getTime() - 14 * 86400000).toISOString().slice(0, 10)
 
   const [
     weekEventsRes,
@@ -114,6 +127,7 @@ export async function getAttention(
     pendingRevisionsRes,
     clientEmailsRes,
     backlog,
+    dismissalsRes,
   ] = await Promise.all([
     supabase
       .from('events')
@@ -135,6 +149,7 @@ export async function getAttention(
       .select('id, name, status, updated_at, clients(name)')
       .in('status', ['editing', 'review'])
       .lt('updated_at', stale7d)
+      .gte('updated_at', shelfLife)
       .order('updated_at')
       .limit(20),
     supabase
@@ -142,6 +157,7 @@ export async function getAttention(
       .select('id, title, date, job_id, jobs(id, name)')
       .eq('event_type', 'deadline')
       .lt('date', todayISO)
+      .gte('date', deadlineCutoff)
       .order('date')
       .limit(10),
     supabase
@@ -158,6 +174,7 @@ export async function getAttention(
       .select('id, status, sent_at, total_value, job_id, jobs(id, name, clients(name))')
       .eq('status', 'sent')
       .lt('sent_at', staleProposal4d)
+      .gte('sent_at', shelfLife)
       .is('responded_at', null)
       .order('sent_at')
       .limit(10),
@@ -167,6 +184,7 @@ export async function getAttention(
       .eq('status', 'lead')
       .in('pipeline_stage', ['enquiry', 'discovery', 'proposal', 'negotiation'])
       .lt('updated_at', staleLead5d)
+      .gte('updated_at', shelfLife)
       .order('updated_at')
       .limit(10),
     // Campaigns at the end of their managed month.
@@ -219,6 +237,9 @@ export async function getAttention(
     // Best-effort: the backlog costs two nested queries, and losing it should
     // cost the backlog line, not the whole page.
     getContentBacklog(supabase, now).catch(() => null),
+    // Done and Snooze. Same wave, so putting rows away costs no extra trip.
+    // { data: null } before the migration runs, absorbed below.
+    supabase.from('attention_dismissals').select('key, until'),
   ])
 
   const items: AttentionItem[] = []
@@ -240,6 +261,7 @@ export async function getAttention(
     const ask = (r.request ?? '').replace(/\s+/g, ' ').trim()
     items.push({
       id: `revision:${r.id}`,
+      key: `revision:${r.id}`,
       kind: 'revision_request',
       severity: 'urgent',
       sentence: `${client} wants revisions${what ? ` — ${what}` : ''}`,
@@ -263,6 +285,7 @@ export async function getAttention(
     const waiting = daysAgo(e.received_at, todayISO)
     items.push({
       id: `email:${e.id}`,
+      key: `email:${e.id}`,
       kind: 'client_email',
       severity: e.kind === 'reschedule' || e.kind === 'payment' ? 'urgent' : 'due',
       sentence: `${e.clients?.name ?? 'A client'} ${e.heading}`,
@@ -280,6 +303,8 @@ export async function getAttention(
     const late = daysAgo(t.due_date, todayISO)
     items.push({
       id: `task:${t.id}`,
+      key: `task:${t.id}@${t.due_date}`,
+      doneTaskId: t.id,
       kind: 'overdue_task',
       severity: 'urgent',
       sentence: `${t.title}${t.jobs ? ` — ${t.jobs.name}` : ''}`,
@@ -294,6 +319,7 @@ export async function getAttention(
   }[]) {
     items.push({
       id: `deadline:${e.id}`,
+      key: `deadline:${e.id}@${e.date}`,
       kind: 'overdue_deadline',
       severity: 'urgent',
       sentence: `Deadline passed: ${e.title}`,
@@ -309,6 +335,7 @@ export async function getAttention(
     const days = -daysAgo(j.shoot_date, todayISO)
     items.push({
       id: `prep:${j.id}`,
+      key: `prep:${j.id}@${j.shoot_date}@${j.status}`,
       kind: 'shoot_without_prep',
       severity: 'urgent',
       sentence: `${j.clients?.name ?? j.name} shoots ${days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${plural(days, 'day')}`} but is still ${j.status}`,
@@ -324,6 +351,7 @@ export async function getAttention(
     const who = j.clients?.name ?? j.name
     items.push({
       id: `handover:${j.id}`,
+      key: `handover:${j.id}@${j.campaign_ends_at}`,
       kind: 'handover_due',
       // Past the end date this is urgent and stays urgent — unpaid work is
       // being done for as long as it goes unnoticed.
@@ -340,6 +368,8 @@ export async function getAttention(
   if (backlog && backlog.totals.videos_owed > 0) {
     items.push({
       id: 'backlog',
+      // Comes back only when the count changes, not every visit.
+      key: `backlog@${backlog.totals.videos_owed}`,
       kind: 'content_backlog',
       severity: 'due',
       sentence: `${plural(backlog.totals.videos_owed, 'video')} owed — ${backlog.clients
@@ -359,6 +389,7 @@ export async function getAttention(
   }[]) {
     items.push({
       id: `stalled:${j.id}`,
+      key: `stalled:${j.id}@${j.updated_at}`,
       kind: 'stalled_job',
       severity: 'due',
       sentence: `${j.name} has sat in ${j.status} untouched`,
@@ -374,6 +405,7 @@ export async function getAttention(
   }[]) {
     items.push({
       id: `proposal:${p.id}`,
+      key: `proposal:${p.id}`,
       kind: 'stale_proposal',
       severity: 'due',
       sentence: `${p.jobs?.clients?.name ?? p.jobs?.name ?? 'A proposal'} hasn't replied to their proposal`,
@@ -391,6 +423,7 @@ export async function getAttention(
   }[]) {
     items.push({
       id: `lead:${c.id}`,
+      key: `lead:${c.id}@${c.updated_at}`,
       kind: 'cold_lead',
       severity: 'watch',
       sentence: `${c.name} has gone quiet at ${c.pipeline_stage}`,
@@ -399,7 +432,13 @@ export async function getAttention(
     })
   }
 
-  items.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity])
+  const putAway = new Set(
+    ((dismissalsRes?.data ?? []) as { key: string; until: string | null }[])
+      .filter((d) => d.until === null || new Date(d.until) > now)
+      .map((d) => d.key)
+  )
+  const visible = items.filter((i) => !putAway.has(i.key))
+  visible.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity])
 
   const weekEvents = ((weekEventsRes?.data ?? []) as {
     id: string; title: string; event_type: string; date: string
@@ -420,7 +459,7 @@ export async function getAttention(
     todayLabel,
     weekEvents,
     hasShootThisWeek: weekEvents.some((e) => e.eventType === 'shoot'),
-    items,
+    items: visible,
     backlog,
   }
 }
