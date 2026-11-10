@@ -161,4 +161,5 @@
 // 3.25.0 — Tui can read the text of emails in hello@tuimedia.nz (read-only, never marks as read) to summarise the inbox or a thread when asked.
 // 3.26.0 — Tui can update every client detail (first contact, retainer, application answers and more) and fills gaps from emails on its own. Lifetime value counts booked jobs, not just paid Xero invoices, and pinned Xero contacts are linked again.
 // 3.27.0 — Your week reworked: every row has Done and Snooze (a week), Done on a task ticks it, quiet leads, stalled jobs and unanswered proposals drop off after 21 days, missed deadlines after 14, and the videos-owed line comes back only when the count changes.
-export const APP_VERSION = '3.27.0'
+// 3.28.0 — a small month forecast on the dashboard Money card: what is in, what is invoiced and due, and booked work and retainers still to come.
+export const APP_VERSION = '3.28.0'

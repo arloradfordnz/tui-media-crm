@@ -3126,6 +3126,36 @@ td.docs-opened-cell { display: none; }
   border: 1px solid transparent;
 }
 
+/* Month forecast: one line, one thin stacked bar, one legend line, above the
+   money figures. Kept deliberately small (see MoneyPanel ForecastStrip). */
+.forecast-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--bg-border);
+}
+.forecast-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.forecast-total { font-size: var(--t-md); font-weight: 600; color: var(--text-primary); }
+.forecast-bar {
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  background: var(--bg-elevated);
+}
+.forecast-bar > span { flex-basis: 0; min-width: 4px; }
+.forecast-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: var(--t-2xs);
+  color: var(--text-tertiary);
+}
+.forecast-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+
 /* The revision you arrived from an email to answer. Ringed rather than
    recoloured, so it stands out without changing what its status badge says. */
 .revision-focused {
