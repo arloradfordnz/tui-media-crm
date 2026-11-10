@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { fetchXeroContacts, createXeroContact, createXeroInvoice, fetchOutstandingInvoices, approveXeroInvoice, emailXeroInvoice, voidXeroInvoice, deleteXeroInvoice, updateXeroInvoice, getXeroInvoice, deleteXeroPayment } from '@/lib/xero'
 import { fetchRecentEmails, fetchUnreadEmails, readInboxEmails } from '@/lib/mail'
 import { getContentBacklog, parseJobMonth } from '@/lib/content-backlog'
+import { INTEREST_OPTIONS, CUSTOMER_VALUE_OPTIONS, AD_SPEND_OPTIONS, START_OPTIONS, DECISION_OPTIONS, CAPACITY_OPTIONS, approxFor } from '@/lib/application-fields'
 import { findDuplicateJobName } from '@/lib/job-naming'
 import { syncShootEvent, removeShootEvent } from '@/lib/job-calendar'
 import { nextDocumentNumber, unfilledPlaceholders } from '@/lib/document-templates'
@@ -240,7 +241,7 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'update_client',
-    description: 'Update an existing client. Provide client_id and any fields to change.',
+    description: 'Update any detail on an existing client. Provide client_id and only the fields to change. Fill gaps proactively when an email, thread or conversation makes a fact clear (contact person, phone, legal name, first contact date, industry and so on), then say in one line what you changed. Never overwrite a value Arlo set with a guess.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -258,6 +259,21 @@ export const TOOLS: Anthropic.Tool[] = [
         client_category: { type: 'string', enum: ['video_ads', 'retainer', 'marketing', 'one_off'] },
         notes: { type: 'string' },
         tags: { type: 'array', items: { type: 'string' } },
+        first_contact: { type: 'string', description: 'Date of first contact, YYYY-MM-DD. Use the date of their earliest email or enquiry when you can see it (read_emails with their name or address). Only change an existing date if you have an earlier one.' },
+        marketing_email: { type: 'string', description: 'Where approved videos are sent, if different from the main email (e.g. their marketing person).' },
+        monthly_retainer: { type: 'number', description: 'Monthly retainer fee in NZD, excluding GST. 0 or null for none.' },
+        shoots_per_month: { type: 'number' },
+        videos_per_month: { type: 'number' },
+        retainer_paused_from: { type: 'string', description: 'YYYY-MM the retainer is paused from. Empty string to unpause.' },
+        industry: { type: 'string' },
+        brand: { type: 'string', description: 'Their brand, website or socials.' },
+        sells: { type: 'string', description: 'What the business sells.' },
+        interest: { type: 'string', enum: INTEREST_OPTIONS.map((o) => o.value) },
+        customer_value_band: { type: 'string', enum: CUSTOMER_VALUE_OPTIONS.map((o) => o.value), description: 'What a customer is worth to them.' },
+        ad_spend_band: { type: 'string', enum: AD_SPEND_OPTIONS.map((o) => o.value) },
+        timeline: { type: 'string', enum: START_OPTIONS.map((o) => o.value), description: 'When they want to start.' },
+        decision_maker: { type: 'string', enum: DECISION_OPTIONS.map((o) => o.value) },
+        capacity: { type: 'string', enum: CAPACITY_OPTIONS.map((o) => o.value), description: 'Whether they can handle more customers.' },
       },
       required: ['client_id'],
     },
@@ -1180,6 +1196,31 @@ export async function executeTool(
       if (input.client_category !== undefined) updates.client_category = input.client_category || null
       if (input.notes !== undefined) updates.notes = input.notes || null
       if (input.tags !== undefined) updates.tags = JSON.stringify(input.tags)
+      if (input.first_contact !== undefined) {
+        const d = String(input.first_contact || '')
+        if (d && Number.isNaN(Date.parse(d))) return JSON.stringify({ error: `first_contact "${d}" is not a date. Use YYYY-MM-DD.` })
+        updates.first_contact = d ? new Date(d).toISOString() : null
+      }
+      for (const k of ['marketing_email', 'industry', 'brand', 'sells', 'interest', 'timeline', 'decision_maker', 'capacity'] as const) {
+        if (input[k] !== undefined) updates[k] = (input[k] as string) || null
+      }
+      for (const k of ['monthly_retainer', 'shoots_per_month', 'videos_per_month'] as const) {
+        if (input[k] !== undefined) updates[k] = input[k] === null || input[k] === '' ? null : Number(input[k])
+      }
+      if (input.retainer_paused_from !== undefined) {
+        const m = String(input.retainer_paused_from || '')
+        updates.retainer_paused_from = /^\d{4}-\d{2}$/.test(m) ? `${m}-01` : null
+      }
+      // Bands are stored as text AND a rough number, like the client form does.
+      if (input.customer_value_band !== undefined) {
+        updates.customer_value_band = (input.customer_value_band as string) || null
+        updates.customer_value = approxFor(CUSTOMER_VALUE_OPTIONS, input.customer_value_band as string)
+      }
+      if (input.ad_spend_band !== undefined) {
+        updates.ad_spend_band = (input.ad_spend_band as string) || null
+        updates.ad_spend_budget = approxFor(AD_SPEND_OPTIONS, input.ad_spend_band as string)
+      }
+      if (Object.keys(updates).length === 0) return JSON.stringify({ error: 'No fields to update were given.' })
 
       const { data, error } = await supabase.from('clients').update(updates).eq('id', input.client_id as string).select('id, name').single()
       if (error) return JSON.stringify({ error: dbErrorMessage(error) })

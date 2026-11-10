@@ -7,6 +7,7 @@ import FilterTabs from '@/components/FilterTabs'
 import QuickStatus from './QuickStatus'
 import QuickCategory from './QuickCategory'
 import SyncLifetimeButton from './SyncLifetimeButton'
+import { displayLifetimeValue } from '@/lib/lifetime-value'
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
@@ -33,7 +34,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
 
   let query = supabase
     .from('clients')
-    .select('id, name, email, location, status, client_category, lifetime_value, tags, created_at, jobs(quote_value)')
+    .select('id, name, email, location, status, client_category, lifetime_value, tags, created_at, jobs(quote_value, status)')
     .order('name', { ascending: true })
 
   if (statusFilter !== 'all') {
@@ -52,13 +53,13 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   const { data: clientRows } = await query
 
   const clients = (clientRows ?? []).map((c) => {
-    const jobs = (c.jobs as unknown as { quote_value: number | null }[]) ?? []
+    const jobs = (c.jobs as unknown as { quote_value: number | null; status: string | null }[]) ?? []
     return {
       ...c,
       client_category: (c as { client_category?: string | null }).client_category ?? null,
       jobCount: jobs.length,
-      // Paid revenue synced from Xero (Sync Value button / daily cron) — not quoted totals.
-      lifetime_value: Number(c.lifetime_value ?? 0),
+      // Paid Xero revenue, or booked job value if that is higher. See displayLifetimeValue.
+      lifetime_value: displayLifetimeValue(c.lifetime_value, jobs),
     }
   })
 

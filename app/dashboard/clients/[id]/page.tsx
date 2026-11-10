@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
+import { displayLifetimeValue } from '@/lib/lifetime-value'
 import { getContentBacklog, type ClientBacklog } from '@/lib/content-backlog'
 import { getAppSetting } from '@/app/actions/settings'
 import { notFound } from 'next/navigation'
@@ -120,8 +121,8 @@ export default async function ClientDetailPage({ params, searchParams }: { param
     pipelineStage: client.pipeline_stage,
     status: client.status,
     clientCategory: client.client_category,
-    // Paid revenue synced from Xero (Sync Value on the Clients page / daily cron).
-    lifetimeValue: Number(client.lifetime_value ?? 0),
+    // Paid Xero revenue, or booked job value if that is higher. See displayLifetimeValue.
+    lifetimeValue: displayLifetimeValue(client.lifetime_value, jobs),
     monthlyRetainer: client.monthly_retainer,
     shootsPerMonth: client.shoots_per_month,
     videosPerMonth: client.videos_per_month,

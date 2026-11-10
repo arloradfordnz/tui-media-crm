@@ -87,3 +87,21 @@ export async function syncClientLifetimeValues(supabase: SupabaseClient): Promis
   const unmatched = totals.filter((t) => t.contactId && !claimed.has(t.contactId)).map((t) => t.name)
   return { connected: true, matched, updated, unmatched }
 }
+
+/**
+ * The lifetime value shown on the Clients list and a client's record.
+ *
+ * `lifetime_value` holds paid Xero revenue only, so a newly booked client
+ * (CLM NZ: a $1,000 job booked, not yet invoiced) showed $0. What is shown is
+ * the larger of paid revenue and the quoted value of every job past enquiry.
+ * Taking the larger, not the sum, avoids counting a job twice once it is paid.
+ */
+export function displayLifetimeValue(
+  paid: number | string | null | undefined,
+  jobs: { quote_value: number | string | null; status?: string | null }[] | null | undefined
+): number {
+  const quoted = (jobs ?? [])
+    .filter((j) => j.status !== 'enquiry')
+    .reduce((sum, j) => sum + (Number(j.quote_value) || 0), 0)
+  return Math.max(Number(paid ?? 0) || 0, quoted)
+}
