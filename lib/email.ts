@@ -744,7 +744,7 @@ export async function sendAdminDocumentSignedEmail(clientName: string, docName: 
     <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;"><span style="color:${C.ink};font-weight:600;">${esc(clientName)}</span> just signed <span style="color:${C.ink};">${esc(docName)}</span> on ${signedAt}.</p>
     <div style="background:${C.surface};border-radius:${C.radius};padding:24px 26px;margin:20px 0 0;" class="card-pad">
       <p style="color:${C.faint};font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;margin:0 0 10px;">Signature</p>
-      <p style="color:${C.ink};font-size:22px;line-height:1.3;margin:0;font-family:'Patrick Hand',cursive;">${safeSignature}</p>
+      <p style="color:${C.ink};font-size:24px;font-weight:600;letter-spacing:-0.01em;line-height:1.3;margin:0;font-family:'Bricolage Grotesque','Helvetica Neue',Helvetica,Arial,sans-serif;">${safeSignature}</p>
     </div>
     ${button('https://dashboard.tuimedia.nz/dashboard/documents', 'Open the dashboard')}
   `)
