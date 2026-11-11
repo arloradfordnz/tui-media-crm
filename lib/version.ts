@@ -166,4 +166,5 @@
 // 3.30.0 — the contract in the client portal is cleaned up: a quiet row with a status pill, the contract on its own sheet, and signing at the end of it with the typed name as the signature. Contracts drafted shorter: 400 to 600 words, 14 clauses at most, 2 pages with signatures.
 // 3.31.0 — Tui can send a client their portal login (or a password reset), and send a proposal or a contract to a client, the last two behind a Send button like invoices. Yearly subscriptions (period, renewal month) with Affordable Domains added at $115.95 a year, counted at a twelfth in the monthly total. Login screens use the bird mark from tuimedia.nz.
 // 3.31.1 — the "document signed" email shows the signature in the brand font instead of a handwriting face.
-export const APP_VERSION = '3.31.1'
+// 3.31.2 — monthly subscriptions show /mo after the amount, like the yearly ones show /yr.
+export const APP_VERSION = '3.31.2'

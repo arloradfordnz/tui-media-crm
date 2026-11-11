@@ -141,14 +141,14 @@ export default function SubscriptionsPanel({ subscriptions }: { subscriptions: S
                 {row.note ? ` · ${row.note}` : ''}
               </span>
             </div>
-            <span className="sub-amount">{nzd.format(row.amount)}{row.period === 'year' ? <small className="sub-per">/yr</small> : null}</span>
+            <span className="sub-amount">{nzd.format(row.amount)}<small className="sub-per">{row.period === 'year' ? '/yr' : '/mo'}</small></span>
           </div>
         ))}
       </div>
       )}
 
       <p className="text-2xs mt-2" style={{ color: 'var(--text-tertiary)' }}>
-        NZD, renewing monthly{hasYearly ? ' unless marked /yr, which count at a twelfth in the total' : ''}. Ask Tui to add, change or cancel one.
+        NZD{hasYearly ? '. Yearly ones count at a twelfth in the monthly total' : ''}. Ask Tui to add, change or cancel one.
       </p>
     </section>
   )
