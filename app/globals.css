@@ -3306,6 +3306,7 @@ td.docs-opened-cell { display: none; }
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
+.sub-per { margin-left: 2px; font-size: var(--t-xs); color: var(--text-tertiary); }
 
 /* ── Phone spacing pass ───────────────────────────────────────
    Last in the file on purpose: several base rules above sit after the main

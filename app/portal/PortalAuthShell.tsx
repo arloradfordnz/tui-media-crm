@@ -14,8 +14,8 @@ export default function PortalAuthShell({
     <div className="min-h-screen flex items-center justify-center px-6" style={{ background: 'var(--bg-base)' }}>
       <div className="w-full max-w-sm animate-fade-in">
         <div className="flex justify-center mb-12">
-          <Image className="logo-light" src="/Primary_Black.svg" alt="Tui Media" width={180} height={37} priority />
-          <Image className="logo-dark" src="/Primary_White.svg" alt="Tui Media" width={180} height={37} priority />
+          {/* The bird mark from tuimedia.nz (its navbar logo). */}
+          <Image src="/tui-bird.webp" alt="Tui Media" width={43} height={72} priority />
         </div>
 
         <h1 className="text-2xl font-semibold mb-2" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>

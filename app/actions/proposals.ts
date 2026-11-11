@@ -4,7 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { createAdminClient } from '@/lib/supabase-admin'
-import { sendProposalEmail, sendProposalAcceptedEmail } from '@/lib/email'
+import { sendProposalAcceptedEmail } from '@/lib/email'
+import { sendProposalToClient } from '@/lib/send-to-client'
 import { emitAssistantEvent } from '@/lib/tui/events'
 import { isAdminViewing } from '@/lib/admin-ip'
 
@@ -85,42 +86,14 @@ export async function updateProposal(prevState: { error?: string } | undefined, 
 
 export async function sendProposal(proposalId: string): Promise<{ error?: string; emailed?: boolean; emailError?: string }> {
   const supabase = await createServerSupabaseClient()
+  const result = await sendProposalToClient(supabase, proposalId)
+  if (result.error) return { error: result.error }
 
-  const { data: proposal } = await supabase
-    .from('proposals')
-    .select('id, job_id, token, status, jobs(id, name, client_id, clients(name, email))')
-    .eq('id', proposalId)
-    .single()
-
-  if (!proposal) return { error: 'Proposal not found.' }
-  if (proposal.status !== 'draft') return { error: 'This proposal has already been sent.' }
-
-  const { error: sendError } = await supabase.from('proposals').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', proposalId)
-  if (sendError) return { error: `Couldn't send: ${sendError.message}` }
-
-  const job = proposal.jobs as unknown as { id: string; name: string; client_id: string; clients: { name: string; email: string | null } }
-
-  await supabase.from('activities').insert({ action: 'proposal_sent', details: `Proposal sent for "${job.name}"`, job_id: proposal.job_id, client_id: job.client_id })
-  await supabase.from('notifications').insert({ title: 'Proposal Sent', message: `Proposal for "${job.name}" has been sent`, type: 'status_change', job_id: proposal.job_id, client_id: job.client_id })
-
-  // The proposal is live the moment its status flips, so a mail failure must not
-  // read as a failed send. It is reported back so Arlo can share the link by hand.
-  let emailed = false
-  let emailError: string | undefined
-  if (job.clients.email) {
-    const proposalUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'}/proposal/${proposal.token}`
-    try {
-      await sendProposalEmail(job.clients.email, job.clients.name, job.name, proposalUrl)
-      emailed = true
-    } catch (err) {
-      emailError = err instanceof Error ? err.message : 'The email could not be sent.'
-      console.error('[proposals] email failed:', err)
-    }
+  if (result.jobId) {
+    revalidatePath(`/dashboard/jobs/${result.jobId}`)
+    revalidatePath(`/dashboard/jobs/${result.jobId}/proposal/${proposalId}`)
   }
-
-  revalidatePath(`/dashboard/jobs/${proposal.job_id}`)
-  revalidatePath(`/dashboard/jobs/${proposal.job_id}/proposal/${proposalId}`)
-  return { emailed, emailError }
+  return { emailed: result.emailed, emailError: result.emailError }
 }
 
 export async function acceptProposal(token: string) {

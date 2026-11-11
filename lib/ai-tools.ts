@@ -13,6 +13,7 @@ import { buildProposalIntake, buildContractIntake, classifyEngagement, CONTRACT_
 import { draftProposal, type PriceLine } from '@/lib/proposal-drafting'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { deleteClientAndLeftovers } from '@/lib/client-delete'
+import { sendPortalLogin, sendProposalToClient, sendDocumentToClient } from '@/lib/send-to-client'
 
 // Shared tool definitions + executor for every AI surface (dashboard chat,
 // SMS assistant). One tool set, one set of side effects — a job marked
@@ -87,6 +88,7 @@ export const MUTATING_TOOLS = new Set([
   'log_shoot',
   'snooze_flag', 'resolve_flag',
   'add_subscription', 'update_subscription', 'cancel_subscription',
+  'send_portal_login', 'send_proposal', 'send_document_to_client',
   'remember', 'update_memory', 'forget',
 ])
 
@@ -111,6 +113,12 @@ export const CONFIRM_TOOLS = new Set([
   // contact or for the wrong amount costs more to walk back than a deleted
   // row does. Arlo presses the button, not the model.
   'send_xero_invoice',
+  // A proposal or contract reaching a client is the same kind of act: it is
+  // in Arlo's name, and one sent too early cannot be un-sent. A portal login
+  // is not listed: it only ever goes to the address already on the client's
+  // record, and the worst case is a client getting a link they asked for.
+  'send_proposal',
+  'send_document_to_client',
   'void_xero_invoice',
   'delete_xero_invoice',
   'remove_xero_payment',
@@ -130,7 +138,7 @@ export function toolFingerprint(name: string, input: Record<string, unknown>): s
 // forward step Arlo asked for, so its card is green; the rest destroy
 // something and stay red.
 export function confirmTone(name: string): 'go' | 'danger' {
-  return name === 'send_xero_invoice' ? 'go' : 'danger'
+  return name === 'send_xero_invoice' || name === 'send_proposal' || name === 'send_document_to_client' ? 'go' : 'danger'
 }
 
 const nzdFmt = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' })
@@ -153,6 +161,26 @@ async function describeAction(name: string, input: Record<string, unknown>): Pro
       const to = inv.Contact?.Name ? ` to ${inv.Contact.Name}` : ' to the client'
       const draft = inv.Status === 'DRAFT' ? ' It will be approved first.' : ''
       return `Email invoice ${inv.InvoiceNumber} (${nzdFmt.format(inv.Total)})${to}.${draft}`
+    }
+    case 'send_proposal': {
+      try {
+        const sb = createAdminClient()
+        const { data } = await sb!.from('proposals').select('status, total_value, jobs(name, clients(name, email))').eq('id', id('proposal_id')).single()
+        const job = (data?.jobs as unknown as { name: string; clients: { name: string; email: string | null } } | null)
+        if (!data || !job) return 'Send this proposal to the client.'
+        const total = Number(data.total_value) ? ` (${nzdFmt.format(Number(data.total_value))})` : ''
+        return `Email the "${job.name}" proposal${total} to ${job.clients.name}${job.clients.email ? ` at ${job.clients.email}` : ''}. They can open and accept it straight away.`
+      } catch { return 'Send this proposal to the client.' }
+    }
+    case 'send_document_to_client': {
+      try {
+        const sb = createAdminClient()
+        const { data } = await sb!.from('documents').select('name, doc_type, clients(name, email)').eq('id', id('document_id')).single()
+        const client = (data?.clients as unknown as { name: string; email: string | null } | null)
+        if (!data || !client) return 'Email this document to the client.'
+        const sign = data.doc_type === 'contract' ? ' to read and sign' : ''
+        return `Email "${data.name}" to ${client.name}${client.email ? ` at ${client.email}` : ''}${sign}. It also appears in their portal.`
+      } catch { return 'Email this document to the client.' }
     }
     case 'void_xero_invoice': return `Void ${invoiceLabel(await xeroInvoice())}. Xero has no un-void.`
     case 'delete_xero_invoice': return `Delete ${invoiceLabel(await xeroInvoice())}. This can't be undone.`
@@ -748,33 +776,37 @@ export const TOOLS: Anthropic.Tool[] = [
   // dashboard. Not client money and not Xero: a list he keeps by telling Tui.
   {
     name: 'list_subscriptions',
-    description: "List Arlo's active monthly subscriptions (his own bills, not client work): name, NZD amount, renewal day, and their ids for update or cancel.",
+    description: "List Arlo's active subscriptions (his own bills, not client work): name, NZD amount, period (month or year), renewal day (and month for yearly ones), and their ids for update or cancel. monthly_total_nzd counts a yearly one at a twelfth.",
     input_schema: { type: 'object' as const, properties: {}, required: [] },
   },
   {
     name: 'add_subscription',
-    description: 'Add one of Arlo\'s own monthly subscriptions to the dashboard list. Amount is NZD per month as charged; day is the day of the month it renews. If he gives a price in another currency, ask for the NZD figure off his statement rather than converting it yourself.',
+    description: 'Add one of Arlo\'s own subscriptions to the dashboard list. Monthly by default: amount is NZD per month as charged and day is the day of the month it renews. For something that bills once a year (a domain), set period to "year": amount is the NZD charged each year, and day plus month say when it renews (both can be left out if he has not said, then ask him for the date). If he gives a price in another currency, ask for the NZD figure off his statement rather than converting it yourself.',
     input_schema: {
       type: 'object' as const,
       properties: {
         name: { type: 'string', description: 'The service, e.g. "Adobe Creative Cloud".' },
-        amount: { type: 'number', description: 'NZD per month.' },
-        day: { type: 'integer', minimum: 1, maximum: 31, description: 'Day of the month it renews.' },
+        amount: { type: 'number', description: 'NZD per period: per month, or per year when period is "year".' },
+        period: { type: 'string', enum: ['month', 'year'], description: 'How often it bills. Defaults to month.' },
+        day: { type: 'integer', minimum: 1, maximum: 31, description: 'Day of the month it renews. Required for monthly ones.' },
+        month: { type: 'integer', minimum: 1, maximum: 12, description: 'Month of the year it renews (1 to 12). Yearly ones only.' },
         note: { type: 'string', description: 'Optional short qualifier shown under the name, e.g. "Billed through WK Strawbridge".' },
       },
-      required: ['name', 'amount', 'day'],
+      required: ['name', 'amount'],
     },
   },
   {
     name: 'update_subscription',
-    description: 'Change a subscription\'s name, amount, renewal day or note. Get the id from list_subscriptions.',
+    description: 'Change a subscription\'s name, amount, period, renewal day or month, or note. Get the id from list_subscriptions.',
     input_schema: {
       type: 'object' as const,
       properties: {
         subscription_id: { type: 'string' },
         name: { type: 'string' },
         amount: { type: 'number' },
+        period: { type: 'string', enum: ['month', 'year'] },
         day: { type: 'integer', minimum: 1, maximum: 31 },
+        month: { type: 'integer', minimum: 1, maximum: 12, description: 'Renewal month, yearly ones only.' },
         note: { type: 'string' },
       },
       required: ['subscription_id'],
@@ -787,6 +819,40 @@ export const TOOLS: Anthropic.Tool[] = [
       type: 'object' as const,
       properties: { subscription_id: { type: 'string' } },
       required: ['subscription_id'],
+    },
+  },
+
+  // ── Reaching clients ──────────────────────────
+  // Email that goes out in Arlo's name. Always to the address on the client's
+  // record, never one the model supplies.
+  {
+    name: 'send_portal_login',
+    description: "Email a client their portal login: a link to choose a password. It creates their login first if they do not have one, and if they do it simply sends a fresh link (use this when they say they can't get in or never got it). Set reset to true to send a password reset for an existing login instead. Goes to the email on the client's record. Get the client id from search_clients.",
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        client_id: { type: 'string' },
+        reset: { type: 'boolean', description: 'Send a password reset instead of the setup email. Only for a client who already has a login.' },
+      },
+      required: ['client_id'],
+    },
+  },
+  {
+    name: 'send_proposal',
+    description: "Send a drafted proposal to the client: it goes live for them and they are emailed the link. Arlo gets a Send button to tap before it goes. Only for a proposal still in draft; get the id from get_job or create_proposal.",
+    input_schema: {
+      type: 'object' as const,
+      properties: { proposal_id: { type: 'string' } },
+      required: ['proposal_id'],
+    },
+  },
+  {
+    name: 'send_document_to_client',
+    description: "Email a saved document (a contract to sign, a brief) to its client with a link to read and sign it in their portal, and make it visible there. Arlo gets a Send button to tap before it goes. Get the id from list_documents or create_contract.",
+    input_schema: {
+      type: 'object' as const,
+      properties: { document_id: { type: 'string' } },
+      required: ['document_id'],
     },
   },
 
@@ -1917,22 +1983,32 @@ export async function executeTool(
     case 'list_subscriptions': {
       const { data, error } = await supabase
         .from('subscriptions')
-        .select('id, name, amount, day, note')
+        .select('id, name, amount, period, day, renew_month, note')
         .eq('active', true)
         .order('day')
       if (error) return JSON.stringify({ error: error.message })
       const rows = (data ?? []).map((r: { amount: unknown }) => ({ ...r, amount: Number(r.amount) }))
-      const monthly = rows.reduce((sum: number, r: { amount: number }) => sum + r.amount, 0)
+      const monthly = rows.reduce((sum: number, r: { amount: number; period: string }) => sum + (r.period === 'year' ? r.amount / 12 : r.amount), 0)
       return JSON.stringify({ subscriptions: rows, monthly_total_nzd: Math.round(monthly * 100) / 100 })
     }
 
     case 'add_subscription': {
       const name = String(input.name ?? '').trim()
       const amount = Number(input.amount)
-      const day = Math.round(Number(input.day))
+      const period = input.period === 'year' ? 'year' : 'month'
+      const hasDay = input.day !== undefined && input.day !== null
+      const hasMonth = input.month !== undefined && input.month !== null
+      const day = hasDay ? Math.round(Number(input.day)) : null
+      const month = hasMonth ? Math.round(Number(input.month)) : null
       if (!name) return JSON.stringify({ error: 'A subscription needs a name.' })
       if (!Number.isFinite(amount) || amount < 0) return JSON.stringify({ error: 'Amount must be a positive NZD figure.' })
-      if (!(day >= 1 && day <= 31)) return JSON.stringify({ error: 'Day must be the day of the month it renews, 1 to 31.' })
+      if (period === 'month') {
+        if (day === null || !(day >= 1 && day <= 31)) return JSON.stringify({ error: 'Day must be the day of the month it renews, 1 to 31.' })
+      } else if (hasDay !== hasMonth) {
+        return JSON.stringify({ error: 'A yearly subscription needs both the day and the month it renews, or neither.' })
+      } else if (day !== null && month !== null && (!(day >= 1 && day <= 31) || !(month >= 1 && month <= 12))) {
+        return JSON.stringify({ error: 'Day must be 1 to 31 and month 1 to 12.' })
+      }
 
       // Same name already on the list: that is an update, not a second row.
       const { data: existing } = await supabase
@@ -1942,13 +2018,13 @@ export async function executeTool(
         .ilike('name', name.replace(/[\\%_]/g, (c) => '\\' + c))
         .limit(1)
       if (existing?.[0]) {
-        return JSON.stringify({ error: `${existing[0].name} is already on the list ($${Number(existing[0].amount).toFixed(2)} on the ${existing[0].day}). Use update_subscription with id ${existing[0].id} if it changed.` })
+        return JSON.stringify({ error: `${existing[0].name} is already on the list ($${Number(existing[0].amount).toFixed(2)}). Use update_subscription with id ${existing[0].id} if it changed.` })
       }
 
       const { data, error } = await supabase
         .from('subscriptions')
-        .insert({ name, amount, day, note: (input.note as string)?.trim() || null })
-        .select('id, name, amount, day')
+        .insert({ name, amount, period, day, renew_month: period === 'year' ? month : null, note: (input.note as string)?.trim() || null })
+        .select('id, name, amount, period, day, renew_month')
         .single()
       if (error) return JSON.stringify({ error: error.message })
       return JSON.stringify({ success: true, subscription: { ...data, amount: Number(data.amount) } })
@@ -1958,14 +2034,18 @@ export async function executeTool(
       const updates: Record<string, unknown> = {}
       if (input.name !== undefined) updates.name = String(input.name).trim()
       if (input.amount !== undefined) updates.amount = Number(input.amount)
+      if (input.period === 'month' || input.period === 'year') updates.period = input.period
       if (input.day !== undefined) updates.day = Math.round(Number(input.day))
+      if (input.month !== undefined) updates.renew_month = Math.round(Number(input.month))
+      // A monthly one has no renewal month, so switching to monthly clears it.
+      if (input.period === 'month') updates.renew_month = null
       if (input.note !== undefined) updates.note = (input.note as string)?.trim() || null
       if (Object.keys(updates).length === 0) return JSON.stringify({ error: 'Nothing to change.' })
       const { data, error } = await supabase
         .from('subscriptions')
         .update(updates)
         .eq('id', input.subscription_id as string)
-        .select('id, name, amount, day')
+        .select('id, name, amount, period, day, renew_month')
         .single()
       if (error) return JSON.stringify({ error: dbErrorMessage(error) })
       return JSON.stringify({ success: true, subscription: { ...data, amount: Number(data.amount) } })
@@ -1980,6 +2060,36 @@ export async function executeTool(
         .single()
       if (error) return JSON.stringify({ error: dbErrorMessage(error) })
       return JSON.stringify({ success: true, cancelled: data.name })
+    }
+
+    case 'send_portal_login': {
+      const admin = createAdminClient()
+      if (!admin) return JSON.stringify({ error: 'The server is missing its service key, so portal logins can only be sent from the client page.' })
+      const result = await sendPortalLogin(admin, String(input.client_id ?? ''), input.reset === true ? 'reset' : 'setup')
+      if (!result.ok) return JSON.stringify({ error: result.error })
+      return JSON.stringify({ success: true, emailed_to: result.email, kind: input.reset === true ? 'password reset' : 'portal login' })
+    }
+
+    case 'send_proposal': {
+      const admin = createAdminClient()
+      const result = await sendProposalToClient(admin ?? supabase, String(input.proposal_id ?? ''))
+      if (result.error) return JSON.stringify({ error: result.error })
+      return JSON.stringify({
+        success: true,
+        job: result.jobName,
+        client: result.clientName,
+        emailed: result.emailed === true,
+        ...(result.emailError ? { email_error: `The proposal is live but the email failed (${result.emailError}). Tell Arlo so he can share the link himself.` } : {}),
+        ...(!result.emailed && !result.emailError ? { note: 'The proposal is live, but the client has no email address on file, so nothing was emailed.' } : {}),
+      })
+    }
+
+    case 'send_document_to_client': {
+      const admin = createAdminClient()
+      if (!admin) return JSON.stringify({ error: 'The server is missing its service key, so documents can only be sent from the document page.' })
+      const result = await sendDocumentToClient(admin, String(input.document_id ?? ''))
+      if (!result.ok) return JSON.stringify({ error: result.error })
+      return JSON.stringify({ success: true, emailed_to: result.email })
     }
 
     case 'get_dashboard_stats': {

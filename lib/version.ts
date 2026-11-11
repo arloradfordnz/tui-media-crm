@@ -164,4 +164,5 @@
 // 3.28.0 — a small month forecast on the dashboard Money card: what is in, what is invoiced and due, and booked work and retainers still to come.
 // 3.29.0 — the contract drafter works from the job: a one-off event is drafted as an event even for a retainer client, the questions fit the kind of contract (event date, hours, turnaround) with the quote and venue to tap, and the drafter reads the job notes and client emails and checks its own draft (full signatory name, fixed liability cap, consistent wording).
 // 3.30.0 — the contract in the client portal is cleaned up: a quiet row with a status pill, the contract on its own sheet, and signing at the end of it with the typed name as the signature. Contracts drafted shorter: 400 to 600 words, 14 clauses at most, 2 pages with signatures.
-export const APP_VERSION = '3.30.0'
+// 3.31.0 — Tui can send a client their portal login (or a password reset), and send a proposal or a contract to a client, the last two behind a Send button like invoices. Yearly subscriptions (period, renewal month) with Affordable Domains added at $115.95 a year, counted at a twelfth in the monthly total. Login screens use the bird mark from tuimedia.nz.
+export const APP_VERSION = '3.31.0'

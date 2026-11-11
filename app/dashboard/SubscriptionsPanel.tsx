@@ -22,10 +22,13 @@ const NZ_TZ = 'Pacific/Auckland'
 export type Subscription = {
   id: string
   name: string
-  /** NZD per month. */
+  /** NZD per period: per month, or per year when period is 'year'. */
   amount: number
-  /** Day of the month it renews. Clamped to the month's length. */
-  day: number
+  period: 'month' | 'year'
+  /** Day of the month it renews. Clamped to the month's length. Null on a yearly one with no date yet. */
+  day: number | null
+  /** Month it renews (1 to 12). Yearly ones only. */
+  renewMonth: number | null
   /** Short muted qualifier shown under the name, where there is one. */
   note: string | null
 }
@@ -36,11 +39,13 @@ export type Subscription = {
 export async function getSubscriptions(supabase: any): Promise<Subscription[] | null> {
   const { data, error } = await supabase
     .from('subscriptions')
-    .select('id, name, amount, day, note')
+    .select('id, name, amount, period, day, renew_month, note')
     .eq('active', true)
   if (error) return null
   // numeric arrives as a string from PostgREST.
-  return (data ?? []).map((r: Subscription) => ({ ...r, amount: Number(r.amount) }))
+  return (data ?? []).map((r: { id: string; name: string; amount: unknown; period: 'month' | 'year'; day: number | null; renew_month: number | null; note: string | null }) => ({
+    id: r.id, name: r.name, amount: Number(r.amount), period: r.period, day: r.day, renewMonth: r.renew_month, note: r.note,
+  }))
 }
 
 function nzToday(now: Date): { year: number; month: number; date: number } {
@@ -61,6 +66,13 @@ function nextCharge(day: number, today: ReturnType<typeof nzToday>): Date {
   if (thisMonth >= today.date) return new Date(today.year, today.month, thisMonth)
   const m = today.month + 1
   return new Date(today.year, m, Math.min(day, daysInMonth(today.year, m)))
+}
+
+/** The next 1 January-style anniversary: the next time `day` of `month` comes around, today included. */
+function nextYearly(day: number, month: number, today: ReturnType<typeof nzToday>): Date {
+  const on = (year: number) => new Date(year, month - 1, Math.min(day, daysInMonth(year, month - 1)))
+  const thisYear = on(today.year)
+  return thisYear.getTime() >= new Date(today.year, today.month, today.date).getTime() ? thisYear : on(today.year + 1)
 }
 
 function daysUntil(when: Date, today: ReturnType<typeof nzToday>): number {
@@ -91,15 +103,21 @@ export default function SubscriptionsPanel({ subscriptions }: { subscriptions: S
   }
 
   const rows = subscriptions.map((sub) => {
-    const when = nextCharge(sub.day, today)
-    const away = daysUntil(when, today)
+    // A yearly one added before its renewal date is known has none to show.
+    const when = sub.period === 'year'
+      ? (sub.day && sub.renewMonth ? nextYearly(sub.day, sub.renewMonth, today) : null)
+      : nextCharge(sub.day ?? 1, today)
+    const away = when ? daysUntil(when, today) : Infinity
     return { ...sub, when, away }
-  }).sort((a, b) => a.away - b.away)
+  }).sort((a, b) => (a.away === b.away ? 0 : a.away < b.away ? -1 : 1))
 
   // Every subscription counts toward this, Xero included — it goes out through
   // WK Strawbridge rather than off the card, but it is still money leaving
   // monthly, and a total that quietly omitted one would be worse than none.
-  const monthly = rows.reduce((sum, r) => sum + r.amount, 0)
+  // A yearly one counts at a twelfth, so the monthly figure is what it costs a
+  // month on average rather than a spike in the month it renews.
+  const monthly = rows.reduce((sum, r) => sum + (r.period === 'year' ? r.amount / 12 : r.amount), 0)
+  const hasYearly = rows.some((r) => r.period === 'year')
 
   return (
     <section className="today-subs">
@@ -119,18 +137,18 @@ export default function SubscriptionsPanel({ subscriptions }: { subscriptions: S
             <div className="sub-body">
               <span className="sub-name">{row.name}</span>
               <span className="sub-meta">
-                {whenLabel(row.when, row.away)}
+                {row.when ? whenLabel(row.when, row.away) : 'Renewal date not set'}
                 {row.note ? ` · ${row.note}` : ''}
               </span>
             </div>
-            <span className="sub-amount">{nzd.format(row.amount)}</span>
+            <span className="sub-amount">{nzd.format(row.amount)}{row.period === 'year' ? <small className="sub-per">/yr</small> : null}</span>
           </div>
         ))}
       </div>
       )}
 
       <p className="text-2xs mt-2" style={{ color: 'var(--text-tertiary)' }}>
-        NZD, renewing monthly. Ask Tui to add, change or cancel one.
+        NZD, renewing monthly{hasYearly ? ' unless marked /yr, which count at a twelfth in the total' : ''}. Ask Tui to add, change or cancel one.
       </p>
     </section>
   )
