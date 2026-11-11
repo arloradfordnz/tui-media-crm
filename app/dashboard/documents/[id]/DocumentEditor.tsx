@@ -11,7 +11,7 @@ import Field from '@/components/Field'
 import DatePicker from '@/components/DatePicker'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
 import DocumentSheet from '@/components/DocumentSheet'
-import ReviseTextarea from '@/components/ReviseTextarea'
+import RichDocEditor from '@/components/RichDocEditor'
 
 // One page for reading, tweaking and sending a saved document, laid out like
 // the proposal editor (jobs/[id]/proposal/[proposalId]/ProposalEditor.tsx):
@@ -294,13 +294,14 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
     })
   }
 
-  // Rewrites just the highlighted range (the floating box in ReviseTextarea).
-  async function reviseRange(range: { start: number; end: number }, instructions: string) {
+  // Rewrites just the selected range (the bar in RichDocEditor). The editor
+  // sends the document as it will be saved, with offsets into that text.
+  async function reviseRange(document: string, range: { start: number; end: number }, instructions: string) {
     try {
       const res = await fetch('/api/documents/revise-section', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ document: form.body, start: range.start, end: range.end, instructions }),
+        body: JSON.stringify({ document, start: range.start, end: range.end, instructions }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || typeof data.revised !== 'string') return { error: data.error || "Couldn't revise that. Try again." }
@@ -421,12 +422,10 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
                 <div>
                   <h3 className="prop-edit-h">{isContract ? 'The agreement' : 'What it says'}</h3>
                   <p className="prop-edit-hint">
-                    {isContract
-                      ? 'Tui drafted this. Start a line with # for a section heading, **bold** a key term, and leave a blank line between clauses.'
-                      : 'Start a line with # for a heading and **bold** a key term. A blank line starts a new paragraph.'}
+                    {isContract ? 'Tui drafted this. Select any text to format it or ask Tui to change it.' : 'Select any text to format it or ask Tui to change it.'}
                   </p>
                 </div>
-                <ReviseTextarea
+                <RichDocEditor
                   value={form.body}
                   onChange={(next) => update('body', next)}
                   onRevise={reviseRange}
