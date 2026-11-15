@@ -167,4 +167,6 @@
 // 3.31.0 — Tui can send a client their portal login (or a password reset), and send a proposal or a contract to a client, the last two behind a Send button like invoices. Yearly subscriptions (period, renewal month) with Affordable Domains added at $115.95 a year, counted at a twelfth in the monthly total. Login screens use the bird mark from tuimedia.nz.
 // 3.31.1 — the "document signed" email shows the signature in the brand font instead of a handwriting face.
 // 3.31.2 — monthly subscriptions show /mo after the amount, like the yearly ones show /yr.
-export const APP_VERSION = '3.31.2'
+// 3.31.3 — Supabase requests give up after 10 seconds, so if Supabase stalls a page shows its "couldn't load" state instead of loading forever.
+// 3.32.0 — the business health report no longer looks at Instagram, and website enquiries for an event video are filed as one-off work, not video ads.
+export const APP_VERSION = '3.32.0'

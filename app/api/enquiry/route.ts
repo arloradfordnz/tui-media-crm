@@ -127,10 +127,9 @@ export async function POST(req: Request) {
     first_contact: new Date().toISOString(),
     pipeline_stage: 'enquiry',
     status: 'lead',
-    // The site offers monthly content alongside ad projects now. A lead that
-    // only wants the monthly option is retainer work; anything that includes
-    // an ad project (or hasn't said) stays a video ads lead.
-    client_category: body.interest === 'Monthly content' ? 'retainer' : 'video_ads',
+    // The site offers monthly content and event videos. Monthly is retainer
+    // work; an event (or anything else) is a one-off.
+    client_category: body.interest === 'Monthly content' ? 'retainer' : 'one_off',
     brand: 'tui_media',
     sells: body.sell?.trim() || null,
     interest: body.interest?.trim() || null,

@@ -2,6 +2,7 @@ import { cache } from 'react'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import type { User } from '@supabase/supabase-js'
+import { timedFetch } from '@/lib/supabase-fetch'
 
 // Server-only: this module imports next/headers. The browser client lives in
 // lib/supabase-browser.ts.
@@ -19,6 +20,8 @@ export const createServerSupabaseClient = cache(async () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      // A stuck Supabase request errors after 10s instead of hanging the page.
+      global: { fetch: timedFetch },
       cookies: {
         getAll() {
           return cookieStore.getAll()

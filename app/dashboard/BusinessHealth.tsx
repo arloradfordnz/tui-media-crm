@@ -14,7 +14,6 @@ type Report = {
 
 const SOURCES = [
   { key: 'xero', label: 'Xero', href: '/dashboard/finance' },
-  { key: 'instagram', label: 'Instagram', href: '/dashboard/settings#integrations' },
 ] as const
 
 function HealthScoreRing({ score }: { score: number | null }) {
@@ -128,7 +127,7 @@ export default async function BusinessHealth() {
                 No report yet
               </p>
               <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                The first daily review will run tonight at midnight. Once integrations are connected, the AI will weigh social engagement, Google reviews and Xero financials alongside your CRM activity.
+                The first daily review will run tonight at midnight. Once Xero is connected, the AI will weigh your Xero financials alongside your CRM activity.
               </p>
             </>
           )}
