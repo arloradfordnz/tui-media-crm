@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowUp, Sparkles, Undo2, X } from 'lucide-react'
+import { ArrowUp, Bot, Undo2, X } from 'lucide-react'
 import { measureRange, type RangeBox } from '@/lib/textarea-geometry'
 
 // The document text box with "ask Tui" built in, the way Claude edits a doc:
@@ -196,7 +196,7 @@ export default function ReviseTextarea({
         >
           {outcome && 'note' in outcome ? (
             <div className="revise-row">
-              <Sparkles className="revise-spark" />
+              <Bot className="revise-spark" />
               <span className="revise-note">{outcome.note}</span>
               <button type="button" className="revise-icon-btn" onClick={undo} aria-label="Undo" title="Undo"><Undo2 className="w-3.5 h-3.5" /></button>
               <button type="button" className="revise-icon-btn" onClick={close} aria-label="Done" title="Done"><X className="w-3.5 h-3.5" /></button>
@@ -204,7 +204,7 @@ export default function ReviseTextarea({
           ) : (
             <>
               <div className={`revise-row${busy ? ' is-busy' : ''}`}>
-                <Sparkles className="revise-spark" />
+                <Bot className="revise-spark" />
                 <input
                   value={ask}
                   onChange={(e) => setAsk(e.target.value)}

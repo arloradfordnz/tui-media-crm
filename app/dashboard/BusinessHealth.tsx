@@ -1,4 +1,4 @@
-import { Sparkles, Plug, RefreshCw } from 'lucide-react'
+import { Bot, Plug, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { timeAgo } from '@/lib/format'
@@ -117,7 +117,7 @@ export default async function BusinessHealth() {
                 {report.summary}
               </p>
               <div className="flex items-center justify-center sm:justify-start gap-1.5 mt-3 text-2xs" style={{ color: 'var(--text-tertiary)' }}>
-                <Sparkles className="w-3 h-3" />
+                <Bot className="w-3 h-3" />
                 AI-generated daily at midnight from your CRM and connected sources.
               </div>
             </>
