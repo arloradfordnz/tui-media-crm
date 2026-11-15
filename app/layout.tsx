@@ -20,12 +20,17 @@ export const metadata: Metadata = {
 // other than zero. Without it the bottom of every screen sits under Safari's
 // home indicator on a phone, which is where this app is mostly used.
 //
-// Deliberately no maximumScale/userScalable: pinch-zoom stays available. The
-// iOS auto-zoom-on-focus problem is fixed by making inputs 16px (globals.css),
-// not by taking zoom away from the user.
+// Zoom is off on purpose (Arlo, November 2026): this is used as an app on a
+// phone, and a pinch or double-tap that leaves it magnified and panning
+// sideways is worse than not being able to zoom. iOS Safari ignores
+// userScalable in a browser tab, so the dashboard also blocks the gesture
+// itself — see useMobileViewport in app/dashboard/DashboardShell.tsx and the
+// touch-action rule in globals.css. Inputs stay at 16px so focus never zooms.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
   themeColor: "#060D1A",
 };

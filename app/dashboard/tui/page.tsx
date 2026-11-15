@@ -10,7 +10,7 @@ export const metadata = { title: 'Tui AI' }
 // was reachable only via ⌘K, which does not exist on a phone — so the single
 // fastest way to get an answer was the one surface the phone could not open.
 //
-// The centre tab in MobileTabBar points here. ⌘K still works on desktop, and
+// The sparkle button in the phone top bar (and the drawer) points here. ⌘K still works on desktop, and
 // this page and that overlay share one thread with Telegram. The dashboard
 // panel deliberately does not — see components/TuiThread.tsx.
 export default async function TuiPage() {

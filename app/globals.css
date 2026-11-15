@@ -1857,13 +1857,10 @@ input, textarea, select, button { font-family: inherit; }
   .field-action { right: 8px; bottom: 8px; }
 }
 
-/* ── Mobile tab bar ───────────────────────────────────────────
-   Mobile only; hidden at >=769px where the sidebar is pinned open. The bar
-   itself (Apple's liquid-glass floating tab bar) is styled at the end of the
-   file. --tab-bar-h is the height every bottom clearance is measured from. */
-:root { --tab-bar-h: 62px; }
-
-.mobile-tab-bar { display: none; }
+/* The bottom tab bar is gone (the phone menu is a side drawer now, see the
+   "Phone shell" block at the end of the file). The variable stays at 0 so the
+   bottom clearances that were measured from it still resolve. */
+:root { --tab-bar-h: 0px; }
 
 /* ── Tui full-page route ──────────────────────────────────── */
 /* Tui as a full-page surface.
@@ -3380,273 +3377,6 @@ td.docs-opened-cell { display: none; }
   .report-panel { width: auto; left: 0; }
 }
 
-/* ── Liquid-glass tab bar (phone) ─────────────────────────────
-   Modelled on iOS 26's floating tab bar: a capsule of the four destinations
-   that floats off the bottom edge with content scrolling under it, and Tui AI
-   as its own round glass button beside it — where Apple puts Search.
-
-   The glass is four layers, which is what makes it read as a lens rather
-   than a tinted panel:
-     1. a thin navy tint, so the page shows through but the labels hold
-     2. blur + saturation (split across two rules — Lightning CSS keeps only
-        one of the pair if they share a rule; see AGENTS.md)
-     3. a specular rim: a bright inset hairline on top fading to a faint one
-        at the bottom, so the edge catches light like curved glass
-     4. a soft drop shadow lifting it off the page
-   The active tab sits in a darker recessed capsule that slides between tabs. */
-@media (max-width: 768px) {
-  .mobile-tab-bar {
-    position: fixed;
-    z-index: 70;
-    left: 14px;
-    right: 14px;
-    /* Sits into the home-indicator area the way Apple's does, but never
-       closer than 12px to the bottom on phones without one. */
-    bottom: max(12px, calc(env(safe-area-inset-bottom) - 8px));
-    display: flex;
-    align-items: stretch;
-    gap: 10px;
-    height: var(--tab-bar-h);
-    pointer-events: none; /* the gap between pill and button stays tappable */
-  }
-
-  .glass-pill,
-  .glass-orb {
-    position: relative;
-    pointer-events: auto;
-    background:
-      linear-gradient(180deg, rgba(239, 242, 248, 0.10) 0%, rgba(239, 242, 248, 0.02) 45%, rgba(239, 242, 248, 0.04) 100%),
-      rgba(16, 26, 50, 0.6);
-    border: 0.5px solid rgba(239, 242, 248, 0.16);
-    box-shadow:
-      inset 0 1px 0.5px rgba(255, 255, 255, 0.22),
-      inset 0 -1px 0.5px rgba(255, 255, 255, 0.06),
-      inset 0 0 18px rgba(255, 255, 255, 0.03),
-      0 10px 30px -6px rgba(0, 0, 0, 0.6),
-      0 2px 6px rgba(0, 0, 0, 0.25);
-  }
-  .glass-pill,
-  .glass-orb { -webkit-backdrop-filter: blur(22px) saturate(180%) brightness(1.05); }
-  .glass-pill,
-  .glass-orb { backdrop-filter: blur(22px) saturate(180%) brightness(1.05); }
-
-  .glass-pill {
-    flex: 1 1 auto;
-    min-width: 0;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    padding: 4px;
-    border-radius: var(--r-pill);
-  }
-
-  /* The recessed capsule behind the active tab. One element that moves, so
-     switching tabs reads as the highlight sliding, not one turning off and
-     another on. --i is the active index, set inline by MobileTabBar. */
-  .glass-pill-indicator {
-    position: absolute;
-    top: 4px;
-    bottom: 4px;
-    left: 4px;
-    width: calc((100% - 8px) / 4);
-    border-radius: var(--r-pill);
-    background: rgba(2, 6, 14, 0.42);
-    box-shadow:
-      inset 0 1px 2px rgba(0, 0, 0, 0.35),
-      0 0.5px 0 rgba(255, 255, 255, 0.07);
-    transform: translateX(calc(var(--i, 0) * 100%));
-    transition: transform 420ms cubic-bezier(0.32, 0.72, 0, 1), opacity var(--dur-base) ease;
-  }
-  .glass-pill-indicator[data-hidden] { opacity: 0; }
-
-  .mobile-tab {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    min-width: 0;
-    border-radius: var(--r-pill);
-    color: var(--text-primary);
-    text-decoration: none;
-    -webkit-tap-highlight-color: transparent;
-    transition: color var(--dur-fast) ease, transform var(--dur-fast) var(--ease-out);
-  }
-  .mobile-tab:active { transform: scale(0.94); }
-  .mobile-tab.active { color: var(--accent); }
-
-  .mobile-tab-icon { width: 23px; height: 23px; stroke-width: 1.9px; }
-  .mobile-tab-label {
-    font-size: var(--t-2xs);
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    line-height: 1;
-    white-space: nowrap;
-  }
-
-  /* Tui AI — the separate round button. */
-  .glass-orb {
-    flex: 0 0 var(--tab-bar-h);
-    width: var(--tab-bar-h);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    color: var(--text-primary);
-    text-decoration: none;
-    -webkit-tap-highlight-color: transparent;
-    transition: transform var(--dur-fast) var(--ease-out), color var(--dur-fast) ease;
-  }
-  .glass-orb:active { transform: scale(0.92); }
-  .glass-orb .mobile-tab-icon { width: 26px; height: 26px; }
-  .glass-orb.active { color: var(--accent); }
-}
-
-/* No blur to see through: fall back to a solid enough fill to read. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  @media (max-width: 768px) {
-    .glass-pill,
-    .glass-orb { background-color: rgba(16, 26, 50, 0.94); }
-  }
-}
-
-/* ── Liquid-glass tab bar: touch response + scroll edge ───────
-   From the Liquid Glass guidance (the skill's `.interactive()` and
-   scroll-edge rules), translated to CSS:
-     - interactive glass: under a finger it lifts, brightens and a highlight
-       blooms where it is touched, then springs back
-     - scroll edge: content fades into the page ground behind the bar rather
-       than being cut off by a hard line, so the bar floats on the content
-     - one family: the pill and the Tui orb share one set of glass tokens
-       (above) and the same press curve, so they read as a single piece of
-       glass, which is what GlassEffectContainer is for
-     - tint only means something: the accent is reserved for "you are here" */
-@media (max-width: 768px) {
-  /* Scroll edge. A tall, soft fade of the page colour under the bar. */
-  .mobile-tab-bar::before {
-    content: '';
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: calc(var(--tab-bar-h) + 44px + env(safe-area-inset-bottom));
-    z-index: -1;
-    pointer-events: none;
-    background: linear-gradient(to top, var(--bg-base) 0%, rgba(6, 13, 26, 0.85) 38%, rgba(6, 13, 26, 0) 100%);
-  }
-
-  /* Press: the glass rises toward the finger. Springy overshoot on release. */
-  .glass-pill,
-  .glass-orb {
-    transition:
-      transform 380ms cubic-bezier(0.34, 1.56, 0.64, 1),
-      box-shadow 380ms var(--ease-out);
-  }
-  .glass-pill:active,
-  .glass-orb:active {
-    transform: scale(1.035);
-    transition-duration: 140ms;
-    box-shadow:
-      inset 0 1px 0.5px rgba(255, 255, 255, 0.34),
-      inset 0 -1px 0.5px rgba(255, 255, 255, 0.1),
-      inset 0 0 26px rgba(255, 255, 255, 0.07),
-      0 14px 36px -6px rgba(0, 0, 0, 0.65),
-      0 2px 8px rgba(0, 0, 0, 0.3);
-  }
-  /* The orb already scaled down on press; swap to the same lift as the pill. */
-  .glass-orb:active { transform: scale(1.08); }
-
-  /* The tab under the finger no longer shrinks — the glass does the moving. */
-  .mobile-tab:active { transform: none; }
-  .glass-pill:has(.mobile-tab:active) .glass-pill-indicator { filter: brightness(1.25); }
-
-  /* Specular bloom: a soft light that sits where the glass is touched. Anchored
-     per tab so it needs no JS; it fades in on press and out on release. */
-  .mobile-tab::before,
-  .glass-orb::before {
-    content: '';
-    position: absolute;
-    inset: 2px;
-    border-radius: inherit;
-    background: radial-gradient(ellipse at 50% 30%, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 70%);
-    opacity: 0;
-    transition: opacity 320ms var(--ease-out);
-    pointer-events: none;
-  }
-  .mobile-tab:active::before,
-  .glass-orb:active::before { opacity: 1; transition-duration: 90ms; }
-
-  /* The indicator is concentric with the pill: its radius is the pill's minus
-     the inset, so the gap reads the same all the way round. */
-  .glass-pill-indicator { border-radius: calc(var(--tab-bar-h) / 2 - 4px); }
-
-  /* Labels and icons stay white (vibrant) at rest; only the current page is tinted. */
-  .mobile-tab { color: rgba(239, 242, 248, 0.92); }
-  .mobile-tab.active { color: var(--accent); }
-}
-
-@media (max-width: 768px) and (prefers-reduced-motion: reduce) {
-  .glass-pill,
-  .glass-orb,
-  .glass-pill-indicator { transition: none; }
-}
-
-/* ── Tab bar position: Safari tab vs installed app ────────────
-   In a Safari tab the browser's own toolbar already sits below the page, so
-   the bar only needs a small gap above it — the 12px+ it gets as an installed
-   app would stack two floating bars with dead space between. Installed to the
-   Home Screen there is no toolbar and the bar drops down beside the home
-   indicator, the way Apple's own apps sit. */
-@media (max-width: 768px) {
-  .mobile-tab-bar { bottom: 8px; }
-}
-@media (max-width: 768px) and (display-mode: standalone) {
-  .mobile-tab-bar { bottom: max(12px, calc(env(safe-area-inset-bottom) - 8px)); }
-}
-
-/* ── Draggable lens ───────────────────────────────────────────
-   While the bar is pressed the highlight lifts into a lens — bigger than the
-   tab, lighter, and allowed to spill past the pill's edge, as iOS 26 does —
-   and while dragging it follows the finger with no easing so it never lags.
-   `scale` is its own property so it animates independently of the translate
-   that tracks the tab, which is what lets the lens grow while it moves. */
-@media (max-width: 768px) {
-  .glass-pill { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
-  .glass-pill a { -webkit-touch-callout: none; }
-
-  .glass-pill-indicator {
-    scale: 1;
-    transition:
-      transform 420ms cubic-bezier(0.32, 0.72, 0, 1),
-      scale 360ms cubic-bezier(0.34, 1.56, 0.64, 1),
-      background 240ms ease,
-      box-shadow 240ms ease,
-      opacity var(--dur-base) ease;
-  }
-  .glass-pill[data-lifted] { transform: none; }
-  .glass-pill[data-lifted] .glass-pill-indicator {
-    scale: 1.22 1.16;
-    background: rgba(239, 242, 248, 0.16);
-    box-shadow:
-      inset 0 1px 1px rgba(255, 255, 255, 0.5),
-      inset 0 -1px 1px rgba(255, 255, 255, 0.14),
-      inset 0 0 14px rgba(255, 255, 255, 0.12),
-      0 8px 22px -4px rgba(0, 0, 0, 0.55);
-    filter: none;
-  }
-  .glass-pill[data-lifted] .glass-pill-indicator { -webkit-backdrop-filter: blur(5px) saturate(190%) brightness(1.35); }
-  .glass-pill[data-lifted] .glass-pill-indicator { backdrop-filter: blur(5px) saturate(190%) brightness(1.35); }
-  /* Tracks the finger exactly while dragging; springs when released. */
-  .glass-pill[data-dragging] .glass-pill-indicator {
-    transition:
-      transform 0s,
-      scale 360ms cubic-bezier(0.34, 1.56, 0.64, 1),
-      background 240ms ease,
-      box-shadow 240ms ease;
-  }
-}
-
 /* ── No zoom-on-focus ─────────────────────────────────────────
    iOS Safari zooms the whole page when a focused field's text is under 16px,
    and doesn't zoom back out — the app ends up magnified, scrollable sideways,
@@ -3654,23 +3384,12 @@ td.docs-opened-cell { display: none; }
    zoomed viewport. The Tui message box was 14px (its own rule sits after the
    16px mobile rule, so it won). This is the catch-all: on a touch screen every
    text field is 16px whatever class it carries, so no future field can bring
-   the zoom back. The viewport still allows pinch-zoom on purpose. */
+   the zoom back. */
 @media (pointer: coarse) {
   input:not([type='checkbox']):not([type='radio']):not([type='range']),
   textarea,
   select {
     font-size: 16px !important;
-  }
-}
-
-/* The keyboard covers the bar anyway; slide it away while typing so it never
-   floats over the field or sits mid-screen as the keyboard animates. */
-@media (max-width: 768px) {
-  .mobile-tab-bar { transition: transform 260ms var(--ease-panel), opacity 200ms ease; }
-  body:has(input:focus, textarea:focus, select:focus) .mobile-tab-bar {
-    transform: translateY(140%);
-    opacity: 0;
-    pointer-events: none;
   }
 }
 
@@ -4068,4 +3787,111 @@ textarea.field-input::-webkit-scrollbar-track { margin-block: 14px; }
   .portal-doc-head { grid-template-columns: 40px minmax(0, 1fr) auto; grid-template-areas: 'icon title chev' '. status .'; row-gap: 10px; padding: 16px; }
   .portal-doc-open { padding: 0 8px 8px; }
   .portal-sign-actions > * { flex: 1; }
+}
+
+
+/* ── Phone shell ──────────────────────────────────────────────
+   Last in the file so it wins on order (see AGENTS.md).
+
+   A slim top bar (menu, wordmark, Tui) and the sidebar as a drawer replace
+   the old bottom tab bar. Heights come from --app-h, the visible height that
+   useMobileViewport (DashboardShell.tsx) publishes, so when the keyboard opens
+   the shell shrinks to what is left above it instead of iOS sliding the whole
+   page up. 100dvh is the fallback before the script runs and on desktop. */
+:root { --top-bar-h: 52px; }
+.dash-root { min-height: 100dvh; }
+.main-area { height: 100dvh; }
+.mobile-top-bar,
+.sidebar-close,
+.nav-mobile-only { display: none; }
+
+/* No pinch or double-tap zoom anywhere in the dashboard. */
+html:has(.dash-root) {
+  touch-action: pan-x pan-y;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+@media (max-width: 768px) {
+  /* The document itself never scrolls; only the page scroller does. */
+  html:has(.dash-root) { height: 100%; overflow: hidden; overscroll-behavior: none; }
+  html:has(.dash-root) body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+  .dash-root { min-height: 0; height: var(--app-h, 100dvh); overflow: hidden; }
+  .main-area { height: var(--app-h, 100dvh); }
+
+  .mobile-top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 0 0 auto;
+    height: calc(var(--top-bar-h) + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 6px 0;
+  }
+  .mobile-top-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-primary);
+    -webkit-tap-highlight-color: transparent;
+    transition: background var(--dur-fast) ease;
+  }
+  .mobile-top-btn:active { background: var(--bg-hover); }
+  .mobile-top-btn.active { color: var(--accent); }
+  .mobile-top-logo { display: flex; align-items: center; height: 44px; padding: 0 12px; }
+
+  /* The top bar now clears the status bar, so the page no longer has to. */
+  .page-shell-inner {
+    padding: 8px 16px calc(24px + env(safe-area-inset-bottom));
+  }
+  .tui-page {
+    height: calc(
+      var(--app-h, 100dvh) - var(--top-bar-h) - env(safe-area-inset-top) - 8px - 24px - env(safe-area-inset-bottom)
+    );
+  }
+
+  /* Drawer: flush to the left edge, full height, thumb-sized rows. */
+  .sidebar-panel {
+    width: min(300px, calc(100vw - 64px));
+    margin: 0;
+    border-radius: 0 var(--r-xl) var(--r-xl) 0;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .sidebar-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin-right: -10px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-secondary);
+  }
+  .sidebar-close:active { background: var(--bg-hover); }
+  .nav-mobile-only { display: block; }
+  .sidebar-panel .nav-item {
+    min-height: 48px;
+    padding: 0 14px;
+    gap: 14px;
+    font-size: var(--t-control);
+  }
+  .sidebar-panel .nav-item-icon { width: 20px; height: 20px; }
+  .sidebar-panel button.w-full { min-height: 46px; font-size: var(--t-sm); }
+
+  /* Sheets and modals sit in the visible area, above the keyboard. */
+  .modal-overlay,
+  .confirm-scrim,
+  .drawer-overlay {
+    bottom: auto;
+    height: var(--app-h, 100dvh);
+  }
+  .modal-content { max-height: calc(var(--app-h, 100dvh) - 24px - env(safe-area-inset-top)); }
+  .drawer-panel { height: var(--app-h, 100dvh); }
 }

@@ -1,7 +1,6 @@
 import { Line, PageHeader } from '@/components/Skeleton'
 
-// Mirrors app/dashboard/settings/page.tsx: the title, the phone-only section
-// tiles, then seven stacked cards in the page's order: Profile, the sign-in
+// Mirrors app/dashboard/settings/page.tsx: the title, then seven stacked cards in the page's order: Profile, the sign-in
 // form, retainer invoicing, the iCloud calendar and push cards, portal
 // notifications, and the small App Info card at the end.
 const CARDS = [
@@ -13,9 +12,6 @@ export default function SettingsLoading() {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader />
-      <div className="settings-mobile-nav">
-        {Array.from({ length: 5 }).map((_, i) => <Line key={i} h={44} r={14} />)}
-      </div>
       {/* Memory: heading, a grouped list, the add box. */}
       <div className="card space-y-4">
         <Line w={120} h={14} />

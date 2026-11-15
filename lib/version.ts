@@ -169,4 +169,5 @@
 // 3.31.2 — monthly subscriptions show /mo after the amount, like the yearly ones show /yr.
 // 3.31.3 — Supabase requests give up after 10 seconds, so if Supabase stalls a page shows its "couldn't load" state instead of loading forever.
 // 3.32.0 — the business health report no longer looks at Instagram, and website enquiries for an event video are filed as one-off work, not video ads.
-export const APP_VERSION = '3.32.0'
+// 3.33.0 — phone: the bottom tab bar is replaced by a top bar with a menu button that opens a side drawer listing every page (Tui and Retainers included). Pinch and double-tap zoom are off, and tapping into a text box no longer slides or leaves the page out of place: the app shrinks to the space above the keyboard instead.
+export const APP_VERSION = '3.33.0'

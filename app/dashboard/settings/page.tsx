@@ -12,8 +12,6 @@ import { getCaldavConfig, STATUS_KEY } from '@/lib/icloud-push'
 import { APP_VERSION } from '@/lib/version'
 import { getAppSetting } from '@/app/actions/settings'
 import { getAdminIps, getRequestIp } from '@/lib/admin-ip'
-import Link from 'next/link'
-import { Users, CalendarDays, Wallet, FileText, TrendingUp } from 'lucide-react'
 
 export default async function SettingsPage() {
   const supabase = await createServerSupabaseClient()
@@ -56,27 +54,6 @@ export default async function SettingsPage() {
           <h1 className="page-title">Settings</h1>
         </div>
       </div>
-
-      {/* Mobile navigation.
-          The bottom tab bar carries the five daily destinations; Clients,
-          Calendar, Money and Documents are lookups that used to live behind a
-          drawer. With the drawer gone, this is their way in on a phone. Hidden
-          from 769px up, where the sidebar is pinned open and already lists
-          them. */}
-      <nav className="settings-mobile-nav" aria-label="Sections">
-        {[
-          { href: '/dashboard/clients', label: 'Clients', icon: Users },
-          { href: '/dashboard/calendar', label: 'Calendar', icon: CalendarDays },
-          { href: '/dashboard/money', label: 'Money', icon: Wallet },
-          { href: '/dashboard/finance', label: 'Finance', icon: TrendingUp },
-          { href: '/dashboard/documents', label: 'Documents', icon: FileText },
-        ].map(({ href, label, icon: Icon }) => (
-          <Link key={href} href={href} className="settings-nav-tile">
-            <Icon className="w-4 h-4" />
-            <span>{label}</span>
-          </Link>
-        ))}
-      </nav>
 
       {/* Profile */}
       <div className="card">

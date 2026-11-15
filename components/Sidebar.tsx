@@ -13,6 +13,9 @@ import {
   Settings,
   LogOut,
   Receipt,
+  Repeat2,
+  Sparkles,
+  X,
 } from 'lucide-react'
 
 const mainNav = [
@@ -29,6 +32,13 @@ const businessNav = [
   { href: '/dashboard/money', label: 'Money', icon: Receipt },
   { href: '/dashboard/finance', label: 'Finance', icon: Wallet },
   { href: '/dashboard/documents', label: 'Documents', icon: FileText },
+]
+
+// Phone only. On desktop Tui is ⌘K and retainers are reached from the
+// dashboard; on a phone the drawer is the whole menu, so both are listed.
+const mobileNav = [
+  { href: '/dashboard/retainers', label: 'Retainers', icon: Repeat2 },
+  { href: '/dashboard/tui', label: 'Tui AI', icon: Sparkles },
 ]
 
 const accountNav = [
@@ -75,11 +85,14 @@ export default function Sidebar({
 
       {/* Sidebar — pinned open on desktop; slides in/out on mobile */}
       <aside className={`sidebar-panel ${open ? 'sidebar-panel-open' : ''}`}>
-        <div className="flex items-center px-5 pt-5 pb-3">
+        <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <span className="sidebar-logo">
             <Image className="sidebar-logo-light" src="/Primary_Black.svg" alt="Tui Media" width={120} height={25} />
             <Image className="sidebar-logo-dark" src="/Primary_White.svg" alt="Tui Media" width={120} height={25} />
           </span>
+          <button type="button" className="sidebar-close" onClick={onClose} aria-label="Close menu">
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 pb-1 scroll-invisible">
@@ -87,6 +100,12 @@ export default function Sidebar({
           {mainNav.map((item) => (
             <NavLink key={item.href} {...item} onClick={onClose} />
           ))}
+
+          <div className="nav-mobile-only">
+            {mobileNav.map((item) => (
+              <NavLink key={item.href} {...item} onClick={onClose} />
+            ))}
+          </div>
 
           <div className="nav-section-label">Business</div>
           {businessNav.map((item) => (
