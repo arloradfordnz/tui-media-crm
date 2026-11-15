@@ -3793,14 +3793,25 @@ textarea.field-input::-webkit-scrollbar-track { margin-block: 14px; }
 /* ── Phone shell ──────────────────────────────────────────────
    Last in the file so it wins on order (see AGENTS.md).
 
-   A slim top bar (menu, wordmark, Tui) and the sidebar as a drawer replace
-   the old bottom tab bar. Heights come from --app-h, the visible height that
-   useMobileViewport (DashboardShell.tsx) publishes, so when the keyboard opens
-   the shell shrinks to what is left above it instead of iOS sliding the whole
-   page up. 100dvh is the fallback before the script runs and on desktop. */
+   Desktop: the sidebar is pinned and .main-scroll is the page's scroller.
+
+   Phone: the DOCUMENT scrolls, not an inner box. That is what lets the page
+   run underneath Safari's floating address bar instead of stopping at a dark
+   band above it, and it leaves bringing a focused field above the keyboard to
+   iOS, which does it properly only for document scroll. A sticky top bar
+   (menu, wordmark, Tui) and the sidebar as a drawer replace the old bottom
+   tab bar. --app-h is the visible height that useMobileViewport publishes
+   (DashboardShell.tsx); sheets, modals and Tui are sized from it. */
 :root { --top-bar-h: 52px; }
 .dash-root { min-height: 100dvh; }
-.main-area { height: 100dvh; }
+.main-area {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+  min-width: 0;
+}
+.main-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; min-width: 0; }
 .mobile-top-bar,
 .sidebar-close,
 .nav-mobile-only { display: none; }
@@ -3813,19 +3824,23 @@ html:has(.dash-root) {
 }
 
 @media (max-width: 768px) {
-  /* The document itself never scrolls; only the page scroller does. */
-  html:has(.dash-root) { height: 100%; overflow: hidden; overscroll-behavior: none; }
-  html:has(.dash-root) body { height: 100%; overflow: hidden; overscroll-behavior: none; }
-  .dash-root { min-height: 0; height: var(--app-h, 100dvh); overflow: hidden; }
-  .main-area { height: var(--app-h, 100dvh); }
+  html.drawer-open { overflow: hidden; }
+  .dash-root { min-height: var(--app-h, 100dvh); }
+  .main-area { display: block; height: auto; overflow: visible; }
+  .main-scroll { overflow: visible; }
 
+  /* Solid, not glass: a blurred bar is what smeared the wordmark. The extra
+     10px keeps the row clear of the soft edge iOS draws under the status bar. */
   .mobile-top-bar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    flex: 0 0 auto;
-    height: calc(var(--top-bar-h) + env(safe-area-inset-top));
-    padding: env(safe-area-inset-top) 6px 0;
+    height: calc(var(--top-bar-h) + 10px + env(safe-area-inset-top));
+    padding: calc(10px + env(safe-area-inset-top)) 6px 0;
+    background: var(--bg-base);
   }
   .mobile-top-btn {
     display: inline-flex;
@@ -3844,13 +3859,16 @@ html:has(.dash-root) {
   .mobile-top-btn.active { color: var(--accent); }
   .mobile-top-logo { display: flex; align-items: center; height: 44px; padding: 0 12px; }
 
-  /* The top bar now clears the status bar, so the page no longer has to. */
+  /* The top bar clears the status bar, so the page no longer has to. The
+     bottom padding is what the last card rests on once it has scrolled up
+     from under Safari's bar. */
   .page-shell-inner {
-    padding: 8px 16px calc(24px + env(safe-area-inset-bottom));
+    overflow: visible;
+    padding: 8px 16px calc(32px + env(safe-area-inset-bottom));
   }
   .tui-page {
     height: calc(
-      var(--app-h, 100dvh) - var(--top-bar-h) - env(safe-area-inset-top) - 8px - 24px - env(safe-area-inset-bottom)
+      var(--app-h, 100dvh) - var(--top-bar-h) - 10px - env(safe-area-inset-top) - 8px - 32px - env(safe-area-inset-bottom)
     );
   }
 
@@ -3894,4 +3912,98 @@ html:has(.dash-root) {
   }
   .modal-content { max-height: calc(var(--app-h, 100dvh) - 24px - env(safe-area-inset-top)); }
   .drawer-panel { height: var(--app-h, 100dvh); }
+}
+
+/* ── Icon micro-animations ────────────────────────────────────
+   Every icon is a lucide <svg class="lucide lucide-name">, so this is done
+   once here rather than per component. Under a finger or a click the icon
+   dips and springs back; under a mouse it does one small move that says what
+   it is for (a cog turns, an arrow travels, a bin rattles). One rule per
+   selector on purpose: Lightning CSS folds a list into :is() and lifts the
+   specificity of every member (see AGENTS.md). */
+@media (prefers-reduced-motion: no-preference) {
+  svg.lucide {
+    transform-origin: center;
+    transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  a:active svg.lucide { transform: scale(0.84); transition-duration: 90ms; }
+  button:active svg.lucide { transform: scale(0.84); transition-duration: 90ms; }
+
+  @media (hover: hover) and (pointer: fine) {
+    a:hover svg.lucide { transform: scale(1.1); }
+    button:hover svg.lucide { transform: scale(1.1); }
+
+    a:hover svg.lucide-settings { transform: rotate(60deg); }
+    button:hover svg.lucide-settings { transform: rotate(60deg); }
+    button:hover svg.lucide-plus { transform: rotate(90deg); }
+    a:hover svg.lucide-plus { transform: rotate(90deg); }
+    button:hover svg.lucide-x { transform: rotate(90deg); }
+    button:hover svg.lucide-refresh-cw { transform: rotate(120deg); }
+    button:hover svg.lucide-rotate-cw { transform: rotate(120deg); }
+    button:hover svg.lucide-rotate-ccw { transform: rotate(-120deg); }
+    button:hover svg.lucide-repeat { transform: rotate(180deg); }
+    a:hover svg.lucide-repeat { transform: rotate(180deg); }
+
+    a:hover svg.lucide-arrow-up-right { transform: translate(2px, -2px); }
+    button:hover svg.lucide-arrow-up-right { transform: translate(2px, -2px); }
+    a:hover svg.lucide-external-link { transform: translate(1px, -1px) scale(1.08); }
+    a:hover svg.lucide-arrow-left { transform: translateX(-3px); }
+    button:hover svg.lucide-arrow-left { transform: translateX(-3px); }
+    a:hover svg.lucide-arrow-right { transform: translateX(3px); }
+    button:hover svg.lucide-arrow-right { transform: translateX(3px); }
+    a:hover svg.lucide-chevron-right { transform: translateX(2px); }
+    button:hover svg.lucide-chevron-right { transform: translateX(2px); }
+    button:hover svg.lucide-chevron-left { transform: translateX(-2px); }
+    button:hover svg.lucide-arrow-up { transform: translateY(-2px); }
+    button:hover svg.lucide-send { transform: translate(2px, -2px); }
+    a:hover svg.lucide-download { transform: translateY(2px); }
+    button:hover svg.lucide-download { transform: translateY(2px); }
+    button:hover svg.lucide-upload { transform: translateY(-2px); }
+    button:hover svg.lucide-log-out { transform: translateX(2px); }
+
+    button:hover svg.lucide-trash-2 { animation: iconWiggle 420ms ease; }
+    button:hover svg.lucide-bot { animation: iconWiggle 520ms ease; }
+    a:hover svg.lucide-bot { animation: iconWiggle 520ms ease; }
+    a:hover svg.lucide-calendar { animation: iconNod 420ms ease; }
+    a:hover svg.lucide-briefcase { animation: iconNod 420ms ease; }
+    a:hover svg.lucide-users { animation: iconNod 420ms ease; }
+    a:hover svg.lucide-file-text { animation: iconNod 420ms ease; }
+    a:hover svg.lucide-chart-column { animation: iconNod 420ms ease; }
+    a:hover svg.lucide-circle-dollar-sign { animation: iconSpinY 520ms ease; }
+    a:hover svg.lucide-house { animation: iconNod 420ms ease; }
+    button:hover svg.lucide-check { animation: iconPop 360ms ease; }
+    button:hover svg.lucide-copy { animation: iconPop 360ms ease; }
+    button:hover svg.lucide-pencil { animation: iconWiggle 420ms ease; }
+    button:hover svg.lucide-menu { transform: scaleX(1.18); }
+  }
+
+  /* The drawer's rows arrive just behind the panel. */
+  @media (max-width: 768px) {
+    .sidebar-panel-open .nav-item { animation: navRowIn 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+    .sidebar-panel-open .nav-item:active .nav-item-icon { transform: scale(0.84); }
+  }
+}
+@keyframes iconWiggle {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-12deg); }
+  60% { transform: rotate(10deg); }
+  85% { transform: rotate(-4deg); }
+}
+@keyframes iconNod {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-3px); }
+  70% { transform: translateY(1px); }
+}
+@keyframes iconPop {
+  0%, 100% { transform: scale(1); }
+  45% { transform: scale(1.28); }
+}
+@keyframes iconSpinY {
+  from { transform: rotateY(0); }
+  to { transform: rotateY(360deg); }
+}
+@keyframes navRowIn {
+  from { opacity: 0; transform: translateX(-14px); }
+  to { opacity: 1; transform: translateX(0); }
 }

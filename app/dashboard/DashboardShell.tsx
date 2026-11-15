@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, createContext, useContext, ReactNode } fro
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { Menu, Sparkles } from 'lucide-react'
+import { Menu, Bot } from 'lucide-react'
 import Sidebar from '@/components/Sidebar'
 import { useMediaQuery } from '@/lib/useMediaQuery'
 import AiChatWidget from '@/components/AiChatWidget'
@@ -42,9 +42,14 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!sidebarOpen) return
+    // The page scrolls as the document on a phone; hold it still behind the drawer.
+    document.documentElement.classList.add('drawer-open')
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenedOn(null) }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      document.documentElement.classList.remove('drawer-open')
+      window.removeEventListener('keydown', onKey)
+    }
   }, [sidebarOpen])
 
   // The report panel PUSHES content on desktop. On a phone there is no room to
@@ -106,10 +111,6 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
             // animates here, so the two must run on identical timing or the
             // page visibly tears mid-transition. Both read the same tokens.
             transition: 'margin-right var(--dur-panel) var(--ease-panel)',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            minWidth: 0,
           }}
         >
           {/* Phone only (hidden from 769px in CSS): menu, wordmark, Tui. */}
@@ -131,12 +132,12 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
               className={`mobile-top-btn${pathname.startsWith('/dashboard/tui') ? ' active' : ''}`}
               aria-label="Tui AI"
             >
-              <Sparkles className="w-5 h-5" />
+              <Bot className="w-5 h-5" />
             </Link>
           </header>
 
           {/* Scrollable page content — scrollbar hidden, scroll still works */}
-          <div className="scroll-invisible" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minWidth: 0 }}>
+          <div className="main-scroll scroll-invisible">
             <div className="page-shell-inner">
               {children}
             </div>
@@ -156,13 +157,11 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
 // cancelled here (gesture* are Safari's own events) and double-tap zoom is
 // removed by touch-action in globals.css.
 //
-// Keyboard: iOS does not shrink the layout viewport when the keyboard opens.
-// It slides the whole page up instead, which drags the top bar off screen,
-// leaves the page parked at an offset after the keyboard closes, and hides
-// whatever sits at the bottom of a 100dvh box. So the visible height is
-// published as --app-h (the shell, sheets and Tui are sized from it), the page
-// is pinned back to the top whenever iOS pans it, and the focused field is
-// scrolled into view inside the app's own scroller instead.
+// Keyboard: the visible height is published as --app-h, which sheets, modals
+// and the Tui page are sized from, so they sit above the keyboard. Ordinary
+// pages scroll as the document and iOS brings the focused field into view by
+// itself. Only a page that fits the screen exactly (Tui) gets pinned back to
+// the top, because there iOS slides the whole page up and leaves it parked.
 function useMobileViewport() {
   useEffect(() => {
     const stop = (e: Event) => e.preventDefault()
@@ -172,7 +171,6 @@ function useMobileViewport() {
     const vv = window.visualViewport
     const touch = window.matchMedia('(pointer: coarse)').matches
     const root = document.documentElement
-    let last = vv ? vv.height : 0
     let raf = 0
 
     const sync = () => {
@@ -180,15 +178,8 @@ function useMobileViewport() {
       raf = requestAnimationFrame(() => {
         if (!vv) return
         root.style.setProperty('--app-h', Math.round(vv.height) + 'px')
-        if (window.scrollY !== 0 || vv.offsetTop !== 0) window.scrollTo(0, 0)
-        // Only when the keyboard has just opened, not on every pan.
-        if (last - vv.height > 80) {
-          const el = document.activeElement
-          if (el instanceof HTMLElement && el.matches('input, textarea, select, [contenteditable]')) {
-            el.scrollIntoView({ block: 'center', behavior: 'smooth' })
-          }
-        }
-        last = vv.height
+        const fits = root.scrollHeight <= window.innerHeight + 2
+        if (fits && (window.scrollY !== 0 || vv.offsetTop !== 0)) window.scrollTo(0, 0)
       })
     }
 

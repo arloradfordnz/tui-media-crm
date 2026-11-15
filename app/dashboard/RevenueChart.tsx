@@ -152,7 +152,7 @@ export default function RevenueChart({
     }
   }
 
-  function handleMouseMove(e: React.MouseEvent) {
+  function handlePointer(e: React.PointerEvent) {
     if (!svgRef.current || tXs.length < 2) return
     const rect = svgRef.current.getBoundingClientRect()
     const svgX = ((e.clientX - rect.left) / rect.width) * W
@@ -287,9 +287,14 @@ export default function RevenueChart({
         <rect
           x={Y_W} y={PAD_T} width={chartW} height={chartH + PAD_B}
           fill="transparent"
-          style={{ cursor: 'crosshair' }}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={() => setIndicator(null)}
+          // Pointer events, not mouse events: a finger never fires mousemove, so
+          // on a phone the chart could not be read at all. pan-y leaves vertical
+          // page scrolling to the browser while a sideways drag scrubs the line.
+          // A touch keeps its reading after the finger lifts; a mouse clears it.
+          style={{ cursor: 'crosshair', touchAction: 'pan-y' }}
+          onPointerDown={handlePointer}
+          onPointerMove={handlePointer}
+          onPointerLeave={(e) => { if (e.pointerType === 'mouse') setIndicator(null) }}
         />
       </svg>
     </div>

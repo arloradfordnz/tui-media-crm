@@ -4,41 +4,41 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
-  House,
+  Home,
   Users,
-  Clapperboard,
-  CalendarDays,
-  Wallet,
+  Briefcase,
+  Calendar,
+  BarChart3,
   FileText,
   Settings,
   LogOut,
-  Receipt,
-  Repeat2,
-  Sparkles,
+  CircleDollarSign,
+  Repeat,
+  Bot,
   X,
 } from 'lucide-react'
 
 const mainNav = [
-  { href: '/dashboard', label: 'Dashboard', icon: House },
+  { href: '/dashboard', label: 'Dashboard', icon: Home },
   { href: '/dashboard/clients', label: 'Clients', icon: Users },
-  { href: '/dashboard/jobs', label: 'Jobs', icon: Clapperboard },
-  { href: '/dashboard/calendar', label: 'Calendar', icon: CalendarDays },
+  { href: '/dashboard/jobs', label: 'Jobs', icon: Briefcase },
+  { href: '/dashboard/calendar', label: 'Calendar', icon: Calendar },
 ]
 
 // Money is the operational half (who owes what, how late), Finance the
 // analytical half (revenue over time, averages). Same split as Today and
 // trends. Money comes first because it is the one you act on.
 const businessNav = [
-  { href: '/dashboard/money', label: 'Money', icon: Receipt },
-  { href: '/dashboard/finance', label: 'Finance', icon: Wallet },
+  { href: '/dashboard/money', label: 'Money', icon: CircleDollarSign },
+  { href: '/dashboard/finance', label: 'Finance', icon: BarChart3 },
   { href: '/dashboard/documents', label: 'Documents', icon: FileText },
 ]
 
 // Phone only. On desktop Tui is ⌘K and retainers are reached from the
 // dashboard; on a phone the drawer is the whole menu, so both are listed.
 const mobileNav = [
-  { href: '/dashboard/retainers', label: 'Retainers', icon: Repeat2 },
-  { href: '/dashboard/tui', label: 'Tui AI', icon: Sparkles },
+  { href: '/dashboard/retainers', label: 'Retainers', icon: Repeat },
+  { href: '/dashboard/tui', label: 'Tui AI', icon: Bot },
 ]
 
 const accountNav = [

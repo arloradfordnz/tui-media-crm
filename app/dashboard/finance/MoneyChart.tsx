@@ -64,7 +64,9 @@ export default function MoneyChart({
     observerRef.current = ro
   }, [])
 
-  const PX_PER_POINT = 96
+  // A phone column is about 300px: at 96px a month that is three months, too
+  // few to read a trend from, so months sit closer there (as on the dashboard).
+  const PX_PER_POINT = wrapWidth != null && wrapWidth < 480 ? 60 : 96
   const AXIS_W = 56
   const fit =
     wrapWidth == null
