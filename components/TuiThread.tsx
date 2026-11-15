@@ -667,6 +667,10 @@ export default function TuiThread({
   return (
     <div
       className="tui-shell"
+      // Read by the phone rules in globals.css: the Today panel folds down to
+      // just its message box until there is a conversation to show.
+      data-variant={variant}
+      data-empty={messages.length === 0 ? '' : undefined}
       style={{
         ...containerStyle,
         /* The overlay floats over the page, so it keeps a hairline to separate
@@ -840,7 +844,7 @@ export default function TuiThread({
           empty thread. Stacked above forty messages of real history they were
           four rows of clutter between the conversation and the composer. */}
       {!hasChatted && messages.length === 0 && (
-        <div className="flex flex-wrap gap-1.5 px-5 pb-3">
+        <div className="tui-suggestions flex flex-wrap gap-1.5 px-5 pb-3">
           {SUGGESTIONS.map((s) => (
             <button key={s} onClick={() => sendMessage(s)} className="suggestion-chip">
               {s}
@@ -862,7 +866,7 @@ export default function TuiThread({
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Message Tui AI..."
+            placeholder="Ask the assistant..."
             className="field-input tui-composer-input"
             disabled={loading}
           />

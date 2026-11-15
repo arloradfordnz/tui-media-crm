@@ -171,4 +171,5 @@
 // 3.32.0 — the business health report no longer looks at Instagram, and website enquiries for an event video are filed as one-off work, not video ads.
 // 3.33.0 — phone: the bottom tab bar is replaced by a top bar with a menu button that opens a side drawer listing every page (Tui and Retainers included). Pinch and double-tap zoom are off, and tapping into a text box no longer slides or leaves the page out of place: the app shrinks to the space above the keyboard instead.
 // 3.34.0 — phone: pages scroll under Safari's address bar instead of stopping at a dark band above it, the top bar is solid and sits lower so the logo and Tui button are sharp, and the money graphs can be tapped and dragged to read a month (Finance shows more months too). Standard menu icons, a robot for Tui everywhere, and small animations on every icon.
-export const APP_VERSION = '3.34.0'
+// 3.35.0 — Tui AI is called Assistant in the menu and on its pages. On a phone the Assistant page no longer bounces or judders when dragged, the starter questions are gone, and the Today panel is just a message box until you ask something. Settings memory reworked: add first, each kind of memory opens on tap, tap a memory to change or forget it. Tapping a calendar event on a phone brings its details into view.
+export const APP_VERSION = '3.35.0'

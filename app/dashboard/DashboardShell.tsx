@@ -130,7 +130,7 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
             <Link
               href="/dashboard/tui"
               className={`mobile-top-btn${pathname.startsWith('/dashboard/tui') ? ' active' : ''}`}
-              aria-label="Tui AI"
+              aria-label="Assistant"
             >
               <Bot className="w-5 h-5" />
             </Link>

@@ -4,7 +4,7 @@ import TuiThread from '@/components/TuiThread'
 
 export const dynamic = 'force-dynamic'
 
-export const metadata = { title: 'Tui AI' }
+export const metadata = { title: 'Assistant' }
 
 // Tui as a destination rather than a keyboard shortcut. Before this route it
 // was reachable only via ⌘K, which does not exist on a phone — so the single

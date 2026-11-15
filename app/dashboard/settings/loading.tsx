@@ -12,12 +12,12 @@ export default function SettingsLoading() {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader />
-      {/* Memory: heading, a grouped list, the add box. */}
+      {/* Memory: heading, the add box, then the closed groups. */}
       <div className="card space-y-4">
         <Line w={120} h={14} />
         <Line w="80%" h={12} />
-        <Line h={120} r={18} />
         <Line h={48} r={22} />
+        <Line h={160} r={18} />
       </div>
       {CARDS.map((c, i) => (
         <div key={i} className="card space-y-4">

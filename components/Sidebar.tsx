@@ -38,7 +38,7 @@ const businessNav = [
 // dashboard; on a phone the drawer is the whole menu, so both are listed.
 const mobileNav = [
   { href: '/dashboard/retainers', label: 'Retainers', icon: Repeat },
-  { href: '/dashboard/tui', label: 'Tui AI', icon: Bot },
+  { href: '/dashboard/tui', label: 'Assistant', icon: Bot },
 ]
 
 const accountNav = [

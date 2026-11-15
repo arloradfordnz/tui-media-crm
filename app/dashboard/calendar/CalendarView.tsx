@@ -254,7 +254,12 @@ export default function CalendarView({ events, jobs, clients, month, year, feedT
                       key={e.id}
                       type="button"
                       className="agenda-row"
-                      onClick={() => setSelectedDay(day)}
+                      onClick={() => {
+                        setSelectedDay(day)
+                        // The detail card sits under the whole list, so on a
+                        // phone a tap looked like it did nothing. Bring it up.
+                        requestAnimationFrame(() => document.getElementById('calendar-day-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+                      }}
                     >
                       <span className="agenda-time">{e.startTime || '\u2014'}</span>
                       <span
@@ -276,7 +281,7 @@ export default function CalendarView({ events, jobs, clients, month, year, feedT
 
       {/* Selected day detail */}
       {selectedDay && (
-        <div className="card">
+        <div className="card" id="calendar-day-detail">
           <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>
             {selectedDay} {MONTHS[month]} {year}
           </h3>

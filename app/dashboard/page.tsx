@@ -111,7 +111,7 @@ export default async function DashboardPage() {
               conversation lives on the Tui AI page and in ⌘K. */}
           <section className="today-tui">
             <div className="section-head">
-              <h2 className="section-heading">Tui AI</h2>
+              <h2 className="section-heading">Assistant</h2>
             </div>
             <TuiThread variant="panel" ephemeral fill />
           </section>

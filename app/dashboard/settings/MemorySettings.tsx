@@ -1,18 +1,27 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Brain, Pencil, Trash2, Plus, Check, X } from 'lucide-react'
+import { Brain, ChevronDown, Trash2, Plus, Check, X } from 'lucide-react'
 import { addMemory, updateMemory, deleteMemory } from '@/app/actions/memory'
 import { MEMORY_CATEGORIES, type Memory } from '@/lib/ai-memory'
 
-// Settings → Memory: everything Tui has been told to remember, grouped the
-// way it reads it, with inline edit and delete and a box to add one by hand.
+// Settings → Memory: everything the assistant has been told to remember.
+//
+// Reworked for the phone (November 2026). It used to be every memory in one
+// long list with two icon buttons on each row, which on a phone made Settings
+// several screens of memory before anything else, and the buttons took a
+// quarter of each row. Now:
+//   - adding one comes first, because that is the thing you come here to do
+//   - each kind of memory is a row that opens, closed to begin with, so the
+//     card is a handful of lines until you want to read one
+//   - a memory is edited by tapping it; Forget lives inside the edit view, so
+//     nothing destructive sits under a scrolling thumb
 
 function savedLabel(m: Memory): string {
   const date = new Date(m.updated_at || m.created_at).toLocaleDateString('en-NZ', {
     timeZone: 'Pacific/Auckland', day: 'numeric', month: 'short',
   })
-  const by = m.source === 'arlo' ? 'Added by you' : 'Learned by Tui'
+  const by = m.source === 'arlo' ? 'Added by you' : 'Learned by the assistant'
   return `${by} · ${date}`
 }
 
@@ -23,6 +32,8 @@ function MemoryRow({ memory }: { memory: Memory }) {
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
 
+  const cancel = () => { setEditing(false); setDraft(memory.content); setCategory(memory.category); setError(null) }
+
   const save = () => start(async () => {
     const res = await updateMemory(memory.id, draft, category)
     if (res.error) setError(res.error)
@@ -30,7 +41,7 @@ function MemoryRow({ memory }: { memory: Memory }) {
   })
 
   const remove = () => {
-    if (!confirm('Forget this? Tui will stop knowing it.')) return
+    if (!confirm('Forget this? The assistant will stop knowing it.')) return
     start(async () => {
       const res = await deleteMemory(memory.id)
       if (res.error) setError(res.error)
@@ -44,23 +55,26 @@ function MemoryRow({ memory }: { memory: Memory }) {
           className="field-input memory-textarea"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          rows={2}
+          rows={3}
           maxLength={500}
           autoFocus
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save() }
-            if (e.key === 'Escape') { setEditing(false); setDraft(memory.content) }
+            if (e.key === 'Escape') cancel()
           }}
         />
+        <select className="memory-select" value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Kind of memory">
+          {MEMORY_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+        </select>
         <div className="memory-edit-bar">
-          <select className="memory-select" value={category} onChange={(e) => setCategory(e.target.value)}>
-            {MEMORY_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
-          </select>
+          <button type="button" className="btn-ghost btn-sm memory-forget" disabled={pending} onClick={remove}>
+            <Trash2 className="w-3.5 h-3.5" /> Forget
+          </button>
           <div className="memory-edit-actions">
-            <button type="button" className="btn-ghost btn-sm" onClick={() => { setEditing(false); setDraft(memory.content); setCategory(memory.category); setError(null) }}>
+            <button type="button" className="btn-ghost btn-sm" onClick={cancel}>
               <X className="w-3.5 h-3.5" /> Cancel
             </button>
-            <button type="button" className="btn-primary btn-sm" disabled={pending} onClick={save}>
+            <button type="button" className="btn-primary btn-sm" disabled={pending || !draft.trim()} onClick={save}>
               <Check className="w-3.5 h-3.5" /> {pending ? 'Saving…' : 'Save'}
             </button>
           </div>
@@ -72,22 +86,14 @@ function MemoryRow({ memory }: { memory: Memory }) {
 
   return (
     <li className="memory-row" style={pending ? { opacity: 0.5 } : undefined}>
-      <div className="memory-body">
-        <p className="memory-content">{memory.content}</p>
-        <p className="memory-meta">
+      <button type="button" className="memory-body" onClick={() => setEditing(true)} aria-label="Edit this memory">
+        <span className="memory-content">{memory.content}</span>
+        <span className="memory-meta">
           {memory.clients?.name && <span className="badge badge-accent badge-sm">{memory.clients.name}</span>}
           <span>{savedLabel(memory)}</span>
-        </p>
-        {error && <p className="text-xs" style={{ color: 'var(--danger)' }}>{error}</p>}
-      </div>
-      <div className="memory-actions">
-        <button type="button" className="btn-icon" aria-label="Edit memory" onClick={() => setEditing(true)}>
-          <Pencil className="w-3.5 h-3.5" />
-        </button>
-        <button type="button" className="btn-icon" aria-label="Forget memory" onClick={remove} disabled={pending}>
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
+        </span>
+      </button>
+      {error && <p className="text-xs" style={{ color: 'var(--danger)' }}>{error}</p>}
     </li>
   )
 }
@@ -115,9 +121,10 @@ function AddMemory() {
         value={content}
         onChange={(e) => setContent(e.target.value)}
         maxLength={500}
+        aria-label="Something to remember"
       />
       <div className="memory-add-bar">
-        <select className="memory-select" value={category} onChange={(e) => setCategory(e.target.value)}>
+        <select className="memory-select" value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Kind of memory">
           {MEMORY_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
         </select>
         <button type="submit" className="btn-primary btn-sm" disabled={pending || !content.trim()}>
@@ -146,34 +153,35 @@ export default function MemorySettings({ memories }: { memories: Memory[] | null
           <span className="badge badge-muted badge-sm">{memories.length} {memories.length === 1 ? 'thing' : 'things'}</span>
         )}
       </div>
-      <p className="text-xs mb-5" style={{ color: 'var(--text-tertiary)' }}>
-        What Tui knows about how you work. Tell it in chat (&ldquo;a reel takes me an hour&rdquo;) and it saves it here, on Telegram too. It reads all of this on every message.
+      <p className="text-xs mb-4" style={{ color: 'var(--text-tertiary)' }}>
+        What the assistant knows about how you work. Tell it in chat or add it here. Tap one to change or forget it.
       </p>
 
+      <AddMemory />
+
       {memories === null ? (
-        <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Couldn&apos;t load memory just now.</p>
+        <p className="text-sm mt-5" style={{ color: 'var(--text-tertiary)' }}>Couldn&apos;t load memory just now.</p>
       ) : groups.length === 0 ? (
         <div className="memory-empty">
           <Brain className="w-5 h-5" />
-          <p>Nothing remembered yet. Tell Tui something about how you work, or add it below.</p>
+          <p>Nothing remembered yet.</p>
         </div>
       ) : (
         <div className="memory-groups">
           {groups.map((g) => (
-            <section key={g.key} className="memory-group">
-              <div className="memory-group-head">
-                <h3 className="memory-group-title">{g.label}</h3>
+            <details key={g.key} className="memory-group">
+              <summary className="memory-group-head">
+                <span className="memory-group-title">{g.label}</span>
                 <span className="memory-group-count">{g.items.length}</span>
-              </div>
+                <ChevronDown className="memory-group-chevron" aria-hidden="true" />
+              </summary>
               <ul className="memory-list">
                 {g.items.map((m) => <MemoryRow key={m.id} memory={m} />)}
               </ul>
-            </section>
+            </details>
           ))}
         </div>
       )}
-
-      <AddMemory />
     </div>
   )
 }
