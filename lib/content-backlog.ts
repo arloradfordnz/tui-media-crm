@@ -138,7 +138,9 @@ type RawClient = {
 export async function getContentBacklog(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
-  now: Date = new Date()
+  now: Date = new Date(),
+  // Scope to one client (the client portal). Everything else wants them all.
+  opts: { clientId?: string } = {}
 ): Promise<ContentBacklog> {
   const nzNow = new Date(now.toLocaleString('en-US', { timeZone: 'Pacific/Auckland' }))
   const currentYear = nzNow.getFullYear()
@@ -177,9 +179,12 @@ export async function getContentBacklog(
   // already has (see /api/weekly-briefing) — so archiving Nelson City Framers
   // didn't move it, it just kept accruing "videos owed" against a client that
   // isn't being billed any more.
-  let rows = await supabase
+  const scoped = <Q extends { eq: (col: string, val: string) => Q }>(q: Q): Q =>
+    opts.clientId ? q.eq('id', opts.clientId) : q
+
+  let rows = await scoped(supabase
     .from('clients')
-    .select(`${CLIENT_COLS}, ${JOB_EMBED}, ${SHOOT_EMBED}`)
+    .select(`${CLIENT_COLS}, ${JOB_EMBED}, ${SHOOT_EMBED}`))
     .eq('client_category', 'retainer')
     .neq('status', 'archived')
     // Filters the EMBEDDED events only — a retainer with no shoots still comes
@@ -203,9 +208,9 @@ export async function getContentBacklog(
   if (rows.error) {
     console.warn('[content-backlog] shoot counts unavailable, continuing without them:', rows.error.message)
     shootsAvailable = false
-    rows = await supabase
+    rows = await scoped(supabase
       .from('clients')
-      .select(`${CLIENT_COLS}, ${JOB_EMBED}`)
+      .select(`${CLIENT_COLS}, ${JOB_EMBED}`))
       .eq('client_category', 'retainer')
       .neq('status', 'archived')
       .order('created_at', { referencedTable: 'jobs', ascending: true })

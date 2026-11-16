@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase-admin'
 import { signedDownloadUrl, signedDownloadUrlAttachment } from '@/lib/r2'
+import { getContentBacklog, type ClientBacklog } from '@/lib/content-backlog'
 
 /**
  * Everything a client may see, for one client.
@@ -22,8 +23,12 @@ export async function loadPortalData(client: PortalClient) {
   const supabase = createAdminClient()
   if (!supabase) return null
 
+  // NZ calendar day, for splitting this month's shoots into done and upcoming.
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })
+  const monthStart = `${today.slice(0, 7)}-01`
+
   // Jobs (with deliverables) and documents don't depend on each other.
-  const [{ data: jobs }, { data: documents }, { data: proposals }] = await Promise.all([
+  const [{ data: jobs }, { data: documents }, { data: proposals }, backlog, { data: shoots }] = await Promise.all([
     supabase
       .from('jobs')
       .select(`
@@ -52,7 +57,43 @@ export async function loadPortalData(client: PortalClient) {
       .eq('jobs.client_id', client.id)
       .neq('status', 'draft')
       .order('sent_at', { ascending: false }),
+    // The same backlog Arlo sees on Retainers, scoped to this one client.
+    // Null for anyone not on a monthly retainer.
+    getContentBacklog(supabase, new Date(), { clientId: client.id }).catch(() => null),
+    // This month's shoots and anything booked after, so the portal can say
+    // what is done and when the next one is.
+    supabase
+      .from('events')
+      .select('date, start_time')
+      .eq('client_id', client.id)
+      .eq('event_type', 'shoot')
+      .gte('date', monthStart)
+      .order('date', { ascending: true })
+      .limit(20),
   ])
+
+  const shootDays = (shoots ?? []).map((e) => ({ date: String(e.date).slice(0, 10), startTime: (e.start_time as string | null) ?? null }))
+  const nextShoot = shootDays.find((e) => e.date >= today) ?? null
+  const retainer: ClientBacklog | null = backlog?.clients[0] ?? null
+  const progress = retainer || nextShoot ? {
+    nextShoot,
+    retainer: retainer ? {
+      videosPerMonth: retainer.typicalVideosPerMonth,
+      shootsPerMonth: retainer.shootsPerMonth,
+      paused: !!retainer.pausedFrom,
+      currentMonth: retainer.currentMonth ? {
+        label: retainer.currentMonth.label.split(' ')[0],
+        expected: retainer.currentMonth.expected,
+        delivered: Math.min(retainer.currentMonth.uploaded, retainer.currentMonth.expected),
+        shootsDone: shootDays.filter((e) => e.date < today).length,
+      } : null,
+      // Earlier months still owing videos, oldest first.
+      catchUp: retainer.months
+        .filter((m) => !m.isCurrentMonth && m.missing > 0)
+        .map((m) => ({ label: m.label, missing: m.missing, delivered: m.uploaded, expected: m.expected })),
+      videosOwed: retainer.videosOwed,
+    } : null,
+  } : null
 
   // Fresh presigned R2 URLs for every delivered file. file_name holds the R2
   // object key; file_url may hold an externally-hosted URL (e.g. Vimeo) in
@@ -121,6 +162,7 @@ export async function loadPortalData(client: PortalClient) {
     // gets their own token passed as a prop rather than carried in the URL.
     portalToken: client.portal_token ?? '',
     jobs: jobsResolved,
+    progress,
     proposals: (proposals ?? []).map((p) => {
       const job = p.jobs as unknown as { name: string; shoot_date: string | null; shoot_location: string | null }
       let lines = 0

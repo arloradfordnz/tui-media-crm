@@ -3689,6 +3689,33 @@ textarea.field-input::-webkit-scrollbar-track { margin-block: 14px; }
   .portal-proposal { flex-wrap: wrap; }
   .portal-proposal-right { width: 100%; justify-content: space-between; }
 }
+/* Client portal: monthly content progress. */
+.portal-progress { display: flex; flex-direction: column; gap: 18px; }
+.portal-progress-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.portal-progress-count { font-size: var(--t-lg); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.portal-progress-count strong { font-size: 2rem; font-weight: 600; letter-spacing: -0.03em; color: var(--text-primary); }
+.portal-progress-caption { font-size: var(--t-sm); color: var(--text-tertiary); }
+.portal-progress-bar { display: flex; gap: 6px; }
+.portal-progress-bar span { flex: 1; height: 8px; border-radius: 999px; background: var(--bg-elevated); transition: background var(--dur-fast) ease; }
+.portal-progress-bar span.is-done { background: var(--accent); }
+.portal-progress-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.portal-progress-steps li { display: flex; align-items: center; gap: 8px; font-size: var(--t-sm); color: var(--text-tertiary); }
+.portal-progress-steps li.is-done { color: var(--text-primary); }
+.portal-progress-steps li.is-current { color: var(--text-primary); font-weight: 600; }
+.portal-progress-dot { width: 20px; height: 20px; flex-shrink: 0; border-radius: 999px; border: 1px solid var(--bg-border); display: inline-flex; align-items: center; justify-content: center; }
+.portal-progress-steps li.is-done .portal-progress-dot { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.portal-progress-steps li.is-current .portal-progress-dot { border-color: var(--accent); box-shadow: inset 0 0 0 4px var(--bg-surface), inset 0 0 0 10px var(--accent); }
+.portal-progress-rows { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 1px solid var(--bg-border); }
+.portal-progress-row { display: flex; justify-content: space-between; gap: 12px; font-size: var(--t-sm); color: var(--text-primary); }
+.portal-progress-row > span:first-child { display: inline-flex; align-items: center; gap: 6px; color: var(--text-tertiary); }
+.portal-progress-row > span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.portal-progress-catchup { padding-top: 16px; border-top: 1px solid var(--bg-border); }
+.portal-progress-catchup:first-child { padding-top: 0; border-top: 0; }
+.portal-progress-catchup-title { font-size: var(--t-sm); color: var(--text-secondary); margin-bottom: 10px; }
+.portal-progress-catchup-title strong { color: var(--text-primary); font-weight: 600; }
+.portal-progress-catchup ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.portal-progress-catchup li { display: flex; justify-content: space-between; gap: 12px; font-size: var(--t-sm); color: var(--text-primary); }
+.portal-progress-catchup li > span:last-child { color: var(--text-tertiary); text-align: right; font-variant-numeric: tabular-nums; }
 .prop-excluded { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--bg-border); font-size: var(--t-sm); color: var(--text-tertiary); }
 .prop-options-note { margin: -6px 0 12px; font-size: var(--t-sm); color: var(--text-tertiary); }
 .prop-line-amount small { font-size: var(--t-xs); font-weight: 400; color: var(--text-tertiary); }

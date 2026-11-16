@@ -9,6 +9,7 @@ import { statusLabel, statusBadgeClass, formatDate, formatNZD, firstName } from 
 import Image from 'next/image'
 import { Briefcase, FileText, ScrollText, ArrowUpRight, Film, Image as ImageIcon, File, Music, Download, ChevronDown, ChevronRight, Check, MessageSquare, PenLine, Archive } from 'lucide-react'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
+import ContentProgress, { type PortalProgress } from './ContentProgress'
 
 type DeliveryFile = {
   id: string
@@ -78,6 +79,7 @@ type PortalData = {
   client: { name: string; contactPerson: string | null }
   portalToken: string
   jobs: Job[]
+  progress: PortalProgress | null
   proposals: PortalProposal[]
   documents: Document[]
 }
@@ -219,6 +221,8 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
             </div>
           </div>
         )}
+
+        {data.progress && <ContentProgress progress={data.progress} />}
 
         <div>
           <div className="flex items-center gap-3 mb-4">
