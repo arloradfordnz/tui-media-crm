@@ -21,12 +21,10 @@ import { renderMarkdown } from './chat-markup'
 //  - **/dashboard/tui and the ⌘K overlay** read and write sms_messages, the
 //    same table the Telegram brain uses, so those two and Telegram are
 //    genuinely one continuous conversation.
-//  - **The Today panel is a scratch pad.** Nothing said in it is written to
-//    the shared thread. It is the box you use to ask a quick question while
-//    looking at the dashboard, and a quick question does not belong in the
-//    middle of a Telegram conversation. The trade is real and deliberate:
-//    Telegram will not know what was asked here, so anything worth
-//    remembering should be asked on the Tui AI page.
+//  - **The Today panel** now reads and writes the same thread as the
+//    Assistant page (November 2026), so the two always match. The `ephemeral`
+//    option below still exists for a box that should start empty and log
+//    nothing, but nothing uses it at the moment.
 //
 // Every mount survives navigation. A client component unmounts when you leave
 // the route, so the panel used to lose a conversation the moment you clicked
@@ -697,9 +695,7 @@ export default function TuiThread({
               priority={false}
             />
             <p className="tui-empty-text">
-              {ephemeral
-                ? 'Ask about your clients, jobs, calendar or money. It can make changes for you too.'
-                : 'Ask about your clients, jobs, calendar or money. It can make changes for you too.'}
+              Ask about your clients, jobs, calendar or money. It can make changes for you too.
             </p>
           </div>
         )}

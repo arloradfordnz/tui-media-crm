@@ -11,6 +11,7 @@ import RowControls from './RowControls'
 import MoneyPanel, { MoneyPanelSkeleton } from './MoneyPanel'
 import SubscriptionsPanel, { getSubscriptions } from './SubscriptionsPanel'
 import TuiThread from '@/components/TuiThread'
+import { getTuiThread } from '@/lib/tui/thread'
 import WeekSection from './WeekSection'
 
 export const dynamic = 'force-dynamic'
@@ -53,13 +54,12 @@ function weekdayShort(dateISO: string): string {
 
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient()
-  // The Tui panel below is deliberately not seeded from the shared thread, so
-  // there is nothing else to fetch here.
-  // One wave: the subscriptions read rides along with the attention queries
-  // rather than costing a second sequential round trip.
-  const [attention, subscriptions] = await Promise.all([
+  // One wave: the subscriptions and the assistant's thread ride along with the
+  // attention queries rather than costing a sequential round trip each.
+  const [attention, subscriptions, thread] = await Promise.all([
     getAttention(supabase, new Date()),
     getSubscriptions(supabase),
+    getTuiThread(supabase, 40),
   ])
 
   // Pick up new client mail for the NEXT view of this page. Runs after the
@@ -106,14 +106,13 @@ export default async function DashboardPage() {
           Subscriptions (CSS order, see .today-split in globals.css). */}
       <div className="today-split">
         <div className="today-split-main dash-stack">
-          {/* A scratch pad, not the Telegram thread. It starts empty on every
-              load and writes nothing to the shared thread — the continuous
-              conversation lives on the Tui AI page and in ⌘K. */}
+          {/* The same assistant and the same conversation as the Assistant
+              page and ⌘K: one thread, which resets after 24 hours. */}
           <section className="today-tui">
             <div className="section-head">
               <h2 className="section-heading">Assistant</h2>
             </div>
-            <TuiThread variant="panel" ephemeral fill />
+            <TuiThread variant="panel" initialThread={thread} fill />
           </section>
 
           {/* Streamed, not awaited — see MoneyPanel. */}

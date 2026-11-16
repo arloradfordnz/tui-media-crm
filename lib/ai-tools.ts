@@ -356,7 +356,7 @@ export const TOOLS: Anthropic.Tool[] = [
           required: ['name'],
         },
         status: { type: 'string', enum: ['enquiry', 'booked', 'preproduction', 'shootday', 'editing', 'review', 'approved', 'live', 'delivered', 'handed_over', 'archived'], description: 'Defaults to enquiry. Use booked once the client has said yes ("lock it in", "confirmed", "go ahead").' },
-        notes: { type: 'string', description: 'The brief in a few lines: what is being delivered, timing and turnaround, where it will be used, anything the client stressed. Write it so Arlo can shoot from it without reopening the email.' },
+        notes: { type: 'string', description: 'One short line at most, and only from what Arlo or the client actually said (what is being delivered, timing). Leave it out when there is nothing to add; never pad or invent a brief.' },
         job_type: { type: 'string', description: 'e.g. wedding, commercial, event, music_video' },
         shoot_date: { type: 'string', description: 'ISO date (YYYY-MM-DD)' },
         shoot_location: { type: 'string' },
@@ -477,7 +477,7 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'create_event',
-    description: 'Create a new calendar event.',
+    description: 'Create a new calendar event. Keep the title short. Leave notes out unless Arlo gave you some; never invent notes, an agenda or a location.',
     input_schema: {
       type: 'object' as const,
       properties: {
