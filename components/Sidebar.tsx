@@ -79,9 +79,7 @@ export default function Sidebar({
   return (
     <>
       {/* Scrim — closes the sidebar on outside click on mobile (hidden on desktop via CSS) */}
-      {open && (
-        <div className="sidebar-scrim" onClick={onClose} aria-hidden="true" />
-      )}
+      <div className={`sidebar-scrim${open ? ' is-open' : ''}`} onClick={onClose} aria-hidden="true" />
 
       {/* Sidebar — pinned open on desktop; slides in/out on mobile */}
       <aside className={`sidebar-panel ${open ? 'sidebar-panel-open' : ''}`}>

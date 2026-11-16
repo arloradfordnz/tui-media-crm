@@ -27,6 +27,7 @@
 // property of the last few minutes, not of this turn, and finding out cost a
 // token refresh and an IMAP login every single time.
 
+import { threadSince } from '@/lib/tui/thread'
 import { getContentBacklog } from '@/lib/content-backlog'
 import { listMemories, formatMemories } from '@/lib/ai-memory'
 
@@ -74,6 +75,7 @@ export async function buildContext(
     supabase
       .from('sms_messages')
       .select('direction, body, created_at')
+      .gte('created_at', threadSince())
       .order('created_at', { ascending: false })
       .limit(12),
     supabase

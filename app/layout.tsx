@@ -13,6 +13,16 @@ export const metadata: Metadata = {
     capable: true,
     title: 'Tui Media',
     statusBarStyle: 'black-translucent',
+    // The launch screen: the bird on the app's navy, shown the instant the
+    // home-screen icon is tapped instead of a blank white flash. iOS wants one
+    // PNG per exact screen size (scripts/make-app-icons.mjs renders them).
+    startupImage: [
+      [440, 956, 3], [402, 874, 3], [430, 932, 3], [420, 912, 3], [393, 852, 3],
+      [428, 926, 3], [390, 844, 3], [375, 812, 3], [414, 896, 3], [414, 896, 2], [375, 667, 2],
+    ].map(([w, h, r]) => ({
+      url: `/splash/${w * r}x${h * r}.png`,
+      media: `(device-width: ${w}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: ${r}) and (orientation: portrait)`,
+    })),
   },
 };
 

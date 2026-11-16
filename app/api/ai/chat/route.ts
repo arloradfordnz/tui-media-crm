@@ -1,3 +1,4 @@
+import { threadSince } from '@/lib/tui/thread'
 import Anthropic from '@anthropic-ai/sdk'
 import { NextRequest, after } from 'next/server'
 import { createServerSupabaseClient } from '@/lib/supabase'
@@ -86,7 +87,7 @@ async function getDynamicContext(supabase: ReturnType<typeof createServerSupabas
     supabase.from('clients').select('*', { count: 'exact', head: true }),
     supabase.from('job_tasks').select('title, due_date, jobs(name)').eq('completed', false).not('due_date', 'is', null).lte('due_date', todayISO).order('due_date').limit(10),
     supabase.from('jobs').select('name, status, updated_at, clients(name)').in('status', ['editing', 'review']).lt('updated_at', staleThreshold).order('updated_at').limit(10),
-    supabase.from('sms_messages').select('direction, body, created_at').order('created_at', { ascending: false }).limit(8),
+    supabase.from('sms_messages').select('direction, body, created_at').gte('created_at', threadSince()).order('created_at', { ascending: false }).limit(8),
     getContentBacklog(supabase, now).catch(() => null),
     supabase.from('clients').select('id, name').order('name').limit(60),
     listMemories(supabase).catch(() => []),

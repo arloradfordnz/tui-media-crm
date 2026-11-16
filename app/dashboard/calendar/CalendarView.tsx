@@ -183,7 +183,7 @@ export default function CalendarView({ events, jobs, clients, month, year, feedT
       </div>
 
       {/* Calendar grid — desktop projection (see .calendar-grid-view) */}
-      <div className="card-flush overflow-hidden calendar-grid-view">
+      <div className="card-flush overflow-hidden calendar-grid-view cal-grid">
         <div className="grid grid-cols-7">
           {DAYS.map((d) => (
             <div key={d} className="table-header text-center py-3 text-xs">{d}</div>
@@ -198,7 +198,7 @@ export default function CalendarView({ events, jobs, clients, month, year, feedT
               <div
                 key={i}
                 onClick={() => day && setSelectedDay(day)}
-                className="min-h-[100px] p-2 cursor-pointer transition-colors"
+                className={`cal-cell min-h-[100px] p-2 cursor-pointer transition-colors${isToday ? ' is-today' : ''}${isSelected ? ' is-selected' : ''}`}
                 style={{
                   background: isSelected ? 'var(--bg-elevated)' : 'var(--bg-surface)',
                   borderRight: '1px solid var(--bg-border)',
@@ -208,8 +208,14 @@ export default function CalendarView({ events, jobs, clients, month, year, feedT
               >
                 {day && (
                   <>
-                    <span className="text-sm font-medium" style={{ color: isToday ? 'var(--accent)' : 'var(--text-secondary)' }}>{day}</span>
-                    <div className="mt-1 space-y-1">
+                    <span className="cal-day-num text-sm font-medium" style={{ color: isToday ? 'var(--accent)' : 'var(--text-secondary)' }}>{day}</span>
+                    {/* Phone: the cell is too small for titles, so each event is a dot. */}
+                    <div className="cal-dots" aria-hidden="true">
+                      {dayEvents.slice(0, 3).map((e) => (
+                        <span key={e.id} style={{ background: EVENT_COLORS[e.eventType] || 'var(--text-tertiary)' }} />
+                      ))}
+                    </div>
+                    <div className="cal-events mt-1 space-y-1">
                       {dayEvents.slice(0, 3).map((e) => (
                         <div key={e.id} className="text-2xs px-1.5 py-0.5 rounded truncate" style={{ background: EVENT_COLORS[e.eventType] || 'var(--bg-elevated)', color: 'var(--on-accent)' }}>
                           {e.title}
@@ -224,6 +230,57 @@ export default function CalendarView({ events, jobs, clients, month, year, feedT
           })}
         </div>
       </div>
+
+      {/* Selected day detail */}
+      {selectedDay && (
+        <div className="card" id="calendar-day-detail">
+          <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>
+            {selectedDay} {MONTHS[month]} {year}
+          </h3>
+          {selectedEvents.length === 0 ? (
+            <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No events on this day.</p>
+          ) : (
+            selectedEvents.map((e) => (
+              <div key={e.id} className="flex items-start gap-3 py-3" style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                <div className="w-3 h-3 rounded-full mt-1 shrink-0" style={{ background: EVENT_COLORS[e.eventType] }} />
+                <div className="flex-1">
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{e.title}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="badge badge-muted">{e.eventType === 'iphone' ? 'iPhone' : statusLabel(e.eventType)}</span>
+                    {e.startTime && <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{e.startTime}{e.endTime ? ` – ${e.endTime}` : ''}</span>}
+                  </div>
+                  {e.notes && <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>{e.notes}</p>}
+                  {editingLinks === e.id ? (
+                    <EditLinks event={e} jobs={jobs} clients={clients} onDone={() => setEditingLinks(null)} />
+                  ) : (
+                    <>
+                      <LinkChips event={e} />
+                      {e.eventType !== 'iphone' && (
+                        <button type="button" className="text-xs mt-1.5 inline-flex items-center gap-1" style={{ color: 'var(--text-tertiary)' }} onClick={() => setEditingLinks(e.id)}>
+                          <Link2 className="w-3 h-3" /> {e.client || e.job ? 'Change link' : 'Link to a client or job'}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+                {/* Mirrored from the phone: it would be back on the next sync,
+                    so the only real delete is on the phone. */}
+                {e.eventType !== 'iphone' && <button
+                  onClick={() => setConfirm({
+                    title: 'Delete this event?',
+                    body: `"${e.title}" comes off the calendar. If it is a shoot mirrored from a job, editing the job is the better move — this removes only the calendar entry.`,
+                    confirmLabel: 'Delete event',
+                    destructive: true,
+                    onConfirm: () => { deleteEvent(e.id) },
+                  })}
+                  className="btn-icon"
+                  aria-label={`Delete ${e.title}`}
+                ><Trash2 className="w-4 h-4" style={{ color: 'var(--danger)' }} /></button>}
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {/* Agenda — mobile projection of the SAME month. A 7-column grid in
           ~45px columns is unreadable on a phone, so below 768px the month
@@ -278,57 +335,6 @@ export default function CalendarView({ events, jobs, clients, month, year, feedT
           </div>
         )}
       </div>
-
-      {/* Selected day detail */}
-      {selectedDay && (
-        <div className="card" id="calendar-day-detail">
-          <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>
-            {selectedDay} {MONTHS[month]} {year}
-          </h3>
-          {selectedEvents.length === 0 ? (
-            <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>No events on this day.</p>
-          ) : (
-            selectedEvents.map((e) => (
-              <div key={e.id} className="flex items-start gap-3 py-3" style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                <div className="w-3 h-3 rounded-full mt-1 shrink-0" style={{ background: EVENT_COLORS[e.eventType] }} />
-                <div className="flex-1">
-                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{e.title}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="badge badge-muted">{e.eventType === 'iphone' ? 'iPhone' : statusLabel(e.eventType)}</span>
-                    {e.startTime && <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{e.startTime}{e.endTime ? ` – ${e.endTime}` : ''}</span>}
-                  </div>
-                  {e.notes && <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>{e.notes}</p>}
-                  {editingLinks === e.id ? (
-                    <EditLinks event={e} jobs={jobs} clients={clients} onDone={() => setEditingLinks(null)} />
-                  ) : (
-                    <>
-                      <LinkChips event={e} />
-                      {e.eventType !== 'iphone' && (
-                        <button type="button" className="text-xs mt-1.5 inline-flex items-center gap-1" style={{ color: 'var(--text-tertiary)' }} onClick={() => setEditingLinks(e.id)}>
-                          <Link2 className="w-3 h-3" /> {e.client || e.job ? 'Change link' : 'Link to a client or job'}
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
-                {/* Mirrored from the phone: it would be back on the next sync,
-                    so the only real delete is on the phone. */}
-                {e.eventType !== 'iphone' && <button
-                  onClick={() => setConfirm({
-                    title: 'Delete this event?',
-                    body: `"${e.title}" comes off the calendar. If it is a shoot mirrored from a job, editing the job is the better move — this removes only the calendar entry.`,
-                    confirmLabel: 'Delete event',
-                    destructive: true,
-                    onConfirm: () => { deleteEvent(e.id) },
-                  })}
-                  className="btn-icon"
-                  aria-label={`Delete ${e.title}`}
-                ><Trash2 className="w-4 h-4" style={{ color: 'var(--danger)' }} /></button>}
-              </div>
-            ))
-          )}
-        </div>
-      )}
 
       {/* Add Event Modal */}
       {showModal && (

@@ -1469,7 +1469,11 @@ input, textarea, select, button { font-family: inherit; }
   inset: 0;
   background: rgba(6, 13, 26, 0.55);
   z-index: 55;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-panel) var(--ease-panel);
 }
+.sidebar-scrim.is-open { opacity: 1; pointer-events: auto; }
 @media (min-width: 769px) {
   .sidebar-scrim { display: none; }
 }
@@ -3831,6 +3835,8 @@ textarea.field-input::-webkit-scrollbar-track { margin-block: 14px; }
 .main-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; min-width: 0; }
 .mobile-top-bar,
 .sidebar-close,
+.pull-refresh,
+.cal-dots,
 .nav-mobile-only { display: none; }
 
 /* No pinch or double-tap zoom anywhere in the dashboard. */
@@ -3883,11 +3889,6 @@ html:has(.dash-root) {
     overflow: visible;
     padding: 8px 16px calc(32px + env(safe-area-inset-bottom));
   }
-  .tui-page {
-    height: calc(
-      var(--app-h, 100dvh) - var(--top-bar-h) - 10px - env(safe-area-inset-top) - 8px - 32px - env(safe-area-inset-bottom)
-    );
-  }
 
   /* A page that fits the screen exactly (the assistant) must not scroll or
      rubber-band at all: the bounce is what fought the keyboard pin and made
@@ -3900,15 +3901,74 @@ html:has(.dash-root) {
      rows and squeezed the conversation into a strip. */
   .tui-suggestions { display: none; }
 
-  /* Today's assistant panel: just the message box until there is something
-     to read, then a thread tall enough to read it in. */
-  .today-tui .tui-shell { height: min(60vh, 440px) !important; }
-  .today-tui .tui-shell[data-empty] { height: auto !important; }
-  .today-tui .tui-shell[data-empty] .tui-scroll { display: none; }
-  .today-tui .tui-shell[data-empty] .tui-composer { border-top: 0; padding: 10px; }
+  /* Today's assistant panel: a proper box with the bird and its line in the
+     middle, taller once there is a conversation to read. */
+  .today-tui .tui-shell { height: 340px !important; }
+  .today-tui .tui-shell:not([data-empty]) { height: min(68vh, 520px) !important; }
+
+  /* The assistant page runs to the bottom of the screen; the message box sits
+     above the home indicator instead of the card stopping short of it. */
+  .page-shell-inner:has(.tui-page) { padding-bottom: 8px; }
+  .tui-page {
+    height: calc(var(--app-h, 100dvh) - var(--top-bar-h) - 10px - env(safe-area-inset-top) - 16px);
+  }
+  .tui-page .tui-composer { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+
   .tui-scroll { padding-left: 14px; padding-right: 14px; }
 
   #calendar-day-detail { scroll-margin-top: calc(var(--top-bar-h) + 22px + env(safe-area-inset-top)); }
+
+  /* Pull to refresh: parked just above the top bar's lower edge, it rides
+     down under the finger and spins while the page reloads. */
+  .pull-refresh {
+    position: fixed;
+    z-index: 39;
+    left: 50%;
+    top: calc(var(--top-bar-h) + env(safe-area-inset-top) - 30px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--bg-elevated);
+    color: var(--accent);
+    box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.6);
+    opacity: 0;
+    transform: translate(-50%, 0);
+    transition: transform 260ms var(--ease-panel), opacity 200ms ease;
+    pointer-events: none;
+  }
+  .pull-refresh.is-busy { opacity: 1; transform: translate(-50%, 56px); }
+  .pull-refresh.is-busy svg { animation: ptrSpin 700ms linear infinite; }
+
+  /* Calendar: the month as a compact grid (a number and a dot per event),
+     with the chosen day's details and the full list under it. */
+  .calendar-grid-view.cal-grid { display: block; }
+  .cal-grid .table-header { padding: 10px 0; }
+  .cal-cell {
+    min-height: 50px;
+    padding: 7px 0 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    border-left: 0 !important;
+  }
+  .cal-cell .cal-events { display: none; }
+  .cal-day-num {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-variant-numeric: tabular-nums;
+  }
+  .cal-cell.is-today .cal-day-num { background: var(--accent); color: var(--on-accent) !important; }
+  .cal-cell.is-selected:not(.is-today) .cal-day-num { box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .cal-dots { display: flex; gap: 3px; height: 5px; }
+  .cal-dots span { width: 5px; height: 5px; border-radius: 50%; }
 
   /* Drawer: flush to the left edge, full height, thumb-sized rows. */
   .sidebar-panel {
@@ -4045,3 +4105,4 @@ html:has(.dash-root) {
   from { opacity: 0; transform: translateX(-14px); }
   to { opacity: 1; transform: translateX(0); }
 }
+@keyframes ptrSpin { to { transform: rotate(360deg); } }
