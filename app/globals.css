@@ -3970,13 +3970,32 @@ html:has(.dash-root) {
   .cal-dots { display: flex; gap: 3px; height: 5px; }
   .cal-dots span { width: 5px; height: 5px; border-radius: 50%; }
 
+  /* Lists reflow into rows on a phone, so nothing in them is wider than the
+     screen; a sideways scroller here only let the list wobble left and right. */
+  .card-flush { overflow-x: hidden; }
+
+  /* Long job names stop at one line with an ellipsis instead of wrapping and
+     pushing the status pill onto a line of its own. The primary cell starts
+     from zero width so the pill always keeps its place on the first line. */
+  .record-table td[data-role="primary"] { flex: 1 1 0; }
+  .job-identity-client,
+  .job-identity-job { white-space: nowrap; max-width: 100%; }
+  .record-table td[data-role="primary"] p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .record-table td[data-role="primary"] a > div { min-width: 0; }
+
+  /* The menu runs the full height of the screen, under Safari's toolbar too.
+     100lvh is the screen with the toolbar hidden; the extra bottom padding is
+     the toolbar's height when it is showing, so Sign out sits above it. */
+  .sidebar-panel,
+  .sidebar-scrim { bottom: auto; height: 100lvh; }
+  .sidebar-panel { padding-bottom: calc(100lvh - 100dvh + env(safe-area-inset-bottom)); }
+
   /* Drawer: flush to the left edge, full height, thumb-sized rows. */
   .sidebar-panel {
     width: min(300px, calc(100vw - 64px));
     margin: 0;
     border-radius: 0 var(--r-xl) var(--r-xl) 0;
     padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
   }
   .sidebar-close {
     display: inline-flex;
@@ -4106,3 +4125,17 @@ html:has(.dash-root) {
   to { opacity: 1; transform: translateX(0); }
 }
 @keyframes ptrSpin { to { transform: rotate(360deg); } }
+
+/* ── Horizontal strips scroll sideways only ───────────────────
+   Tab and filter strips scroll left and right. Without overflow-y hidden an
+   x-scroller is a y-scroller too, so the strip could be dragged up and down a
+   few pixels; touch-action keeps a drag that starts on it horizontal. */
+.page-tabs,
+.page-tabs-scroll {
+  overflow-y: hidden;
+  overscroll-behavior: contain;
+}
+@media (pointer: coarse) {
+  .page-tabs { touch-action: pan-x; }
+  .page-tabs-scroll { touch-action: pan-x; }
+}

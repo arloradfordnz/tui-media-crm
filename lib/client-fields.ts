@@ -11,12 +11,22 @@
  * make the wind-down impossible to track. `one_off` covers everything from
  * before that isn't either.
  */
+// The kind of work a client buys. The stored keys predate the labels:
+// 'retainer' is monthly social media content (the backlog, reminders and the
+// weekly briefing all key off it, so it keeps its name), and 'video_ads' is
+// commercial work. 'marketing' is no longer offered but old rows still read.
 export const CLIENT_CATEGORIES = [
-  { value: 'video_ads', label: 'Video Ads' },
+  { value: 'retainer', label: 'Social media' },
+  { value: 'video_ads', label: 'Commercial' },
+  { value: 'events', label: 'Events' },
+  { value: 'wedding', label: 'Weddings' },
   { value: 'one_off', label: 'One-off' },
-  { value: 'retainer', label: 'Retainer' },
-  { value: 'marketing', label: 'Marketing' },
 ] as const
+
+export const CATEGORY_LABELS: Record<string, string> = {
+  ...Object.fromEntries(CLIENT_CATEGORIES.map((c) => [c.value, c.label])),
+  marketing: 'Marketing',
+}
 
 /**
  * The Industry dropdown. 'Other' covers anything that broadly fits — the

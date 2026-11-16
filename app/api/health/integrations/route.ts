@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getValidXeroAccount } from '@/lib/xero'
 import { checkMailConnection } from '@/lib/mail'
-import { sendTelegramMessage } from '@/lib/telegram'
 import { hasCronBearer } from '@/lib/secure-compare'
 
 // Keeps integration_status warm so the assistant never has to probe Xero or
@@ -108,13 +107,8 @@ export async function GET(req: NextRequest) {
     ...fixed.map((r) => `${LABELS[r.integration] ?? r.integration} is back.`),
   ]
 
-  if (lines.length) {
-    // Failure to notify is worth a log line but not a failed cron — the status
-    // row is already written, and the dashboard reads that.
-    await sendTelegramMessage(lines.join('\n')).catch((err) =>
-      console.error('[health] alert send failed:', err)
-    )
-  }
+  // Changes are logged; the status rows themselves are what the dashboard reads.
+  if (lines.length) console.log('[health] ' + lines.join(' | '))
 
   return NextResponse.json({ ok: true, checked_at: checkedAt, rows, alerted: lines })
 }

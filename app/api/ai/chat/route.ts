@@ -123,7 +123,7 @@ async function getDynamicContext(supabase: ReturnType<typeof createServerSupabas
   if (memoryText) lines.push(memoryText)
 
   if ((recentThread ?? []).length > 0)
-    lines.push(`Recent thread with Arlo (oldest first, spans Telegram and this panel): ${(recentThread ?? []).slice().reverse().map(m => `${m.direction === 'inbound' ? 'Arlo' : 'You'}: ${m.body}`).join(' | ')}`)
+    lines.push(`Recent thread with Arlo (oldest first, today's conversation): ${(recentThread ?? []).slice().reverse().map(m => `${m.direction === 'inbound' ? 'Arlo' : 'You'}: ${m.body}`).join(' | ')}`)
 
   return lines.join('\n')
 }

@@ -170,7 +170,7 @@ export async function updateClientCategory(clientId: string, category: string | 
   // 'video_ads' is the post-rebrand offer; the rest stay for the retainer
   // clients still on the books. Leaving it off this list silently rejected
   // every attempt to categorise a new client from the list view.
-  const allowed = ['video_ads', 'retainer', 'marketing', 'one_off', null]
+  const allowed = ['video_ads', 'retainer', 'marketing', 'one_off', 'events', 'wedding', null]
   if (!allowed.includes(category)) return { error: 'Invalid category.' }
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.from('clients').update({ client_category: category }).eq('id', clientId)

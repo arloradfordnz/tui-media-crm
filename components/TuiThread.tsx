@@ -698,8 +698,8 @@ export default function TuiThread({
             />
             <p className="tui-empty-text">
               {ephemeral
-                ? 'Ask about jobs, clients or invoices. This one starts fresh each time.'
-                : 'Ask about jobs, clients or invoices. Same thread as your Telegram.'}
+                ? 'Ask about your clients, jobs, calendar or money. It can make changes for you too.'
+                : 'Ask about your clients, jobs, calendar or money. It can make changes for you too.'}
             </p>
           </div>
         )}

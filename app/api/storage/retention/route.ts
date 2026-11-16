@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { deleteObject } from '@/lib/r2'
-import { sendTelegramMessage } from '@/lib/telegram'
 import { secretMatches, hasCronBearer } from '@/lib/secure-compare'
 
 /**
@@ -128,14 +127,8 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Only speaks when it actually did something — a sweep that found nothing is
-  // not news, and a channel that reports every night gets muted.
   if (archived.length) {
-    try {
-      await sendTelegramMessage(
-        `Storage cleanup: archived ${archived.length} old ${archived.length === 1 ? 'delivery' : 'deliveries'} from R2, freeing ~${(freedBytes / 1e9).toFixed(2)} GB. Clients keep the delivery history; the files are no longer downloadable.`
-      )
-    } catch { /* best-effort */ }
+    console.log(`[retention] archived ${archived.length} old deliveries, freed ~${(freedBytes / 1e9).toFixed(2)} GB`)
   }
 
   return NextResponse.json({

@@ -8,27 +8,23 @@ been the app confidently showing a figure it had made up.
 
 ## Tui, the assistant
 
-**What it is.** One assistant with one memory, reachable in three places:
+**What it is.** One assistant, reachable in two places:
 
-- **Telegram** — you can text it, and it texts you when a client does
-  something or an integration breaks. It never sends anything on a schedule;
-  see CRONS.md for why.
-- **The Today screen** — the panel at the bottom of the home page.
-- **`/dashboard/tui`** — the centre tab on your phone, or ⌘K on a desktop.
+- **The Today screen** — the Assistant box on the home page. It starts fresh
+  on every visit.
+- **`/dashboard/tui`** — Assistant in the menu (or the robot button on your
+  phone), or ⌘K on a desktop. This one keeps the day's conversation and starts
+  a new one after 24 hours. What it should know for good lives in Settings,
+  under Memory.
 
-All three are the same conversation. Say something on Telegram and it is there
-in the dashboard panel; ask something in the panel and Telegram knows you
-already discussed it. Before this branch they were two separate assistants with
-separate histories, which is why it used to repeat itself.
+Telegram was removed in November 2026; it was not being used.
 
 **What you need it for.** Three things it does that nothing else in the app
 does:
 
-1. **It notices things without being asked.** It reads the CRM and texts you
-   only if something needs you: a retainer month
-   you still owe videos on, a job that has sat untouched, an invoice gone
-   overdue, a lead that has gone quiet, a shoot in a few days with nothing
-   organised. If there is nothing, it says nothing.
+1. **It knows what needs you.** Client actions in the portal and things like a
+   retainer month you still owe videos on, a job that has sat untouched or a
+   lead gone quiet show up in Your week on the Today screen.
 2. **It does the work, not just the reporting.** It has real tools. "Push Smith
    to Friday", "invoice Greg 600", "create July Content for Bainbridge" — it
    makes the change in the CRM or in Xero, and tells you it did.
@@ -38,9 +34,8 @@ does:
 
 **What stops it going wrong.** Anything destructive — voiding or deleting a
 Xero invoice, removing a payment, deleting a job — is refused by the code
-before the model ever runs it. On the dashboard you get a Confirm button; over
-Telegram it sends you a four-character code and only that exact code, typed
-back, releases that one action. The permission is tied to the specific
+before the model ever runs it. You get a Confirm button, and only that tap
+releases that one action. The permission is tied to the specific
 arguments, so confirming one deletion cannot be reused for a different one.
 
 **Why it does not nag.** Every concern it can see gets a row in a table with a

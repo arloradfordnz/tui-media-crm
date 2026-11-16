@@ -1,3 +1,4 @@
+import { CLIENT_CATEGORIES } from '@/lib/client-fields'
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { formatNZD, getInitials } from '@/lib/format'
 import { Users, UserPlus } from 'lucide-react'
@@ -19,9 +20,7 @@ const STATUS_OPTIONS = [
 
 const CATEGORY_OPTIONS = [
   { value: 'all', label: 'All types' },
-  { value: 'retainer', label: 'Retainer' },
-  { value: 'marketing', label: 'Marketing' },
-  { value: 'one_off', label: 'One-off' },
+  ...CLIENT_CATEGORIES.map((c) => ({ value: c.value as string, label: c.label as string })),
 ]
 
 export default async function ClientsPage({ searchParams }: { searchParams: Promise<{ search?: string; status?: string; category?: string }> }) {

@@ -127,9 +127,9 @@ export async function POST(req: Request) {
     first_contact: new Date().toISOString(),
     pipeline_stage: 'enquiry',
     status: 'lead',
-    // The site offers monthly content and event videos. Monthly is retainer
-    // work; an event (or anything else) is a one-off.
-    client_category: body.interest === 'Monthly content' ? 'retainer' : 'one_off',
+    // The site offers monthly content and event videos. Monthly is social
+    // media (stored as 'retainer'); an event is events; anything else one-off.
+    client_category: body.interest === 'Monthly content' ? 'retainer' : /event/i.test(body.interest ?? '') ? 'events' : 'one_off',
     brand: 'tui_media',
     sells: body.sell?.trim() || null,
     interest: body.interest?.trim() || null,

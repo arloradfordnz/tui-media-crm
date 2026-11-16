@@ -1,5 +1,10 @@
 # Schedules
 
+> **November 2026:** Telegram has been removed from the CRM. Nothing below that
+> mentions sending a Telegram message happens any more: the storage and
+> integration checks only log, and client actions in the portal are recorded
+> as flags for Your week on the Today screen. The history is kept for context.
+
 All times are UTC, because that is what Vercel cron takes. NZ is UTC+12 (+13 in
 daylight saving), so the offsets below are what actually matters.
 

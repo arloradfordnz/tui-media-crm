@@ -4,12 +4,11 @@ import { useEffect, useRef, useState, useTransition, useLayoutEffect } from 'rea
 import { createPortal } from 'react-dom'
 import { Check } from 'lucide-react'
 import { updateClientCategory } from '@/app/actions/clients'
-import { statusLabel, statusBadgeClass } from '@/lib/format'
+import { statusLabel } from '@/lib/format'
+import { CLIENT_CATEGORIES, CATEGORY_LABELS } from '@/lib/client-fields'
 
 const OPTIONS: Array<{ value: string | null; label: string }> = [
-  { value: 'retainer', label: 'Retainer' },
-  { value: 'marketing', label: 'Marketing' },
-  { value: 'one_off', label: 'One-off' },
+  ...CLIENT_CATEGORIES.map((c) => ({ value: c.value as string, label: c.label as string })),
   { value: null, label: 'None' },
 ]
 
@@ -66,13 +65,13 @@ export default function QuickCategory({ clientId, category }: { clientId: string
         ref={btnRef}
         type="button"
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen((v) => !v) }}
-        className={current ? `badge ${statusBadgeClass(current)}` : 'badge badge-muted'}
+        className={current ? 'badge badge-accent' : 'badge badge-muted'}
         style={{ cursor: 'pointer', opacity: pending ? 0.6 : 1 }}
         aria-haspopup="listbox"
         aria-expanded={open}
         title="Click to change type"
       >
-        {current ? statusLabel(current) : '—'}
+        {current ? (CATEGORY_LABELS[current] ?? statusLabel(current)) : '—'}
       </button>
 
       {open && pos && mounted && createPortal(
