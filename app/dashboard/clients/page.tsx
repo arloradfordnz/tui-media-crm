@@ -33,7 +33,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
 
   let query = supabase
     .from('clients')
-    .select('id, name, email, location, status, client_category, lifetime_value, tags, created_at, jobs(quote_value, status)')
+    .select('id, name, email, location, status, client_category, lifetime_value, is_volunteer, tags, created_at, jobs(quote_value, status)')
     .order('name', { ascending: true })
 
   if (statusFilter !== 'all') {
@@ -136,7 +136,11 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
                       <QuickCategory clientId={c.id} category={c.client_category} />
                     </td>
                     <td className="px-4 py-4 text-sm text-right" data-role="secondary" style={{ color: 'var(--text-secondary)' }}>{c.jobCount} {c.jobCount === 1 ? 'job' : 'jobs'}</td>
-                    <td className="px-4 py-4 text-sm text-right" data-role="secondary" style={{ color: 'var(--text-primary)' }}>{formatNZD(c.lifetime_value)}</td>
+                    <td className="px-4 py-4 text-sm text-right" data-role="secondary" style={{ color: 'var(--text-primary)' }}>
+                      {c.is_volunteer && !c.lifetime_value
+                        ? <span className="badge badge-accent">Volunteer</span>
+                        : formatNZD(c.lifetime_value)}
+                    </td>
                     <td className="px-4 py-4 text-right" data-role="trailing">
                       <QuickStatus clientId={c.id} status={c.status} />
                     </td>

@@ -176,4 +176,5 @@
 // 3.37.0 — clients have a kind of work: Social media, Commercial, Events, Weddings or One-off (Events and Weddings are new), filled in for every client with jobs to go on. Telegram is gone from the CRM. Phone: long job names stop at one line so the status stays beside them, lists and tabs no longer wobble, and the menu runs to the bottom of the screen.
 // 3.38.0 — the Today assistant and the Assistant page are now the same conversation (one thread, reset after 24 hours). The assistant replies in one short sentence and, when it adds a client, job or event, fills in only what you said instead of padding notes.
 // 3.39.0 — the client portal has a Your Content card: this month's videos delivered out of how many, where the month is up to (shoot, editing, delivered), the next shoot, shoots done, and videos still to come from earlier months. Same counts as the Retainers page.
-export const APP_VERSION = '3.39.0'
+// 3.40.0 — clients can be marked Volunteer (shows instead of $0), and a retainer can have no set number of videos, so nothing is counted as owed. Client portal: the Shoot, Editing, Delivered steps span the card evenly, and videos play in their own shape, so 9:16 Reels and TikToks, 4:5 and square sit properly instead of in a wide black box.
+export const APP_VERSION = '3.40.0'

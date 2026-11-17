@@ -80,12 +80,16 @@ export async function loadPortalData(client: PortalClient) {
     retainer: retainer ? {
       videosPerMonth: retainer.typicalVideosPerMonth,
       shootsPerMonth: retainer.shootsPerMonth,
+      openEnded: retainer.openEnded,
       paused: !!retainer.pausedFrom,
       currentMonth: retainer.currentMonth ? {
         label: retainer.currentMonth.label.split(' ')[0],
         expected: retainer.currentMonth.expected,
         delivered: Math.min(retainer.currentMonth.uploaded, retainer.currentMonth.expected),
         shootsDone: shootDays.filter((e) => e.date < today).length,
+        // Arlo marking the month's job delivered is the only "finished" signal
+        // when there's no number of videos to reach.
+        markedDone: retainer.currentMonth.jobDone,
       } : null,
       // Earlier months still owing videos, oldest first.
       catchUp: retainer.months

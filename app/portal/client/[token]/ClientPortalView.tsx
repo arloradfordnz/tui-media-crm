@@ -404,15 +404,7 @@ function FileCard({ file, jobId, portalToken, onApprove }: { file: DeliveryFile;
               that is not where they left. preload="metadata" pulls the first
               frame so the player shows the video rather than a black rectangle
               — the closest thing to a poster frame without storing one. */}
-          <video
-            controls
-            playsInline
-            preload="metadata"
-            className="w-full"
-            style={{ maxHeight: '70vh', background: '#060D1A', display: 'block' }}
-          >
-            <source src={file.fileUrl} type={file.mimeType || undefined} />
-          </video>
+          <AdaptiveVideo src={file.fileUrl} type={file.mimeType} />
         </div>
       )}
       {file.fileUrl && kind === 'image' && (
@@ -470,6 +462,36 @@ function FileCard({ file, jobId, portalToken, onApprove }: { file: DeliveryFile;
           </button>
         )}
       </div>
+    </div>
+  )
+}
+
+// The player takes the video's own shape: 16:9, 9:16 for Reels and TikTok,
+// 4:5, 1:1, whatever was exported. It used to be a full-width box capped at
+// 70vh, so a vertical video sat as a thin strip between two wide black bars.
+// The real ratio is only known once the metadata loads, so it starts at 16:9
+// and settles on the file's own; preload="metadata" makes that near instant.
+function AdaptiveVideo({ src, type }: { src: string; type: string | null }) {
+  const [ratio, setRatio] = useState(16 / 9)
+  return (
+    <div className="media-frame" style={{ '--ratio': ratio } as React.CSSProperties}>
+      {/* playsInline is the whole ballgame on iOS: without it Safari yanks
+          the client out of the page into its own fullscreen player the
+          moment they hit play, and they land back on a scroll position
+          that is not where they left. preload="metadata" pulls the first
+          frame so the player shows the video rather than a black rectangle
+          — the closest thing to a poster frame without storing one. */}
+      <video
+        controls
+        playsInline
+        preload="metadata"
+        onLoadedMetadata={(e) => {
+          const v = e.currentTarget
+          if (v.videoWidth && v.videoHeight) setRatio(v.videoWidth / v.videoHeight)
+        }}
+      >
+        <source src={src} type={type || undefined} />
+      </video>
     </div>
   )
 }

@@ -11,7 +11,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
 
   const supabase = await createServerSupabaseClient()
 
-  type ClientRow = { id: string; name: string; contact_person: string | null; email: string | null; phone: string | null; marketing_email: string | null; location: string | null; lead_source: string | null; first_contact: string | null; pipeline_stage: string; status: string; client_category: string | null; lifetime_value: number; monthly_retainer: number | null; shoots_per_month: number | null; videos_per_month: number | null; retainer_paused_from: string | null; notes: string | null; tags: string | null; portal_token?: string | null }
+  type ClientRow = { id: string; name: string; contact_person: string | null; email: string | null; phone: string | null; marketing_email: string | null; location: string | null; lead_source: string | null; first_contact: string | null; pipeline_stage: string; status: string; client_category: string | null; lifetime_value: number; monthly_retainer: number | null; shoots_per_month: number | null; videos_per_month: number | null; videos_open_ended: boolean | null; is_volunteer: boolean | null; retainer_paused_from: string | null; notes: string | null; tags: string | null; portal_token?: string | null }
 
   // Queried on its own, and tolerant of the column not being there.
   //
@@ -78,7 +78,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
   ] = await Promise.all([
     supabase
       .from('clients')
-      .select('id, name, contact_person, email, phone, marketing_email, location, lead_source, first_contact, pipeline_stage, status, client_category, lifetime_value, monthly_retainer, shoots_per_month, videos_per_month, retainer_paused_from, notes, tags, portal_token')
+      .select('id, name, contact_person, email, phone, marketing_email, location, lead_source, first_contact, pipeline_stage, status, client_category, lifetime_value, monthly_retainer, shoots_per_month, videos_per_month, videos_open_ended, is_volunteer, retainer_paused_from, notes, tags, portal_token')
       .eq('id', id)
       .single(),
     supabase
@@ -126,6 +126,8 @@ export default async function ClientDetailPage({ params, searchParams }: { param
     monthlyRetainer: client.monthly_retainer,
     shootsPerMonth: client.shoots_per_month,
     videosPerMonth: client.videos_per_month,
+    videosOpenEnded: !!client.videos_open_ended,
+    isVolunteer: !!client.is_volunteer,
     retainerPausedFrom: client.retainer_paused_from?.slice(0, 7) ?? null,
     invoiceDay: invoiceDayRaw ? parseInt(invoiceDayRaw, 10) : null,
     industry: (rebrandFields.industry as string | null) ?? null,

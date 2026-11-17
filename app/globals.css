@@ -2332,6 +2332,18 @@ td.docs-opened-cell { display: none; }
   }
 }
 
+/* The video inside the band, sized to the file's own aspect ratio (--ratio,
+   width over height, set from the video's metadata). Full width for landscape;
+   a vertical 9:16 is held to 75% of the screen height and centred, so the whole
+   frame is visible without scrolling. */
+.media-frame {
+  --frame-max-h: min(75vh, 760px);
+  aspect-ratio: var(--ratio, 1.7778);
+  width: min(100%, calc(var(--frame-max-h) * var(--ratio, 1.7778)));
+  margin: 0 auto;
+}
+.media-frame video { display: block; width: 100%; height: 100%; object-fit: contain; background: #060D1A; }
+
 /* ── Confirm sheet ────────────────────────────────────────────
    Bottom sheet on a phone, centred dialog above 640px. Replaces the native
    confirm() on approve / request revision / sign — a grey OS dialog carrying
@@ -3698,8 +3710,15 @@ textarea.field-input::-webkit-scrollbar-track { margin-block: 14px; }
 .portal-progress-bar { display: flex; gap: 6px; }
 .portal-progress-bar span { flex: 1; height: 8px; border-radius: 999px; background: var(--bg-elevated); transition: background var(--dur-fast) ease; }
 .portal-progress-bar span.is-done { background: var(--accent); }
-.portal-progress-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.portal-progress-steps li { display: flex; align-items: center; gap: 8px; font-size: var(--t-sm); color: var(--text-tertiary); }
+/* A stepper that spans the card: first step on the left edge, last on the
+   right, and a line between each that fills in as the month moves along. It
+   was three equal grid columns with everything left-aligned, so "Delivered"
+   stopped two-thirds across and the gaps between steps read as uneven. */
+.portal-progress-steps { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; }
+.portal-progress-steps li { display: flex; align-items: center; gap: 8px; flex: 1 1 0; min-width: 0; font-size: var(--t-sm); color: var(--text-tertiary); white-space: nowrap; }
+.portal-progress-steps li:last-child { flex: 0 0 auto; }
+.portal-progress-steps li:not(:last-child)::after { content: ''; flex: 1; min-width: 12px; height: 2px; margin: 0 12px 0 4px; border-radius: 999px; background: var(--bg-border); transition: background var(--dur-fast) ease; }
+.portal-progress-steps li.is-done:not(:last-child)::after { background: var(--accent); }
 .portal-progress-steps li.is-done { color: var(--text-primary); }
 .portal-progress-steps li.is-current { color: var(--text-primary); font-weight: 600; }
 .portal-progress-dot { width: 20px; height: 20px; flex-shrink: 0; border-radius: 999px; border: 1px solid var(--bg-border); display: inline-flex; align-items: center; justify-content: center; }

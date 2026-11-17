@@ -110,10 +110,15 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
   const tags = tagsRaw ? JSON.stringify(tagsRaw.split(',').map((t: string) => t.trim()).filter(Boolean)) : null
   const monthlyRetainer = monthlyRetainerRaw ? parseFloat(monthlyRetainerRaw) : null
   const shootsPerMonth = shootsPerMonthRaw ? parseInt(shootsPerMonthRaw, 10) : null
-  const videosPerMonth = videosPerMonthRaw ? parseInt(videosPerMonthRaw, 10) : null
+  const isVolunteer = formData.get('isVolunteer') === 'volunteer'
+  // The videos-per-month dropdown carries 'open' for "No set amount".
+  const videosOpenEnded = videosPerMonthRaw === 'open'
+  const videosPerMonth = !videosOpenEnded && videosPerMonthRaw ? parseInt(videosPerMonthRaw, 10) || null : null
 
   const supabase = await createServerSupabaseClient()
   const { error } = await supabase.from('clients').update({
+    is_volunteer: isVolunteer,
+    videos_open_ended: videosOpenEnded,
     name,
     contact_person: contactPerson || null,
     email: email || null,

@@ -29,6 +29,8 @@ export type MonthStatus = {
   missing: number
   shoots: number         // shoot events logged against this client that month
   jobExists: boolean
+  /** A job for this month is marked delivered, handed over or archived. */
+  jobDone: boolean
   isCurrentMonth: boolean
 }
 
@@ -46,6 +48,13 @@ export type ClientBacklog = {
   videosPerMonth: number | null
   /** The shoot target from the client record. Null when nothing is set. */
   shootsPerMonth: number | null
+  /**
+   * No set number of videos: one shoot a month and whatever comes out of it.
+   * Every month expects what it delivered, so nothing is ever owed.
+   */
+  openEnded: boolean
+  /** Unpaid work Arlo does as a volunteer. */
+  volunteer: boolean
   /** First month not owed ('2026-08'), or null when the retainer is running. */
   pausedFrom: string | null
   /** Shoots logged this calendar month, however many videos came out of them. */
@@ -115,6 +124,7 @@ type RawDeliverable = { id: string; delivery_files: { id: string; created_at: st
 type RawJob = {
   id: string
   name: string
+  status: string | null
   created_at: string | null
   client_id: string
   deliverables: RawDeliverable[] | null
@@ -126,6 +136,8 @@ type RawClient = {
   shoots_per_month: number | null
   videos_per_month: number | null
   retainer_paused_from: string | null
+  videos_open_ended: boolean | null
+  is_volunteer: boolean | null
 }
 
 /**
@@ -163,10 +175,10 @@ export async function getContentBacklog(
   //
   // Verified against live data that the flattened embeds are byte-identical to
   // what the separate queries returned.
-  const CLIENT_COLS = 'id, name, monthly_retainer, shoots_per_month, videos_per_month, retainer_paused_from'
+  const CLIENT_COLS = 'id, name, monthly_retainer, shoots_per_month, videos_per_month, retainer_paused_from, videos_open_ended, is_volunteer'
   // Archived jobs are included on purpose: an archived month still shipped its
   // videos, and dropping it would invent a hole in the history.
-  const JOB_EMBED = 'jobs(id, name, created_at, client_id, deliverables(id, delivery_files(id, created_at)))'
+  const JOB_EMBED = 'jobs(id, name, status, created_at, client_id, deliverables(id, delivery_files(id, created_at)))'
   // Shoots, bucketed below by the NZ calendar month they happened in.
   // Deliberately keyed off the event's own client_id rather than its job: a
   // retainer month job holds one shoot_date, so a month with two shoots in it
@@ -291,15 +303,16 @@ export async function getContentBacklog(
     // another, say) silently became the new "typical" for August and every
     // month after, with nothing to correct it back to the real number.
     const sortedKeys = [...byMonth.keys()].sort()
-    let typical = client.videos_per_month ?? 0
-    if (typical === 0) {
+    const openEnded = !!client.videos_open_ended
+    let typical = openEnded ? 0 : client.videos_per_month ?? 0
+    if (typical === 0 && !openEnded) {
       for (const key of [...sortedKeys].reverse()) {
         const { expected } = countFor(byMonth.get(key)!)
         if (expected > 0) { typical = expected; break }
       }
     }
-    if (typical === 0) typical = client.shoots_per_month ?? 0
-    if (typical === 0) continue
+    if (typical === 0 && !openEnded) typical = client.shoots_per_month ?? 0
+    if (typical === 0 && !openEnded) continue
 
     // A paused retainer owes nothing from the pause month on, so the walk
     // stops there instead of at today. Without this a pause read as a run of
@@ -319,7 +332,9 @@ export async function getContentBacklog(
       if (pausedFrom && key >= pausedFrom) break
       const entry = byMonth.get(key)
       const { expected, uploaded } = entry ? countFor(entry) : { expected: 0, uploaded: 0 }
-      const effectiveExpected = entry && expected > 0 ? expected : typical
+      // Open-ended: a month expects exactly what it delivered, so it is never
+      // short, and a month with nothing in it is just a quiet month.
+      const effectiveExpected = openEnded ? uploaded : entry && expected > 0 ? expected : typical
 
       months.push({
         month: key,
@@ -331,6 +346,7 @@ export async function getContentBacklog(
         missing: Math.max(0, effectiveExpected - uploaded),
         shoots: shootsFor(client.id, key),
         jobExists: !!entry,
+        jobDone: !!entry?.jobs.some((j) => ['delivered', 'handed_over', 'archived'].includes(j.status ?? '')),
         isCurrentMonth: key === currentKey,
       })
 
@@ -356,6 +372,8 @@ export async function getContentBacklog(
       typicalVideosPerMonth: typical,
       videosPerMonth: client.videos_per_month ?? null,
       shootsPerMonth: client.shoots_per_month ?? null,
+      openEnded,
+      volunteer: !!client.is_volunteer,
       pausedFrom,
       shootsThisMonth: shootsFor(client.id, currentKey),
       months,
@@ -421,10 +439,13 @@ export function summariseBacklog(backlog: ContentBacklog): string {
     // "~" only where the number is still inferred from job history. Where the
     // target is actually stored, say it flat, because hedging a figure Arlo
     // himself set reads as though the CRM does not trust its own record.
-    const volume = c.videosPerMonth
+    const volume = c.openEnded
+      ? 'no set number of videos (whatever each shoot yields, so nothing is ever owed)'
+      : c.videosPerMonth
       ? `${c.videosPerMonth} videos/month`
       : `~${c.typicalVideosPerMonth} videos/month (inferred, no target set)`
-    return `${c.clientName} [$${c.monthlyRetainer ?? 0}/mo, ${volume}${cadence}]: ${headline}.${pastText}${curText}${paused}`
+    const pay = c.volunteer ? 'VOLUNTEER, unpaid, Arlo does this for free' : `$${c.monthlyRetainer ?? 0}/mo`
+    return `${c.clientName} [${pay}, ${volume}${cadence}]: ${headline}.${pastText}${curText}${paused}`
   })
 
   return [

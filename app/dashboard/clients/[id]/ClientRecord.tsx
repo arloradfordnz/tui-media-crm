@@ -38,6 +38,8 @@ type ClientData = {
   monthlyRetainer: number | null
   shootsPerMonth: number | null
   videosPerMonth: number | null
+  videosOpenEnded: boolean
+  isVolunteer: boolean
   retainerPausedFrom: string | null
   invoiceDay: number | null
   industry: string | null
@@ -107,8 +109,11 @@ function RetainerSchedule({
         <div className="flex flex-col gap-2">
           {months.map((m) => {
             const done = m.missing === 0 && m.expected > 0
+            // No set amount: a month can't be short, only quiet.
             const colour = m.isCurrentMonth
               ? 'var(--text-secondary)'
+              : backlog?.openEnded
+                ? (m.uploaded > 0 ? 'var(--success)' : 'var(--text-tertiary)')
               : !m.jobExists
                 ? 'var(--danger)'
                 : m.missing > 0
@@ -121,10 +126,12 @@ function RetainerSchedule({
                   {m.label}
                 </span>
                 <span className="text-sm tabular-nums" style={{ color: colour }}>
-                  {m.uploaded}/{m.expected}
+                  {backlog?.openEnded ? m.uploaded : `${m.uploaded}/${m.expected}`}
                 </span>
                 <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                  {m.isCurrentMonth
+                  {backlog?.openEnded
+                    ? `${m.uploaded === 1 ? 'video' : 'videos'}${m.isCurrentMonth ? ' so far' : ''}`
+                    : m.isCurrentMonth
                     ? 'in progress'
                     : !m.jobExists
                       ? 'job never created'
@@ -264,6 +271,7 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
             invitedAt={client.portalInvitedAt}
             hasEmail={!!client.email}
           />
+          {client.isVolunteer && <span className="badge badge-accent">Volunteer</span>}
           <span className={`badge ${statusBadgeClass(client.status)}`}>{statusLabel(client.status)}</span>
         </div>
       </div>
@@ -271,8 +279,9 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
       {/* Stat strip */}
       <div className="grid grid-cols-3 gap-3 sm:gap-4 stat-strip">
         <div className="stat-card">
-          <div className="stat-value">{formatNZD(client.lifetimeValue)}</div>
-          <div className="stat-label">Lifetime Value</div>
+          {/* Volunteer work has no value to show, and $0 reads as unbilled. */}
+          <div className="stat-value">{client.isVolunteer && !client.lifetimeValue ? 'Volunteer' : formatNZD(client.lifetimeValue)}</div>
+          <div className="stat-label">{client.isVolunteer && !client.lifetimeValue ? 'Unpaid work' : 'Lifetime Value'}</div>
         </div>
         <div className="stat-card">
           <div className="stat-value">{completedJobs}</div>
@@ -402,14 +411,26 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
                 placeholder="1–4 — retainer clients only"
               />
             </Field>
-            <Field label="Videos per month" hint="The retainer target — drives the content backlog on the Retainers page">
-              <input
+            <Field label="Videos per month" hint="The retainer target. No set amount means nothing is ever counted as owed">
+              <CustomSelect
                 name="videosPerMonth"
-                type="number"
-                min="1"
-                defaultValue={client.videosPerMonth ?? ''}
-                className="field-input"
-                placeholder="e.g. 4 — retainer clients only"
+                defaultValue={client.videosOpenEnded ? 'open' : client.videosPerMonth ? String(client.videosPerMonth) : ''}
+                placeholder="Not set"
+                options={[
+                  { value: '', label: 'Not set' },
+                  { value: 'open', label: 'No set amount' },
+                  ...Array.from({ length: Math.max(12, client.videosPerMonth ?? 0) }, (_, i) => ({ value: String(i + 1), label: String(i + 1) })),
+                ]}
+              />
+            </Field>
+            <Field label="Paid or volunteer" hint="Volunteer work shows as Volunteer instead of a dollar value">
+              <CustomSelect
+                name="isVolunteer"
+                defaultValue={client.isVolunteer ? 'volunteer' : 'paid'}
+                options={[
+                  { value: 'paid', label: 'Paid' },
+                  { value: 'volunteer', label: 'Volunteer (unpaid)' },
+                ]}
               />
             </Field>
             <Field label="Retainer paused from" hint="First month nothing is owed. Clear it to resume">

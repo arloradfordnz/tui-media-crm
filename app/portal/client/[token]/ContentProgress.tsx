@@ -11,8 +11,10 @@ export type PortalProgress = {
   retainer: {
     videosPerMonth: number
     shootsPerMonth: number | null
+    /** No set number of videos: show what came in, never "x of y". */
+    openEnded: boolean
     paused: boolean
-    currentMonth: { label: string; expected: number; delivered: number; shootsDone: number } | null
+    currentMonth: { label: string; expected: number; delivered: number; shootsDone: number; markedDone: boolean } | null
     catchUp: { label: string; missing: number; delivered: number; expected: number }[]
     videosOwed: number
   } | null
@@ -34,11 +36,14 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 export default function ContentProgress({ progress }: { progress: PortalProgress }) {
   const { retainer, nextShoot } = progress
   const month = retainer?.currentMonth ?? null
+  const openEnded = !!retainer?.openEnded
 
   // Three stages a month moves through. Delivered wins; any shoot done or
   // video in means editing; otherwise the month is still waiting on a shoot.
+  // With no set number of videos there's no count to reach, so the month is
+  // delivered when Arlo marks its job delivered.
   const stage = !month ? null
-    : month.delivered >= month.expected ? 2
+    : (openEnded ? month.markedDone : month.expected > 0 && month.delivered >= month.expected) ? 2
     : month.shootsDone > 0 || month.delivered > 0 ? 1
     : 0
   const stages = ['Shoot', 'Editing', 'Delivered']
@@ -64,25 +69,37 @@ export default function ContentProgress({ progress }: { progress: PortalProgress
         {month && (
           <>
             <div className="portal-progress-head">
-              <p className="portal-progress-count">
-                <strong>{month.delivered}</strong> of {plural(month.expected, 'video')}
-              </p>
+              {openEnded ? (
+                <p className="portal-progress-count">
+                  <strong>{month.delivered}</strong> {month.delivered === 1 ? 'video' : 'videos'}
+                </p>
+              ) : (
+                <p className="portal-progress-count">
+                  <strong>{month.delivered}</strong> of {plural(month.expected, 'video')}
+                </p>
+              )}
               <p className="portal-progress-caption">delivered for {month.label}</p>
             </div>
 
-            <div className="portal-progress-bar" role="img" aria-label={`${month.delivered} of ${month.expected} videos delivered`}>
-              {Array.from({ length: month.expected }, (_, i) => (
-                <span key={i} className={i < month.delivered ? 'is-done' : ''} />
-              ))}
-            </div>
+            {/* A bar only means something against a target. */}
+            {!openEnded && month.expected > 0 && (
+              <div className="portal-progress-bar" role="img" aria-label={`${month.delivered} of ${month.expected} videos delivered`}>
+                {Array.from({ length: month.expected }, (_, i) => (
+                  <span key={i} className={i < month.delivered ? 'is-done' : ''} />
+                ))}
+              </div>
+            )}
 
             <ol className="portal-progress-steps">
-              {stages.map((label, i) => (
-                <li key={label} className={i < stage! || stage === 2 ? 'is-done' : i === stage ? 'is-current' : ''}>
-                  <span className="portal-progress-dot">{(i < stage! || stage === 2) && <Check className="w-3 h-3" />}</span>
-                  {label}
-                </li>
-              ))}
+              {stages.map((label, i) => {
+                const done = i < stage! || stage === 2
+                return (
+                  <li key={label} className={done ? 'is-done' : i === stage ? 'is-current' : ''} aria-current={i === stage && !done ? 'step' : undefined}>
+                    <span className="portal-progress-dot">{done && <Check className="w-3 h-3" strokeWidth={3} />}</span>
+                    <span className="portal-progress-step-label">{label}</span>
+                  </li>
+                )
+              })}
             </ol>
           </>
         )}
