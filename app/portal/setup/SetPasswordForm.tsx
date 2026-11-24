@@ -6,7 +6,7 @@ import { setPortalPassword } from '@/app/actions/portal-auth'
 import Field from '@/components/Field'
 import PasswordStrength from '@/components/PasswordStrength'
 
-export default function SetPasswordForm({ token, email }: { token?: string; email?: string | null }) {
+export default function SetPasswordForm({ token, email, first }: { token?: string; email?: string | null; first?: boolean }) {
   const [state, action, pending] = useActionState(setPortalPassword, undefined)
   const [password, setPassword] = useState('')
 
@@ -17,6 +17,8 @@ export default function SetPasswordForm({ token, email }: { token?: string; emai
   return (
     <form action={action} className="space-y-5">
       {carryToken && <input type="hidden" name="token" value={token} />}
+      {/* From the setup email (not a reset): Arlo is told once it works. */}
+      {first && <input type="hidden" name="first" value="1" />}
 
       <Field label="Password">
         <input

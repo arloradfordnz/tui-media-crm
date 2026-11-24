@@ -110,6 +110,12 @@ export default function NewClientPage() {
           <textarea name="notes" rows={3} className="field-input" placeholder="Private notes..." />
       </Field>
 
+        {/* On by default: a new client gets their portal login as soon as
+            they are added. Untick for a lead who isn't a client yet. */}
+        <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+          <input type="checkbox" name="sendPortal" defaultChecked /> Email them their portal login (needs an email above)
+        </label>
+
         {state?.error && (
           <div className="alert alert-danger">
             {state.error}

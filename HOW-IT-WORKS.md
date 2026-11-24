@@ -471,6 +471,17 @@ account, so it is also the fix when someone lets the link lapse (they can also
 press **Forgot your password?** themselves). The
 button only appears once the client has an email address on file.
 
+**New clients get it automatically.** Adding a client with an email sends the
+setup email straight away (untick "Email them their portal login" on the form
+for a lead who isn't a client yet). You land on their record with a toast
+saying it went, or that it didn't and to press the button. This replaces the
+old welcome email. Clients added by Tui or by an enquiry are not sent one.
+
+Under the client's email, one line says where they're up to: no portal login
+sent yet, sent on a date but not set up, or set up with their last sign-in.
+When a client chooses their password from the setup email, hello@ gets a
+"Portal set up" email, so you know it arrived without checking.
+
 An account exists because Arlo made one. **Public sign-up is still switched on
 at the Supabase project, though, and that is a hole — see below.**
 

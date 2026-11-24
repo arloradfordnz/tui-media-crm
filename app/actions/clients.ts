@@ -4,9 +4,9 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createServerSupabaseClient } from '@/lib/supabase'
-import { getAuthUser } from '@/lib/supabase-admin'
+import { createAdminClient, getAuthUser } from '@/lib/supabase-admin'
 import { CUSTOMER_VALUE_OPTIONS, AD_SPEND_OPTIONS, approxFor } from '@/lib/application-fields'
-import { sendWelcomeEmail } from '@/lib/email'
+import { sendPortalLogin } from '@/lib/send-to-client'
 import { normalizeBrand } from '@/lib/brand'
 import { deleteClientAndLeftovers } from '@/lib/client-delete'
 
@@ -37,6 +37,7 @@ export async function createClient(prevState: { error?: string } | undefined, fo
   const videosPerMonthRaw = formData.get('videosPerMonth') as string
   const industry = formData.get('industry') as string
   const brand = formData.get('brand') as string
+  const sendPortal = formData.get('sendPortal') === 'on'
 
   if (!name) return { error: 'Client / business name is required.' }
 
@@ -46,7 +47,7 @@ export async function createClient(prevState: { error?: string } | undefined, fo
   const videosPerMonth = videosPerMonthRaw ? parseInt(videosPerMonthRaw, 10) : null
 
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase.from('clients').insert({
+  const { data: created, error } = await supabase.from('clients').insert({
     name,
     contact_person: contactPerson || null,
     email: email || null,
@@ -64,15 +65,27 @@ export async function createClient(prevState: { error?: string } | undefined, fo
     monthly_retainer: monthlyRetainer,
     shoots_per_month: shootsPerMonth,
     videos_per_month: videosPerMonth,
-  })
+  }).select('id').single()
 
-  if (error) return { error: error.message }
-
-  if (email) {
-    sendWelcomeEmail(email, name, undefined, normalizeBrand(brand)).catch(() => {})
-  }
+  if (error || !created) return { error: error?.message ?? 'Could not create the client.' }
 
   revalidatePath('/dashboard/clients')
+
+  // A new client with an email gets their portal login straight away, unless
+  // the box on the form was unticked. It used to be a silent welcome email
+  // (fire and forget, failures swallowed) plus a separate button on the
+  // record, so Arlo never knew whether anything had arrived. Now it is awaited,
+  // and the record it lands on says what happened (?portal=sent|failed shows
+  // a toast; the account line under the name stays).
+  // The insert above ran under RLS as Arlo, so reaching here means an admin
+  // session; the service role is only used for the auth account.
+  if (email && sendPortal) {
+    const admin = createAdminClient()
+    const result = admin ? await sendPortalLogin(admin, created.id, 'setup') : { ok: false as const, error: 'Supabase is not configured.' }
+    if (!result.ok) console.error('[clients] portal login on create failed:', result.error)
+    redirect(`/dashboard/clients/${created.id}?portal=${result.ok ? 'sent' : 'failed'}`)
+  }
+
   redirect('/dashboard/clients')
 }
 

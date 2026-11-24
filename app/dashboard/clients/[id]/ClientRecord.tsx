@@ -15,7 +15,7 @@ import {
 } from '@/lib/application-fields'
 import DatePicker from '@/components/DatePicker'
 import Field from '@/components/Field'
-import PortalAccountButton from './PortalAccountButton'
+import PortalAccountButton, { PortalStatus } from './PortalAccountButton'
 import { CLIENT_CATEGORIES, INDUSTRIES, BRANDS } from '@/lib/client-fields'
 
 const PIPELINE_STAGES = ['enquiry', 'discovery', 'proposal', 'negotiation', 'won']
@@ -58,6 +58,10 @@ type ClientData = {
   tags: string | null
   portalToken: string | null
   portalInvitedAt: string | null
+  /** Last portal sign-in. Set means the setup email arrived and was used. */
+  portalSignedInAt: string | null
+  /** 'sent' | 'failed' straight after creating the client, for the toast. */
+  portalNotice: 'sent' | 'failed' | null
   documents: { id: string; name: string; docType: string; updatedAt: string }[]
   jobs: { id: string; name: string; jobType: string | null; status: string; quoteValue: number | null; shootDate: string | null }[]
   activities: { id: string; action: string; details: string | null; createdAt: string; job: { name: string } | null }[]
@@ -258,6 +262,7 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
           ) : (
             <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>No email</p>
           )}
+          <PortalStatus email={client.email} invitedAt={client.portalInvitedAt} signedInAt={client.portalSignedInAt} />
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {portalLink && (
@@ -270,6 +275,8 @@ export default function ClientRecord({ client, completedJobs, activeTab, backlog
             clientId={client.id}
             invitedAt={client.portalInvitedAt}
             hasEmail={!!client.email}
+            notice={client.portalNotice}
+            email={client.email}
           />
           {client.isVolunteer && <span className="badge badge-accent">Volunteer</span>}
           <span className={`badge ${statusBadgeClass(client.status)}`}>{statusLabel(client.status)}</span>

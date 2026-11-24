@@ -42,7 +42,7 @@ export default async function PortalSetupPage({ searchParams }: { searchParams: 
         }
         brand={brand}
       >
-        <SetPasswordForm token={token} />
+        <SetPasswordForm token={token} first={!reset} />
       </PortalAuthShell>
     )
   }

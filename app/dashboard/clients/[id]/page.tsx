@@ -4,10 +4,11 @@ import { getContentBacklog, type ClientBacklog } from '@/lib/content-backlog'
 import { getAppSetting } from '@/app/actions/settings'
 import { notFound } from 'next/navigation'
 import ClientRecord from './ClientRecord'
+import { createAdminClient } from '@/lib/supabase-admin'
 
-export default async function ClientDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
+export default async function ClientDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; portal?: string }> }) {
   const { id } = await params
-  const { tab } = await searchParams
+  const { tab, portal } = await searchParams
 
   const supabase = await createServerSupabaseClient()
 
@@ -21,6 +22,23 @@ export default async function ClientDetailPage({ params, searchParams }: { param
   // every client record page would read "not found" until the SQL was run.
   // Split out, the worst case is that the setup button says "Send" instead of
   // "Resend" for a few minutes.
+  // When the client last signed in to their portal, which is how we know the
+  // setup email arrived and was used: setting a password signs them in. Two
+  // calls in sequence (link row, then the auth user), but in the same wave as
+  // everything else on the page. Null for no account or never signed in.
+  const portalSignedInAtPromise = (async () => {
+    try {
+      const admin = createAdminClient()
+      if (!admin) return null
+      const { data: link } = await admin.from('client_users').select('user_id').eq('client_id', id).limit(1).maybeSingle()
+      if (!link?.user_id) return null
+      const { data } = await admin.auth.admin.getUserById(link.user_id as string)
+      return data?.user?.last_sign_in_at ?? null
+    } catch {
+      return null
+    }
+  })()
+
   const portalInvitedAtPromise = (async () => {
     try {
       const { data } = await supabase
@@ -75,6 +93,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
     invoiceDayRaw,
     portalInvitedAt,
     rebrandFields,
+    portalSignedInAt,
   ] = await Promise.all([
     supabase
       .from('clients')
@@ -100,6 +119,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
     getAppSetting('retainer_invoice_day'),
     portalInvitedAtPromise,
     rebrandFieldsPromise,
+    portalSignedInAtPromise,
   ])
 
   const client = clientResult.data as ClientRow | null
@@ -145,6 +165,9 @@ export default async function ClientDetailPage({ params, searchParams }: { param
     tags: client.tags,
     portalToken: client.portal_token ?? null,
     portalInvitedAt,
+    portalSignedInAt,
+    // Set by createClient's redirect, for the toast saying the login went out.
+    portalNotice: (portal === 'sent' || portal === 'failed' ? portal : null) as 'sent' | 'failed' | null,
     documents: (documents ?? []).map((d) => ({
       id: d.id,
       name: d.name,

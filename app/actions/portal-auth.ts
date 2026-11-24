@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase-admin'
 import { emailPortalPasswordLink } from '@/lib/portal-setup-link'
 import { checkPassword } from '@/lib/password-strength'
 import { breachCount } from '@/lib/pwned'
+import { sendAdminPortalSetUpEmail } from '@/lib/email'
 
 const isPortalRole = (r: unknown) => r === 'client' || r === 'marketer'
 
@@ -32,6 +33,7 @@ export async function setPortalPassword(_prev: SetPasswordState, formData: FormD
   const token = String(formData.get('token') ?? '')
   const password = String(formData.get('password') ?? '')
   const confirm = String(formData.get('confirm') ?? '')
+  const first = formData.get('first') === '1'
 
   // Checked before the token is touched, so a typo or a weak choice does not
   // spend the link. The browser shows the same meter, but this is the check
@@ -45,6 +47,7 @@ export async function setPortalPassword(_prev: SetPasswordState, formData: FormD
 
   const supabase = await createServerSupabaseClient()
   let role: string | undefined
+  let userId: string | undefined
 
   if (token) {
     const { data, error } = await supabase.auth.verifyOtp({ type: 'recovery', token_hash: token })
@@ -58,6 +61,7 @@ export async function setPortalPassword(_prev: SetPasswordState, formData: FormD
       return { error: 'That link isn’t for a portal account.', expired: true }
     }
     role = data.user.app_metadata?.role
+    userId = data.user.id
     // The email address is only known now. The link is spent, so a retry has
     // to run on the session it created.
     if (!checkPassword(password, [data.user.email]).ok) {
@@ -72,6 +76,7 @@ export async function setPortalPassword(_prev: SetPasswordState, formData: FormD
       return { error: 'Don’t use your name or email address in your password.' }
     }
     role = user.app_metadata?.role
+    userId = user.id
   }
 
   const { error } = await supabase.auth.updateUser({ password })
@@ -79,6 +84,23 @@ export async function setPortalPassword(_prev: SetPasswordState, formData: FormD
     // The session exists now even though the password did not take, so the
     // next try must not resend the spent token.
     return { error: error.message, verified: true }
+  }
+
+  // The answer to "did they ever get it": the setup email worked and the
+  // client is in. Tell Arlo once, at the end of the first setup only (a reset
+  // or a password change says nothing). A mail failure must not stop the
+  // client getting into their portal.
+  if (first && role === 'client' && userId) {
+    try {
+      const admin = createAdminClient()
+      const { data: link } = admin
+        ? await admin.from('client_users').select('client_id, clients(name, contact_person)').eq('user_id', userId).maybeSingle()
+        : { data: null }
+      const c = (Array.isArray(link?.clients) ? link?.clients[0] : link?.clients) as { name: string; contact_person: string | null } | null | undefined
+      if (link?.client_id && c) await sendAdminPortalSetUpEmail(c.name, c.contact_person, link.client_id as string)
+    } catch (err) {
+      console.error('[portal-auth] setup notice failed:', err)
+    }
   }
 
   redirect(role === 'marketer' ? '/marketing' : '/portal/me')

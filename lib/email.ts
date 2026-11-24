@@ -809,6 +809,18 @@ export async function sendAdminRevisionRequestedEmail(clientName: string, jobNam
   await send({ to: ADMIN_INBOX, subject, html, type: 'admin_revision_requested', clientId, jobId })
 }
 
+/** A client finished setting up their portal from the setup email. */
+export async function sendAdminPortalSetUpEmail(clientName: string, contactPerson: string | null, clientId: string) {
+  const who = contactPerson && contactPerson !== clientName ? `${contactPerson} at ${clientName}` : clientName
+  const subject = `Portal set up — ${clientName}`
+  const html = wrap(`
+    ${heading('Kia ora Arlo,')}
+    <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;"><span style="color:${C.ink};font-weight:600;">${esc(who)}</span> got the setup email, chose a password and is signed in to their portal.</p>
+    ${button(`${APP_URL}/dashboard/clients/${clientId}`, 'Open the client')}
+  `)
+  await send({ to: ADMIN_INBOX, subject, html, type: 'admin_portal_set_up', clientId })
+}
+
 export async function sendAdminDocumentSignedEmail(clientName: string, docName: string, signature: string, signedAt: string, clientId?: string) {
   const subject = `Document signed — ${docName}`
   const safeSignature = signature.replace(/</g, '&lt;').replace(/>/g, '&gt;')
