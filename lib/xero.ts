@@ -1450,3 +1450,50 @@ export async function fetchOutstandingInvoices(): Promise<XeroCreatedInvoice[]> 
     return []
   }
 }
+
+export type XeroRepeatingInvoice = {
+  id: string
+  contactId: string
+  contactName: string
+  /** What each generated invoice comes to, after any line discount. */
+  total: number
+  status: string
+  nextScheduledDate: string | null
+}
+
+/**
+ * Repeating sales invoices, the templates that raise each retainer's invoice
+ * on the 1st. Read by the monthly retainer setup (lib/month-setup.ts) so it can
+ * say when a retainer is not being billed, or billed a different amount from
+ * the client record. Null when Xero is not connected or the read failed, so a
+ * caller can tell "none set up" from "could not look".
+ */
+export async function fetchRepeatingInvoices(): Promise<XeroRepeatingInvoice[] | null> {
+  const account = await getValidXeroAccount()
+  if (!account || !account.account_id) return null
+
+  type Raw = {
+    RepeatingInvoiceID: string
+    Type?: string
+    Status?: string
+    Total?: number
+    Contact?: { ContactID?: string; Name?: string }
+    Schedule?: { NextScheduledDateString?: string; NextScheduledDate?: string }
+  }
+  try {
+    const res = await xeroGet<{ RepeatingInvoices?: Raw[] }>('/RepeatingInvoices', account.access_token, account.account_id)
+    return (res.RepeatingInvoices ?? [])
+      .filter((r) => (r.Type ?? 'ACCREC') === 'ACCREC' && r.Status !== 'DELETED')
+      .map((r) => ({
+        id: r.RepeatingInvoiceID,
+        contactId: r.Contact?.ContactID ?? '',
+        contactName: r.Contact?.Name ?? '',
+        total: Number(r.Total ?? 0),
+        status: r.Status ?? '',
+        nextScheduledDate: r.Schedule?.NextScheduledDateString?.slice(0, 10) ?? null,
+      }))
+  } catch (err) {
+    console.warn('[xero] repeating invoices read failed:', err instanceof Error ? err.message : err)
+    return null
+  }
+}

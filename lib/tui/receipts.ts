@@ -32,7 +32,10 @@ export type TuiEvent =
   | { t: 'done' }
 
 export type AskOption = { label: string; detail?: string }
-export type AskQuestion = { question: string; options: AskOption[]; multi?: boolean }
+/** A question whose options the popup fetches itself while earlier ones are
+ *  answered: the contract's legal name, looked up on the Companies Register. */
+export type AskLookup = { kind: 'legal_entity'; clientId: string }
+export type AskQuestion = { question: string; options: AskOption[]; multi?: boolean; lookup?: AskLookup }
 
 /** Clean an ask_arlo payload from the model into something safe to render. */
 export function sanitiseAsk(input: unknown): AskQuestion[] {
@@ -52,7 +55,11 @@ export function sanitiseAsk(input: unknown): AskQuestion[] {
     // No options means a typed answer (a name, an email address). One option
     // is not a choice, so that is still malformed.
     if (!question || options.length === 1) return []
-    return [{ question, options, multi: (q as { multi?: unknown })?.multi === true }]
+    const rawLookup = (q as { lookup?: { kind?: unknown; client_id?: unknown } })?.lookup
+    const lookup = rawLookup?.kind === 'legal_entity' && typeof rawLookup.client_id === 'string' && /^[0-9a-f-]{36}$/i.test(rawLookup.client_id)
+      ? { kind: 'legal_entity' as const, clientId: rawLookup.client_id }
+      : undefined
+    return [{ question, options, multi: (q as { multi?: unknown })?.multi === true, ...(lookup ? { lookup } : {}) }]
   })
 }
 

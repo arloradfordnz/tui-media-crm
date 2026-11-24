@@ -27,6 +27,9 @@ export type EmailSummary = {
   /** Recipients (to + cc), lowercased. Only used to cross-reference the sent
    *  folder in fetchMailAwaitingReply — irrelevant for an inbox message. */
   to: string[]
+  /** Display names, where the envelope has them. Used by the leads board. */
+  fromName?: string
+  toName?: string
 }
 
 /** Where sent mail actually lives. Hard-coding a name went wrong twice: first
@@ -34,7 +37,7 @@ export type EmailSummary = {
  *  in favour of "INBOX.Sent" (found 7 October 2026 — the folder was reading 0
  *  messages, so nothing ever counted as answered). The server flags the real
  *  one \\Sent, so ask it. */
-async function resolveSentMailbox(client: ImapFlow): Promise<string> {
+export async function resolveSentMailbox(client: ImapFlow): Promise<string> {
   try {
     const boxes = await client.list()
     return boxes.find((b) => b.specialUse === '\\Sent')?.path ?? 'INBOX.Sent'
@@ -43,7 +46,7 @@ async function resolveSentMailbox(client: ImapFlow): Promise<string> {
   }
 }
 
-async function withClient<T>(fn: (client: ImapFlow) => Promise<T>): Promise<T | null> {
+export async function withClient<T>(fn: (client: ImapFlow) => Promise<T>): Promise<T | null> {
   const host = process.env.EMAIL_IMAP_HOST
   const port = process.env.EMAIL_IMAP_PORT
   const user = process.env.EMAIL_IMAP_USER
@@ -77,7 +80,7 @@ async function withClient<T>(fn: (client: ImapFlow) => Promise<T>): Promise<T | 
  *  read fetchMailAwaitingReply does — same four headers, same guarantee that
  *  nothing here can mark a message \\Seen, because the lock is read-only and
  *  headers are not a body fetch. */
-async function fetchMailboxEnvelopes(client: ImapFlow, mailbox: string, limit: number): Promise<EmailSummary[]> {
+export async function fetchMailboxEnvelopes(client: ImapFlow, mailbox: string, limit: number): Promise<EmailSummary[]> {
   const lock = await client.getMailboxLock(mailbox, { readOnly: true })
   try {
     const status = await client.status(mailbox, { messages: true })
@@ -99,6 +102,8 @@ async function fetchMailboxEnvelopes(client: ImapFlow, mailbox: string, limit: n
         unread: !msg.flags?.has('\\Seen'),
         flagged: !!msg.flags?.has('\\Flagged'),
         bulk: BULK_HEADERS.some((h) => raw.includes(`${h}:`)),
+        fromName: msg.envelope?.from?.[0]?.name || undefined,
+        toName: msg.envelope?.to?.[0]?.name || undefined,
         to: [...(msg.envelope?.to ?? []), ...(msg.envelope?.cc ?? [])]
           .map((a) => a.address?.toLowerCase())
           .filter((a): a is string => !!a),
@@ -239,7 +244,7 @@ type StructureNode = {
 }
 
 /** The best readable part: first text/plain, else first text/html. */
-function pickTextPart(node: StructureNode | undefined): { part: string; html: boolean } | null {
+export function pickTextPart(node: StructureNode | undefined): { part: string; html: boolean } | null {
   let html: string | null = null
   const walk = (n: StructureNode): string | null => {
     if (n.childNodes?.length) {
@@ -281,7 +286,7 @@ function stripQuoted(text: string): string {
   return out.join('\n').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
 }
 
-async function readPartText(client: ImapFlow, uid: number, found: { part: string; html: boolean }): Promise<string> {
+export async function readPartText(client: ImapFlow, uid: number, found: { part: string; html: boolean }): Promise<string> {
   try {
     const { content } = await client.download(String(uid), found.part, { uid: true, maxBytes: BODY_CAP_BYTES })
     const chunks: Buffer[] = []

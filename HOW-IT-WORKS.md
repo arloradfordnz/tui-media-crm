@@ -147,6 +147,33 @@ once.
 
 ---
 
+## Shoot pack
+
+Every shoot in the calendar has a **Shoot pack** (the chip on the event, or
+the row on Today from 3pm the day before until the shoot is over). One page
+with when, the address (opens Apple Maps), the contact with a tap-to-call
+number, what you're making, the brief, the client's last few emails, and the
+shoot-day tasks still open.
+
+**Write shot list** has Claude write one from all of that, grouped by video,
+with a short "Don't forget" for things the notes mention. It is saved on the
+shoot, so it's there in the morning without waiting, and **Edit** changes it
+by hand. It only uses what the CRM knows, so a thin brief gives a general list.
+
+---
+
+## Instagram, two posts a week
+
+Tui Media's own Instagram gets two slots a week, **Tuesday and Friday**, shown
+in green on the calendar (worked out each time, not stored, so they never land
+on the phone). There's no Instagram connection, so on a slot day Today shows
+"Tui Media Instagram post due today"; tap the tick (**Posted it**) once it's up.
+A slot passed with nothing logged turns into "Missed Tuesday's Tui Media
+Instagram post". Posts count for the week, so two on Monday cover both slots
+and a Wednesday post covers Tuesday. The days are in `lib/instagram-slots.ts`.
+
+---
+
 ## Video ad projects
 
 The job type the business now sells. Picking **Video Ad Project** on a new job
@@ -210,6 +237,54 @@ is the only thing between the form and someone filling the CRM with junk.
 
 ---
 
+### Wedding enquiries from arloradford.nz
+
+The wedding form on arloradford.nz still emails arloradford.nz@gmail.com, and
+now also lands here. The CRM reads the date ("14 February 2027", "14/2/27"),
+checks the calendar for that day, makes the couple a client (Weddings, lead) and
+a "<names> Wedding" job as an enquiry, and drafts the reply: whether you're
+free, the three packages with prices, $500 to hold the date, and two
+after-school times to meet. Today shows it at the top as "New wedding enquiry:
+Sam & Alex, Saturday 14 February 2027 (date is free)" with a **Reply** button
+that opens the draft in Mail to read and send. The row goes once the client's
+pipeline moves past enquiry, or with Done.
+
+Prices in the draft live in `lib/wedding-enquiry.ts`; change them there and in
+the playbook together. Commercial enquiries from the same site are filed as a
+lead with no draft.
+
+The arloradford Vercel project needs `CRM_ENQUIRY_URL`
+(`https://dashboard.tuimedia.nz/api/enquiry`) and `CRM_ENQUIRY_SECRET` (the
+same value as the CRM's `ENQUIRY_SECRET`). Without them the site only emails.
+
+---
+
+## Leads
+
+**Leads** in the menu is the cold and warm list from hello@tuimedia.nz, not
+the CRM's clients. It reads the folders under **02 Leads** (Cold, Warm and the
+named sub-folders) and the pitches in Sent ("Locally filmed video ads for X?",
+"More enquiries for X?", "More bookings for X?"), one row per email address.
+Filing an email into Cold or Warm is what puts a lead there.
+
+| Section | Means |
+|---|---|
+| Reply | They wrote last and nothing has gone back |
+| Nudge | A week or more since you last wrote, warm first, then cold, then pitches |
+| Later | You pressed 1 wk or 1 mo; back on that date |
+| Gone quiet | Three emails with no reply, or nothing either way for 3 months |
+| Dropped | You pressed ✕. Bring back undoes it |
+
+**Draft nudge** reads the last couple of emails each way and writes a short
+follow-up in your voice (Claude Haiku). **Open in Mail** opens it as a reply to
+check and send; **Sent it** moves the row on straight away. The mailbox is read
+in the background when the page is opened and the last read is over an hour
+old, or now with **Check mail**. Today shows one row with how many are waiting
+on a reply and how many are due a nudge. Someone who becomes an active client
+drops off the board on their own.
+
+---
+
 ## Money vs Finance
 
 Two pages, deliberately.
@@ -250,6 +325,20 @@ tab to the first month they don't owe. From that month on nothing is counted,
 the client shows as Paused, and Tui stops chasing it. Clear the field to
 resume. Team Bainbridge is paused from August 2026.
 
+**Months set themselves up.** Early each morning the CRM makes the current
+month's content job ("December Content") for every active retainer that isn't
+paused, with one deliverable per video owed (none for an open-ended one). A
+month that already has a job is left alone, and each client is done once a
+month, so deleting a month's job (a skipped month) keeps it deleted. A client
+with no videos per month on their record is skipped, and Today says so.
+
+It does not make invoices. Xero's repeating invoices already bill retainers on
+the 1st, so a CRM invoice would bill them twice. Instead it reads those repeating
+invoices and puts a row on Today when a retainer has none, when Xero's amount
+differs from the client's monthly retainer, or when one is still running for a
+client that is paused or no longer active. Extras (a site visit, hourly work)
+still go on that month's invoice by hand or through Tui.
+
 ---
 
 ## Documents
@@ -267,6 +356,24 @@ the platform. It writes in your voice — no em dashes, never "storytelling",
 Where a real figure is needed and you have not given one it leaves a
 placeholder like `[project fee]`. A made-up price in a contract is worse than
 a blank.
+
+**Contracts: legal name and the fixed terms.** When Tui asks the contract
+questions, the popup searches the NZ Companies Register for the client in the
+background, while you answer the earlier questions. The legal-name question is
+near the end and is a confirmation: tap the company it found ("Company:
+Johnson Residential Limited", saved as a company) or the sole trader line
+("Sole trader: Sam Johnson trading as Johnson Residential") when there is no
+company by that name. Type your own if neither is right. It only asks when the
+client record has no legal name yet.
+
+These are the same in every contract and are no longer asked: the client owns
+the videos once paid in full, Tui Media may show the work in its portfolio, 2
+revision rounds per video, invoices due 7 days after they are sent, and Tui
+Media keeps the deposit if the client cancels (a postponed event moves it to
+the new date once). If Tui Media cancels, the deposit is refunded. Anything
+different goes under "anything unusual" and overrides the default for that deal.
+Xero's repeating retainer invoices are set to 14 days, so change those to 7
+if you want them to match.
 
 ---
 

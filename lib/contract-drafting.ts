@@ -69,7 +69,7 @@ Start with the summary, unnumbered, one fact per line as its own paragraph with 
 
 **What:** 2 vertical videos a month for Instagram and TikTok, from one shoot a month
 
-**Fee:** $900 a month, no GST, invoiced on signing and then monthly in advance, due in 14 days
+**Fee:** $900 a month, no GST, invoiced on signing and then monthly in advance, due in 7 days
 
 **Starts:** 1 November 2026, month to month with no minimum term (or, if no start date was given: "the day both parties sign, month to month with no minimum term")
 
@@ -122,6 +122,9 @@ Ending the agreement:
 - For videos the Client has already paid for but Tui Media has not delivered, Tui Media chooses whether to complete and deliver them within a reasonable time or to refund what was paid for them, and says which in writing. Never leave this open or blank.
 
 Deposits: only a one-off project can have a deposit. Monthly work (a retainer) never has one.
+- If the Client cancels, for any reason and at any time, Tui Media keeps the deposit. It is not refunded and not credited against anything else. Give the reason in a few words: it secures the date and Tui Media has turned other work away. This applies to every agreement that has a deposit, whatever the deal says about timing; only a term in this deal that expressly says otherwise changes it.
+- A postponed event moves the deposit to the new date once, if Tui Media is free that day. If it is not, or the date moves a second time, it counts as a cancellation.
+- If Tui Media cancels, or cannot do the work, the deposit is refunded in full.
 
 No GST: Tui Media is not GST registered and no GST is payable on the fees. Keep this clause in every agreement.
 
@@ -150,7 +153,7 @@ Defaults, used only where the deal says nothing:
 - Feedback period: 2 working days after an edit is sent to the client portal, to approve it or leave one consolidated set of changes there.
 - Deemed approval: if the Client neither approves nor leaves feedback in that time, Tui Media sends a reminder, and if there is still no response 2 working days after the reminder, the edit is approved.
 - Invoice date: the first invoice (the deposit on a one-off project, or the whole Fee if there is no deposit, or the first month of monthly work) is sent the day the agreement is signed. A one-off project's balance is invoiced when the final videos are delivered. Monthly work is invoiced in advance on the same day each month after that.
-- Invoice due date: 14 days after the invoice is sent.
+- Invoice due date: 7 days after the invoice is sent. (Arlo's decision, 24 November 2026, matching the playbook: money before work, and an overdue invoice pauses work.)
 - Reschedule notice: 24 hours' notice to reschedule a shoot without charge.
 - Raw footage: sent on request, by download link within 5 working days after the Client asks for it, once the Fee is paid in full.
 - Storage period: Tui Media keeps the raw and final files for 12 months after final delivery.
@@ -207,7 +210,7 @@ No preamble before the contract.`
 export const SETTLED_CONTRACT_TERMS = [
   'Ending: either side gives 14 days\' written notice (email is fine). There is no minimum term and no other notice period.',
   'Rollover: a missed shoot rolls over only if Tui Media cancels or weather stops it; a client cancellation or no-show lapses the video; nothing rolls twice.',
-  'Deposits: one-off projects only. Monthly work never has a deposit.',
+  'Deposits: one-off projects only. Monthly work never has a deposit. If the client cancels, Tui Media keeps the deposit.',
   'Paid but undelivered videos at the end: Tui Media chooses to deliver or refund.',
   'Revisions: 2 rounds per video.',
   'Shoot length: about 1 hour.',
@@ -215,7 +218,7 @@ export const SETTLED_CONTRACT_TERMS = [
   'Delivery and feedback: through the client portal, 2 working days to approve or give feedback, then a reminder, then approved 2 working days later.',
   'Ownership: the Client owns the final videos once paid; raw footage sent on request.',
   'Portfolio: Tui Media may show the work unless the Client says no.',
-  'Invoices: first one sent on signing (monthly work then monthly in advance), each due 14 days after it is sent.',
+  'Invoices: first one sent on signing (monthly work then monthly in advance), each due 7 days after it is sent.',
   'Rescheduling: free with 24 hours\' notice.',
   'Raw footage: sent on request once paid. Files kept 12 months.',
   'No GST, liability cap, consumer law, privacy, confidentiality and disputes are standard clauses.',

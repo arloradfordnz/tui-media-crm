@@ -18,6 +18,12 @@
 // active work in it from another session.
 
 import { getContentBacklog, type ContentBacklog } from './content-backlog'
+import { createAdminClient } from './supabase-admin'
+import { MONTH_SETUP_KEY, type MonthSetupReport } from './month-setup'
+import { longDate, replyMailto } from './wedding-enquiry'
+import { stageOf, type LeadRow } from './leads'
+import { eventDay } from './shoot-pack'
+import { postsByWeek, slotsForWeek, weekStart, POSTS_PER_WEEK } from './instagram-slots'
 
 export type Severity = 'urgent' | 'due' | 'watch'
 
@@ -35,6 +41,8 @@ export type AttentionItem = {
   doneEmailId?: string
   /** Set on overdue task rows: Done ticks the task itself. */
   doneTaskId?: string
+  /** Set on the Instagram row: Done logs a post for today. */
+  donePost?: boolean
   /** id plus a version of the thing it is about. Done and Snooze are stored
    *  against this, so a Done holds only until that thing changes. See
    *  supabase/migrations/20261110_0002_attention_dismissals.sql. */
@@ -128,6 +136,10 @@ export async function getAttention(
     clientEmailsRes,
     backlog,
     dismissalsRes,
+    monthSetupRes,
+    weddingEnquiriesRes,
+    leadsRes,
+    postsThisWeek,
   ] = await Promise.all([
     supabase
       .from('events')
@@ -240,6 +252,36 @@ export async function getAttention(
     // Done and Snooze. Same wave, so putting rows away costs no extra trip.
     // { data: null } before the migration runs, absorbed below.
     supabase.from('attention_dismissals').select('key, until'),
+    // The monthly retainer setup's last report (lib/month-setup.ts). kv_cache
+    // has no policy for the signed-in role, so it is read with the service
+    // client; the row holds nothing a signed-in admin can't already see.
+    (async () => {
+      const admin = createAdminClient()
+      if (!admin) return null
+      const { data } = await admin.from('kv_cache').select('value').eq('key', MONTH_SETUP_KEY).maybeSingle()
+      return (data?.value ?? null) as MonthSetupReport | null
+    })().catch(() => null),
+    // Wedding enquiries from arloradford.nz with a drafted reply, until the
+    // pipeline moves on from enquiry. { data: null } before the migration
+    // that adds event_date and enquiry_reply runs, absorbed below.
+    supabase
+      .from('clients')
+      .select('id, name, email, event_date, enquiry_reply, notes, first_contact')
+      .eq('client_category', 'wedding')
+      .eq('status', 'lead')
+      .eq('pipeline_stage', 'enquiry')
+      .not('enquiry_reply', 'is', null)
+      .gte('first_contact', shelfLife)
+      .order('first_contact')
+      .limit(10),
+    // The leads board, counted (lib/leads.ts works out each stage). { data:
+    // null } before the leads migration runs.
+    supabase
+      .from('leads')
+      .select('id, email, name, organisation, temperature, last_subject, last_in_at, last_out_at, messages_in, messages_out, follow_up_on, status, note, client_id, nudge_draft, nudge_drafted_at, clients(id, name, status)')
+      .eq('status', 'open'),
+    // Tui Media's own Instagram posts this week, against two slots.
+    postsByWeek(supabase, weekStart(todayISO), todayISO).catch(() => null),
   ])
 
   const items: AttentionItem[] = []
@@ -381,6 +423,148 @@ export async function getAttention(
         ? `${plural(backlog.totals.months_never_started, 'month')} never set up`
         : undefined,
     })
+  }
+
+  // ── Shoot pack, the evening before ──────────────────────────
+  // From 3pm the day before (after school) until the end of the shoot day,
+  // each shoot gets a row that opens its pack: address, contact, brief and
+  // shot list on one page.
+  {
+    const tomorrowISO = new Date(Date.parse(`${todayISO}T00:00:00Z`) + 86400000).toISOString().slice(0, 10)
+    const evening = nzNow.getHours() >= 15
+    for (const e of (weekEventsRes?.data ?? []) as { id: string; title: string; event_type: string; date: string; start_time: string | null }[]) {
+      if (e.event_type !== 'shoot') continue
+      const day = eventDay(e.date)
+      const isToday = day === todayISO
+      if (!isToday && !(day === tomorrowISO && evening)) continue
+      items.push({
+        id: `shoot-pack:${e.id}`,
+        key: `shoot-pack:${e.id}@${day}`,
+        kind: 'shoot_pack',
+        severity: 'due',
+        sentence: `${isToday ? "Today's" : "Tomorrow's"} shoot: ${e.title}`,
+        action: { label: 'Shoot pack', href: `/dashboard/shoots/${e.id}` },
+        meta: e.start_time ? e.start_time.slice(0, 5) : undefined,
+      })
+    }
+  }
+
+  // ── New wedding enquiries ───────────────────────────────────
+  // The playbook says reply the same day, so these sit with the urgent rows.
+  // The reply is already drafted; the row's link opens it in Mail.
+  for (const w of (weddingEnquiriesRes?.data ?? []) as {
+    id: string; name: string; email: string | null; event_date: string | null
+    enquiry_reply: string; notes: string | null; first_contact: string
+  }[]) {
+    if (!w.email) continue
+    const calendar = /Calendar: (.*)/.exec(w.notes ?? '')?.[1] ?? null
+    const when = w.event_date ? longDate(w.event_date) : null
+    items.push({
+      id: `wedding:${w.id}`,
+      key: `wedding:${w.id}@${w.first_contact}`,
+      kind: 'wedding_enquiry',
+      severity: 'urgent',
+      sentence: `New wedding enquiry: ${w.name}${when ? `, ${when}` : ''}${calendar ? ` (${calendar.charAt(0).toLowerCase()}${calendar.slice(1)})` : ''}`,
+      action: {
+        label: 'Reply',
+        href: replyMailto(w.email, {
+          subject: w.event_date ? `Your wedding on ${longDate(w.event_date)}` : 'Your wedding film',
+          body: w.enquiry_reply,
+        }),
+      },
+      meta: daysAgo(w.first_contact, todayISO) === 0 ? 'today' : `${plural(daysAgo(w.first_contact, todayISO), 'day')} ago`,
+    })
+  }
+
+  // ── Leads board ─────────────────────────────────────────────
+  // One row, not one per lead: there are a couple of hundred pitches, and the
+  // board is where they get worked. Replies count first because someone is
+  // waiting on those.
+  {
+    const staged = ((leadsRes?.data ?? []) as LeadRow[]).map((l) => stageOf(l, todayISO))
+    const replies = staged.filter((l) => l.stage === 'reply')
+    const nudges = staged.filter((l) => l.stage === 'nudge')
+    if (replies.length + nudges.length > 0) {
+      const parts = [
+        replies.length > 0 ? `${plural(replies.length, 'lead')} waiting on a reply` : null,
+        nudges.length > 0 ? `${nudges.length} due a nudge` : null,
+      ].filter(Boolean)
+      items.push({
+        id: 'leads',
+        key: `leads@${replies.map((l) => l.id).sort().join(',')}`,
+        kind: 'leads',
+        severity: replies.length > 0 ? 'due' : 'watch',
+        sentence: parts.join(', '),
+        action: { label: 'Open leads', href: '/dashboard/leads' },
+        meta: replies.length > 0 ? replies.slice(0, 3).map((l) => l.label).join(', ') : undefined,
+      })
+    }
+  }
+
+  // ── Instagram, two posts a week ─────────────────────────────
+  // The earliest slot this week that is due or past and not yet covered.
+  if (postsThisWeek) {
+    const monday = weekStart(todayISO)
+    const posted = postsThisWeek.get(monday) ?? 0
+    const slot = slotsForWeek(monday, posted).find((sl) => !sl.covered && sl.date <= todayISO)
+    if (slot) {
+      items.push({
+        id: 'instagram',
+        key: `instagram:${monday}@${posted}`,
+        kind: 'instagram_post',
+        severity: slot.date === todayISO ? 'due' : 'urgent',
+        sentence: slot.date === todayISO
+          ? 'Tui Media Instagram post due today'
+          : `Missed ${slot.dayName}'s Tui Media Instagram post`,
+        action: { label: 'Calendar', href: '/dashboard/calendar' },
+        meta: `${posted} of ${POSTS_PER_WEEK} this week`,
+        donePost: true,
+      })
+    }
+  }
+
+  // ── Monthly retainer setup ──────────────────────────────────
+  // Only this month's report counts: last month's skips and billing notes were
+  // either fixed or re-reported by this month's run.
+  const currentMonthKey = todayISO.slice(0, 7)
+  const setup = monthSetupRes && monthSetupRes.month === currentMonthKey ? monthSetupRes : null
+  if (setup) {
+    const freshlyMade = setup.createdAt && daysAgo(setup.createdAt, todayISO) <= 7
+    if (freshlyMade && setup.created.length > 0) {
+      const videos = setup.created.reduce((n, c) => n + c.videos, 0)
+      items.push({
+        id: `month-setup:${setup.month}`,
+        key: `month-setup:${setup.month}@${setup.created.length}`,
+        kind: 'month_setup',
+        severity: 'watch',
+        sentence: `${setup.label.split(' ')[0]} content jobs made for ${setup.created.map((c) => c.clientName).join(', ')}`,
+        action: { label: 'Open retainers', href: '/dashboard/retainers' },
+        meta: videos > 0 ? `${plural(videos, 'video')} to make` : undefined,
+      })
+    }
+    for (const s of setup.skipped) {
+      items.push({
+        id: `month-skip:${s.clientId}`,
+        key: `month-skip:${s.clientId}@${setup.month}`,
+        kind: 'month_setup_skipped',
+        severity: 'due',
+        sentence: s.reason,
+        action: { label: 'Open client', href: `/dashboard/clients/${s.clientId}` },
+      })
+    }
+    for (const b of setup.billing) {
+      items.push({
+        id: `billing:${b.clientId ?? b.clientName}`,
+        // Keyed on the wording, so Done holds until the amounts change.
+        key: `billing:${b.clientId ?? b.clientName}@${b.issue}`,
+        kind: 'retainer_billing',
+        severity: 'due',
+        sentence: b.issue,
+        action: b.clientId
+          ? { label: 'Open client', href: `/dashboard/clients/${b.clientId}` }
+          : { label: 'Open money', href: '/dashboard/money' },
+      })
+    }
   }
 
   // ── Jobs sitting still ──────────────────────────────────────

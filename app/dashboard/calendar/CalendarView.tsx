@@ -20,6 +20,7 @@ const EVENT_COLORS: Record<string, string> = {
   deadline: 'var(--warning)',
   personal: 'var(--text-tertiary)',
   iphone: 'var(--text-secondary)',
+  post: 'var(--success)',
 }
 
 type EventData = {
@@ -71,9 +72,11 @@ function LinkPickers({ jobs, clients, initialClient = '', initialJob = '' }: { j
 }
 
 function LinkChips({ event }: { event: EventData }) {
-  if (!event.client && !event.job) return null
+  const shoot = event.eventType === 'shoot'
+  if (!event.client && !event.job && !shoot) return null
   return (
     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+      {shoot && <Link href={`/dashboard/shoots/${event.id}`} className="badge badge-warning">Shoot pack</Link>}
       {event.client && <Link href={`/dashboard/clients/${event.client.id}`} className="badge badge-accent">{event.client.name}</Link>}
       {event.job && <Link href={`/dashboard/jobs/${event.job.id}`} className="badge badge-muted">{event.job.name}</Link>}
     </div>
@@ -246,7 +249,7 @@ export default function CalendarView({ events, jobs, clients, month, year, feedT
                 <div className="flex-1">
                   <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{e.title}</p>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="badge badge-muted">{e.eventType === 'iphone' ? 'iPhone' : statusLabel(e.eventType)}</span>
+                    <span className="badge badge-muted">{e.eventType === 'iphone' ? 'iPhone' : e.eventType === 'post' ? 'Instagram' : statusLabel(e.eventType)}</span>
                     {e.startTime && <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{e.startTime}{e.endTime ? ` – ${e.endTime}` : ''}</span>}
                   </div>
                   {e.notes && <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>{e.notes}</p>}
@@ -255,7 +258,7 @@ export default function CalendarView({ events, jobs, clients, month, year, feedT
                   ) : (
                     <>
                       <LinkChips event={e} />
-                      {e.eventType !== 'iphone' && (
+                      {e.eventType !== 'iphone' && e.eventType !== 'post' && (
                         <button type="button" className="text-xs mt-1.5 inline-flex items-center gap-1" style={{ color: 'var(--text-tertiary)' }} onClick={() => setEditingLinks(e.id)}>
                           <Link2 className="w-3 h-3" /> {e.client || e.job ? 'Change link' : 'Link to a client or job'}
                         </button>
@@ -265,7 +268,7 @@ export default function CalendarView({ events, jobs, clients, month, year, feedT
                 </div>
                 {/* Mirrored from the phone: it would be back on the next sync,
                     so the only real delete is on the phone. */}
-                {e.eventType !== 'iphone' && <button
+                {e.eventType !== 'iphone' && e.eventType !== 'post' && <button
                   onClick={() => setConfirm({
                     title: 'Delete this event?',
                     body: `"${e.title}" comes off the calendar. If it is a shoot mirrored from a job, editing the job is the better move — this removes only the calendar entry.`,

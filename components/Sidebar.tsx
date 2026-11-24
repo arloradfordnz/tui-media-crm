@@ -15,12 +15,14 @@ import {
   CircleDollarSign,
   Repeat,
   Bot,
+  Inbox,
   X,
 } from 'lucide-react'
 
 const mainNav = [
   { href: '/dashboard', label: 'Dashboard', icon: Home },
   { href: '/dashboard/clients', label: 'Clients', icon: Users },
+  { href: '/dashboard/leads', label: 'Leads', icon: Inbox },
   { href: '/dashboard/jobs', label: 'Jobs', icon: Briefcase },
   { href: '/dashboard/calendar', label: 'Calendar', icon: Calendar },
 ]

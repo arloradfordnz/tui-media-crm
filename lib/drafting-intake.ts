@@ -16,6 +16,8 @@ export type IntakeQuestion = {
   question: string
   options: IntakeOption[]
   multi?: boolean
+  /** The popup fills the options itself (see AskSheet). */
+  lookup?: { kind: 'legal_entity'; client_id: string }
 }
 
 const nzd = (n: number) => `$${Number(n).toLocaleString('en-NZ', { maximumFractionDigits: 2 })}`
@@ -281,12 +283,17 @@ export function classifyEngagement(job: JobCtx | null, client: ClientCtx): Engag
   return client.client_category === 'retainer' || client.monthly_retainer ? 'monthly_retainer' : 'video_ad_project'
 }
 
-// Ownership and portfolio used to be asked every time and answered the same
-// way every time. They are settled terms now, confirmed with the rest in
-// standard_terms, and create_contract fills them in.
+// These used to be asked every time and answered the same way every time:
+// ownership, portfolio, the standard terms and what happens to a deposit when
+// the client cancels. Arlo settled them (24 November 2026) as the same in
+// every contract, so they are no longer questions. create_contract fills them
+// in, and the drafter's FIRM POSITIONS hold them (lib/contract-drafting.ts).
+// Something Arlo types under special_requests can still change one for a deal.
 export const CONTRACT_DEFAULT_BRIEF: Record<string, string> = {
-  ownership: 'Client owns the final videos once paid (copyright assigned on payment in full)',
-  portfolio: 'Tui Media may show the work in its portfolio and socials unless the Client says no',
+  ownership: 'Client owns the final videos once paid in full (copyright assigned on payment)',
+  portfolio: 'Tui Media may show the work in its portfolio and socials unless the Client says no in writing',
+  standard_terms: 'Standard terms: 2 revision rounds per video, every invoice due 7 days after it is sent',
+  cancellation: 'If the Client cancels, for any reason, Tui Media keeps the deposit. A postponed event moves the deposit to the new date once, if Tui Media is free; otherwise it counts as a cancellation',
 }
 
 export function contractRequiredKeys(engagement: string): string[] {
@@ -322,6 +329,7 @@ export function buildContractIntake(
   engagement: Engagement,
   missingClientDetails: string[],
   proposal?: ProposalCtx | null,
+  clientId?: string,
 ): IntakeQuestion[] {
   const who = client.name
   const retainer = engagement === 'monthly_retainer'
@@ -342,7 +350,14 @@ export function buildContractIntake(
     ),
   })
 
-  q.push(...missingClientDetails.map((k) => CLIENT_DETAIL_QUESTIONS[k]?.(who)).filter((x): x is IntakeQuestion => !!x))
+  // Legal name and entity type are one question, looked up on the Companies
+  // Register by the popup while the questions before it are answered, so it
+  // goes near the end (below) rather than here.
+  const needsLegal = missingClientDetails.includes('legal_name') || missingClientDetails.includes('entity_type')
+  q.push(...missingClientDetails
+    .filter((k) => k !== 'legal_name' && k !== 'entity_type')
+    .map((k) => CLIENT_DETAIL_QUESTIONS[k]?.(who))
+    .filter((x): x is IntakeQuestion => !!x))
 
   if (event) {
     q.push({
@@ -429,28 +444,14 @@ export function buildContractIntake(
       ),
     })
   }
-  if (!retainer) {
+  if (needsLegal) {
     q.push({
-      key: 'cancellation',
-      question: event
-        ? `If ${who} cancels or the event is called off, what happens to the deposit?`
-        : `If ${who} cancels, what happens to the deposit?`,
-      options: opts(
-        { label: 'Kept if cancelled within 14 days', detail: 'Refunded before that' },
-        { label: 'Always kept, it secures the date' },
-        event && { label: 'Moved to a new date if the event is postponed' },
-        { label: 'Refunded less costs spent' },
-      ),
+      key: 'legal_entity',
+      question: `${who}'s legal name for the contract?`,
+      options: [],
+      ...(clientId ? { lookup: { kind: 'legal_entity' as const, client_id: clientId } } : {}),
     })
   }
-  q.push({
-    key: 'standard_terms',
-    question: `Keep the standard terms? They own the videos once paid, Tui Media can show them in its portfolio, 2 revision rounds, invoices due in 14 days${retainer ? ", 14 days' notice to end" : ''}.`,
-    options: opts(
-      { label: 'Keep all the standard terms' },
-      { label: 'Change some', detail: 'Type what to change' },
-    ),
-  })
   q.push({
     key: 'special_requests',
     question: `Anything ${who} asked for specifically, or anything unusual about this one?`,

@@ -4185,3 +4185,56 @@ html:has(.dash-root) {
   .page-tabs { touch-action: pan-x; }
   .page-tabs-scroll { touch-action: pan-x; }
 }
+
+/* ── Leads board (/dashboard/leads) ─────────────────────────────────────────
+   Same row rhythm as Your week: one line that matters, muted lines under it,
+   actions on the right, wrapping under the text on a phone. */
+.lead-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--bg-border);
+}
+.lead-list > .lead-row:last-child, .lead-more > .lead-row:last-child { border-bottom: none; }
+.lead-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
+.lead-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--t-md); font-weight: 500; color: var(--text-primary); }
+.lead-title a:hover { text-decoration: underline; }
+.lead-sub { font-size: var(--t-xs); color: var(--text-tertiary); overflow-wrap: anywhere; }
+.lead-actions-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex: 0 1 auto; max-width: 420px; }
+.lead-actions { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.lead-actions .btn-ghost, .lead-actions .btn-secondary { gap: 6px; }
+.lead-draft {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--r-md, 10px);
+  background: var(--bg-elevated);
+}
+.lead-draft-text { white-space: pre-wrap; font-size: var(--t-sm); color: var(--text-secondary, var(--text-primary)); }
+.lead-error { font-size: var(--t-xs); color: var(--danger); }
+.lead-more { border-top: 1px solid var(--bg-border); }
+.lead-more > summary { list-style: none; display: block; padding: 10px 18px; cursor: pointer; }
+.lead-more > summary::-webkit-details-marker { display: none; }
+.lead-more[open] > summary { border-bottom: 1px solid var(--bg-border); }
+.lead-collapsed { list-style: none; cursor: pointer; }
+.lead-collapsed::-webkit-details-marker { display: none; }
+@media (max-width: 768px) {
+  .lead-row { flex-direction: column; gap: 10px; padding: 14px 16px; }
+  .lead-actions-wrap { align-items: stretch; max-width: none; width: 100%; }
+  .lead-actions { justify-content: flex-start; }
+}
+
+/* ── Shoot pack (/dashboard/shoots/[id]) ─────────────────────────────────── */
+.shoot-card { display: flex; flex-direction: column; gap: 12px; }
+.shoot-card > .section-head { margin-bottom: 0; }
+.shoot-facts { display: flex; flex-direction: column; gap: 10px; font-size: var(--t-md); color: var(--text-primary); }
+.shoot-facts li { display: flex; align-items: flex-start; gap: 10px; overflow-wrap: anywhere; }
+.shoot-facts svg { flex: none; margin-top: 3px; color: var(--text-tertiary); }
+.shoot-facts a { color: var(--accent); }
+.shoot-notes, .shoot-shotlist { white-space: pre-wrap; font-size: var(--t-sm); color: var(--text-secondary); line-height: 1.6; }
+.shoot-shotlist { color: var(--text-primary); }
+.shoot-list { display: flex; flex-direction: column; gap: 6px; font-size: var(--t-sm); color: var(--text-primary); padding-left: 18px; list-style: disc; }
+.shoot-shotlist-edit { font-family: inherit; line-height: 1.6; }

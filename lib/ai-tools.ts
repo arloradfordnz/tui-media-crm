@@ -714,6 +714,12 @@ export const TOOLS: Anthropic.Tool[] = [
                 },
               },
               multi: { type: 'boolean', description: 'True if he can pick more than one.' },
+              lookup: {
+                type: 'object',
+                description: 'Pass through unchanged when a question from prepare_contract has one: the popup looks the answer up itself (the Companies Register) while he answers the earlier questions.',
+                properties: { kind: { type: 'string', enum: ['legal_entity'] }, client_id: { type: 'string' } },
+                required: ['kind', 'client_id'],
+              },
             },
             required: ['question'],
           },
@@ -1732,7 +1738,7 @@ export async function executeTool(
       const proposalCtx: ProposalCtx | null = basis
         ? { status: basis.status, job: basis.job, total: basis.total, lines: basis.lines.map((l) => l.description).filter(Boolean), paymentTerms: basis.payment_terms }
         : null
-      const questions = buildContractIntake(client.data, focus, engagement, missing, proposalCtx)
+      const questions = buildContractIntake(client.data, focus, engagement, missing, proposalCtx, clientId)
       const unsigned = contracts.filter((k: { signed: boolean }) => !k.signed)
       if (unsigned.length) {
         questions.unshift({ key: 'existing', question: `There's an unsigned contract for ${client.data.name} from ${unsigned[0].created}. Revise that one or start fresh?`, options: [{ label: 'Revise the existing one' }, { label: 'Start a new contract' }] })
@@ -1749,7 +1755,7 @@ export async function executeTool(
         proposal_note: proposals.length ? 'These are this client\'s proposals, accepted ones included (read-only, locked but fully usable as source material). When the contract follows a proposal, pass its proposal_id to create_contract so the drafter works from its exact scope, prices and payment terms, and the first option in the questions already reflects it.' : undefined,
         already_in_every_contract: SETTLED_CONTRACT_TERMS,
         ask_arlo_questions: questions,
-        guidance: 'The contract is for focus_job and is shaped as engagement_type. If that is the wrong job, call prepare_contract again with the right job_id before asking anything. Read inbox_emails_with_client and the job notes, and sharpen the questions with what they settle (dates, times, venue, deliverables, what the client asked for). Call ask_arlo ONCE with ask_arlo_questions as they are (you may sharpen the wording with names from the record or a pasted thread, and drop a question only if Arlo already answered it in this conversation). Do not add small questions of your own and do not split it into several popups. When the answers come back: save any client details with update_client, then call create_contract once with job_id (focus_job.id), engagement_type, and brief keyed by each question key, his answers word for word. If his answer to engagement names a different kind from engagement_type, call prepare_contract again with that engagement_type and ask only the questions that are new, before drafting. If an answer is "Change some" or "Yes" with nothing typed, ask one short follow-up popup about just that before drafting.',
+        guidance: 'The contract is for focus_job and is shaped as engagement_type. If that is the wrong job, call prepare_contract again with the right job_id before asking anything. Read inbox_emails_with_client and the job notes, and sharpen the questions with what they settle (dates, times, venue, deliverables, what the client asked for). Call ask_arlo ONCE with ask_arlo_questions as they are (you may sharpen the wording with names from the record or a pasted thread, and drop a question only if Arlo already answered it in this conversation). Do not add small questions of your own and do not split it into several popups. When the answers come back: save any client details with update_client, then call create_contract once with job_id (focus_job.id), engagement_type, and brief keyed by each question key, his answers word for word. If his answer to engagement names a different kind from engagement_type, call prepare_contract again with that engagement_type and ask only the questions that are new, before drafting. If special_requests is "Yes" with nothing typed, ask one short follow-up popup about just that before drafting. Ownership, the portfolio, 2 revision rounds, invoices due in 7 days and keeping the deposit if the client cancels are the same in every contract and are not asked about.',
       })
     }
 

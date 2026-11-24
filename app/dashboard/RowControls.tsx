@@ -2,7 +2,7 @@
 
 import { useTransition } from 'react'
 import { Check, Clock } from 'lucide-react'
-import { putAwayAttention } from '@/app/actions/client-emails'
+import { putAwayAttention, logInstagramPost } from '@/app/actions/client-emails'
 
 /** Done and Snooze on a Your week row. Every row has both, so nothing has to
  *  sit on the home screen until it is ignored. The row vanishes at once; if
@@ -15,10 +15,13 @@ export default function RowControls({
   itemKey,
   taskId,
   emailId,
+  post,
 }: {
   itemKey: string
   taskId?: string
   emailId?: string
+  /** The Instagram row: Done logs today's post rather than hiding the row. */
+  post?: boolean
 }) {
   const [pending, startTransition] = useTransition()
 
@@ -26,12 +29,14 @@ export default function RowControls({
     const row = e.currentTarget.closest<HTMLElement>('.attention-row')
     if (row) row.style.display = 'none'
     startTransition(async () => {
-      const res = await putAwayAttention(itemKey, { snooze, taskId, emailId })
+      const res = post && !snooze
+        ? await logInstagramPost()
+        : await putAwayAttention(itemKey, { snooze, taskId, emailId })
       if (!res.ok && row) row.style.display = ''
     })
   }
 
-  const doneLabel = taskId ? 'Mark task done' : emailId ? 'Mark as answered' : 'Done, hide this'
+  const doneLabel = post ? 'Posted it' : taskId ? 'Mark task done' : emailId ? 'Mark as answered' : 'Done, hide this'
 
   return (
     <>

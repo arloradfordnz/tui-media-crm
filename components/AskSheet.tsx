@@ -38,7 +38,33 @@ export default function AskSheet({
   const [step, setStep] = useState(0)
   const [picked, setPicked] = useState<string[][]>(() => questions.map(() => []))
   const [typed, setTyped] = useState<string[]>(() => questions.map(() => ''))
+  // Options fetched for a lookup question, by index, and that lookup's note.
+  // Started the moment the sheet opens, so they are usually in by the time he
+  // reaches that question.
+  const [looked, setLooked] = useState<Record<number, { options: AskQuestion['options']; note: string } | 'pending'>>(
+    () => Object.fromEntries(questions.flatMap((q, i) => (q.lookup ? [[i, 'pending' as const]] : []))),
+  )
   const mounted = useMounted()
+
+  useEffect(() => {
+    let live = true
+    questions.forEach((q, i) => {
+      if (q.lookup?.kind !== 'legal_entity') return
+      fetch(`/api/clients/${q.lookup.clientId}/legal-lookup`)
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+        .then((res: { options?: AskQuestion['options']; note?: string }) => {
+          if (!live) return
+          const options = res.options ?? []
+          setLooked((l) => ({ ...l, [i]: { options, note: res.note ?? '' } }))
+          // The register's answer is the one to confirm, so it starts picked.
+          if (options[0]?.label) setPicked((p) => p.map((v, j) => (j === i && v.length === 0 ? [options[0].label] : v)))
+        })
+        .catch(() => {
+          if (live) setLooked((l) => ({ ...l, [i]: { options: [], note: "Couldn't search the Companies Register. Type the legal name." } }))
+        })
+    })
+    return () => { live = false }
+  }, [questions])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -53,7 +79,10 @@ export default function AskSheet({
     }
   }, [onClose])
 
-  const q = questions[step]
+  const lookupState = looked[step]
+  const q = lookupState && lookupState !== 'pending' && lookupState.options.length > 0
+    ? { ...questions[step], options: lookupState.options }
+    : questions[step]
   const isLast = step === questions.length - 1
   const answerFor = (i: number) => typed[i].trim() || picked[i].join(', ')
   const answered = Boolean(answerFor(step))
@@ -105,6 +134,8 @@ export default function AskSheet({
         </p>
         <h2 id="ask-title" className="confirm-title">{q.question}</h2>
         {q.multi && <p className="ask-hint">Pick any that apply.</p>}
+        {lookupState === 'pending' && <p className="ask-hint">Searching the Companies Register…</p>}
+        {lookupState && lookupState !== 'pending' && lookupState.note && <p className="ask-hint">{lookupState.note}</p>}
 
         {q.options.length > 0 && <div className="ask-options">
           {q.options.map((o) => {

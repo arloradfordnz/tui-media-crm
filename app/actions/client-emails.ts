@@ -52,3 +52,15 @@ export async function putAwayAttention(
   revalidatePath('/dashboard')
   return { ok: true }
 }
+
+/** Log a Tui Media Instagram post for today (NZ). Counted against the two
+ *  weekly slots in lib/instagram-slots.ts. */
+export async function logInstagramPost(): Promise<{ ok: boolean }> {
+  if (!(await getAuthUser())) return { ok: false }
+  const supabase = await createServerSupabaseClient()
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Pacific/Auckland' })
+  const { error } = await supabase.from('social_posts').insert({ posted_on: today })
+  revalidatePath('/dashboard')
+  revalidatePath('/dashboard/calendar')
+  return { ok: !error }
+}

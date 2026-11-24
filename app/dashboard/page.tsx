@@ -203,10 +203,18 @@ function AttentionRow({ item }: { item: AttentionItem }) {
         {item.meta && <span className="attention-meta">{item.meta}</span>}
       </div>
       <div className="attention-actions">
-        <RowControls itemKey={item.key} taskId={item.doneTaskId} emailId={item.doneEmailId} />
-        <Link href={item.action.href} className="btn-ghost attention-action">
-          {item.action.label}
-        </Link>
+        <RowControls itemKey={item.key} taskId={item.doneTaskId} emailId={item.doneEmailId} post={item.donePost} />
+        {/* A wedding enquiry's Reply opens a prefilled email, which is not a
+            route for the client router to handle. */}
+        {item.action.href.startsWith('mailto:') ? (
+          <a href={item.action.href} className="btn-ghost attention-action">
+            {item.action.label}
+          </a>
+        ) : (
+          <Link href={item.action.href} className="btn-ghost attention-action">
+            {item.action.label}
+          </Link>
+        )}
       </div>
     </div>
   )

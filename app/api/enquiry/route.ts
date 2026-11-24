@@ -19,10 +19,18 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { timingSafeEqual } from 'node:crypto'
 import { CUSTOMER_VALUE_OPTIONS, AD_SPEND_OPTIONS, approxFor } from '@/lib/application-fields'
+import { parseEnquiryDate, checkDate, draftWeddingReply, longDate } from '@/lib/wedding-enquiry'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
 
 type Payload = {
+  /** 'wedding' or 'commercial' from arloradford.nz. Absent from tuimedia.nz. */
+  kind?: string
+  date?: string
+  place?: string
+  package?: string
+  timing?: string
   name?: string
   business?: string
   email?: string
@@ -87,6 +95,14 @@ export async function POST(req: Request) {
     body = await req.json()
   } catch {
     return NextResponse.json({ ok: false, error: 'Invalid JSON' }, { status: 400 })
+  }
+
+  // arloradford.nz sends its own two forms here, told apart by `kind`.
+  if (body.kind === 'wedding' || body.kind === 'commercial') {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!url || !key) return NextResponse.json({ ok: false, error: 'Not configured' }, { status: 500 })
+    return fileArloRadfordEnquiry(createClient(url, key), body)
   }
 
   const business = String(body.business || '').trim()
@@ -208,6 +224,124 @@ export async function POST(req: Request) {
     supabase.from('activities').insert({
       action: 'enquiry_received',
       details: `Application received from ${business}`,
+      client_id: clientId,
+    }),
+  ])
+
+  return NextResponse.json({ ok: true, clientId })
+}
+
+// ── arloradford.nz ──────────────────────────────────────────────────────────
+//
+// Weddings (and commercial enquiries) sold under Arlo's own name. They are
+// still invoiced by Tui Media, so the brand stays tui_media. A wedding gets a
+// date check and a drafted reply (lib/wedding-enquiry.ts); Today shows it as
+// a row with a Reply link. A commercial enquiry is filed as a lead and nothing
+// more, since its answer depends on the project.
+async function fileArloRadfordEnquiry(supabase: SupabaseClient, body: Payload) {
+  const names = String(body.name || '').trim()
+  const email = String(body.email || '').trim().toLowerCase()
+  if (!names || !email) {
+    return NextResponse.json({ ok: false, error: 'name and email are required' }, { status: 400 })
+  }
+  const wedding = body.kind === 'wedding'
+  const place = body.place?.trim() || null
+  const pkg = body.package?.trim() || null
+  const rawDate = body.date?.trim() || ''
+  const isoDate = wedding ? parseEnquiryDate(rawDate) : null
+
+  let reply: string | null = null
+  let dateNote: string | null = null
+  if (wedding) {
+    const check = await checkDate(supabase, isoDate)
+    dateNote = check.state === 'free' ? 'Date is free'
+      : check.state === 'booked' ? `Already booked that day: ${check.what}`
+      : check.state === 'busy' ? `Something else on that day: ${check.what}`
+      : 'No single date given'
+    reply = (await draftWeddingReply(supabase, { names, rawDate, isoDate, place, pkg, check })).body
+  }
+
+  const note = [
+    `── ${wedding ? 'Wedding' : 'Commercial'} enquiry from arloradford.nz ──`,
+    `Names: ${names}`,
+    body.business && `Business: ${body.business}`,
+    rawDate && `Date: ${rawDate}${isoDate ? ` (${longDate(isoDate)})` : ''}`,
+    dateNote && `Calendar: ${dateNote}`,
+    place && `Where: ${place}`,
+    pkg && `After: ${pkg}`,
+    body.timing && `When: ${body.timing}`,
+    body.notes && `Notes: ${body.notes}`,
+  ].filter(Boolean).join('\n')
+
+  const fields = {
+    name: wedding ? names : String(body.business || '').trim() || names,
+    contact_person: names,
+    email,
+    lead_source: 'arloradford.nz',
+    first_contact: new Date().toISOString(),
+    pipeline_stage: 'enquiry',
+    status: 'lead',
+    client_category: wedding ? 'wedding' : 'one_off',
+    brand: 'tui_media',
+    interest: pkg,
+    timeline: rawDate || body.timing?.trim() || null,
+    event_date: isoDate,
+    enquiry_reply: reply,
+  }
+
+  const { data: existing } = await supabase
+    .from('clients').select('id, notes, status, pipeline_stage').eq('email', email).maybeSingle()
+
+  let clientId: string
+  if (existing) {
+    const answered = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== null))
+    const { error } = await supabase.from('clients').update({
+      ...answered,
+      status: existing.status === 'lead' ? 'lead' : existing.status,
+      pipeline_stage: existing.pipeline_stage === 'won' ? 'won' : 'enquiry',
+      notes: [existing.notes, note].filter(Boolean).join('\n\n'),
+    }).eq('id', existing.id)
+    if (error) {
+      console.error('arloradford enquiry update failed', error)
+      return NextResponse.json({ ok: false, error: 'Write failed' }, { status: 500 })
+    }
+    clientId = existing.id
+  } else {
+    const { data, error } = await supabase.from('clients').insert({ ...fields, notes: note }).select('id').single()
+    if (error || !data) {
+      console.error('arloradford enquiry insert failed', error)
+      return NextResponse.json({ ok: false, error: 'Write failed' }, { status: 500 })
+    }
+    clientId = data.id
+  }
+
+  // A wedding gets its job straight away, as an enquiry, so the proposal and
+  // contract flows have something to hang off. No shoot_date: that is for
+  // booked work and would put it on the calendar.
+  const jobName = `${names} Wedding`
+  const { data: sameJob } = wedding
+    ? await supabase.from('jobs').select('id').eq('client_id', clientId).eq('name', jobName).maybeSingle()
+    : { data: null }
+  await Promise.allSettled([
+    wedding && !sameJob
+      ? supabase.from('jobs').insert({
+          name: jobName,
+          client_id: clientId,
+          job_type: 'wedding',
+          status: 'enquiry',
+          notes: note,
+        })
+      : Promise.resolve(null),
+    supabase.from('notifications').insert({
+      title: wedding ? 'New wedding enquiry' : 'New commercial enquiry',
+      message: wedding ? `${names}${isoDate ? `, ${longDate(isoDate)}` : ''}${dateNote ? ` (${dateNote.toLowerCase()})` : ''}` : fields.name,
+      type: 'enquiry',
+      client_id: clientId,
+      link_url: `/dashboard/clients/${clientId}`,
+    }),
+    supabase.from('activities').insert({
+      action: 'enquiry_received',
+      details: `${wedding ? 'Wedding' : 'Commercial'} enquiry from arloradford.nz: ${names}`,
       client_id: clientId,
     }),
   ])
