@@ -199,8 +199,8 @@ export function buildProposalIntake(client: ClientCtx, job: JobCtx | null, other
     key: 'travel',
     question: `Travel: which places are included in the price, and what's the fee beyond that? (name the places)`,
     options: opts(
-      { label: 'Nelson and Richmond included, +$30 a shoot beyond', detail: 'Flat fee, named zones' },
-      { label: 'Nelson only, +$30 a shoot beyond' },
+      { label: 'Within 15 min of Nelson included, $1/km return beyond', detail: 'Standard rate' },
+      { label: 'Nelson and Richmond included, $1/km return beyond' },
       { label: 'All of Nelson Tasman included', detail: 'No travel fee' },
       { label: 'No travel fee at all' },
     ),
@@ -316,8 +316,8 @@ const TRAVEL_Q: IntakeQuestion = {
   key: 'travel',
   question: `Travel: which places are included in the price, and what's the fee beyond that? (name the places)`,
   options: opts(
-    { label: 'Nelson and Richmond included, +$30 a shoot beyond', detail: 'Flat fee, named zones' },
-    { label: 'Nelson only, +$30 a shoot beyond' },
+    { label: 'Within 15 min of Nelson included, $1/km return beyond', detail: 'Standard rate' },
+    { label: 'Nelson and Richmond included, $1/km return beyond' },
     { label: 'All of Nelson Tasman included', detail: 'No travel fee' },
     { label: 'No travel fee at all' },
   ),

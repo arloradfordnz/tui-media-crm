@@ -939,16 +939,26 @@ export const TOOLS: Anthropic.Tool[] = [
       properties: {
         contact_id: { type: 'string', description: 'Xero ContactID (from list_xero_contacts)' },
         contact_name: { type: 'string', description: 'Contact display name (for confirmation)' },
-        description: {
-          type: 'string',
-          description: 'Client-facing invoice line, written by you from the job and its deliverables — not the job name, and never asked of Arlo. See the invoicing rules in the system prompt.',
+        lines: {
+          type: 'array',
+          description: 'The invoice lines, one per deliverable or charge (event film, extra video, travel, hours, deposit or balance). Written by you from the job and its deliverables, never the job name, never asked of Arlo. See the invoicing rules in the system prompt. Use this for every invoice.',
+          items: {
+            type: 'object',
+            properties: {
+              description: { type: 'string', description: 'Client-facing line, e.g. "Event highlight video, Trafalgar Centre, Fri 18 Dec 2026"' },
+              quantity: { type: 'number', description: 'Default 1. Use real quantities, e.g. 5 for 5 hours.' },
+              unit_amount: { type: 'number', description: 'Price of one, excluding GST. Never negative.' },
+            },
+            required: ['description', 'unit_amount'],
+          },
         },
-        amount: { type: 'number', description: 'Amount excluding GST' },
-        due_date: { type: 'string', description: 'Due date YYYY-MM-DD. Defaults to 14 days from today.' },
-        reference: { type: 'string', description: 'Optional invoice reference/PO number' },
+        description: { type: 'string', description: 'Only if you are not using lines: one client-facing line.' },
+        amount: { type: 'number', description: 'Only if you are not using lines: the amount for that one line, excluding GST.' },
+        due_date: { type: 'string', description: 'Due date YYYY-MM-DD. Defaults to 7 days from today (the contract term).' },
+        reference: { type: 'string', description: 'Short job name the client will see on their bank transfer, e.g. "Expo highlights Oct26". Always set it.' },
         approve: { type: 'boolean', description: 'If true, creates it already approved (status AUTHORISED) instead of DRAFT. This does NOT email it — use send_xero_invoice for that. Default false.' },
       },
-      required: ['contact_id', 'contact_name', 'description', 'amount'],
+      required: ['contact_id', 'contact_name'],
     },
   },
   {
@@ -2185,13 +2195,21 @@ export async function executeTool(
 
     case 'create_xero_invoice': {
       const now = new Date()
-      const defaultDue = new Date(now.getTime() + 14 * 86400000).toISOString().slice(0, 10)
+      const defaultDue = new Date(now.getTime() + 7 * 86400000).toISOString().slice(0, 10)
+      const rawLines = Array.isArray(input.lines) ? (input.lines as Array<{ description?: string; quantity?: number; unit_amount?: number }>) : []
+      const lineItems = rawLines
+        .filter((l) => l && l.description && typeof l.unit_amount === 'number' && l.unit_amount >= 0)
+        .map((l) => ({ Description: l.description as string, UnitAmount: l.unit_amount as number, Quantity: l.quantity && l.quantity > 0 ? l.quantity : 1 }))
+      if (lineItems.length === 0) {
+        if (typeof input.amount !== 'number') return JSON.stringify({ error: 'Pass lines (description and unit_amount for each), or description and amount.' })
+        lineItems.push({ Description: (input.description as string) || 'Services', UnitAmount: input.amount as number, Quantity: 1 })
+      }
       const res = await createXeroInvoice({
         contactId: input.contact_id as string,
         contactName: input.contact_name as string,
         date: now.toISOString().slice(0, 10),
         dueDate: (input.due_date as string) || defaultDue,
-        lineItems: [{ Description: (input.description as string) || 'Services', UnitAmount: input.amount as number, Quantity: 1 }],
+        lineItems,
         reference: (input.reference as string) || undefined,
         status: input.approve ? 'AUTHORISED' : 'DRAFT',
       })

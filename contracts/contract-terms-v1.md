@@ -24,7 +24,7 @@ How a contract is put together:
 | **Fee** | {fee}{ a month}. No GST (we are not GST registered). |
 | **Deposit** (not monthly) | {deposit amount}, due on signing. It holds your date. |
 | **Invoices** | {when invoices are sent}. Each is due 7 days after it is sent. |
-| **Travel** | {included places and the flat fee beyond them, or "No travel fee"} |
+| **Travel** | {included places and the rate beyond them (standard $1 a km return from Nelson), or "No travel fee"} |
 | **Starts** | {the day both sign / date} |
 | **Ending** (monthly only) | Either of us, with 14 days' notice by email |
 | **Anything else agreed** | {special requests, or "Nothing extra"} |
