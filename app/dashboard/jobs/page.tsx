@@ -30,7 +30,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
 
   let query = supabase
     .from('jobs')
-    .select('id, name, job_type, status, shoot_date, quote_value, client_id, clients(id, name)')
+    .select('id, name, job_type, status, shoot_date, quote_value, created_at, client_id, clients(id, name)')
     .order('shoot_date', { ascending: false })
 
   if (statusFilter === 'archived') query = query.eq('status', 'archived')
@@ -60,7 +60,22 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
       return totals
     }))
 
-  const { data: jobs } = await query
+  const { data: rawJobs } = await query
+
+  // Grouped by client, so each client's jobs sit together, then newest first
+  // within a client (a job with no shoot date yet counts as newest, as it did
+  // when the list was ordered by shoot date alone). PostgREST can only order
+  // the embedded client rows, not the jobs by their client's name, so this is
+  // done here. Same rows and same columns as before, so loading.tsx is unchanged.
+  const clientName = (j: { clients: unknown }) => (j.clients as { name?: string } | null)?.name ?? ''
+  const jobs = [...(rawJobs ?? [])].sort((a, b) => {
+    const byClient = clientName(a).localeCompare(clientName(b), 'en-NZ', { sensitivity: 'base' })
+    if (byClient !== 0) return byClient
+    const ad = a.shoot_date ?? '\uffff'
+    const bd = b.shoot_date ?? '\uffff'
+    if (ad !== bd) return ad < bd ? 1 : -1
+    return (b.created_at ?? '') < (a.created_at ?? '') ? -1 : 1
+  })
 
   return (
     <div>
