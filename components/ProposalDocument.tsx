@@ -1,5 +1,6 @@
 import { CheckCircle2 } from 'lucide-react'
 import { formatNZD } from '@/lib/format'
+import { brandIdentity } from '@/lib/brand'
 
 // The body of a proposal as the client reads it: the letter, the price, what
 // is included and how to pay. Rendered on the public proposal page and in the
@@ -43,7 +44,8 @@ export function parseInclusions(raw: string | null | undefined): string[] {
   return (raw || '').split('\n').map((l) => l.replace(/^[-•*]\s*/, '').trim()).filter(Boolean)
 }
 
-export default function ProposalDocument({ body }: { body: ProposalBody }) {
+export default function ProposalDocument({ body, brand }: { body: ProposalBody; brand?: string | null }) {
+  const id = brandIdentity(brand)
   const options = body.pricingMode === 'options'
   // "Not included: ..." is the drafter's last line. It is not a tick, so it
   // sits under the list as a plain note.
@@ -75,7 +77,7 @@ export default function ProposalDocument({ body }: { body: ProposalBody }) {
             <span className="prop-total-value">{formatNZD(body.totalValue)}</span>
           </div>
         )}
-        <p className="prop-total-note">NZD. Tui Media is not GST registered, so no GST is added.</p>
+        <p className="prop-total-note">NZD. {id.gstNote}</p>
       </section>
 
       {body.inclusions.length > 0 && (
@@ -97,6 +99,8 @@ export default function ProposalDocument({ body }: { body: ProposalBody }) {
         <section className="prop-section">
           <h2 className="prop-h">Payment terms</h2>
           <p className="prop-terms">{body.paymentTerms}</p>
+          {/* A drafted proposal may already say it; never twice. */}
+          {id.invoiceNote && !body.paymentTerms.includes(id.invoiceNote) && <p className="prop-terms">{id.invoiceNote}</p>}
         </section>
       )}
     </div>

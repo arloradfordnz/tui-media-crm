@@ -1,10 +1,24 @@
 import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
+import { brandIdentity, portalAuthHref, resolveBrand, type BrandIdentity } from '@/lib/brand'
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 
 const FROM = process.env.EMAIL_FROM || 'Tui Media <noreply@dashboard.tuimedia.nz>'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
+
+/* The sending ADDRESS never changes (it is the verified Resend domain); only
+   the display name in front of it follows the client's brand. */
+const FROM_ADDRESS = /<([^>]+)>/.exec(FROM)?.[1] ?? FROM
+function fromFor(id: BrandIdentity) {
+  return id.brand === 'tui_media' ? FROM : `${id.senderName} <${FROM_ADDRESS}>`
+}
+
+/* Emails Arlo gets himself (briefing, admin alerts) are always Tui Media. */
+const TUI = brandIdentity('tui_media')
+
+/** A client email's subject or body, written once for either brand. */
+type Branded = string | ((id: BrandIdentity) => string)
 
 /* ── The rebrand palette, as literals ────────────────────────────────────────
    Email has no custom properties, so tuimedia.nz's tokens are spelled out here
@@ -107,25 +121,56 @@ async function logEmail({
   }
 }
 
+/**
+ * Which brand a client email goes out under. An explicit brand wins; else the
+ * job's brand if it has one, else its client's; else the client's. One small
+ * query, and only for emails that are written per brand.
+ */
+async function lookupBrand(clientId?: string, jobId?: string): Promise<BrandIdentity> {
+  try {
+    const supabase = getLogClient()
+    if (!supabase || (!clientId && !jobId)) return TUI
+    if (jobId) {
+      const { data } = await supabase.from('jobs').select('brand, clients(brand)').eq('id', jobId).maybeSingle()
+      const client = (Array.isArray(data?.clients) ? data?.clients[0] : data?.clients) as { brand?: string | null } | null | undefined
+      if (data) return brandIdentity(resolveBrand(data.brand as string | null, client?.brand))
+    }
+    if (clientId) {
+      const { data } = await supabase.from('clients').select('brand').eq('id', clientId).maybeSingle()
+      return brandIdentity(data?.brand as string | null)
+    }
+  } catch (err) {
+    console.error('[email brand lookup]', err)
+  }
+  return TUI
+}
+
 async function send({
   to,
-  subject,
-  html,
+  subject: subjectIn,
+  html: htmlIn,
   type,
   clientId,
   jobId,
+  brand,
   attachments,
   rethrow,
 }: {
   to: string
-  subject: string
-  html: string
+  subject: Branded
+  html: Branded
   type: string
   clientId?: string
   jobId?: string
+  /** The client's (or job's) brand, when the caller already has it. */
+  brand?: string | null
   attachments?: { filename: string; content: string }[]
   rethrow?: boolean
 }) {
+  const branded = typeof subjectIn === 'function' || typeof htmlIn === 'function'
+  const id = !branded ? TUI : brand !== undefined ? brandIdentity(brand) : await lookupBrand(clientId, jobId)
+  const subject = typeof subjectIn === 'function' ? subjectIn(id) : subjectIn
+  const html = typeof htmlIn === 'function' ? htmlIn(id) : htmlIn
   if (!resend) {
     console.log(`[email skipped] No RESEND_API_KEY — would have sent to ${to}: ${subject}`)
     await logEmail({ to, subject, type, status: 'failed', error: 'No RESEND_API_KEY configured', clientId, jobId })
@@ -134,7 +179,7 @@ async function send({
   }
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const payload: any = { from: FROM, to, subject, html }
+    const payload: any = { from: fromFor(id), to, subject, html }
     if (attachments && attachments.length) payload.attachments = attachments
     await resend.emails.send(payload)
     await logEmail({ to, subject, type, status: 'sent', clientId, jobId })
@@ -146,9 +191,12 @@ async function send({
   }
 }
 
-const SIGNOFF = `
-  <p style="color:${C.muted};font-size:15px;line-height:1.6;margin:36px 0 0;">Ng\u0101 mihi,<br/><span style="color:${C.ink};font-weight:600;">Arlo Radford</span></p>
+function signoff(id: BrandIdentity) {
+  return `
+  <p style="color:${C.muted};font-size:15px;line-height:1.6;margin:36px 0 0;">${id.signoff}<br/><span style="color:${C.ink};font-weight:600;">${id.signatureName}</span></p>
 `
+}
+const SIGNOFF = signoff(TUI)
 
 const BRIEFING_SIGNOFF = `
   <p style="color:${C.ink};font-size:15px;font-weight:600;margin:36px 0 0;">Tui Media</p>
@@ -160,7 +208,22 @@ const NO_REPLY = `
   </div>
 `
 
-function wrap(body: string, signoff = SIGNOFF, preheader?: string) {
+/* The logo in the header, at the same height either way. */
+function headerLogo(id: BrandIdentity) {
+  /* Same 140px width as Tui Media's lockup; the wordmark is wider, so shorter. */
+  const w = 140
+  const hh = id.brand === 'tui_media' ? 29 : Math.round((w * id.logo.height) / id.logo.width)
+  return `<img src="https://dashboard.tuimedia.nz${id.logo.onDark}" alt="${id.displayName}" width="${w}" height="${hh}" style="display:block;border:0;outline:none;text-decoration:none;" />`
+}
+
+/** The one plain invoicing line, for brands whose invoices carry another name. */
+function invoiceLine(id: BrandIdentity) {
+  return id.invoiceNote
+    ? `<p style="color:${C.muted};font-size:15px;line-height:1.7;margin:16px 0 0;">${id.invoiceNote}</p>`
+    : ''
+}
+
+function wrap(body: string, signoff = SIGNOFF, preheader?: string, id: BrandIdentity = TUI) {
   const preheaderHtml = preheader
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${C.paper};font-size:1px;line-height:1px;">${preheader}${'&#847;&zwnj;&nbsp;'.repeat(30)}</div>`
     : ''
@@ -203,7 +266,7 @@ function wrap(body: string, signoff = SIGNOFF, preheader?: string) {
           <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.paper}" style="background:${C.paper};width:100%;max-width:560px;margin:0 auto;">
             <tr>
               <td align="left" bgcolor="${C.paper}" class="gutter" style="background:${C.paper};padding:0 40px 36px;">
-                <img src="https://dashboard.tuimedia.nz/Primary_White.png" alt="Tui Media" width="140" height="29" style="display:block;border:0;outline:none;text-decoration:none;" />
+                ${headerLogo(id)}
               </td>
             </tr>
             <tr>
@@ -215,7 +278,7 @@ function wrap(body: string, signoff = SIGNOFF, preheader?: string) {
             </tr>
             <tr>
               <td align="left" bgcolor="${C.paper}" class="gutter" style="background:${C.paper};padding:28px 40px 0;color:#5F6E8C;font-size:12px;">
-                &copy; ${new Date().getFullYear()} Tui Media &middot; <a href="https://tuimedia.nz" style="color:${C.faint};text-decoration:none;">www.tuimedia.nz</a>
+                &copy; ${new Date().getFullYear()} ${id.displayName} &middot; <a href="${id.websiteUrl}" style="color:${C.faint};text-decoration:none;">${id.website}</a>
               </td>
             </tr>
           </table>
@@ -232,7 +295,7 @@ function wrap(body: string, signoff = SIGNOFF, preheader?: string) {
 
 const TEMPLATES: Record<string, { subject: string; body: string }> = {
   welcome: {
-    subject: 'Welcome to Tui Media',
+    subject: 'Welcome to {{brandName}}',
     body: "Good to have you on board. I'll be in touch shortly to chat through your project and next steps.\n\nIf you've got any questions before then, just reply to hello@tuimedia.nz.",
   },
   proposal: {
@@ -296,13 +359,18 @@ function heading(text: string): string {
   return `<h2 style="margin:0 0 20px;font-size:26px;line-height:1.1;letter-spacing:-0.035em;color:${C.ink};font-weight:500;">${text}</h2>`
 }
 
-function buildGreeting(clientName?: string): string {
-  return heading(clientName ? `Hi ${esc(clientName)},` : 'Kia ora,')
+function buildGreeting(clientName?: string, id: BrandIdentity = TUI): string {
+  return heading(id.greeting(clientName ? esc(clientName) : null))
+}
+
+/* A client email in the client's brand: logo, footer, sign-off. */
+function wrapFor(id: BrandIdentity, body: string, preheader?: string) {
+  return wrap(body, signoff(id), preheader, id)
 }
 
 // --- Email functions ---
 
-export async function sendPortalDeliveryEmail(to: string, clientName: string, jobName: string, portalUrl: string, clientId?: string, jobId?: string) {
+export async function sendPortalDeliveryEmail(to: string, clientName: string, jobName: string, portalUrl: string, clientId?: string, jobId?: string, brand?: string | null) {
   const tpl = getTemplate('delivery')
   const vars = { clientName, jobName, portalUrl }
   const subject = replacePlaceholders(tpl.subject, vars)
@@ -311,11 +379,12 @@ export async function sendPortalDeliveryEmail(to: string, clientName: string, jo
   await send({
     to,
     subject,
+    brand,
     type: 'delivery',
     clientId,
     jobId,
-    html: wrap(`
-      ${buildGreeting(clientName)}
+    html: (id) => wrapFor(id, `
+      ${buildGreeting(clientName, id)}
       ${bodyToHtml(bodyText)}
       ${button(portalUrl, 'View your project')}
       ${plainLink(portalUrl)}
@@ -323,7 +392,7 @@ export async function sendPortalDeliveryEmail(to: string, clientName: string, jo
   })
 }
 
-export async function sendApprovalConfirmationEmail(to: string, clientName: string, jobName: string, clientId?: string, jobId?: string) {
+export async function sendApprovalConfirmationEmail(to: string, clientName: string, jobName: string, clientId?: string, jobId?: string, brand?: string | null) {
   const tpl = getTemplate('approval')
   const vars = { clientName, jobName }
   const subject = replacePlaceholders(tpl.subject, vars)
@@ -332,17 +401,18 @@ export async function sendApprovalConfirmationEmail(to: string, clientName: stri
   await send({
     to,
     subject,
+    brand,
     type: 'approval',
     clientId,
     jobId,
-    html: wrap(`
-      ${buildGreeting(clientName)}
+    html: (id) => wrapFor(id, `
+      ${buildGreeting(clientName, id)}
       ${bodyToHtml(bodyText)}
     `),
   })
 }
 
-export async function sendRevisionRequestEmail(to: string, clientName: string, jobName: string, round: number, clientId?: string, jobId?: string) {
+export async function sendRevisionRequestEmail(to: string, clientName: string, jobName: string, round: number, clientId?: string, jobId?: string, brand?: string | null) {
   const tpl = getTemplate('revision')
   const vars = { clientName, jobName, round: String(round) }
   const subject = replacePlaceholders(tpl.subject, vars)
@@ -351,11 +421,12 @@ export async function sendRevisionRequestEmail(to: string, clientName: string, j
   await send({
     to,
     subject,
+    brand,
     type: 'revision',
     clientId,
     jobId,
-    html: wrap(`
-      ${buildGreeting(clientName)}
+    html: (id) => wrapFor(id, `
+      ${buildGreeting(clientName, id)}
       ${bodyToHtml(bodyText)}
     `),
   })
@@ -370,6 +441,7 @@ export async function sendRevisionResponseEmail(
   reply?: string | null,
   clientId?: string,
   jobId?: string,
+  brand?: string | null,
 ) {
   const type = response === 'reply' ? 'revision_reply' : `revision_${response}`
   const tpl = getTemplate(type)
@@ -377,8 +449,8 @@ export async function sendRevisionResponseEmail(
   const subject = replacePlaceholders(tpl.subject, vars)
   const bodyText = replacePlaceholders(tpl.body, vars)
 
-  const replyBlock = reply?.trim()
-    ? quote('Note from Tui Media', esc(reply.trim()))
+  const replyBlock = (id: BrandIdentity) => reply?.trim()
+    ? quote(`Note from ${id.shortName}`, esc(reply.trim()))
     : ''
 
   await send({
@@ -387,15 +459,16 @@ export async function sendRevisionResponseEmail(
     type,
     clientId,
     jobId,
-    html: wrap(`
-      ${buildGreeting(clientName)}
+    brand,
+    html: (id) => wrapFor(id, `
+      ${buildGreeting(clientName, id)}
       ${bodyToHtml(bodyText)}
-      ${replyBlock}
+      ${replyBlock(id)}
     `),
   })
 }
 
-export async function sendProposalEmail(to: string, clientName: string, jobName: string, proposalUrl: string, clientId?: string, jobId?: string) {
+export async function sendProposalEmail(to: string, clientName: string, jobName: string, proposalUrl: string, clientId?: string, jobId?: string, brand?: string | null) {
   const tpl = getTemplate('proposal')
   const vars = { clientName, jobName, proposalUrl }
   const subject = replacePlaceholders(tpl.subject, vars)
@@ -404,32 +477,31 @@ export async function sendProposalEmail(to: string, clientName: string, jobName:
   await send({
     to,
     subject,
+    brand,
     type: 'proposal',
     clientId,
     jobId,
-    html: wrap(`
-      ${buildGreeting(clientName)}
+    html: (id) => wrapFor(id, `
+      ${buildGreeting(clientName, id)}
       ${bodyToHtml(bodyText)}
+      ${invoiceLine(id)}
       ${button(proposalUrl, 'View the proposal')}
       ${plainLink(proposalUrl)}
     `),
   })
 }
 
-export async function sendWelcomeEmail(to: string, clientName: string, clientId?: string) {
+export async function sendWelcomeEmail(to: string, clientName: string, clientId?: string, brand?: string | null) {
   const tpl = getTemplate('welcome')
-  const vars = { clientName }
-  const subject = replacePlaceholders(tpl.subject, vars)
-  const bodyText = replacePlaceholders(tpl.body, vars)
-
   await send({
     to,
-    subject,
+    subject: (id) => replacePlaceholders(tpl.subject, { clientName, brandName: id.displayName }),
+    brand,
     type: 'welcome',
     clientId,
-    html: wrap(`
-      ${buildGreeting(clientName)}
-      ${bodyToHtml(bodyText)}
+    html: (id) => wrapFor(id, `
+      ${buildGreeting(clientName, id)}
+      ${bodyToHtml(replacePlaceholders(tpl.body, { clientName, brandName: id.displayName }))}
     `),
   })
 }
@@ -696,7 +768,7 @@ export async function sendAdminDeliveryApprovedEmail(clientName: string, jobName
 // cut is often not the one who posts it (Sam at Johnson Residential), so the
 // finished file goes straight to whoever does, instead of waiting on a forward.
 export async function sendApprovedVideoToMarketingEmail({
-  to, clientName, approverName, jobName, fileName, shareUrl, clientId, jobId,
+  to, clientName, approverName, jobName, fileName, shareUrl, clientId, jobId, brand,
 }: {
   to: string
   clientName: string
@@ -706,17 +778,18 @@ export async function sendApprovedVideoToMarketingEmail({
   shareUrl: string
   clientId?: string
   jobId?: string
+  brand?: string | null
 }) {
   const who = approverName ? `${esc(approverName)} at ${esc(clientName)}` : esc(clientName)
   const subject = `Approved and ready to post — ${jobName}`
-  const html = wrap(`
-    ${buildGreeting()}
+  const html = (id: BrandIdentity) => wrapFor(id, `
+    ${buildGreeting(undefined, id)}
     <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0 0 16px;">${who} has just approved <span style="color:${C.ink};">${esc(fileName)}</span> for <span style="color:${C.ink};">${esc(jobName)}</span>. It's final, so it's ready for you to download and share.</p>
     <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">The link stays live for two months.</p>
     ${button(shareUrl, 'Download the video')}
     ${plainLink(shareUrl)}
   `)
-  await send({ to, subject, html, type: 'marketing_approved_video', clientId, jobId })
+  await send({ to, subject, html, type: 'marketing_approved_video', clientId, jobId, brand })
 }
 
 export async function sendAdminRevisionRequestedEmail(clientName: string, jobName: string, round: number, request: string, jobId?: string, clientId?: string, revisionId?: string) {
@@ -758,6 +831,7 @@ export async function sendDocumentToClientEmail({
   template,
   clientId,
   portalToken,
+  brand,
 }: {
   to: string
   clientName: string
@@ -765,20 +839,27 @@ export async function sendDocumentToClientEmail({
   template: string
   clientId?: string
   portalToken?: string | null
+  brand?: string | null
 }) {
-  const subject = `${docName} — Tui Media`
-  const intro = `Your ${template.toLowerCase()} is ready to view and sign. Click the button below to open it in your client portal — you can review the details and add your signature online. Let me know if anything needs changing.`
+  // Tui Media's wording is unchanged. Arlo Radford's is the same message
+  // without the dash, in the warmer voice of arloradford.nz.
+  const subject = (id: BrandIdentity) => id.brand === 'tui_media' ? `${docName} — Tui Media` : `${docName} from Arlo Radford`
+  const intro = (id: BrandIdentity) => id.brand === 'tui_media'
+    ? `Your ${template.toLowerCase()} is ready to view and sign. Click the button below to open it in your client portal — you can review the details and add your signature online. Let me know if anything needs changing.`
+    : `Your ${template.toLowerCase()} is ready to read and sign. It's in your portal at the button below, and you can sign it online in a minute. If anything needs changing, just let me know.`
   const portalUrl = portalToken ? `https://dashboard.tuimedia.nz/portal/client/${portalToken}` : null
   const buttonSection = portalUrl ? button(portalUrl, 'View and sign the document') : ''
-  const html = wrap(`
-    ${buildGreeting(clientName)}
-    <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">${intro}</p>
+  const html = (id: BrandIdentity) => wrapFor(id, `
+    ${buildGreeting(clientName, id)}
+    <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">${intro(id)}</p>
+    ${invoiceLine(id)}
     ${buttonSection}
   `)
   await send({
     to,
     subject,
     html,
+    brand,
     type: 'document_to_client',
     clientId,
     rethrow: true,
@@ -827,64 +908,67 @@ export async function sendDeliveryReminderEmail(
   daysSinceViewed: number | null,
   clientId?: string,
   jobId?: string,
+  brand?: string | null,
 ) {
   const subject = `Just checking in — ${jobName}`
   // Two versions: they opened it and went quiet, or it has not been opened yet.
   const opener = daysSinceViewed === null
     ? `Just a nudge. Your video for <span style="color:${C.ink};">${esc(jobName)}</span> is in your portal, ready for you to watch.`
     : `Just a nudge. You had a look at your video for <span style="color:${C.ink};">${esc(jobName)}</span> ${daysSinceViewed <= 1 ? 'a day' : `${daysSinceViewed} days`} ago and haven't had a chance to come back to it yet.`
-  const html = wrap(`
-    ${buildGreeting(clientName)}
+  const html = (id: BrandIdentity) => wrapFor(id, `
+    ${buildGreeting(clientName, id)}
     <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0 0 16px;">${opener}</p>
     <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">No rush at all. Whenever you're ready, you can approve it or send through any feedback straight from the portal.</p>
     ${button(portalUrl, 'Open your portal')}
     <p style="color:${C.muted};font-size:13px;line-height:1.5;margin:16px 0 0;">If anything's unclear or you'd rather talk it through, email <a href="mailto:hello@tuimedia.nz" style="color:${C.ink};text-decoration:underline;">hello@tuimedia.nz</a>.</p>
   `)
-  await send({ to, subject, html, type: 'delivery_reminder', clientId, jobId })
+  await send({ to, subject, html, type: 'delivery_reminder', clientId, jobId, brand })
 }
 
 // A retainer client with no shoot planned for the month (app/api/portal-reminders).
-export async function sendShootPlanningReminderEmail(to: string, clientName: string, monthName: string, clientId?: string) {
+export async function sendShootPlanningReminderEmail(to: string, clientName: string, monthName: string, clientId?: string, brand?: string | null) {
   const subject = `Let's plan your ${monthName} shoot`
-  const html = wrap(`
-    ${buildGreeting(clientName)}
+  const html = (id: BrandIdentity) => wrapFor(id, `
+    ${buildGreeting(clientName, id)}
     <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0 0 16px;">We don't have a shoot booked in for <span style="color:${C.ink};">${esc(monthName)}</span> yet, and I'd like to get it locked in so your content for the month stays on track.</p>
     <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">Reply with a couple of days that suit you and I'll confirm one, or tell me if you'd rather skip this month.</p>
     ${button('mailto:hello@tuimedia.nz?subject=' + encodeURIComponent(`${monthName} shoot`), 'Pick a date')}
     <p style="color:${C.muted};font-size:13px;line-height:1.5;margin:16px 0 0;">Or email <a href="mailto:hello@tuimedia.nz" style="color:${C.ink};text-decoration:underline;">hello@tuimedia.nz</a> any time.</p>
   `)
-  await send({ to, subject, html, type: 'shoot_reminder', clientId })
+  await send({ to, subject, html, type: 'shoot_reminder', clientId, brand })
 }
 
 // Two days after a proposal went out with no answer (app/api/portal-reminders).
-export async function sendProposalFollowUpEmail(to: string, clientName: string, jobName: string, proposalUrl: string, opened: boolean, clientId?: string, jobId?: string) {
+export async function sendProposalFollowUpEmail(to: string, clientName: string, jobName: string, proposalUrl: string, opened: boolean, clientId?: string, jobId?: string, brand?: string | null) {
   const subject = `Following up on your proposal — ${jobName}`
   const opener = opened
     ? `Just following up on the proposal for <span style="color:${C.ink};">${esc(jobName)}</span>. I know it's one more thing on the list, so I wanted to check whether you had any questions about it.`
     : `Just making sure the proposal for <span style="color:${C.ink};">${esc(jobName)}</span> reached you. It's ready whenever you have a moment to look.`
-  const html = wrap(`
-    ${buildGreeting(clientName)}
+  const html = (id: BrandIdentity) => wrapFor(id, `
+    ${buildGreeting(clientName, id)}
     <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0 0 16px;">${opener}</p>
     <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">If it looks right you can accept it on the page. If the scope or price isn't quite right, just reply and I can rework it.</p>
+    ${invoiceLine(id)}
     ${button(proposalUrl, 'View the proposal')}
     ${plainLink(proposalUrl)}
   `)
-  await send({ to, subject, html, type: 'proposal_follow_up', clientId, jobId })
+  await send({ to, subject, html, type: 'proposal_follow_up', clientId, jobId, brand })
 }
 
 // Two days after a contract was emailed and not signed (app/api/portal-reminders).
-export async function sendContractFollowUpEmail(to: string, clientName: string, docName: string, portalUrl: string, opened: boolean, clientId?: string) {
+export async function sendContractFollowUpEmail(to: string, clientName: string, docName: string, portalUrl: string, opened: boolean, clientId?: string, brand?: string | null) {
   const subject = `Following up — ${docName}`
   const opener = opened
     ? `Just following up on <span style="color:${C.ink};">${esc(docName)}</span>. Once it's signed we can lock in the dates and get started.`
     : `Just making sure <span style="color:${C.ink};">${esc(docName)}</span> reached you. It's in your portal, ready to read and sign.`
-  const html = wrap(`
-    ${buildGreeting(clientName)}
+  const html = (id: BrandIdentity) => wrapFor(id, `
+    ${buildGreeting(clientName, id)}
     <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0 0 16px;">${opener}</p>
     <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">You can sign it online in a minute, or download a copy as a PDF. If anything needs changing, leave a note on it or reply to this email.</p>
+    ${invoiceLine(id)}
     ${button(portalUrl, 'Read and sign')}
   `)
-  await send({ to, subject, html, type: 'contract_follow_up', clientId })
+  await send({ to, subject, html, type: 'contract_follow_up', clientId, brand })
 }
 
 export async function sendProposalAcceptedEmail(to: string, clientName: string, jobName: string, clientId?: string, jobId?: string) {
@@ -911,29 +995,33 @@ export async function sendClientAccountSetupEmail({
   clientName,
   setupUrl,
   clientId,
+  brand,
 }: {
   to: string
   clientName: string
   setupUrl: string
   clientId?: string
+  brand?: string | null
 }) {
   await send({
     to,
-    subject: 'Set up your Tui Media account',
+    subject: (id) => `Set up your ${id.displayName} account`,
     type: 'account_setup',
     clientId,
+    brand,
     rethrow: true,
-    html: wrap(
+    html: (id) => wrap(
       `
-      ${buildGreeting(clientName)}
-      <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0 0 16px;">You now have your own login for the Tui Media portal, the place where your footage, photos and paperwork live. Everything that used to arrive as a one-off link is in one spot, and it stays there.</p>
+      ${buildGreeting(clientName, id)}
+      <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0 0 16px;">You now have your own login for the ${id.displayName} portal, the place where your footage, photos and paperwork live. Everything that used to arrive as a one-off link is in one spot, and it stays there.</p>
       <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">Choose a password to finish setting it up.</p>
       ${button(setupUrl, 'Choose a password')}
-      <p style="color:${C.faint};font-size:13px;line-height:1.55;margin:16px 0 0;">This link works once. If it has run out by the time you get to it, press “Forgot your password?” at <a href="${APP_URL}/portal/login" style="color:${C.faint};text-decoration:underline;">${APP_URL.replace(/^https?:\/\//, '')}/portal/login</a> for a fresh one.</p>
+      <p style="color:${C.faint};font-size:13px;line-height:1.55;margin:16px 0 0;">This link works once. If it has run out by the time you get to it, press “Forgot your password?” at <a href="${APP_URL}${portalAuthHref('/portal/login', id.brand)}" style="color:${C.faint};text-decoration:underline;">${APP_URL.replace(/^https?:\/\//, '')}/portal/login</a> for a fresh one.</p>
       ${plainLink(setupUrl)}
     `,
-      SIGNOFF,
-      'Choose a password to finish setting up your portal.'
+      signoff(id),
+      'Choose a password to finish setting up your portal.',
+      id,
     ),
   })
 }
@@ -944,28 +1032,35 @@ export async function sendMarketerAccountSetupEmail({
   name,
   setupUrl,
   reset,
+  clientId,
+  brand,
 }: {
   to: string
   name: string
   setupUrl: string
   reset?: boolean
+  clientId?: string
+  brand?: string | null
 }) {
   await send({
     to,
-    subject: reset ? 'Reset your Tui Media password' : 'Your Tui Media login',
+    subject: (id) => reset ? `Reset your ${id.displayName} password` : `Your ${id.displayName} login`,
     type: reset ? 'password_reset' : 'account_setup',
+    clientId,
+    brand,
     rethrow: true,
-    html: wrap(
+    html: (id) => wrap(
       `
-      ${buildGreeting(name)}
-      <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0 0 16px;">${reset ? 'Choose a new password for your Tui Media login.' : 'You now have a Tui Media login. It opens the library of approved videos, ready to watch and download for marketing.'}</p>
+      ${buildGreeting(name, id)}
+      <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0 0 16px;">${reset ? `Choose a new password for your ${id.displayName} login.` : `You now have a${id.displayName.startsWith('A') ? 'n' : ''} ${id.displayName} login. It opens the library of approved videos, ready to watch and download for marketing.`}</p>
       <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">Choose a password to ${reset ? 'finish' : 'get started'}.</p>
       ${button(setupUrl, 'Choose a password')}
-      <p style="color:${C.faint};font-size:13px;line-height:1.55;margin:16px 0 0;">This link works once. If it has run out, press “Forgot your password?” at <a href="${APP_URL}/portal/login" style="color:${C.faint};text-decoration:underline;">${APP_URL.replace(/^https?:\/\//, '')}/portal/login</a> for a fresh one.</p>
+      <p style="color:${C.faint};font-size:13px;line-height:1.55;margin:16px 0 0;">This link works once. If it has run out, press “Forgot your password?” at <a href="${APP_URL}${portalAuthHref('/portal/login', id.brand)}" style="color:${C.faint};text-decoration:underline;">${APP_URL.replace(/^https?:\/\//, '')}/portal/login</a> for a fresh one.</p>
       ${plainLink(setupUrl)}
     `,
-      SIGNOFF,
-      'Choose a password to finish setting up your login.'
+      signoff(id),
+      'Choose a password to finish setting up your login.',
+      id,
     ),
   })
 }
@@ -976,28 +1071,32 @@ export async function sendClientPasswordResetEmail({
   clientName,
   setupUrl,
   clientId,
+  brand,
 }: {
   to: string
   clientName: string
   setupUrl: string
   clientId?: string
+  brand?: string | null
 }) {
   await send({
     to,
-    subject: 'Reset your Tui Media password',
+    subject: (id) => `Reset your ${id.displayName} password`,
+    brand,
     type: 'password_reset',
     clientId,
     rethrow: true,
-    html: wrap(
+    html: (id) => wrap(
       `
-      ${buildGreeting(clientName)}
-      <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">Someone asked to reset the password for your Tui Media portal. If that was you, choose a new one below.</p>
+      ${buildGreeting(clientName, id)}
+      <p style="color:${C.muted};font-size:15px;line-height:1.7;margin:0;">Someone asked to reset the password for your ${id.displayName} portal. If that was you, choose a new one below.</p>
       ${button(setupUrl, 'Choose a new password')}
       <p style="color:${C.faint};font-size:13px;line-height:1.55;margin:16px 0 0;">This link works once. If you didn't ask for it, ignore this email and your password stays as it is.</p>
       ${plainLink(setupUrl)}
     `,
-      SIGNOFF,
-      'Choose a new password for your portal.'
+      signoff(id),
+      'Choose a new password for your portal.',
+      id,
     ),
   })
 }

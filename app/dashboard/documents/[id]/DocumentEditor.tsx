@@ -31,6 +31,8 @@ export type ClientOption = {
   phone: string | null
   location: string | null
   portalToken: string | null
+  /** The client's brand (lib/brand.ts): the logo and names on the document. */
+  brand?: string | null
 }
 
 export type DocFormShape = {
@@ -138,6 +140,7 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
   const [form, setForm] = useState<DocFormShape>(() => ({ ...EMPTY_FORM, ...(parsed?.form ?? { body: doc.content || '' }) }))
   const [docName, setDocName] = useState(doc.name)
   const [selectedClientId, setSelectedClientId] = useState(doc.clientId || '')
+  const clientBrand = clients.find((c) => c.id === selectedClientId)?.brand ?? null
   const [tab, setTab] = useState<'edit' | 'preview'>(form.body ? 'preview' : 'edit')
   const [dirty, setDirty] = useState(false)
   const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
@@ -234,7 +237,7 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
       const { pdf } = await import('@react-pdf/renderer')
       const { default: TuiDocument } = await import('../TuiPdfDocument')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const blob = await pdf(TuiDocument({ template, form }) as any).toBlob()
+      const blob = await pdf(TuiDocument({ template, form, brand: clientBrand }) as any).toBlob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -411,7 +414,7 @@ export default function DocumentEditor({ doc, clients }: { doc: DocData; clients
         <div className="space-y-5 min-w-0">
           {(tab === 'preview' || locked) && (
             <div className="card prop-preview">
-              <DocumentSheet template={template} form={form} title={title} emptyText="Nothing written yet. Ask Tui to draft it, or write it in Edit." />
+              <DocumentSheet template={template} form={form} title={title} brand={clientBrand} emptyText="Nothing written yet. Ask Tui to draft it, or write it in Edit." />
             </div>
           )}
 

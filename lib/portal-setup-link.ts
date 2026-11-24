@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendClientAccountSetupEmail, sendClientPasswordResetEmail, sendMarketerAccountSetupEmail } from '@/lib/email'
+import { normalizeBrand, portalAuthHref } from '@/lib/brand'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'
 
@@ -47,16 +48,24 @@ export async function emailPortalPasswordLink(
   const hashed = link?.properties?.hashed_token
   if (error || !hashed) return { ok: false, error: error?.message ?? 'Could not generate the link.' }
 
+  // The setup page comes before a session, so the link carries the client's
+  // brand (lib/brand.ts portalAuthHref). Tui Media links are unchanged.
+  let brand: string | null = null
+  if (clientId) {
+    const { data } = await admin.from('clients').select('brand').eq('id', clientId).maybeSingle()
+    brand = normalizeBrand(data?.brand as string | null)
+  }
+
   const params = new URLSearchParams({ token: hashed })
   if (kind === 'reset') params.set('k', 'reset')
-  const url = `${APP_URL}/portal/setup?${params}`
+  const url = `${APP_URL}${portalAuthHref(`/portal/setup?${params}`, brand)}`
 
   try {
     if (audience === 'marketer') {
       await sendMarketerAccountSetupEmail({ to: email, name, setupUrl: url, reset: kind === 'reset' })
     } else {
       const send = kind === 'setup' ? sendClientAccountSetupEmail : sendClientPasswordResetEmail
-      await send({ to: email, clientName: name, setupUrl: url, clientId })
+      await send({ to: email, clientName: name, setupUrl: url, clientId, brand })
     }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'Could not send the email.' }

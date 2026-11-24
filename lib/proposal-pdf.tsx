@@ -4,7 +4,8 @@ import type { ReactElement } from 'react'
 // Importing the contract document registers Bricolage Grotesque and gives us
 // the same logo and palette, so a proposal and the contract that follows it
 // read as one set of paperwork.
-import { TuiLogo, C } from '@/app/dashboard/documents/TuiPdfDocument'
+import { BrandLogo, C } from '@/app/dashboard/documents/TuiPdfDocument'
+import { brandIdentity } from '@/lib/brand'
 
 export type ProposalPdfData = {
   jobName: string
@@ -25,6 +26,8 @@ export type ProposalPdfData = {
   respondedAt?: string | null
   /** Public link where it can be accepted. */
   url?: string | null
+  /** The job's brand, else the client's (lib/brand.ts resolveBrand). */
+  brand?: string | null
 }
 
 const money = (n: number) => `$${Number(n || 0).toLocaleString('en-NZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -78,8 +81,9 @@ export default function ProposalPdf({ p }: { p: ProposalPdfData }): ReactElement
   ].filter((f): f is { label: string; value: string } => !!f)
 
   const accepted = p.status === 'accepted'
+  const id = brandIdentity(p.brand)
   return (
-    <Document title={`Proposal - ${p.clientName}`} author="Tui Media">
+    <Document title={`Proposal - ${p.clientName}`} author={id.displayName}>
       <Page size="A4" style={s.page}>
         <View fixed style={s.headerWrap}>
           <View style={s.header}>
@@ -88,7 +92,7 @@ export default function ProposalPdf({ p }: { p: ProposalPdfData }): ReactElement
               <Text style={s.sub}>{p.clientName}</Text>
               <Text style={s.subDate}>{longDate(p.issuedAt)}</Text>
             </View>
-            <TuiLogo />
+            <BrandLogo id={id} />
           </View>
           <View style={s.rule} />
         </View>
@@ -127,7 +131,7 @@ export default function ProposalPdf({ p }: { p: ProposalPdfData }): ReactElement
               <Text style={s.totalValue}>{money(p.totalValue)}</Text>
             </View>
           )}
-          <Text style={s.totalNote}>NZD. Tui Media is not GST registered, so no GST is added.</Text>
+          <Text style={s.totalNote}>NZD. {id.gstNote}</Text>
         </View>
 
         {p.inclusions.length > 0 && (
@@ -149,6 +153,7 @@ export default function ProposalPdf({ p }: { p: ProposalPdfData }): ReactElement
           <View style={s.section} wrap={false}>
             <Text style={s.h1}>Payment terms</Text>
             <Text style={s.para}>{p.paymentTerms}</Text>
+            {id.invoiceNote && !p.paymentTerms.includes(id.invoiceNote) ? <Text style={s.para}>{id.invoiceNote}</Text> : null}
           </View>
         ) : null}
 
@@ -162,9 +167,9 @@ export default function ProposalPdf({ p }: { p: ProposalPdfData }): ReactElement
         </View>
 
         <View style={s.footer} fixed>
-          <Text>Tui Media</Text>
+          <Text>{id.displayName}</Text>
           <Text render={({ pageNumber, totalPages }) => (totalPages > 1 ? `${pageNumber} of ${totalPages}` : '')} />
-          <Text>hello@tuimedia.nz</Text>
+          <Text>{id.contactEmail}</Text>
         </View>
       </Page>
     </Document>

@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { Check, X, MapPin, Calendar, Download, CheckCircle2 } from 'lucide-react'
 import { acceptProposal, declineProposal, recordProposalView } from '@/app/actions/proposals'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
+import { brandIdentity } from '@/lib/brand'
 import ProposalDocument, { parseServices, parseInclusions, priceHeadline, type PricingMode } from '@/components/ProposalDocument'
 
 // Written out in full: a client reads "14 October 2026", not "14/10/26".
@@ -26,6 +27,7 @@ type ProposalData = {
   sentAt: string | null
   respondedAt: string | null
   createdAt: string
+  brand?: string | null
   job: {
     name: string
     jobType: string | null
@@ -50,6 +52,7 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
   const open = proposal.status === 'sent'
   const headline = priceHeadline(proposal.pricingMode, services, proposal.totalValue, proposal.priceSuffix)
   const picks = proposal.pricingMode === 'options'
+  const id = brandIdentity(proposal.brand)
 
   async function download() {
     setDownloading(true)
@@ -72,6 +75,7 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
         status: proposal.status,
         respondedAt: proposal.respondedAt,
         url: window.location.href,
+        brand: id.brand,
       })
     } catch (err) {
       console.error('Proposal PDF failed:', err)
@@ -107,8 +111,17 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
   return (
     <div className="prop-page">
       <header className="prop-topbar">
-        <Image className="logo-light" src="/Primary_Black.svg" alt="Tui Media" width={124} height={26} />
-        <Image className="logo-dark" src="/Primary_White.svg" alt="Tui Media" width={124} height={26} />
+        {id.brand === 'tui_media' ? (
+          <>
+            <Image className="logo-light" src="/Primary_Black.svg" alt="Tui Media" width={124} height={26} />
+            <Image className="logo-dark" src="/Primary_White.svg" alt="Tui Media" width={124} height={26} />
+          </>
+        ) : (
+          <>
+            <Image className="logo-light" src={id.logo.onLight} alt={id.displayName} width={160} height={23} />
+            <Image className="logo-dark" src={id.logo.onDark} alt={id.displayName} width={160} height={23} />
+          </>
+        )}
         <button type="button" onClick={download} disabled={downloading} className="btn-ghost btn-sm prop-topbar-dl">
           <Download className="w-3.5 h-3.5" /> {downloading ? 'Preparing…' : 'PDF'}
         </button>
@@ -143,7 +156,7 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
         )}
 
         <div className="prop-card">
-          <ProposalDocument body={{ coverNote: proposal.coverNote, services, inclusions, paymentTerms: proposal.paymentTerms, totalValue: proposal.totalValue, pricingMode: proposal.pricingMode, priceSuffix: proposal.priceSuffix }} />
+          <ProposalDocument brand={id.brand} body={{ coverNote: proposal.coverNote, services, inclusions, paymentTerms: proposal.paymentTerms, totalValue: proposal.totalValue, pricingMode: proposal.pricingMode, priceSuffix: proposal.priceSuffix }} />
         </div>
 
         {open && (
@@ -164,8 +177,8 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
         )}
 
         <footer className="prop-footer">
-          <span>Tui Media · Nelson, New Zealand</span>
-          <a href="mailto:hello@tuimedia.nz">hello@tuimedia.nz</a>
+          <span>{id.displayName} · Nelson, New Zealand</span>
+          <a href={`mailto:${id.contactEmail}`}>{id.contactEmail}</a>
         </footer>
       </main>
 

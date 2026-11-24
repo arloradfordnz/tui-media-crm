@@ -241,7 +241,7 @@ is the only thing between the form and someone filling the CRM with junk.
 
 The wedding form on arloradford.nz still emails arloradford.nz@gmail.com, and
 now also lands here. The CRM reads the date ("14 February 2027", "14/2/27"),
-checks the calendar for that day, makes the couple a client (Weddings, lead) and
+checks the calendar for that day, makes the couple a client (Weddings, lead, brand Arlo Radford) and
 a "<names> Wedding" job as an enquiry, and drafts the reply: whether you're
 free, the three packages with prices, $500 to hold the date, and two
 after-school times to meet. Today shows it at the top as "New wedding enquiry:
@@ -357,6 +357,20 @@ Where a real figure is needed and you have not given one it leaves a
 placeholder like `[project fee]`. A made-up price in a contract is worse than
 a blank.
 
+**Contracts are fixed terms plus a summary (since 3.45.0).** Every contract is
+the same approved wording, `lib/contract-terms.ts` (terms version 1, written
+from `contracts/contract-terms-v1.md`), with three variants of the cancelling,
+ending and liability clauses: monthly, one-off, and event or wedding. Only the
+"At a glance" summary on top changes per client, filled from your answers to
+the popup by Sonnet in a few seconds. The contract says the summary wins over
+the terms, so a one-off change (3 revision rounds for one client) goes under
+"Anything else agreed". Changing a contract later edits the summary and
+rebuilds it, so the terms never change. Before saving, the CRM checks the fee,
+the legal name, who signs, and that a deposit is no more than half the fee.
+Changing a term for everyone means a new terms version, not an edit, so every
+saved contract records which version it used. Contracts made before 3.45.0
+still edit the old way.
+
 **Contracts: legal name and the fixed terms.** When Tui asks the contract
 questions, the popup searches the NZ Companies Register for the client in the
 background, while you answer the earlier questions. The legal-name question is
@@ -395,6 +409,24 @@ in **Marketing Email** on the client's Details tab (only Johnson Residential has
 one) and the first time a cut is approved, that person is emailed a download
 link. The link opens that one file, not the portal, and works until the file
 is archived at two months. Leave the field empty and nothing extra is sent.
+
+### Which name the client sees
+
+Each client has a **Brand** on their Details tab: Tui Media (social content,
+events) or Arlo Radford (weddings, testimonials, brand films, commercial).
+Arlo Radford clients see Arlo's name and wordmark instead of Tui Media's across
+the portal and its sign-in pages, every client email (the sender name changes,
+the address does not), document and proposal PDFs, the proposal page, and the
+signature block. Wherever price or payment comes up they also get one line:
+invoices are issued by Tui Media, Arlo's business name for invoicing. Nothing
+changes for Tui Media clients, and billing stays on the Tui Media Xero account.
+
+A job can override its client's brand (`jobs.brand`, empty means "same as the
+client"); there is no field for it yet. Enquiries from arloradford.nz come in as
+Arlo Radford. Everything lives in `lib/brand.ts`, including
+`contractPartyLine()` for the contract rewrite. The sign-in pages come before a
+login, so emailed links carry `?brand=arlo_radford`; a client who types the
+plain address sees Tui Media there until they sign in.
 
 ---
 

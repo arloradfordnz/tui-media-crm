@@ -233,8 +233,9 @@ export async function POST(req: Request) {
 
 // ── arloradford.nz ──────────────────────────────────────────────────────────
 //
-// Weddings (and commercial enquiries) sold under Arlo's own name. They are
-// still invoiced by Tui Media, so the brand stays tui_media. A wedding gets a
+// Weddings (and commercial enquiries) sold under Arlo's own name, so the
+// client's brand is arlo_radford: their portal, emails and documents say Arlo
+// Radford (lib/brand.ts). They are still invoiced by Tui Media. A wedding gets a
 // date check and a drafted reply (lib/wedding-enquiry.ts); Today shows it as
 // a row with a Reply link. A commercial enquiry is filed as a lead and nothing
 // more, since its answer depends on the project.
@@ -282,7 +283,7 @@ async function fileArloRadfordEnquiry(supabase: SupabaseClient, body: Payload) {
     pipeline_stage: 'enquiry',
     status: 'lead',
     client_category: wedding ? 'wedding' : 'one_off',
-    brand: 'tui_media',
+    brand: 'arlo_radford',
     interest: pkg,
     timeline: rawDate || body.timing?.trim() || null,
     event_date: isoDate,

@@ -3,10 +3,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { portalAuthHref } from '@/lib/brand'
 import { createClient } from '@/lib/supabase-browser'
 import Field from '@/components/Field'
 
-export default function PortalLoginForm({ notice }: { notice: string | null }) {
+export default function PortalLoginForm({ notice, brand }: { notice: string | null; brand: string | null }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -54,7 +55,7 @@ export default function PortalLoginForm({ notice }: { notice: string | null }) {
       </button>
 
       <p className="text-center text-sm">
-        <Link href="/portal/forgot" className="link-subtle">Forgot your password?</Link>
+        <Link href={portalAuthHref('/portal/forgot', brand)} className="link-subtle">Forgot your password?</Link>
       </p>
     </form>
   )

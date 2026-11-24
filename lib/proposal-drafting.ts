@@ -9,6 +9,7 @@ import Anthropic from '@anthropic-ai/sdk'
 
 const MODEL = 'claude-opus-5-5'
 
+import { brandIdentity, normalizeBrand } from '@/lib/brand'
 export const PROPOSAL_DRAFTING_BRIEF = `You write proposals for Tui Media, a one-person video production business in Nelson, New Zealand, run by Arlo Radford. A proposal is what a small local business reads to decide whether to say yes. It is shown on a web page with four parts: a cover note, a priced list of services, a "What's included" list, and payment terms, with Accept and Decline buttons underneath.
 
 You are given a complete brief that Arlo has already confirmed. Write from it, exactly. Never invent a deliverable, date, number, platform, inclusion or promise that is not in the brief. Never promise results (views, sales, leads): Tui Media does not guarantee outcomes.
@@ -72,6 +73,8 @@ export async function draftProposal(opts: {
   /** 'options' means the price lines are packages the client chooses between. */
   pricingMode?: 'total' | 'options'
   priceSuffix?: string
+  /** The job's brand, else the client's (lib/brand.ts). Tui Media if absent. */
+  brand?: string | null
 }): Promise<ProposalDraft> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) return { error: 'ANTHROPIC_API_KEY is not configured.' }
@@ -97,7 +100,9 @@ ${opts.priceLines.map((l, i) => `${i + 1}. ${l.description}: $${l.amount}${optio
 ${options ? '' : `TOTAL: $${total}`}
 
 THE BRIEF (confirmed by Arlo)
-${opts.brief.trim()}`
+${opts.brief.trim()}${normalizeBrand(opts.brand) === 'arlo_radford' ? `
+
+BRAND: ARLO RADFORD. This client books Arlo under his own name (arloradford.nz: weddings, testimonials, brand films, commercial), not as Tui Media. Everything above that says Tui Media means Arlo here: write "I" and "Arlo", never "Tui Media", with one exception. In the payment terms, say Arlo is not GST registered so no GST is added, and add this sentence word for word: "${brandIdentity('arlo_radford').invoiceNote}" Keep the voice warm and casual.` : ''}`
 
   try {
     const stream = anthropic.messages.stream({

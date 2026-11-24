@@ -1,7 +1,8 @@
-import { Document, Page, Text, View, StyleSheet, Font, Svg, G, Path, Ellipse } from '@react-pdf/renderer'
+import { Document, Page, Text, View, StyleSheet, Font, Svg, G, Path, Ellipse, Image } from '@react-pdf/renderer'
 import type { DocumentProps } from '@react-pdf/renderer'
 import type { Style } from '@react-pdf/types'
 import { cloneElement, type ReactElement } from 'react'
+import { brandIdentity, type BrandIdentity } from '@/lib/brand'
 
 // Bricolage Grotesque is Tui Media's brand typeface (see the site's
 // PALETTES.md / wireframe). These are static-weight TTFs pulled from the
@@ -127,6 +128,25 @@ export function TuiLogo({ fill = C.black }: { fill?: string }) {
   )
 }
 
+/* An absolute URL for a file in public/: react-pdf fetches images itself. The
+   PDFs are made in the browser, so the page's own origin serves them. */
+function publicUrl(path: string) {
+  const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz')
+  return `${origin}${path}`
+}
+
+/**
+ * The brand's logo, top right of every document. Tui Media keeps its vector
+ * lockup at 110 x 23; the Arlo Radford wordmark is wider, so it is a touch
+ * wider and shorter in the same slot.
+ */
+export function BrandLogo({ id, fill = C.black }: { id: BrandIdentity; fill?: string }) {
+  if (id.brand === 'tui_media') return <TuiLogo fill={fill} />
+  const width = 130
+  // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image has no alt
+  return <Image src={publicUrl(id.logo.onLight)} style={{ width, height: (width * id.logo.height) / id.logo.width, marginTop: 2 }} />
+}
+
 function renderInline(text: string): ReactElement[] {
   const parts: ReactElement[] = []
   const re = /\*\*(.+?)\*\*/g
@@ -193,7 +213,8 @@ function renderBody(body: string, st: BodyStyles): ReactElement[] {
   return out
 }
 
-export default function TuiDocument({ template, form }: { template: string; form: FormData }): ReactElement<DocumentProps> {
+export default function TuiDocument({ template, form, brand }: { template: string; form: FormData; brand?: string | null }): ReactElement<DocumentProps> {
+  const id = brandIdentity(brand)
   const isContract = template === 'Contract'
   const formattedDate = form.date
     ? new Date(form.date + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -217,7 +238,7 @@ export default function TuiDocument({ template, form }: { template: string; form
               <Text style={styles.headerDate}>{[isContract ? documentNumber : '', formattedDate].filter(Boolean).join('   ')}</Text>
             ) : null}
           </View>
-          <TuiLogo />
+          <BrandLogo id={id} />
         </View>
 
         <View style={styles.rule} />
@@ -245,6 +266,7 @@ export default function TuiDocument({ template, form }: { template: string; form
               <Text style={styles.contractParagraph}>
                 By signing below, both parties agree to the scope, terms and payment set out in this contract.
               </Text>
+              {id.invoiceNote ? <Text style={styles.contractParagraph}>{id.invoiceNote}</Text> : null}
             </View>
           )}
           <View style={isContract ? styles.contractSignatureBlock : styles.signatureBlock}>
@@ -260,7 +282,7 @@ export default function TuiDocument({ template, form }: { template: string; form
                 <Text style={styles.signatureDateValue}>{today}</Text>
               </View>
               <Text style={styles.signatureName}>Arlo Radford</Text>
-              <Text style={styles.signaturePrinted}>Tui Media</Text>
+              <Text style={styles.signaturePrinted}>{id.signatureLine ?? ' '}</Text>
             </View>
             <View style={styles.signatureCol}>
               <View style={styles.signatureField}>
@@ -280,8 +302,8 @@ export default function TuiDocument({ template, form }: { template: string; form
         </View>
 
         <View style={styles.footer} fixed={isContract}>
-          <Text>Tui Media</Text>
-          <Text>hello@tuimedia.nz</Text>
+          <Text>{id.displayName}</Text>
+          <Text>{id.contactEmail}</Text>
         </View>
       </Page>
     </Document>

@@ -8,13 +8,14 @@ import { sendProposalAcceptedEmail } from '@/lib/email'
 import { sendProposalToClient } from '@/lib/send-to-client'
 import { emitAssistantEvent } from '@/lib/tui/events'
 import { isAdminViewing } from '@/lib/admin-ip'
+import { brandIdentity, resolveBrand } from '@/lib/brand'
 
 export async function createProposal(jobId: string) {
   const supabase = await createServerSupabaseClient()
 
   const { data: job } = await supabase
     .from('jobs')
-    .select('id, name, quote_value, client_id, clients(name, email, contact_person)')
+    .select('id, name, quote_value, client_id, brand, clients(name, email, contact_person, brand)')
     .eq('id', jobId)
     .single()
 
@@ -25,7 +26,8 @@ export async function createProposal(jobId: string) {
     redirect(`/dashboard/jobs/${jobId}/proposal/${existing.id}`)
   }
 
-  const client = job.clients as unknown as { name: string; email: string | null; contact_person: string | null }
+  const client = job.clients as unknown as { name: string; email: string | null; contact_person: string | null; brand: string | null }
+  const id = brandIdentity(resolveBrand(job.brand as string | null, client.brand))
   const services = job.quote_value
     ? JSON.stringify([{ description: job.name, amount: job.quote_value }])
     : '[]'
@@ -34,11 +36,11 @@ export async function createProposal(jobId: string) {
     job_id: jobId,
     // A starting point in Arlo's own voice, for when he writes one by hand.
     // Tui's drafted proposals replace all of this.
-    cover_note: `Hi ${client.contact_person?.split(' ')[0] || 'there'},\n\nThanks for having a chat about ${job.name}. Here's what I'd suggest, with the price and what's included below.\n\nHave a look through and let me know if you want to tweak anything. If it all looks good, tap Accept and I'll be in touch to lock in a date.\n\nCheers,\nArlo`,
+    cover_note: `${id.brand === 'tui_media' ? 'Hi' : 'Kia ora'} ${client.contact_person?.split(' ')[0] || 'there'},\n\nThanks for having a chat about ${job.name}. Here's what I'd suggest, with the price and what's included below.\n\nHave a look through and let me know if you want to tweak anything. If it all looks good, tap Accept and I'll be in touch to lock in a date.\n\nCheers,\nArlo`,
     services,
     total_value: job.quote_value || 0,
     inclusions: 'Filming on location\nEditing and colour grading\nLicensed music and captions\nTwo rounds of changes on each video\nFinal videos delivered through your client portal',
-    payment_terms: '50% deposit to lock in the shoot date, then the rest on delivery. Invoices are due within 14 days by bank transfer. Tui Media is not GST registered, so no GST is added. This price is good for 30 days.',
+    payment_terms: `50% deposit to lock in the shoot date, then the rest on delivery. Invoices are due within 14 days by bank transfer. ${id.gstNote} This price is good for 30 days.`,
   }).select('id').single()
 
   if (error || !proposal) return { error: error?.message || 'Failed to create proposal.' }

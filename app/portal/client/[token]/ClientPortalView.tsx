@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useEffect, useRef, useState } from 'react'
+import { createContext, useActionState, useContext, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { approveDelivery, markViewed, markDownloaded, requestDeliverableRevision, recordDocumentView } from '@/app/actions/portal'
 import { signDocumentByClient, submitDocumentFeedback } from '@/app/actions/documents'
@@ -10,6 +10,10 @@ import Image from 'next/image'
 import { Briefcase, FileText, ScrollText, ArrowUpRight, Film, Image as ImageIcon, File, Music, Download, ChevronDown, ChevronRight, Check, MessageSquare, PenLine, Archive } from 'lucide-react'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
 import ContentProgress, { type PortalProgress } from './ContentProgress'
+import { brandIdentity, type BrandIdentity } from '@/lib/brand'
+
+/* The client's brand (lib/brand.ts), for the cards deep in the tree. */
+const BrandCtx = createContext<BrandIdentity>(brandIdentity(null))
 
 type DeliveryFile = {
   id: string
@@ -76,7 +80,7 @@ type PortalProposal = {
 }
 
 type PortalData = {
-  client: { name: string; contactPerson: string | null }
+  client: { name: string; contactPerson: string | null; brand?: string | null }
   portalToken: string
   jobs: Job[]
   progress: PortalProgress | null
@@ -134,6 +138,7 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
   const [confirmSpec, setConfirm] = useState<ConfirmSpec | null>(null)
   const router = useRouter()
   const [expandedJob, setExpandedJob] = useState<string | null>(data.jobs[0]?.id || null)
+  const id = brandIdentity(data.client.brand)
 
   // Mark any 'sent' files as viewed once the client opens the portal.
   useEffect(() => {
@@ -164,10 +169,21 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
   }
 
   return (
+    <BrandCtx.Provider value={id}>
     <div className="min-h-screen" style={{ background: 'var(--bg-base)' }}>
       <header className="py-5 px-6 flex items-center justify-center">
-        <Image className="logo-light" src="/Primary_Black.svg" alt="Tui Media" width={130} height={27} />
-        <Image className="logo-dark" src="/Primary_White.svg" alt="Tui Media" width={130} height={27} />
+        {id.brand === 'tui_media' ? (
+          <>
+            <Image className="logo-light" src="/Primary_Black.svg" alt="Tui Media" width={130} height={27} />
+            <Image className="logo-dark" src="/Primary_White.svg" alt="Tui Media" width={130} height={27} />
+          </>
+        ) : (
+          /* The arloradford.nz wordmark, sized to sit in the same 27px row. */
+          <>
+            <Image className="logo-light" src={id.logo.onLight} alt={id.displayName} width={170} height={25} />
+            <Image className="logo-dark" src={id.logo.onDark} alt={id.displayName} width={170} height={25} />
+          </>
+        )}
       </header>
 
       <div className="max-w-3xl mx-auto px-6 py-6 space-y-6 animate-fade-in">
@@ -219,6 +235,9 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
                 )
               })}
             </div>
+            {id.invoiceNote && (
+              <p className="text-xs mt-3" style={{ color: 'var(--text-tertiary)' }}>{id.invoiceNote}</p>
+            )}
           </div>
         )}
 
@@ -330,18 +349,20 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
         )}
 
         <div className="text-center pt-8 pb-4">
-          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>&copy; {new Date().getFullYear()} Tui Media</p>
+          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>&copy; {new Date().getFullYear()} {id.displayName}</p>
         </div>
 
       <ConfirmSheet spec={confirmSpec} onClose={() => setConfirm(null)} />
       </div>
     </div>
+    </BrandCtx.Provider>
   )
 }
 
 function FileCard({ file, jobId, portalToken, onApprove }: { file: DeliveryFile; jobId: string; portalToken: string; onApprove: (fileId: string, jobId: string) => void }) {
   const kind = file.fileUrl && file.fileUrl.includes('vimeo') ? 'vimeo' : fileKind(file.mimeType, file.originalName)
   const router = useRouter()
+  const brand = useContext(BrandCtx)
   const canApprove = file.deliveryStatus === 'sent' || file.deliveryStatus === 'viewed'
 
   function handleDownload() {
@@ -440,7 +461,7 @@ function FileCard({ file, jobId, portalToken, onApprove }: { file: DeliveryFile;
 
       {file.personalNote && (
         <div className="p-3 rounded-lg mb-3" style={{ background: 'var(--bg-surface)' }}>
-          <p className="label mb-1">Note from Tui Media</p>
+          <p className="label mb-1">Note from {brand.shortName}</p>
           <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{file.personalNote}</p>
         </div>
       )}
@@ -497,6 +518,7 @@ function AdaptiveVideo({ src, type }: { src: string; type: string | null }) {
 }
 
 function RevisionPanel({ deliverable, portalToken }: { deliverable: Deliverable; portalToken: string }) {
+  const brand = useContext(BrandCtx)
   const [open, setOpen] = useState(false)
   const [state, action, pending] = useActionState(requestDeliverableRevision, undefined)
   const used = deliverable.revisionsUsed
@@ -528,7 +550,7 @@ function RevisionPanel({ deliverable, portalToken }: { deliverable: Deliverable;
               <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{r.request}</p>
               {r.reply && (
                 <div className="mt-2 p-2.5 rounded-md" style={{ background: 'var(--bg-elevated)' }}>
-                  <p className="label mb-1">Reply from Tui Media</p>
+                  <p className="label mb-1">Reply from {brand.shortName}</p>
                   <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{r.reply}</p>
                 </div>
               )}
@@ -574,6 +596,7 @@ function RevisionPanel({ deliverable, portalToken }: { deliverable: Deliverable;
 
 function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string }) {
   const router = useRouter()
+  const brand = useContext(BrandCtx)
   const [expanded, setExpanded] = useState(false)
   // Opening a document is what Arlo sees as "Opened" on the document page.
   // Recorded once per visit; the server ignores his own views.
@@ -672,7 +695,7 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
       const { pdf } = await import('@react-pdf/renderer')
       const { default: TuiDocument } = await import('@/app/dashboard/documents/TuiPdfDocument')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const blob = await pdf(TuiDocument({ template: sheetTemplate, form: { clientName: '', clientEmail: '', clientPhone: '', businessName: 'Tui Media', date: '', jobDescription: '', shootDate: '', location: '', ...sheetForm } }) as any).toBlob()
+      const blob = await pdf(TuiDocument({ template: sheetTemplate, form: { clientName: '', clientEmail: '', clientPhone: '', businessName: brand.displayName, date: '', jobDescription: '', shootDate: '', location: '', ...sheetForm }, brand: brand.brand }) as any).toBlob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -719,7 +742,7 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
           </div>
 
           <article className="portal-paper">
-            <DocumentSheet template={sheetTemplate} form={sheetForm} title={parsed ? (parsed.form.jobDescription || doc.name) : doc.name} />
+            <DocumentSheet template={sheetTemplate} form={sheetForm} title={parsed ? (parsed.form.jobDescription || doc.name) : doc.name} brand={brand.brand} />
           </article>
 
           {isSigned && parsed && (
@@ -744,6 +767,7 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
               <div>
                 <h3 className="portal-sign-title">Sign this {parsed.template.toLowerCase() || 'document'}</h3>
                 <p className="portal-sign-copy">Type your full name below. By signing, you confirm you have read and agree to the terms above.</p>
+                {brand.invoiceNote && <p className="portal-sign-copy">{brand.invoiceNote}</p>}
               </div>
               {/* A typed name on a signing rule, not a handwriting face: a
                   script font imitating ink invites "did they actually write
@@ -776,7 +800,7 @@ function DocumentCard({ doc, portalToken }: { doc: Document; portalToken: string
 
           {(parsed?.feedback.length ?? 0) > 0 && (
             <div className="portal-feedback">
-              <p className="portal-feedback-label">Your notes to Tui Media</p>
+              <p className="portal-feedback-label">Your notes to {brand.shortName}</p>
               {parsed!.feedback.map((fb, i) => (
                 <div key={i} className="portal-feedback-item">
                   <div className="portal-feedback-head">

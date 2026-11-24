@@ -74,7 +74,7 @@ async function finishApproval(
     // marketing person the same video twice.
     const alreadyApproved = file.delivery_status === 'approved'
     await Promise.all([
-      clientRel.email ? sendApprovalConfirmationEmail(clientRel.email, clientRel.name, job.name) : Promise.resolve(),
+      clientRel.email ? sendApprovalConfirmationEmail(clientRel.email, clientRel.name, job.name, job.client_id, jobId) : Promise.resolve(),
       sendAdminDeliveryApprovedEmail(clientRel.name, job.name, fileName, jobId, job.client_id),
       client.marketing_email && !alreadyApproved
         ? sendApprovedVideoToMarketingEmail({
@@ -160,7 +160,7 @@ export async function requestChanges(prevState: { error?: string; success?: bool
   const adminViewing = await isAdminViewing()
   if (!adminViewing) {
     await Promise.all([
-      clientRel.email ? sendRevisionRequestEmail(clientRel.email, clientRel.name, job.name, round) : Promise.resolve(),
+      clientRel.email ? sendRevisionRequestEmail(clientRel.email, clientRel.name, job.name, round, job.client_id, jobId) : Promise.resolve(),
       sendAdminRevisionRequestedEmail(clientRel.name, job.name, round, request, jobId, job.client_id, newRevision?.id),
     ])
   }
@@ -235,7 +235,7 @@ export async function requestDeliverableRevision(prevState: { error?: string; su
   const adminViewing = await isAdminViewing()
   if (!adminViewing) {
     await Promise.all([
-      clientRel?.email ? sendRevisionRequestEmail(clientRel.email, clientRel.name, job.name, round) : Promise.resolve(),
+      clientRel?.email ? sendRevisionRequestEmail(clientRel.email, clientRel.name, job.name, round, job.client_id, job.id) : Promise.resolve(),
       sendAdminRevisionRequestedEmail(clientRel?.name || 'Your client', `${job.name} — ${deliverable.title}`, round, request, job.id, job.client_id, newRevision?.id),
     ])
   }

@@ -30,6 +30,8 @@ type ProposalData = {
   viewedAt: string | null
   lastViewedAt: string | null
   viewCount: number
+  /** Resolved brand: the job's, else the client's (lib/brand.ts). */
+  brand?: string | null
   job: {
     id: string
     name: string
@@ -167,6 +169,7 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
         status: proposal.status,
         respondedAt: proposal.respondedAt,
         url: isDraft ? null : proposalUrl,
+        brand: proposal.brand,
       })
     } catch (err) {
       console.error('Proposal PDF failed:', err)
@@ -241,7 +244,7 @@ export default function ProposalEditor({ proposal }: { proposal: ProposalData })
                 <h2 className="prop-title prop-title-sm">{proposal.job.name}</h2>
                 <p className="prop-for">Prepared for {proposal.job.client.contactPerson ? `${proposal.job.client.contactPerson}, ` : ''}{proposal.job.client.name}</p>
               </div>
-              <ProposalDocument body={{ coverNote, services, inclusions: inclusionList, paymentTerms, totalValue: total, pricingMode, priceSuffix }} />
+              <ProposalDocument brand={proposal.brand} body={{ coverNote, services, inclusions: inclusionList, paymentTerms, totalValue: total, pricingMode, priceSuffix }} />
             </div>
           )}
           {tab === 'edit' && (

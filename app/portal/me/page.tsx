@@ -36,7 +36,7 @@ export default async function PortalMePage() {
 
   const { data: client } = await admin
     .from('clients')
-    .select('id, name, contact_person, portal_token')
+    .select('id, name, contact_person, portal_token, brand')
     .eq('id', session.clientId)
     .single()
 

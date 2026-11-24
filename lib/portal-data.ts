@@ -17,7 +17,7 @@ type RawRevision = { id: string; round: number; request: string; status: string;
 type RawDeliverable = { id: string; title: string; description: string | null; completed: boolean; revision_limit: number | null; revisions_used: number | null; delivery_files: RawDeliveryFile[]; revisions: RawRevision[] | null }
 type RawJob = { id: string; name: string; status: string; job_type: string | null; shoot_date: string | null; deliverables: RawDeliverable[] }
 
-export type PortalClient = { id: string; name: string; contact_person: string | null; portal_token: string | null }
+export type PortalClient = { id: string; name: string; contact_person: string | null; portal_token: string | null; brand?: string | null }
 
 export async function loadPortalData(client: PortalClient) {
   const supabase = createAdminClient()
@@ -161,7 +161,7 @@ export async function loadPortalData(client: PortalClient) {
   )
 
   return {
-    client: { name: client.name, contactPerson: client.contact_person ?? null },
+    client: { name: client.name, contactPerson: client.contact_person ?? null, brand: client.brand ?? null },
     // The portal's server actions still authorise by token. A signed-in client
     // gets their own token passed as a prop rather than carried in the URL.
     portalToken: client.portal_token ?? '',

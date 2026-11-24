@@ -4,18 +4,21 @@ import { useActionState } from 'react'
 import Link from 'next/link'
 import { requestPortalPasswordReset } from '@/app/actions/portal-auth'
 import Field from '@/components/Field'
+import { brandIdentity, portalAuthHref } from '@/lib/brand'
 
-export default function ForgotPasswordForm() {
+export default function ForgotPasswordForm({ brand }: { brand: string | null }) {
   const [state, action, pending] = useActionState(requestPortalPasswordReset, undefined)
+  const id = brandIdentity(brand)
+  const loginHref = portalAuthHref('/portal/login', brand)
 
   if (state?.sent) {
     return (
       <div className="space-y-5">
         {/* Worded for both cases on purpose — see requestPortalPasswordReset. */}
         <div className="alert alert-success">
-          If that email has a Tui Media portal account, a link to choose a new password is on its way. Check your junk folder if it hasn’t arrived in a few minutes.
+          If that email has {id.brand === 'tui_media' ? 'a' : 'an'} {id.displayName} portal account, a link to choose a new password is on its way. Check your junk folder if it hasn’t arrived in a few minutes.
         </div>
-        <Link href="/portal/login" className="btn-secondary w-full">Back to sign in</Link>
+        <Link href={loginHref} className="btn-secondary w-full">Back to sign in</Link>
       </div>
     )
   }
@@ -33,7 +36,7 @@ export default function ForgotPasswordForm() {
       </button>
 
       <p className="text-center text-sm">
-        <Link href="/portal/login" className="link-subtle">Back to sign in</Link>
+        <Link href={loginHref} className="link-subtle">Back to sign in</Link>
       </p>
     </form>
   )

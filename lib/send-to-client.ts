@@ -139,7 +139,7 @@ export async function sendProposalToClient(
   let emailError: string | undefined
   if (job.clients.email) {
     try {
-      await sendProposalEmail(job.clients.email, job.clients.name, job.name, `${APP_URL}/proposal/${proposal.token}`)
+      await sendProposalEmail(job.clients.email, job.clients.name, job.name, `${APP_URL}/proposal/${proposal.token}`, job.client_id, job.id)
       emailed = true
     } catch (err) {
       emailError = err instanceof Error ? err.message : 'The email could not be sent.'

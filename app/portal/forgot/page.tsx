@@ -1,15 +1,24 @@
+import type { Metadata } from 'next'
 import PortalAuthShell from '../PortalAuthShell'
 import ForgotPasswordForm from './ForgotPasswordForm'
+import { brandTitle } from '@/lib/brand'
 
-export const metadata = { title: 'Reset your password — Tui Media' }
+type Search = Promise<{ brand?: string }>
 
-export default function PortalForgotPage() {
+export async function generateMetadata({ searchParams }: { searchParams: Search }): Promise<Metadata> {
+  const { brand } = await searchParams
+  return { title: brandTitle('Reset your password', brand) }
+}
+
+export default async function PortalForgotPage({ searchParams }: { searchParams: Search }) {
+  const { brand } = await searchParams
   return (
     <PortalAuthShell
       title="Reset your password"
       intro="Enter the email you sign in with and we’ll send a link to choose a new password."
+      brand={brand}
     >
-      <ForgotPasswordForm />
+      <ForgotPasswordForm brand={brand ?? null} />
     </PortalAuthShell>
   )
 }

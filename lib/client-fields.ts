@@ -48,11 +48,13 @@ export const INDUSTRIES = [
 ]
 
 /**
- * Tui Media is the commercial video ads brand. The personal/creative work is
- * splitting off into its own brand and should not show up in Tui Media's
- * pipeline, revenue or client list.
+ * Which of Arlo's two trading names the client sees: Tui Media (social
+ * content, events) or Arlo Radford (weddings, testimonials, brand films,
+ * commercial). It changes the portal, emails, PDFs and proposal pages through
+ * lib/brand.ts. Invoicing does not change: everything is billed from the Tui
+ * Media Xero account.
  */
 export const BRANDS = [
   { value: 'tui_media', label: 'Tui Media' },
-  { value: 'personal', label: 'Personal / Creative' },
+  { value: 'arlo_radford', label: 'Arlo Radford' },
 ] as const

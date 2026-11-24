@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase-admin'
 import { loadPortalData, type PortalClient } from '@/lib/portal-data'
 import ClientPortalView from './ClientPortalView'
 import type { Metadata } from 'next'
+import { brandTitle } from '@/lib/brand'
 
 // generateMetadata and the page body both need this row, and Next runs them as
 // part of the same request — so without cache() every portal visit looked the
@@ -13,7 +14,7 @@ const clientByToken = cache(async (token: string) => {
   if (!supabase) return null
   const { data } = await supabase
     .from('clients')
-    .select('id, name, email, contact_person, portal_token')
+    .select('id, name, email, contact_person, portal_token, brand')
     .eq('portal_token', token)
     .single()
   return data ?? null
@@ -29,7 +30,7 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
   const fallback: Metadata = { title: 'Tui Media — Client Portal' }
   const client = await clientByToken(token)
   if (!client) return fallback
-  return { title: `${client.name} — Tui Media` }
+  return { title: brandTitle(client.name, client.brand as string | null) }
 }
 
 export default async function ClientPortalPage({ params }: { params: Promise<{ token: string }> }) {

@@ -2,6 +2,7 @@ import { cache } from 'react'
 import { createAdminClient } from '@/lib/supabase-admin'
 import ProposalView from './ProposalView'
 import type { Metadata } from 'next'
+import { brandTitle, resolveBrand } from '@/lib/brand'
 
 // One lookup per request, shared by generateMetadata and the page body. Both
 // run in the same request, so fetching this separately meant every proposal a
@@ -11,7 +12,7 @@ const proposalByToken = cache(async (token: string) => {
   if (!supabase) return null
   const { data } = await supabase
     .from('proposals')
-    .select('id, job_id, token, status, cover_note, services, inclusions, payment_terms, total_value, pricing_mode, price_suffix, sent_at, responded_at, created_at, jobs(name, job_type, shoot_date, shoot_location, clients(name, contact_person))')
+    .select('id, job_id, token, status, cover_note, services, inclusions, payment_terms, total_value, pricing_mode, price_suffix, sent_at, responded_at, created_at, jobs(name, job_type, shoot_date, shoot_location, brand, clients(name, contact_person, brand))')
     .eq('token', token)
     .single()
   return data ?? null
@@ -25,9 +26,10 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
   const fallback: Metadata = { title: 'Tui Media — Proposal' }
   const proposal = await proposalByToken(token)
 
-  const clientName = (proposal?.jobs as unknown as { clients: { name: string } | null } | null)?.clients?.name
+  const job = proposal?.jobs as unknown as { brand: string | null; clients: { name: string; brand: string | null } | null } | null
+  const clientName = job?.clients?.name
   if (!clientName) return fallback
-  return { title: `Proposal for ${clientName} — Tui Media` }
+  return { title: brandTitle(`Proposal for ${clientName}`, resolveBrand(job?.brand, job?.clients?.brand)) }
 }
 
 export default async function PublicProposalPage({ params }: { params: Promise<{ token: string }> }) {
@@ -55,7 +57,7 @@ export default async function PublicProposalPage({ params }: { params: Promise<{
     )
   }
 
-  const job = proposal.jobs as unknown as { name: string; job_type: string | null; shoot_date: string | null; shoot_location: string | null; clients: { name: string; contact_person: string | null } }
+  const job = proposal.jobs as unknown as { name: string; job_type: string | null; shoot_date: string | null; shoot_location: string | null; brand: string | null; clients: { name: string; contact_person: string | null; brand: string | null } }
 
   const proposalData = {
     id: proposal.id,
@@ -72,6 +74,8 @@ export default async function PublicProposalPage({ params }: { params: Promise<{
     sentAt: proposal.sent_at,
     respondedAt: proposal.responded_at,
     createdAt: proposal.created_at,
+    // The job's brand if it has one, else the client's (lib/brand.ts).
+    brand: resolveBrand(job.brand, job.clients.brand),
     job: {
       name: job.name,
       jobType: job.job_type,

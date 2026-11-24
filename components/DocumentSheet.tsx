@@ -1,5 +1,6 @@
 import { Calendar, MapPin } from 'lucide-react'
 import DocumentBody from '@/components/DocumentBody'
+import { brandIdentity } from '@/lib/brand'
 
 // A saved document as the client reads it: the heading block, the body set by
 // DocumentBody, and for a contract the two signatures. One component for both
@@ -26,7 +27,8 @@ export const longDate = (iso: string | null | undefined) =>
     ? new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-NZ', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' })
     : new Date(iso).toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'long', year: 'numeric' })
 
-export default function DocumentSheet({ template, form, title, emptyText }: { template: string; form: SheetForm; title: string; emptyText?: string }) {
+export default function DocumentSheet({ template, form, title, emptyText, brand }: { template: string; form: SheetForm; title: string; emptyText?: string; brand?: string | null }) {
+  const id = brandIdentity(brand)
   const isContract = template === 'Contract'
   const isSigned = !!form.clientSignature
   return (
@@ -53,11 +55,12 @@ export default function DocumentSheet({ template, form, title, emptyText }: { te
         <section className="doc-approval">
           <h2 className="prop-h">Approval</h2>
           <p className="doc-para">By signing below, both parties agree to the scope, terms and payment set out in this contract.</p>
+          {id.invoiceNote && <p className="doc-para">{id.invoiceNote}</p>}
           <div className="doc-sign">
             <div>
               <div className="doc-sign-line">Arlo Radford</div>
               <p className="doc-sign-name">Arlo Radford</p>
-              <p className="doc-sign-meta">Tui Media</p>
+              <p className="doc-sign-meta">{id.signatureLine ?? '\u00a0'}</p>
             </div>
             <div>
               <div className={`doc-sign-line${isSigned ? '' : ' is-empty'}`}>{isSigned ? form.clientSignature : 'Awaiting signature'}</div>

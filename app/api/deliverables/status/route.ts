@@ -47,7 +47,7 @@ export async function PATCH(request: NextRequest) {
           const client = job.clients as unknown as { name: string; email: string | null; portal_token: string | null }
           if (client.email && client.portal_token) {
             const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://dashboard.tuimedia.nz'}/portal/client/${client.portal_token}`
-            await sendPortalDeliveryEmail(client.email, client.name, job.name, portalUrl)
+            await sendPortalDeliveryEmail(client.email, client.name, job.name, portalUrl, job.client_id, deliverable.job_id)
           }
 
           await supabase.from('activities').insert({

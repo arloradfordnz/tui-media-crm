@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase'
 import { notFound } from 'next/navigation'
+import { resolveBrand } from '@/lib/brand'
 import ProposalEditor from './ProposalEditor'
 
 export default async function ProposalPage({ params }: { params: Promise<{ id: string; proposalId: string }> }) {
@@ -8,13 +9,13 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
 
   const { data: proposal } = await supabase
     .from('proposals')
-    .select('id, job_id, token, status, cover_note, services, inclusions, payment_terms, total_value, pricing_mode, price_suffix, sent_at, responded_at, created_at, viewed_at, last_viewed_at, view_count, jobs(id, name, job_type, shoot_date, shoot_location, client_id, clients(id, name, contact_person, email))')
+    .select('id, job_id, token, status, cover_note, services, inclusions, payment_terms, total_value, pricing_mode, price_suffix, sent_at, responded_at, created_at, viewed_at, last_viewed_at, view_count, jobs(id, name, job_type, shoot_date, shoot_location, client_id, brand, clients(id, name, contact_person, email, brand))')
     .eq('id', proposalId)
     .single()
 
   if (!proposal || proposal.job_id !== id) notFound()
 
-  const job = proposal.jobs as unknown as { id: string; name: string; job_type: string | null; shoot_date: string | null; shoot_location: string | null; client_id: string; clients: { id: string; name: string; contact_person: string | null; email: string | null } }
+  const job = proposal.jobs as unknown as { id: string; name: string; job_type: string | null; shoot_date: string | null; shoot_location: string | null; client_id: string; brand: string | null; clients: { id: string; name: string; contact_person: string | null; email: string | null; brand: string | null } }
 
   const proposalData = {
     id: proposal.id,
@@ -34,6 +35,7 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
     lastViewedAt: (proposal.last_viewed_at as string | null) ?? null,
     viewCount: (proposal.view_count as number | null) ?? 0,
     createdAt: proposal.created_at,
+    brand: resolveBrand(job.brand, job.clients.brand),
     job: {
       id: job.id,
       name: job.name,

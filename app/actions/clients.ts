@@ -7,6 +7,7 @@ import { createServerSupabaseClient } from '@/lib/supabase'
 import { getAuthUser } from '@/lib/supabase-admin'
 import { CUSTOMER_VALUE_OPTIONS, AD_SPEND_OPTIONS, approxFor } from '@/lib/application-fields'
 import { sendWelcomeEmail } from '@/lib/email'
+import { normalizeBrand } from '@/lib/brand'
 import { deleteClientAndLeftovers } from '@/lib/client-delete'
 
 // Service-role client that bypasses RLS. Used for cleanup on tables where the
@@ -57,7 +58,7 @@ export async function createClient(prevState: { error?: string } | undefined, fo
     status: status || 'lead',
     client_category: clientCategory || null,
     industry: industry || null,
-    brand: brand || 'tui_media',
+    brand: normalizeBrand(brand),
     notes: notes || null,
     tags,
     monthly_retainer: monthlyRetainer,
@@ -68,7 +69,7 @@ export async function createClient(prevState: { error?: string } | undefined, fo
   if (error) return { error: error.message }
 
   if (email) {
-    sendWelcomeEmail(email, name).catch(() => {})
+    sendWelcomeEmail(email, name, undefined, normalizeBrand(brand)).catch(() => {})
   }
 
   revalidatePath('/dashboard/clients')
@@ -131,7 +132,7 @@ export async function updateClient(prevState: { error?: string } | undefined, fo
     status: status || 'lead',
     client_category: clientCategory || null,
     industry: industry || null,
-    brand: brand || 'tui_media',
+    brand: normalizeBrand(brand),
     // The application answers. Editable rather than read-only because plenty of
     // these arrive over the phone rather than through the form on the site.
     sells: sells || null,

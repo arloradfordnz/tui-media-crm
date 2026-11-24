@@ -7,13 +7,16 @@ import { INTEREST_OPTIONS, CUSTOMER_VALUE_OPTIONS, AD_SPEND_OPTIONS, START_OPTIO
 import { findDuplicateJobName } from '@/lib/job-naming'
 import { syncShootEvent, removeShootEvent } from '@/lib/job-calendar'
 import { nextDocumentNumber, unfilledPlaceholders } from '@/lib/document-templates'
-import { draftContract, reviseContract, quickEditContract, SETTLED_CONTRACT_TERMS, type ContractParties } from '@/lib/contract-drafting'
+import { reviseContract, quickEditContract, SETTLED_CONTRACT_TERMS, type ContractParties } from '@/lib/contract-drafting'
+import { TERMS_VERSION, assembleContract, checkContract, contractKindFor, type ContractKind, type SheetFacts, type SheetParties } from '@/lib/contract-terms'
+import { fillSheet } from '@/lib/contract-sheet'
 import { MEMORY_CATEGORY_KEYS, isMemoryCategory } from '@/lib/ai-memory'
 import { buildProposalIntake, buildContractIntake, classifyEngagement, CONTRACT_DEFAULT_BRIEF, type Engagement, type ProposalCtx, PROPOSAL_REQUIRED_KEYS, contractRequiredKeys, missingBriefKeys, briefLines } from '@/lib/drafting-intake'
 import { draftProposal, type PriceLine } from '@/lib/proposal-drafting'
 import { createAdminClient } from '@/lib/supabase-admin'
 import { deleteClientAndLeftovers } from '@/lib/client-delete'
 import { sendPortalLogin, sendProposalToClient, sendDocumentToClient } from '@/lib/send-to-client'
+import { normalizeBrand, resolveBrand, brandIdentity } from '@/lib/brand'
 
 // Shared tool definitions + executor for every AI surface (dashboard chat,
 // SMS assistant). One tool set, one set of side effects — a job marked
@@ -294,7 +297,7 @@ export const TOOLS: Anthropic.Tool[] = [
         videos_per_month: { type: 'number' },
         retainer_paused_from: { type: 'string', description: 'YYYY-MM the retainer is paused from. Empty string to unpause.' },
         industry: { type: 'string' },
-        brand: { type: 'string', description: 'Their brand, website or socials.' },
+        brand: { type: 'string', enum: ['tui_media', 'arlo_radford'], description: "Which of Arlo's two names the client sees in the portal, emails and documents. tui_media for social content and events, arlo_radford for weddings, testimonials, brand films and commercial. Not their own business's brand." },
         sells: { type: 'string', description: 'What the business sells.' },
         interest: { type: 'string', enum: INTEREST_OPTIONS.map((o) => o.value) },
         customer_value_band: { type: 'string', enum: CUSTOMER_VALUE_OPTIONS.map((o) => o.value), description: 'What a customer is worth to them.' },
@@ -575,7 +578,7 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: 'create_contract',
-    description: "Draft and save a complete, lawyer-grade contract for a client. A specialist drafter writes the whole agreement from the terms you pass (it takes up to a minute or two), tailored to this deal, under New Zealand law, following Arlo's contract rules. It is saved into the CRM as unsent: the client cannot see it in their portal until Arlo sends it from the document page. It is NOT emailed. Before calling, settle the commercial terms with Arlo using ask_arlo; pass every agreed fact in terms. Never invent a price, deposit, quantity, date, legal name or signatory. Every other gap (shoot length, turnaround, feedback and approval periods, invoice timing, reschedule notice, raw footage timing, storage period) the drafter fills with a default and lists in drafter_notes for Arlo to review.",
+    description: "Make and save a contract for a client. The contract is the same approved fixed terms for every client (version 1: ownership once paid, portfolio use, 2 revision rounds, invoices due in 7 days, deposit kept if the client cancels, 14 days' notice on monthly work) under a one-page At a glance summary filled from the brief you pass. It takes a few seconds. It is saved into the CRM as unsent: the client cannot see it in their portal until Arlo sends it from the document page. It is NOT emailed. Before calling, settle the deal with Arlo using ask_arlo and pass every answer in brief. Never invent a price, deposit, quantity, date, legal name or signatory. It runs checks before saving (fee, legal name, signatory, deposit no more than half the fee) and refuses with the reason if one fails; ask Arlo about that and call again.",
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -1276,7 +1279,8 @@ export async function executeTool(
         if (d && Number.isNaN(Date.parse(d))) return JSON.stringify({ error: `first_contact "${d}" is not a date. Use YYYY-MM-DD.` })
         updates.first_contact = d ? new Date(d).toISOString() : null
       }
-      for (const k of ['marketing_email', 'industry', 'brand', 'sells', 'interest', 'timeline', 'decision_maker', 'capacity'] as const) {
+      if (input.brand !== undefined) updates.brand = normalizeBrand(input.brand as string)
+      for (const k of ['marketing_email', 'industry', 'sells', 'interest', 'timeline', 'decision_maker', 'capacity'] as const) {
         if (input[k] !== undefined) updates[k] = (input[k] as string) || null
       }
       for (const k of ['monthly_retainer', 'shoots_per_month', 'videos_per_month'] as const) {
@@ -1760,7 +1764,7 @@ export async function executeTool(
     }
 
     case 'create_contract': {
-      const { data: client, error: clientError } = await supabase.from('clients').select('id, name, legal_name, entity_type, contact_person, email, phone, location, portal_token').eq('id', input.client_id as string).single()
+      const { data: client, error: clientError } = await supabase.from('clients').select('id, name, legal_name, entity_type, contact_person, email, phone, location, portal_token, brand').eq('id', input.client_id as string).single()
       if (clientError || !client) return JSON.stringify({ error: clientError ? dbErrorMessage(clientError) : 'No such client.' })
 
       // One draft, built on a complete brief. Anything unanswered is asked
@@ -1797,18 +1801,21 @@ export async function executeTool(
           pc.payment_terms ? `Proposal payment terms: ${pc.payment_terms}` : '',
         ].filter(Boolean).join('\n')
       }
-      const terms = [briefLines(brief), String(input.terms ?? '').trim(), proposalBlock].filter(Boolean).join('\n')
+      // Only what Arlo actually answered goes to the sheet. The defaults above
+      // are already in the fixed terms, and passing them as "agreed" would get
+      // them repeated in the summary as if they were extras.
+      const terms = [briefLines(given), String(input.terms ?? '').trim(), proposalBlock].filter(Boolean).join('\n')
 
       // Background: the job and what the client has said, so specifics (the
       // event name, venue, dates, what they asked for) come from the record
       // instead of a retelling. The agreed terms above always win over it.
       const [jobRes, mailRes] = await Promise.all([
         input.job_id
-          ? supabase.from('jobs').select('name, job_type, shoot_date, shoot_location, quote_value, notes, deliverables(title)').eq('id', input.job_id as string).eq('client_id', client.id).maybeSingle()
+          ? supabase.from('jobs').select('name, job_type, shoot_date, shoot_location, quote_value, notes, brand, deliverables(title)').eq('id', input.job_id as string).eq('client_id', client.id).maybeSingle()
           : Promise.resolve({ data: null }),
         supabase.from('client_emails').select('heading, summary, received_at').eq('client_id', client.id).order('received_at', { ascending: false }).limit(6),
       ])
-      const bgJob = jobRes.data as { name: string; job_type: string | null; shoot_date: string | null; shoot_location: string | null; quote_value: number | null; notes: string | null; deliverables: { title: string }[] | null } | null
+      const bgJob = jobRes.data as { name: string; job_type: string | null; shoot_date: string | null; shoot_location: string | null; quote_value: number | null; notes: string | null; brand: string | null; deliverables: { title: string }[] | null } | null
       const background = [
         bgJob && `The job: "${bgJob.name}"${bgJob.job_type ? ` (${bgJob.job_type})` : ''}${bgJob.shoot_date ? `, shoot or event date ${bgJob.shoot_date.slice(0, 10)}` : ''}${bgJob.shoot_location ? `, at ${bgJob.shoot_location}` : ''}${bgJob.quote_value ? `, quoted $${bgJob.quote_value}` : ''}`,
         bgJob?.deliverables?.length ? `Deliverables on the job: ${bgJob.deliverables.map((d) => d.title).join('; ')}` : '',
@@ -1833,29 +1840,29 @@ export async function executeTool(
         return JSON.stringify({ error: `The client record is missing: ${missing.join(', ')}. Ask Arlo for them with ask_arlo, save them with update_client, then call create_contract again. Do not guess.` })
       }
 
-      // The whole agreement is drafted fresh for this deal. There is no
-      // "use the template as it stands" path any more: that path is how every
-      // contract kept coming back as the same five-section video-ads template.
-      const today = new Date().toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'long', year: 'numeric' })
+      // Fixed terms (lib/contract-terms.ts) under a project sheet filled from
+      // Arlo's answers (lib/contract-sheet.ts). Only the sheet is written per
+      // deal; the legal wording is the same approved text for every client.
+      const kind = contractKindFor(engagement)
+      const clientIsBusiness = input.client_is_business !== false
+      const brand = brandIdentity(resolveBrand(bgJob?.brand ?? null, (client as { brand?: string | null }).brand ?? null))
+      const parties: SheetParties = {
+        partyLine: brand.partyLine,
+        ourContact: `Arlo Radford, ${brand.contactEmail}`,
+        clientLegalName: legalName,
+        signatoryName,
+        signatoryRole: typeof input.signatory_role === 'string' && input.signatory_role.trim() ? input.signatory_role.trim() : null,
+        clientContact: [signatoryName, client.email, client.phone].filter(Boolean).join(', '),
+      }
+      const sheet = await fillSheet({ kind, deal: terms, background })
+      if ('error' in sheet) return JSON.stringify({ error: sheet.error })
+      const body = assembleContract(kind, clientIsBusiness, parties, sheet.facts)
+      const check = checkContract(kind, parties, sheet.facts, body)
+      if (check.problems.length) {
+        return JSON.stringify({ error: `NOT saved. The contract failed its checks: ${check.problems.join('; ')}. Ask Arlo about anything that needs his answer (one ask_arlo popup), then call create_contract again.`, summary_as_filled: sheet.facts })
+      }
       const documentNumber = await nextDocumentNumber(supabase)
-      const drafted = await draftContract({
-        parties: {
-          clientName: client.name,
-          clientLegalName: legalName,
-          clientEntityType: entityType || null,
-          signatoryName,
-          signatoryRole: typeof input.signatory_role === 'string' ? input.signatory_role : null,
-          contactPerson: client.contact_person,
-          clientEmail: client.email,
-          clientPhone: client.phone,
-          clientLocation: client.location,
-          clientIsBusiness: input.client_is_business !== false,
-        },
-        terms: `Engagement type: ${String(input.engagement_type ?? 'other').replace(/_/g, ' ')}\n${terms}`,
-        background,
-        today,
-      })
-      if ('error' in drafted) return JSON.stringify({ error: drafted.error })
+      const drafted = { body, notes: sheet.summary }
 
       // clientName and contactPerson are what the PDF's signature block prints:
       // the legal entity, and the named person signing for it.
@@ -1873,6 +1880,13 @@ export async function executeTool(
         clientSignature: '',
         clientSignedAt: '',
         documentNumber,
+        // What the contract was assembled from, so an edit reassembles it
+        // instead of rewording it, and the signed version is traceable.
+        termsVersion: TERMS_VERSION,
+        contractKind: kind,
+        clientIsBusiness,
+        parties,
+        sheet: sheet.facts,
       }
       const docName = `Contract - ${client.name}`
       const { data: doc, error } = await supabase.from('documents').insert({
@@ -1917,8 +1931,26 @@ export async function executeTool(
       // Small changes go through the cheap quick edit (exact find-and-replace,
       // the rest of the contract untouched). Only a change it judges too big,
       // or one Tui marks as a redraft, pays for the full Opus revision.
-      let method: 'quick edit' | 'full redraft' | null = null
-      if (instructions) {
+      let method: 'quick edit' | 'full redraft' | 'summary updated' | null = null
+      // A contract built from the fixed terms is changed by changing its
+      // summary and reassembling, so the terms stay word for word the approved
+      // version. A change to a term itself lands in "anything else agreed",
+      // which the contract says wins over the terms.
+      if (instructions && form.termsVersion && form.sheet && form.parties) {
+        const kind = (form.contractKind as ContractKind) ?? 'one_off'
+        const parties = form.parties as SheetParties
+        const filled = await fillSheet({ kind, deal: '', current: form.sheet as SheetFacts, change: instructions })
+        if ('error' in filled) return JSON.stringify({ error: filled.error })
+        const body = assembleContract(kind, form.clientIsBusiness !== false, parties, filled.facts)
+        const check = checkContract(kind, parties, filled.facts, body)
+        if (check.problems.length) {
+          return JSON.stringify({ error: `NOT changed. The change failed the contract checks: ${check.problems.join('; ')}.`, summary_as_filled: filled.facts })
+        }
+        form.sheet = filled.facts
+        form.body = body
+        notes = filled.summary
+        method = 'summary updated'
+      } else if (instructions) {
         const currentBody = String(form.body ?? '')
         const quick = input.redraft === true ? null : await quickEditContract({ currentBody, instructions })
         if (quick && 'error' in quick) return JSON.stringify({ error: quick.error })
@@ -2313,7 +2345,7 @@ export async function executeTool(
       if (priceLines.length === 0) return JSON.stringify({ error: 'Pass price_lines with the agreed amounts. Never invent a price: ask Arlo if you do not have one.' })
 
       const [{ data: job, error: jobError }, { data: existing }] = await Promise.all([
-        supabase.from('jobs').select('id, name, client_id, clients(name, contact_person)').eq('id', jobId).single(),
+        supabase.from('jobs').select('id, name, client_id, brand, clients(name, contact_person, brand)').eq('id', jobId).single(),
         supabase.from('proposals').select('id, status').eq('job_id', jobId).maybeSingle(),
       ])
       if (jobError || !job) return JSON.stringify({ error: jobError ? dbErrorMessage(jobError) : 'No such job.' })
@@ -2322,9 +2354,10 @@ export async function executeTool(
         return JSON.stringify({ error: 'This job already has a draft proposal. Ask Arlo whether to redraft it (call again with replace_existing true) or edit it with update_proposal.', proposal_id: existing.id })
       }
 
-      const client = job.clients as unknown as { name: string; contact_person: string | null }
+      const client = job.clients as unknown as { name: string; contact_person: string | null; brand: string | null }
       const today = new Date().toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'long', year: 'numeric' })
       const drafted = await draftProposal({
+        brand: resolveBrand(job.brand as string | null, client.brand),
         pricingMode,
         priceSuffix,
         clientName: client.name,
