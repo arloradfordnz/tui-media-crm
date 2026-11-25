@@ -7,6 +7,7 @@ import { Check, X, MapPin, Calendar, Download, CheckCircle2 } from 'lucide-react
 import { acceptProposal, declineProposal, recordProposalView } from '@/app/actions/proposals'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
 import { brandIdentity } from '@/lib/brand'
+import { ArFooter } from '@/app/portal/ArloRadfordChrome'
 import ProposalDocument, { parseServices, parseInclusions, priceHeadline, type PricingMode } from '@/components/ProposalDocument'
 
 // Written out in full: a client reads "14 October 2026", not "14/10/26".
@@ -53,6 +54,9 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
   const headline = priceHeadline(proposal.pricingMode, services, proposal.totalValue, proposal.priceSuffix)
   const picks = proposal.pricingMode === 'options'
   const id = brandIdentity(proposal.brand)
+  // Arlo Radford: arloradford.nz's paper, header, centred serif title and ink
+  // footer (app/portal/arlo-radford.css). Tui Media is unchanged.
+  const ar = id.brand === 'arlo_radford'
 
   async function download() {
     setDownloading(true)
@@ -109,7 +113,7 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
   }
 
   return (
-    <div className="prop-page">
+    <div className={ar ? 'prop-page ar-theme' : 'prop-page'}>
       <header className="prop-topbar">
         {id.brand === 'tui_media' ? (
           <>
@@ -117,10 +121,9 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
             <Image className="logo-dark" src="/Primary_White.svg" alt="Tui Media" width={124} height={26} />
           </>
         ) : (
-          <>
-            <Image className="logo-light" src={id.logo.onLight} alt={id.displayName} width={160} height={23} />
-            <Image className="logo-dark" src={id.logo.onDark} alt={id.displayName} width={160} height={23} />
-          </>
+          <a href={id.websiteUrl} className="flex items-center">
+            <Image src={id.logo.onLight} alt={id.displayName} width={id.logo.width} height={id.logo.height} priority />
+          </a>
         )}
         <button type="button" onClick={download} disabled={downloading} className="btn-ghost btn-sm prop-topbar-dl">
           <Download className="w-3.5 h-3.5" /> {downloading ? 'Preparing…' : 'PDF'}
@@ -130,7 +133,7 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
       <main className="prop-main animate-fade-in">
         <div className="prop-hero">
           <p className="prop-eyebrow">Proposal · {formatDate(issued)}</p>
-          <h1 className="prop-title">{proposal.job.name}</h1>
+          <h1 className="prop-title">{ar ? accentLast(proposal.job.name) : proposal.job.name}</h1>
           <p className="prop-for">Prepared for {proposal.job.client.contactPerson ? `${proposal.job.client.contactPerson}, ` : ''}{proposal.job.client.name}</p>
           {(proposal.job.shootDate || proposal.job.shootLocation) && (
             <div className="prop-meta">
@@ -182,6 +185,8 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
         </footer>
       </main>
 
+      {ar && <ArFooter />}
+
       {/* On a phone the decision stays in reach while reading. */}
       {open && (
         <div className="prop-mobile-bar">
@@ -195,4 +200,11 @@ export default function ProposalView({ proposal }: { proposal: ProposalData }) {
       <ConfirmSheet spec={confirmSpec} onClose={() => setConfirm(null)} />
     </div>
   )
+}
+
+/** arloradford.nz's heading habit: the last word in italic. */
+function accentLast(text: string) {
+  const at = text.lastIndexOf(' ')
+  if (at < 0) return <em>{text}</em>
+  return <>{text.slice(0, at + 1)}<em>{text.slice(at + 1)}</em></>
 }

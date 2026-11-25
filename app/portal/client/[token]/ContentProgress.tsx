@@ -33,7 +33,8 @@ function shootDay(date: string, startTime: string | null): string {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
-export default function ContentProgress({ progress }: { progress: PortalProgress }) {
+/** `ar`: an Arlo Radford client, so the site's centred serif heading (the card itself is restyled by arlo-radford.css). */
+export default function ContentProgress({ progress, ar = false }: { progress: PortalProgress; ar?: boolean }) {
   const { retainer, nextShoot } = progress
   const month = retainer?.currentMonth ?? null
   const openEnded = !!retainer?.openEnded
@@ -55,6 +56,12 @@ export default function ContentProgress({ progress }: { progress: PortalProgress
 
   return (
     <div>
+      {ar ? (
+        <div className="ar-section-head">
+          <h2 className="ar-h2">Your <em>content</em></h2>
+          {subtitle && <p className="ar-section-sub">{subtitle}</p>}
+        </div>
+      ) : (
       <div className="flex items-center gap-3 mb-4">
         <div className="stat-icon-bubble bubble-sm">
           <Clapperboard className="w-4 h-4" />
@@ -64,6 +71,7 @@ export default function ContentProgress({ progress }: { progress: PortalProgress
           {subtitle && <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{subtitle}</p>}
         </div>
       </div>
+      )}
 
       <div className="card portal-progress">
         {month && (

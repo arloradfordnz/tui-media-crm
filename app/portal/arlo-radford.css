@@ -1,0 +1,374 @@
+/* Arlo Radford: the client-facing look for Arlo Radford clients.
+
+   The portal, its sign-in pages and the proposal page are shared with Tui
+   Media. For an Arlo Radford client the page root carries `.ar-theme`, and
+   everything here is scoped under it, so a Tui Media page is untouched by
+   this file. It is arloradford.nz's own look: paper and ink, Gambetta
+   headings with an italic accent word, General Sans for everything else,
+   hairline rules instead of filled cards, square corners, an ink footer.
+
+   Most of the work is done by redefining the CRM's tokens inside the scope,
+   so every existing component (fields, sheets, documents) follows without
+   its markup changing. The rest are shape overrides (radius, rules) and the
+   `ar-*` pieces the Arlo Radford pages render themselves (header, intro,
+   section heads, footer). Values are the site's (src/assets/css/site.css in
+   arlo-radford-site); keep them in step if the site moves. */
+
+@font-face {
+  font-family: 'General Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/arlo-radford/general-sans-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'General Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/arlo-radford/general-sans-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Gambetta';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/arlo-radford/gambetta-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Gambetta';
+  font-style: italic;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/arlo-radford/gambetta-500-italic.woff2') format('woff2');
+}
+
+/* ── Tokens ─────────────────────────────────────────────────── */
+
+.ar-theme {
+  --ar-ink: #111111;
+  --ar-paper: #F6F4F0;
+  --ar-muted: #4F4F4F;
+  --ar-muted-on-dark: #9A9A9A;
+  --ar-rule: rgba(17, 17, 17, 0.16);
+  --ar-display: 'Gambetta', Georgia, 'Times New Roman', serif;
+  --ar-sans: 'General Sans', ui-sans-serif, system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --ar-gutter: max(16px, env(safe-area-inset-left), env(safe-area-inset-right));
+
+  /* The CRM's names, the site's values. */
+  --bg-base: #F6F4F0;
+  --bg-surface: #EFECE7;
+  --bg-elevated: #EAE7E1;
+  --bg-hover: #E2E0DB;
+  --bg-border: var(--ar-rule);
+  --text-primary: #111111;
+  --text-secondary: #4F4F4F;
+  --text-tertiary: #6E6C68;
+  --accent: #111111;
+  --accent-hover: #333333;
+  --accent-muted: rgba(17, 17, 17, 0.07);
+  --accent-soft: #4F4F4F;
+  --on-accent: #F6F4F0;
+  --success: #2E6A43;
+  --warning: #8A5A12;
+  --danger: #A3392D;
+  --glass-card-bg: rgba(246, 244, 240, 0.94);
+  --glass-card-border: var(--ar-rule);
+  --glass-shadow: 0 10px 30px -12px rgba(17, 17, 17, 0.25);
+  --media-bg: #111111;
+
+  /* Square corners, as on the site. */
+  --r-sm: 0px;
+  --r-md: 0px;
+  --r-lg: 0px;
+  --r-xl: 0px;
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+  --font-sans: var(--ar-sans);
+
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--ar-paper);
+  color: var(--ar-ink);
+  font-family: var(--ar-sans);
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+/* The page behind (overscroll, the strip under Safari's toolbar) is paper. */
+html:has(.ar-theme), html:has(.ar-theme) body { background: #F6F4F0; }
+.ar-theme ::selection { background: #111111; color: #F6F4F0; }
+.ar-theme :focus-visible { outline: 2px solid #111111; outline-offset: 3px; }
+
+/* ── Type ───────────────────────────────────────────────────── */
+
+.ar-h1, .ar-h2, .ar-h3 { font-family: var(--ar-display); font-weight: 500; letter-spacing: -0.02em; margin: 0; color: var(--ar-ink); }
+.ar-h1 em, .ar-h2 em, .ar-h3 em { font-style: italic; letter-spacing: -0.01em; }
+.ar-h1 { font-size: clamp(2.5rem, 1rem + 4vw, 3.75rem); line-height: 1.05; text-wrap: balance; }
+.ar-h2 { font-size: clamp(1.75rem, 1.1rem + 2.2vw, 2.625rem); line-height: 1.1; }
+.ar-h3 { font-size: clamp(1.0625rem, 0.95rem + 0.4vw, 1.25rem); line-height: 1.25; }
+.ar-lede { max-width: 52ch; margin: 0; font-size: clamp(1rem, 0.85rem + 0.35vw, 1.125rem); line-height: 1.6; color: var(--ar-muted); }
+.ar-body { margin: 0; font-size: 15px; line-height: 1.6; color: var(--ar-muted); }
+
+/* The site's text link: a hairline underline and the arrow that turns. */
+.ar-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(17, 17, 17, 0.25);
+  font-size: 14px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--ar-ink);
+  text-decoration: none;
+  background: none;
+  cursor: pointer;
+}
+.ar-link::after { content: ''; position: absolute; inset: -14px -6px; }
+.ar-link svg { width: 12px; height: 12px; transition: transform 0.3s ease-out; }
+.ar-link:hover svg, .ar-link:focus-visible svg { transform: rotate(45deg); }
+
+/* ── Header, intro, sections, footer ────────────────────────── */
+
+.ar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  height: 72px;
+  padding: 0 var(--ar-gutter);
+  flex-shrink: 0;
+}
+.ar-header-brand { display: flex; align-items: center; }
+.ar-header-brand img { height: 28px; width: auto; }
+.ar-header-nav { display: flex; align-items: center; gap: 24px; font-size: 14px; }
+.ar-header-nav a, .ar-header-nav button {
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--ar-ink);
+  text-decoration: none;
+  cursor: pointer;
+}
+.ar-header-nav a:hover, .ar-header-nav button:hover { color: var(--ar-muted); }
+@media (max-width: 480px) {
+  .ar-header-brand img { height: 20px; }
+  .ar-header-nav { gap: 16px; font-size: 13px; }
+}
+
+.ar-main { flex: 1; width: 100%; }
+.ar-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  padding: clamp(2.5rem, 2rem + 3vw, 4.5rem) var(--ar-gutter) clamp(2.5rem, 2rem + 2vw, 3.5rem);
+}
+.ar-section { padding: 0 var(--ar-gutter) clamp(3.5rem, 3rem + 3vw, 5rem); }
+.ar-wrap { max-width: 760px; margin: 0 auto; }
+.ar-section-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+.ar-section-sub { margin: 0; font-size: 14px; color: var(--ar-muted); }
+.ar-note { margin: 16px 0 0; font-size: 13px; line-height: 1.55; color: var(--text-tertiary); }
+
+.ar-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 24px;
+  margin-top: auto;
+  padding: 48px var(--ar-gutter) calc(24px + env(safe-area-inset-bottom));
+  background: var(--ar-ink);
+  color: var(--ar-paper);
+}
+.ar-footer-logo { height: clamp(28px, 4.5vw, 48px); width: auto; }
+.ar-footer-nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 28px; font-size: 14px; }
+.ar-footer-nav a { color: var(--ar-paper); text-decoration: none; transition: color 0.2s ease; }
+.ar-footer-nav a:hover { color: var(--ar-muted-on-dark); }
+.ar-footer-meta { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 13px; color: var(--ar-muted-on-dark); }
+
+/* A list of rows between hairlines, like the site's price list. */
+.ar-rows { border-top: 1px solid var(--ar-rule); }
+.ar-rows > * { border-bottom: 1px solid var(--ar-rule); }
+
+/* The sign-in pages: one centred column on paper. */
+.ar-auth { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: clamp(2rem, 1rem + 6vh, 6rem) var(--ar-gutter) 64px; }
+.ar-auth-inner { width: 100%; max-width: 400px; }
+.ar-auth-head { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; margin-bottom: 36px; }
+.ar-auth-help { margin-top: 40px; text-align: center; font-size: 13px; color: var(--text-tertiary); }
+.ar-auth-help a { color: var(--ar-ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(17, 17, 17, 0.3); }
+
+/* ── The CRM's shared pieces, reshaped ──────────────────────── */
+
+.ar-theme .btn-primary,
+.ar-theme .btn-secondary,
+.ar-theme .btn-danger {
+  height: 46px;
+  padding: 0 24px;
+  border-radius: 0;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.ar-theme .btn-primary { background: #111111; color: #F6F4F0; }
+.ar-theme .btn-primary:hover { background: #333333; }
+.ar-theme .btn-secondary { border-color: rgba(17, 17, 17, 0.3); }
+.ar-theme .btn-secondary:hover { background: transparent; border-color: #111111; }
+.ar-theme .btn-sm { height: 38px; padding: 0 16px; font-size: 13px; }
+/* The quiet button becomes the site's underlined text link. */
+.ar-theme .btn-ghost {
+  height: auto;
+  min-height: 32px;
+  padding: 0 0 2px;
+  gap: 6px;
+  border: 0;
+  border-bottom: 1px solid rgba(17, 17, 17, 0.25);
+  border-radius: 0;
+  background: none;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--ar-ink);
+}
+.ar-theme .btn-ghost:hover { background: none; color: var(--ar-muted); border-color: #111111; }
+
+/* Badges lose their fill: a coloured dot and the word, nothing else. */
+.ar-theme .badge {
+  gap: 6px;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.ar-theme .badge::before { content: ''; width: 6px; height: 6px; border-radius: 999px; background: currentColor; flex-shrink: 0; }
+.ar-theme .badge-muted, .ar-theme .badge-accent { color: var(--text-secondary); background: none; box-shadow: none; }
+.ar-theme .badge-accent { color: var(--ar-ink); }
+
+.ar-theme .card { background: none; border-radius: 0; padding: 24px 0; }
+.ar-theme .box-inset-lg { background: none; border-radius: 0; padding: 20px 0 0; border-top: 1px solid var(--ar-rule); }
+.ar-theme .alert { border-radius: 0; font-size: 14px; }
+.ar-theme .field-input { border-radius: 0; border-color: rgba(17, 17, 17, 0.25); }
+.ar-theme .field-input:focus { border-color: #111111; box-shadow: none; }
+.ar-theme .label { font-size: 13px; color: var(--text-tertiary); }
+
+.ar-theme .media-band { margin: 0 0 16px; border-radius: 0; background: #111111; }
+.ar-theme .media-frame video { background: #111111; }
+
+.ar-theme .confirm-scrim { background: rgba(17, 17, 17, 0.4); }
+.ar-theme .confirm-sheet { border-radius: 0; box-shadow: 0 -18px 48px rgba(17, 17, 17, 0.18); background: #F6F4F0; }
+.ar-theme .confirm-title { font-family: var(--ar-display); font-size: 24px; font-weight: 500; letter-spacing: -0.02em; }
+
+/* ── Portal: projects ───────────────────────────────────────── */
+
+.ar-theme .portal-job-name { font-family: var(--ar-display); font-size: clamp(1.125rem, 1rem + 0.5vw, 1.375rem); font-weight: 500; letter-spacing: -0.02em; line-height: 1.2; }
+.ar-theme .portal-job-toggle { width: 20px; height: 20px; flex-shrink: 0; color: var(--ar-ink); transition: transform 0.3s var(--ease-out, ease); }
+.ar-theme .portal-job-toggle.is-open { transform: rotate(45deg); }
+.ar-theme .portal-job-body { border-top: 0 !important; padding-top: 8px !important; }
+.ar-theme .portal-revisions { background: none !important; padding: 4px 0 8px; }
+.ar-theme .portal-deliverable-title { font-family: var(--ar-display); font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
+
+/* ── Portal: proposals ──────────────────────────────────────── */
+
+.ar-theme .portal-proposal { padding: 22px 0; border-radius: 0; background: none; box-shadow: none; }
+.ar-theme .portal-proposal:hover { background: none; }
+.ar-theme .portal-proposal:hover .portal-proposal-name { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+.ar-theme .portal-proposal.is-waiting { box-shadow: none; }
+.ar-theme .portal-proposal-name { font-family: var(--ar-display); font-size: clamp(1.125rem, 1rem + 0.5vw, 1.375rem); font-weight: 500; letter-spacing: -0.02em; white-space: normal; }
+.ar-theme .portal-proposal-meta { font-size: 14px; margin-top: 4px; }
+.ar-theme .portal-proposal-total { font-size: 15px; font-weight: 400; }
+
+/* ── Portal: monthly content ────────────────────────────────── */
+
+.ar-theme .portal-progress { padding: 28px 0; border-top: 1px solid var(--ar-rule); border-bottom: 1px solid var(--ar-rule); }
+.ar-theme .portal-progress-count { font-size: 15px; }
+.ar-theme .portal-progress-count strong { font-family: var(--ar-display); font-size: 3rem; font-weight: 500; letter-spacing: -0.02em; }
+.ar-theme .portal-progress-bar { gap: 4px; }
+.ar-theme .portal-progress-bar span { height: 3px; border-radius: 0; background: rgba(17, 17, 17, 0.12); }
+.ar-theme .portal-progress-bar span.is-done { background: #111111; }
+.ar-theme .portal-progress-steps li:not(:last-child)::after { height: 1px; border-radius: 0; }
+.ar-theme .portal-progress-steps li.is-current .portal-progress-dot { box-shadow: inset 0 0 0 4px var(--ar-paper), inset 0 0 0 10px #111111; }
+
+/* ── Portal: documents ──────────────────────────────────────── */
+
+.ar-theme .portal-doc { background: none; border-radius: 0; }
+.ar-theme .portal-doc.is-open { box-shadow: none; }
+.ar-theme .portal-doc-head { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: 'title status chev'; padding: 22px 0; border-radius: 0; }
+.ar-theme .portal-doc-icon { display: none; }
+.ar-theme .portal-doc-name { font-family: var(--ar-display); font-size: clamp(1.125rem, 1rem + 0.5vw, 1.375rem); font-weight: 500; letter-spacing: -0.02em; }
+.ar-theme .portal-doc-meta { font-size: 14px; }
+.ar-theme .portal-doc-status { padding: 0; border-radius: 0; background: none; font-size: 13px; font-weight: 400; }
+.ar-theme .portal-doc-chevron { color: var(--ar-ink); }
+.ar-theme .portal-doc-open { padding: 0 0 28px; gap: 18px; }
+.ar-theme .portal-doc-toolbar { padding: 0; font-size: 14px; }
+.ar-theme .portal-paper { background: #FFFFFF; border: 1px solid var(--ar-rule); border-radius: 0; }
+.ar-theme .portal-sign { border-radius: 0; background: var(--bg-surface); }
+.ar-theme .portal-sign-title { font-family: var(--ar-display); font-size: 24px; font-weight: 500; }
+.ar-theme .portal-sign-input { font-family: var(--ar-display); font-size: 30px; font-weight: 500; border-bottom-color: rgba(17, 17, 17, 0.4); }
+.ar-theme .portal-sign-input:focus { border-bottom-color: #111111; }
+.ar-theme .portal-signed { border-radius: 0; }
+.ar-theme .portal-signed-tick { color: #F6F4F0; }
+.ar-theme .portal-feedback, .ar-theme .portal-feedback-form { padding-left: 0; padding-right: 0; }
+.ar-theme .portal-feedback-item { border-radius: 0; }
+@media (max-width: 560px) {
+  .ar-theme .portal-doc-head { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'title chev' 'status .'; padding: 18px 0; }
+}
+
+/* Documents and proposals on paper: Gambetta section heads, ink figures. */
+.ar-theme .prop-title { font-family: var(--ar-display); font-weight: 500; letter-spacing: -0.02em; }
+.ar-theme .prop-eyebrow { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 14px; color: var(--ar-muted); }
+.ar-theme .prop-h,
+.ar-theme .doc-section > .prop-h,
+.ar-theme .doc-approval > .prop-h { font-family: var(--ar-display); font-size: 20px; font-weight: 500; letter-spacing: -0.015em; text-transform: none; color: var(--ar-ink); }
+.ar-theme .doc-sign-line { font-family: var(--ar-display); font-weight: 500; font-size: 20px; }
+
+/* ── Proposal page ──────────────────────────────────────────── */
+
+.ar-theme.prop-page { padding-bottom: 0; }
+.ar-theme .prop-topbar { justify-content: space-between; height: 72px; padding: 0 var(--ar-gutter); border-bottom: 0; }
+.ar-theme .prop-topbar img { height: 28px; width: auto; }
+.ar-theme .prop-topbar-dl { position: static; transform: none; }
+.ar-theme .prop-main { max-width: 760px; padding: clamp(2.5rem, 2rem + 3vw, 4rem) var(--ar-gutter) clamp(3.5rem, 3rem + 3vw, 5rem); gap: 28px; }
+.ar-theme .prop-hero { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 0 12px; }
+.ar-theme .prop-title { font-size: clamp(2.5rem, 1rem + 4vw, 3.75rem); line-height: 1.05; }
+.ar-theme .prop-title.prop-title-sm { font-size: clamp(1.75rem, 1.1rem + 2.2vw, 2.25rem); }
+.ar-theme .prop-for { font-size: clamp(1rem, 0.85rem + 0.35vw, 1.125rem); color: var(--ar-muted); }
+.ar-theme .prop-meta { justify-content: center; font-size: 14px; }
+.ar-theme .prop-hero-total { justify-content: center; }
+.ar-theme .prop-hero-total span { font-family: var(--ar-display); font-weight: 500; font-size: 2.25rem; }
+.ar-theme .prop-banner { border-radius: 0; }
+.ar-theme .prop-card { background: none; border-radius: 0; padding: 32px 0 0; border-top: 1px solid var(--ar-rule); }
+.ar-theme .prop-letter { font-size: 16px; color: var(--ar-ink); }
+.ar-theme .prop-total-value { font-family: var(--ar-display); font-weight: 500; color: var(--ar-ink); }
+.ar-theme .prop-respond { padding-bottom: 8px; }
+.ar-theme .prop-footer { display: none; }
+@media (max-width: 639px) {
+  .ar-theme .prop-mobile-bar { border-radius: 0; left: 0; right: 0; bottom: 0; padding: 10px var(--ar-gutter) calc(10px + env(safe-area-inset-bottom)); border: 0; border-top: 1px solid var(--ar-rule); box-shadow: none; }
+  .ar-theme .prop-mobile-total { font-family: var(--ar-display); font-weight: 500; font-size: 20px; }
+  .ar-theme.prop-page .ar-footer { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+}

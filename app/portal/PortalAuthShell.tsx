@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import { brandIdentity } from '@/lib/brand'
+import { ArFooter, ArHeader } from './ArloRadfordChrome'
 
 /**
  * The framing shared by the portal's login and password-setup pages.
@@ -20,6 +21,29 @@ export default function PortalAuthShell({
   children: React.ReactNode
 }) {
   const id = brandIdentity(brand)
+
+  // Arlo Radford: arloradford.nz's paper page, header and footer.
+  if (id.brand === 'arlo_radford') {
+    return (
+      <div className="ar-theme">
+        <ArHeader />
+        <main className="ar-auth">
+          <div className="ar-auth-inner animate-fade-in">
+            <div className="ar-auth-head">
+              <h1 className="ar-h2">{accentLast(title)}</h1>
+              <p className="ar-body">{intro}</p>
+            </div>
+            {children}
+            <p className="ar-auth-help">
+              Need a hand? <a href={`mailto:${id.contactEmail}`}>{id.contactEmail}</a>
+            </p>
+          </div>
+        </main>
+        <ArFooter />
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center px-6" style={{ background: 'var(--bg-base)' }}>
       <div className="w-full max-w-sm animate-fade-in">
@@ -49,4 +73,11 @@ export default function PortalAuthShell({
       </div>
     </div>
   )
+}
+
+/** The site's heading habit: the last word in italic ("Sign <em>in</em>"). */
+function accentLast(text: string) {
+  const at = text.lastIndexOf(' ')
+  if (at < 0) return <em>{text}</em>
+  return <>{text.slice(0, at + 1)}<em>{text.slice(at + 1)}</em></>
 }

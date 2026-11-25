@@ -7,9 +7,29 @@ import ClientPortalView from '../client/[token]/ClientPortalView'
 import PortalSignOut from './PortalSignOut'
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { cache } from 'react'
 import { KeyRound } from 'lucide-react'
+import { brandTitle, normalizeBrand } from '@/lib/brand'
 
-export const metadata: Metadata = { title: 'Your projects — Tui Media' }
+// generateMetadata and the page both need the client row; cache() makes it
+// one lookup per request (AGENTS.md).
+const signedInClient = cache(async () => {
+  const session = await getClientSession()
+  if (!session) return { session: null, client: null }
+  const admin = createAdminClient()
+  if (!admin) return { session, client: null }
+  const { data: client } = await admin
+    .from('clients')
+    .select('id, name, contact_person, portal_token, brand')
+    .eq('id', session.clientId)
+    .single()
+  return { session, client: client ?? null }
+})
+
+export async function generateMetadata(): Promise<Metadata> {
+  const { client } = await signedInClient()
+  return { title: brandTitle('Your projects', (client?.brand as string | null) ?? null) }
+}
 
 /**
  * The portal for a signed-in client.
@@ -20,7 +40,7 @@ export const metadata: Metadata = { title: 'Your projects — Tui Media' }
  * id never comes from the URL, so there is no id here to tamper with.
  */
 export default async function PortalMePage() {
-  const session = await getClientSession()
+  const { session, client } = await signedInClient()
   if (!session) {
     // Plain /portal/login would bounce a signed-in user straight back here
     // (proxy.ts sends them to their front door), so say why instead.
@@ -31,19 +51,24 @@ export default async function PortalMePage() {
     redirect('/portal/login?error=account')
   }
 
-  const admin = createAdminClient()
-  if (!admin) redirect('/portal/login')
-
-  const { data: client } = await admin
-    .from('clients')
-    .select('id, name, contact_person, portal_token, brand')
-    .eq('id', session.clientId)
-    .single()
-
+  if (!createAdminClient()) redirect('/portal/login')
   if (!client) redirect('/portal/login?error=account')
 
   const portalData = await loadPortalData(client as unknown as PortalClient)
   if (!portalData) redirect('/portal/login?error=account')
+
+  // Arlo Radford: the account links sit in the site-style header.
+  if (normalizeBrand(client.brand as string | null) === 'arlo_radford') {
+    return (
+      <ClientPortalView
+        data={portalData}
+        headerActions={<>
+          <Link href="/portal/setup">Change password</Link>
+          <PortalSignOut plain />
+        </>}
+      />
+    )
+  }
 
   return (
     <>

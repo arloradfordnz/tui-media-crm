@@ -7,10 +7,11 @@ import { signDocumentByClient, submitDocumentFeedback } from '@/app/actions/docu
 import DocumentSheet, { longDate } from '@/components/DocumentSheet'
 import { statusLabel, statusBadgeClass, formatDate, formatNZD, firstName } from '@/lib/format'
 import Image from 'next/image'
-import { Briefcase, FileText, ScrollText, ArrowUpRight, Film, Image as ImageIcon, File, Music, Download, ChevronDown, ChevronRight, Check, MessageSquare, PenLine, Archive } from 'lucide-react'
+import { Briefcase, FileText, ScrollText, ArrowUpRight, Film, Image as ImageIcon, File, Music, Download, ChevronDown, ChevronRight, Check, MessageSquare, PenLine, Archive, Plus } from 'lucide-react'
 import ConfirmSheet, { type ConfirmSpec } from '@/components/ConfirmSheet'
 import ContentProgress, { type PortalProgress } from './ContentProgress'
 import { brandIdentity, type BrandIdentity } from '@/lib/brand'
+import { ArFooter, ArHeader } from '../../ArloRadfordChrome'
 
 /* The client's brand (lib/brand.ts), for the cards deep in the tree. */
 const BrandCtx = createContext<BrandIdentity>(brandIdentity(null))
@@ -134,11 +135,50 @@ function fileKind(mime: string | null, name: string): 'video' | 'image' | 'audio
   return 'other'
 }
 
-export default function ClientPortalView({ data }: { data: PortalData }) {
+/**
+ * `headerActions` (the signed-in portal's Change password and Sign out) sit in
+ * the Arlo Radford header. A Tui Media page renders them above the view
+ * itself, as it always has.
+ */
+export default function ClientPortalView({ data, headerActions }: { data: PortalData; headerActions?: React.ReactNode }) {
   const [confirmSpec, setConfirm] = useState<ConfirmSpec | null>(null)
   const router = useRouter()
   const [expandedJob, setExpandedJob] = useState<string | null>(data.jobs[0]?.id || null)
   const id = brandIdentity(data.client.brand)
+  // Arlo Radford clients get arloradford.nz's look (./../../arlo-radford.css):
+  // its header, a centred serif intro, sections under Gambetta headings with
+  // the italic word, hairline rows in place of cards, and the ink footer.
+  // Tui Media renders exactly as before.
+  const ar = id.brand === 'arlo_radford'
+  const name = firstName(data.client.contactPerson) || data.client.name
+
+  // A section: Tui Media's icon-bubble head, or the site's centred heading.
+  // A plain function, not a component: a component defined in render would
+  // remount every card below it (and lose an open document) on each refresh.
+  const section = ({ icon, title, arTitle, sub, children }: { icon: React.ReactNode; title: string; arTitle: React.ReactNode; sub?: string; children: React.ReactNode }) => ar ? (
+    <section className="ar-section">
+      <div className="ar-wrap">
+        <div className="ar-section-head">
+          <h2 className="ar-h2">{arTitle}</h2>
+          {sub && <p className="ar-section-sub">{sub}</p>}
+        </div>
+        {children}
+      </div>
+    </section>
+  ) : (
+    <div>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="stat-icon-bubble bubble-sm">
+          {icon}
+        </div>
+        <div>
+          <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h2>
+          {sub && <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{sub}</p>}
+        </div>
+      </div>
+      {children}
+    </div>
+  )
 
   // Mark any 'sent' files as viewed once the client opens the portal.
   useEffect(() => {
@@ -168,22 +208,178 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
     })
   }
 
+  const proposalsBlock = data.proposals.length > 0 && section({
+    icon: <ScrollText className="w-4 h-4" />,
+    title: 'Proposals',
+    arTitle: <>Your <em>{data.proposals.length === 1 ? 'proposal' : 'proposals'}</em></>,
+    sub: data.proposals.some((p) => p.status === 'sent') ? 'Waiting on your answer' : `${data.proposals.length} proposal${data.proposals.length === 1 ? '' : 's'}`,
+    children: (
+      <>
+        <div className={ar ? 'ar-rows' : 'space-y-2'}>
+          {data.proposals.map((p) => {
+            const waiting = p.status === 'sent'
+            return (
+              <a key={p.id} href={`/proposal/${p.token}`} className={`portal-proposal${waiting ? ' is-waiting' : ''}`}>
+                <div className="min-w-0 flex-1">
+                  <p className="portal-proposal-name">{p.jobName}</p>
+                  <p className="portal-proposal-meta">
+                    {waiting ? `Sent ${formatDate(p.sentAt)}` : `${statusLabel(p.status)} ${formatDate(p.respondedAt)}`}
+                    {p.shootDate ? ` · Shoot ${formatDate(p.shootDate)}` : ''}
+                  </p>
+                </div>
+                <div className="portal-proposal-right">
+                  <span className="portal-proposal-total">{p.priceLabel ?? formatNZD(p.total)}</span>
+                  {waiting
+                    ? <span className="btn-primary btn-sm">Review <ArrowUpRight className="w-3.5 h-3.5" /></span>
+                    : <span className={`badge ${statusBadgeClass(p.status)}`}>{statusLabel(p.status)}</span>}
+                </div>
+              </a>
+            )
+          })}
+        </div>
+        {id.invoiceNote && (
+          ar
+            ? <p className="ar-note">{id.invoiceNote}</p>
+            : <p className="text-xs mt-3" style={{ color: 'var(--text-tertiary)' }}>{id.invoiceNote}</p>
+        )}
+      </>
+    ),
+  })
+
+  const projectsBlock = section({
+    icon: <Briefcase className="w-4 h-4" />,
+    title: 'Your Projects',
+    arTitle: <>Your <em>{data.jobs.length === 1 ? 'project' : 'projects'}</em></>,
+    sub: `${data.jobs.length} project${data.jobs.length === 1 ? '' : 's'}`,
+    children: data.jobs.length === 0 ? (
+      ar ? (
+        <div className="ar-rows">
+          <p className="ar-body" style={{ padding: '28px 0', textAlign: 'center' }}>Nothing here yet. Your project will show up here once it begins.</p>
+        </div>
+      ) : (
+        <div className="card text-center py-12">
+          <Briefcase className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-tertiary)' }} />
+          <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>No active projects</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>Your projects will appear here once they begin.</p>
+        </div>
+      )
+    ) : (
+      <div className={ar ? 'ar-rows' : 'space-y-3'}>
+        {data.jobs.map((job) => {
+          const isExpanded = expandedJob === job.id
+          const allFiles = job.deliverables.flatMap((d) => d.deliveryFiles)
+          return (
+            <div key={job.id} className="card">
+              <button
+                onClick={() => setExpandedJob(isExpanded ? null : job.id)}
+                className="flex items-center gap-3 w-full text-left"
+                aria-expanded={isExpanded}
+              >
+                {!ar && (isExpanded ? (
+                  <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+                ) : (
+                  <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
+                ))}
+                <div className="flex-1 min-w-0">
+                  <h3 className="portal-job-name text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{job.name}</h3>
+                  <div className={`flex items-center gap-2 ${ar ? 'gap-x-4 mt-2' : 'mt-1'} flex-wrap`}>
+                    <span className={`badge ${clientStatus(job.status).badge}`}>{clientStatus(job.status).label}</span>
+                    {job.jobType && <span className="badge badge-muted">{statusLabel(job.jobType)}</span>}
+                    {job.shootDate && <span className={ar ? 'text-sm' : 'text-xs'} style={{ color: 'var(--text-tertiary)' }}>{formatDate(job.shootDate)}</span>}
+                  </div>
+                </div>
+                {allFiles.length > 0 && (
+                  <span className={`${ar ? 'text-sm' : 'text-xs'} shrink-0 whitespace-nowrap`} style={{ color: 'var(--text-tertiary)' }}>{allFiles.length} file{allFiles.length !== 1 ? 's' : ''}</span>
+                )}
+                {ar && <Plus className={`portal-job-toggle${isExpanded ? ' is-open' : ''}`} strokeWidth={1.25} aria-hidden="true" />}
+              </button>
+
+              {isExpanded && (
+                <div className="portal-job-body mt-4 space-y-4" style={{ borderTop: '1px solid var(--bg-border)', paddingTop: '16px' }}>
+                  {job.deliverables.length === 0 ? (
+                    <p className="text-sm py-4 text-center" style={{ color: 'var(--text-tertiary)' }}>No deliverables uploaded yet.</p>
+                  ) : (
+                    job.deliverables.map((d) => (
+                      <div key={d.id} className={ar ? 'space-y-4 pt-2' : 'space-y-3'}>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {!ar && <Film className="w-4 h-4" style={{ color: 'var(--accent)' }} />}
+                          <span className="portal-deliverable-title text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{d.title}</span>
+                          {d.completed && <span className="badge badge-success">Complete</span>}
+                          <span className={`${ar ? 'text-sm' : 'text-xs'} ml-auto`} style={{ color: 'var(--text-tertiary)' }}>
+                            {Math.max(d.revisionLimit - d.revisionsUsed, 0)} of {d.revisionLimit} revision{d.revisionLimit !== 1 ? 's' : ''} remaining
+                          </span>
+                        </div>
+                        {d.description && <p className={ar ? 'text-sm' : 'text-xs'} style={{ color: 'var(--text-secondary)' }}>{d.description}</p>}
+
+                        {d.deliveryFiles.map((f) => (
+                          <FileCard key={f.id} file={f} jobId={job.id} portalToken={data.portalToken} onApprove={handleApprove} />
+                        ))}
+
+                        {d.deliveryFiles.length === 0 && (
+                          <p className={`${ar ? 'text-sm' : 'text-xs'} py-2`} style={{ color: 'var(--text-tertiary)' }}>Files will appear here once uploaded.</p>
+                        )}
+
+                        {d.deliveryFiles.length > 0 && (
+                          <RevisionPanel deliverable={d} portalToken={data.portalToken} />
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    ),
+  })
+
+  const documentsBlock = data.documents.length > 0 && section({
+    icon: <FileText className="w-4 h-4" />,
+    title: 'Your Documents',
+    arTitle: <>The <em>paperwork</em></>,
+    sub: `${data.documents.length} document${data.documents.length === 1 ? '' : 's'}`,
+    children: (
+      <div className={ar ? 'ar-rows' : 'space-y-2'}>
+        {data.documents.map((doc) => (
+          <DocumentCard key={doc.id} doc={doc} portalToken={data.portalToken} />
+        ))}
+      </div>
+    ),
+  })
+
+  if (ar) {
+    return (
+      <BrandCtx.Provider value={id}>
+        <div className="ar-theme">
+          <ArHeader>{headerActions}</ArHeader>
+          <main className="ar-main animate-fade-in">
+            <div className="ar-intro">
+              <h1 className="ar-h1">Kia ora, <em>{name}</em></h1>
+              <p className="ar-lede">Everything for your project in one place: the films and photos as they come in, the paperwork, and where we&apos;re up to.</p>
+            </div>
+
+            {/* Proposals first: an open one is the only thing waiting on the client. */}
+            {proposalsBlock}
+            {data.progress && (
+              <section className="ar-section"><div className="ar-wrap"><ContentProgress progress={data.progress} ar /></div></section>
+            )}
+            {projectsBlock}
+            {documentsBlock}
+          </main>
+          <ArFooter />
+          <ConfirmSheet spec={confirmSpec} onClose={() => setConfirm(null)} />
+        </div>
+      </BrandCtx.Provider>
+    )
+  }
+
   return (
     <BrandCtx.Provider value={id}>
     <div className="min-h-screen" style={{ background: 'var(--bg-base)' }}>
       <header className="py-5 px-6 flex items-center justify-center">
-        {id.brand === 'tui_media' ? (
-          <>
-            <Image className="logo-light" src="/Primary_Black.svg" alt="Tui Media" width={130} height={27} />
-            <Image className="logo-dark" src="/Primary_White.svg" alt="Tui Media" width={130} height={27} />
-          </>
-        ) : (
-          /* The arloradford.nz wordmark, sized to sit in the same 27px row. */
-          <>
-            <Image className="logo-light" src={id.logo.onLight} alt={id.displayName} width={170} height={25} />
-            <Image className="logo-dark" src={id.logo.onDark} alt={id.displayName} width={170} height={25} />
-          </>
-        )}
+        <Image className="logo-light" src="/Primary_Black.svg" alt="Tui Media" width={130} height={27} />
+        <Image className="logo-dark" src="/Primary_White.svg" alt="Tui Media" width={130} height={27} />
       </header>
 
       <div className="max-w-3xl mx-auto px-6 py-6 space-y-6 animate-fade-in">
@@ -191,7 +387,7 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
         <div className="py-2">
           <p className="text-xs mb-2" style={{ color: 'var(--text-tertiary)' }}>Client Portal</p>
           <h1 className="text-3xl md:text-4xl font-semibold" style={{ letterSpacing: '-0.03em', lineHeight: 1.1, color: 'var(--text-primary)' }}>
-            Kia ora, {firstName(data.client.contactPerson) || data.client.name}
+            Kia ora, {name}
           </h1>
           <p className="text-sm md:text-base mt-2 max-w-md" style={{ color: 'var(--text-secondary)' }}>
             View your projects, deliverables, and documents below.
@@ -200,153 +396,13 @@ export default function ClientPortalView({ data }: { data: PortalData }) {
 
         {/* Proposals come first: an open one is the only thing on this page
             waiting on the client. */}
-        {data.proposals.length > 0 && (
-          <div>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="stat-icon-bubble bubble-sm">
-                <ScrollText className="w-4 h-4" />
-              </div>
-              <div>
-                <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Proposals</h2>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-                  {data.proposals.some((p) => p.status === 'sent') ? 'Waiting on your answer' : `${data.proposals.length} proposal${data.proposals.length === 1 ? '' : 's'}`}
-                </p>
-              </div>
-            </div>
-            <div className="space-y-2">
-              {data.proposals.map((p) => {
-                const waiting = p.status === 'sent'
-                return (
-                  <a key={p.id} href={`/proposal/${p.token}`} className={`portal-proposal${waiting ? ' is-waiting' : ''}`}>
-                    <div className="min-w-0 flex-1">
-                      <p className="portal-proposal-name">{p.jobName}</p>
-                      <p className="portal-proposal-meta">
-                        {waiting ? `Sent ${formatDate(p.sentAt)}` : `${statusLabel(p.status)} ${formatDate(p.respondedAt)}`}
-                        {p.shootDate ? ` · Shoot ${formatDate(p.shootDate)}` : ''}
-                      </p>
-                    </div>
-                    <div className="portal-proposal-right">
-                      <span className="portal-proposal-total">{p.priceLabel ?? formatNZD(p.total)}</span>
-                      {waiting
-                        ? <span className="btn-primary btn-sm">Review <ArrowUpRight className="w-3.5 h-3.5" /></span>
-                        : <span className={`badge ${statusBadgeClass(p.status)}`}>{statusLabel(p.status)}</span>}
-                    </div>
-                  </a>
-                )
-              })}
-            </div>
-            {id.invoiceNote && (
-              <p className="text-xs mt-3" style={{ color: 'var(--text-tertiary)' }}>{id.invoiceNote}</p>
-            )}
-          </div>
-        )}
+        {proposalsBlock}
 
         {data.progress && <ContentProgress progress={data.progress} />}
 
-        <div>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="stat-icon-bubble bubble-sm">
-              <Briefcase className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Your Projects</h2>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{data.jobs.length} project{data.jobs.length === 1 ? '' : 's'}</p>
-            </div>
-          </div>
+        {projectsBlock}
 
-          {data.jobs.length === 0 ? (
-            <div className="card text-center py-12">
-              <Briefcase className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-tertiary)' }} />
-              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>No active projects</p>
-              <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>Your projects will appear here once they begin.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {data.jobs.map((job) => {
-                const isExpanded = expandedJob === job.id
-                const allFiles = job.deliverables.flatMap((d) => d.deliveryFiles)
-                return (
-                  <div key={job.id} className="card">
-                    <button
-                      onClick={() => setExpandedJob(isExpanded ? null : job.id)}
-                      className="flex items-center gap-3 w-full text-left"
-                    >
-                      {isExpanded ? (
-                        <ChevronDown className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
-                      ) : (
-                        <ChevronRight className="w-4 h-4 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{job.name}</h3>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <span className={`badge ${clientStatus(job.status).badge}`}>{clientStatus(job.status).label}</span>
-                          {job.jobType && <span className="badge badge-muted">{statusLabel(job.jobType)}</span>}
-                          {job.shootDate && <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{formatDate(job.shootDate)}</span>}
-                        </div>
-                      </div>
-                      {allFiles.length > 0 && (
-                        <span className="text-xs shrink-0 whitespace-nowrap" style={{ color: 'var(--text-tertiary)' }}>{allFiles.length} file{allFiles.length !== 1 ? 's' : ''}</span>
-                      )}
-                    </button>
-
-                    {isExpanded && (
-                      <div className="mt-4 space-y-4" style={{ borderTop: '1px solid var(--bg-border)', paddingTop: '16px' }}>
-                        {job.deliverables.length === 0 ? (
-                          <p className="text-sm py-4 text-center" style={{ color: 'var(--text-tertiary)' }}>No deliverables uploaded yet.</p>
-                        ) : (
-                          job.deliverables.map((d) => (
-                            <div key={d.id} className="space-y-3">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <Film className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-                                <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{d.title}</span>
-                                {d.completed && <span className="badge badge-success">Complete</span>}
-                                <span className="text-xs ml-auto" style={{ color: 'var(--text-tertiary)' }}>
-                                  {Math.max(d.revisionLimit - d.revisionsUsed, 0)} of {d.revisionLimit} revision{d.revisionLimit !== 1 ? 's' : ''} remaining
-                                </span>
-                              </div>
-                              {d.description && <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{d.description}</p>}
-
-                              {d.deliveryFiles.map((f) => (
-                                <FileCard key={f.id} file={f} jobId={job.id} portalToken={data.portalToken} onApprove={handleApprove} />
-                              ))}
-
-                              {d.deliveryFiles.length === 0 && (
-                                <p className="text-xs py-2" style={{ color: 'var(--text-tertiary)' }}>Files will appear here once uploaded.</p>
-                              )}
-
-                              {d.deliveryFiles.length > 0 && (
-                                <RevisionPanel deliverable={d} portalToken={data.portalToken} />
-                              )}
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {data.documents.length > 0 && (
-          <div>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="stat-icon-bubble bubble-sm">
-                <FileText className="w-4 h-4" />
-              </div>
-              <div>
-                <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Your Documents</h2>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{data.documents.length} document{data.documents.length === 1 ? '' : 's'}</p>
-              </div>
-            </div>
-            <div className="space-y-2">
-              {data.documents.map((doc) => (
-                <DocumentCard key={doc.id} doc={doc} portalToken={data.portalToken} />
-              ))}
-            </div>
-          </div>
-        )}
+        {documentsBlock}
 
         <div className="text-center pt-8 pb-4">
           <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>&copy; {new Date().getFullYear()} {id.displayName}</p>
@@ -436,12 +492,12 @@ function FileCard({ file, jobId, portalToken, onApprove }: { file: DeliveryFile;
               transform from the plan's quota, for a photo that is already
               sized and already on a CDN. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={file.fileUrl} alt={file.originalName} className="w-full" style={{ maxHeight: '70vh', objectFit: 'contain', background: '#060D1A', display: 'block' }} />
+          <img src={file.fileUrl} alt={file.originalName} className="w-full" style={{ maxHeight: '70vh', objectFit: 'contain', background: 'var(--media-bg, #060D1A)', display: 'block' }} />
         </a>
       )}
       {file.fileUrl && kind === 'pdf' && (
         <div className="media-band">
-          <iframe src={file.fileUrl} className="w-full" style={{ height: '70vh', background: '#060D1A', border: 0, display: 'block' }} />
+          <iframe src={file.fileUrl} className="w-full" style={{ height: '70vh', background: 'var(--media-bg, #060D1A)', border: 0, display: 'block' }} />
         </div>
       )}
       {file.fileUrl && kind === 'audio' && (
@@ -536,7 +592,7 @@ function RevisionPanel({ deliverable, portalToken }: { deliverable: Deliverable;
   }
 
   return (
-    <div className="rounded-lg p-4" style={{ background: 'var(--bg-elevated)' }}>
+    <div className="portal-revisions rounded-lg p-4" style={{ background: 'var(--bg-elevated)' }}>
       {deliverable.revisions.length > 0 && (
         <div className="space-y-2 mb-3">
           <p className="label">Revision history</p>

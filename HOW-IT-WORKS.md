@@ -421,6 +421,15 @@ signature block. Wherever price or payment comes up they also get one line:
 invoices are issued by Tui Media, Arlo's business name for invoicing. Nothing
 changes for Tui Media clients, and billing stays on the Tui Media Xero account.
 
+They also get arloradford.nz's look, not Tui Media's navy one: paper and ink,
+Gambetta headings with an italic word, General Sans, hairline rows, square ink
+buttons and the site's ink footer. That covers the portal, its sign-in pages,
+the proposal page and every client email. The page styles are in
+`app/portal/arlo-radford.css` (scoped under `.ar-theme`, so Tui Media pages
+can't pick them up) with the header and footer in `ArloRadfordChrome.tsx`; the
+email shell is `wrapArloRadford()` in `lib/email.ts`. If the site's colours or
+fonts change, change them in those two places too.
+
 A job can override its client's brand (`jobs.brand`, empty means "same as the
 client"); there is no field for it yet. Enquiries from arloradford.nz come in as
 Arlo Radford. Everything lives in `lib/brand.ts`, including

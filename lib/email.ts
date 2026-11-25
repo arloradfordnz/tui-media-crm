@@ -54,6 +54,9 @@ const C = {
   pill: '999px',
 } as const
 
+/* The heading's layout, shared with the Arlo Radford shell, which swaps it. */
+const HEADING_STYLE = 'margin:0 0 20px;font-size:26px;line-height:1.1;letter-spacing:-0.035em;'
+
 /** The one filled button. Pill, accent fill, accent-ink label — as on the site. */
 function button(href: string, label: string) {
   return `<div style="margin:28px 0 0;">
@@ -224,6 +227,7 @@ function invoiceLine(id: BrandIdentity) {
 }
 
 function wrap(body: string, signoff = SIGNOFF, preheader?: string, id: BrandIdentity = TUI) {
+  if (id.brand === 'arlo_radford') return wrapArloRadford(body, signoff, preheader)
   const preheaderHtml = preheader
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${C.paper};font-size:1px;line-height:1px;">${preheader}${'&#847;&zwnj;&nbsp;'.repeat(30)}</div>`
     : ''
@@ -282,6 +286,121 @@ function wrap(body: string, signoff = SIGNOFF, preheader?: string, id: BrandIden
               </td>
             </tr>
           </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`
+}
+
+/* ── Arlo Radford ─────────────────────────────────────────────────────────────
+   An Arlo Radford client's email looks like arloradford.nz: paper and ink,
+   Gambetta for the heading, General Sans for the rest, a square ink button
+   and the site's ink footer band with the wordmark. Tui Media's emails are
+   untouched by any of this.
+
+   The templates are written once, in Tui Media's palette (C). Rather than
+   thread a second palette through every template, the Arlo Radford shell
+   swaps C's literals for the site's on the finished body, along with the
+   corner radii, the button's weight and the heading face. Every colour in a
+   client email comes from C, so the swap is complete; a template that adds a
+   colour should add it to C. */
+const AR = {
+  paper: '#F6F4F0',
+  surface: '#ECE9E3',
+  ink: '#111111',
+  muted: '#4F4F4F',
+  faint: '#6E6C68',
+  mutedOnDark: '#9A9A9A',
+  rule: 'rgba(17, 17, 17, 0.16)',
+  display: "Gambetta,Georgia,'Times New Roman',serif",
+  sans: "'General Sans','Helvetica Neue',Helvetica,Arial,sans-serif",
+} as const
+
+const AR_SWAP: Record<string, string> = {
+  [C.paper]: AR.paper,
+  [C.surface]: AR.surface,
+  [C.ink]: AR.ink,
+  [C.muted]: AR.muted,
+  [C.faint]: AR.faint,
+  [C.accent]: AR.ink,
+  [C.accentInk]: AR.paper,
+  [C.error]: '#A3392D',
+  [C.rule]: AR.rule,
+  [`border-radius:${C.pill}`]: 'border-radius:0',
+  [`border-radius:${C.radius}`]: 'border-radius:0',
+  [`border-radius:${C.radiusSm}`]: 'border-radius:0',
+  /* the button's label: the site's 500, untracked */
+  'font-weight:600;font-size:14px;letter-spacing:-0.01em;': 'font-weight:500;font-size:14px;letter-spacing:0;',
+  [HEADING_STYLE]: `margin:0 0 22px;font-family:${AR.display};font-size:32px;line-height:1.1;letter-spacing:-0.02em;`,
+}
+const AR_SWAP_RE = new RegExp(
+  Object.keys(AR_SWAP).map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
+  'g',
+)
+function toArloRadford(html: string) {
+  return html.replace(AR_SWAP_RE, (m) => AR_SWAP[m] ?? m)
+}
+
+function wrapArloRadford(body: string, signoff: string, preheader?: string) {
+  const id = brandIdentity('arlo_radford')
+  const ASSETS = 'https://dashboard.tuimedia.nz'
+  const preheaderHtml = preheader
+    ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${AR.paper};font-size:1px;line-height:1px;">${preheader}${'&#847;&zwnj;&nbsp;'.repeat(30)}</div>`
+    : ''
+  const logoW = 150
+  const logoH = Math.round((logoW * id.logo.height) / id.logo.width)
+  const footW = 180
+  const footH = Math.round((footW * id.logo.height) / id.logo.width)
+  return `<!DOCTYPE html>
+<html lang="en" style="background:${AR.paper};margin:0;padding:0;">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light only" />
+    <meta name="supported-color-schemes" content="light only" />
+    <meta name="theme-color" content="${AR.paper}" />
+    <style>
+      @font-face { font-family:'General Sans'; font-style:normal; font-weight:400; font-display:swap; src:url(${ASSETS}/fonts/arlo-radford/general-sans-400.woff2) format('woff2'); }
+      @font-face { font-family:'General Sans'; font-style:normal; font-weight:500; font-display:swap; src:url(${ASSETS}/fonts/arlo-radford/general-sans-500.woff2) format('woff2'); }
+      @font-face { font-family:'Gambetta'; font-style:normal; font-weight:500; font-display:swap; src:url(${ASSETS}/fonts/arlo-radford/gambetta-500.woff2) format('woff2'); }
+      @font-face { font-family:'Gambetta'; font-style:italic; font-weight:500; font-display:swap; src:url(${ASSETS}/fonts/arlo-radford/gambetta-500-italic.woff2) format('woff2'); }
+      :root { color-scheme: light only; supported-color-schemes: light only; }
+      html, body { background:${AR.paper} !important; margin:0 !important; padding:0 !important; }
+      body, table, td, div, p, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+      @media (max-width: 600px) {
+        .gutter { padding-left:22px !important; padding-right:22px !important; }
+      }
+    </style>
+  </head>
+  <body bgcolor="${AR.paper}" style="background:${AR.paper};margin:0;padding:0;font-family:${AR.sans};color:${AR.ink};">
+    ${preheaderHtml}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${AR.paper}" style="background:${AR.paper};width:100%;margin:0;padding:0;">
+      <tr>
+        <td align="center" bgcolor="${AR.paper}" style="background:${AR.paper};padding:40px 0 56px;">
+          <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;margin:0 auto;">
+            <tr>
+              <td align="left" class="gutter" style="padding:0 40px 44px;">
+                <a href="${id.websiteUrl}" style="text-decoration:none;"><img src="${ASSETS}${id.logo.onLight}" alt="${id.displayName}" width="${logoW}" height="${logoH}" style="display:block;border:0;outline:none;text-decoration:none;" /></a>
+              </td>
+            </tr>
+            <tr>
+              <td class="gutter" style="padding:0 40px;font-family:${AR.sans};">
+                ${toArloRadford(`${body}${signoff}${NO_REPLY}`)}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td align="center" bgcolor="${AR.ink}" style="background:${AR.ink};padding:44px 24px 36px;font-family:${AR.sans};">
+          <a href="${id.websiteUrl}" style="text-decoration:none;"><img src="${ASSETS}${id.logo.onDark}" alt="${id.displayName}" width="${footW}" height="${footH}" style="display:block;margin:0 auto;border:0;outline:none;text-decoration:none;" /></a>
+          <p style="margin:24px 0 0;font-size:14px;line-height:1.6;">
+            <a href="${id.websiteUrl}" style="color:${AR.paper};text-decoration:none;">${id.website}</a>
+            <span style="color:${AR.mutedOnDark};">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
+            <a href="https://www.instagram.com/arloradford" style="color:${AR.paper};text-decoration:none;">Instagram</a>
+          </p>
+          <p style="margin:14px 0 0;font-size:13px;line-height:1.6;color:${AR.mutedOnDark};">&copy; ${new Date().getFullYear()} Arlo Radford &middot; Nelson, New Zealand</p>
         </td>
       </tr>
     </table>
@@ -356,10 +475,12 @@ function bodyToHtml(body: string): string {
 /* Headings sit at the site's own weight and tracking rather than a browser
    default: 500, tight letter-spacing, near-1 leading. */
 function heading(text: string): string {
-  return `<h2 style="margin:0 0 20px;font-size:26px;line-height:1.1;letter-spacing:-0.035em;color:${C.ink};font-weight:500;">${text}</h2>`
+  return `<h2 style="${HEADING_STYLE}color:${C.ink};font-weight:500;">${text}</h2>`
 }
 
 function buildGreeting(clientName?: string, id: BrandIdentity = TUI): string {
+  /* arloradford.nz sets the accent word in italic ("Kia ora, <em>Sam</em>"). */
+  if (id.brand === 'arlo_radford' && clientName) return heading(`Kia ora <em style="font-style:italic;">${esc(clientName)}</em>,`)
   return heading(id.greeting(clientName ? esc(clientName) : null))
 }
 
