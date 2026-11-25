@@ -152,9 +152,9 @@ export default async function LeadsPage() {
       ) : (
         <div className="dash-stack">
           <Section title="Reply" hint="they wrote last" leads={reply} today={today} />
-          <Section title="Nudge" hint={`a week or more since you wrote, warm first`} leads={nudge} today={today} />
+          <Section title="Nudge" hint={`a week since you wrote and still worth one more, warm first`} leads={nudge} today={today} />
           <Section title="Later" hint="back on the date shown" leads={later} today={today} />
-          <Section title="Gone quiet" hint="three emails with no reply, or nothing for 3 months" leads={quiet} today={today} open={false} />
+          <Section title="Gone quiet" hint="pitches with no reply after one nudge, threads that went silent, ones you left" leads={quiet} today={today} open={false} />
           <Section title="Dropped" hint="won't come back on their own" leads={dropped} today={today} open={false} />
         </div>
       )}

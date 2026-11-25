@@ -23,8 +23,12 @@ const SYNC_EVERY_MS = 60 * 60 * 1000
 
 /** Days after Arlo's last email before a lead is due a nudge. */
 export const NUDGE_AFTER_DAYS = 7
-/** A pitch nudged this many times with nothing back has gone quiet. */
-const QUIET_AFTER_EMAILS = 3
+/** A pitch nobody answered gets one nudge, in this window after it went out. */
+const PITCH_NUDGE_UNTIL_DAYS = 21
+/** Arlo wrote last and heard nothing back for this long: it has gone quiet. */
+const NO_ANSWER_AFTER_DAYS = 30
+/** They wrote last and Arlo left it this long: he chose not to reply. */
+const LEFT_AFTER_DAYS = 14
 /** No mail either way for this long and a lead has gone quiet. */
 const QUIET_AFTER_DAYS = 90
 
@@ -72,18 +76,36 @@ export function stageOf(row: LeadRow, today: string): Lead {
   const inAt = row.last_in_at ? Date.parse(row.last_in_at) : 0
   const outAt = row.last_out_at ? Date.parse(row.last_out_at) : 0
   const todayAt = Date.parse(`${today}T00:00:00Z`)
-  // Nothing either way for months: not worth a nudge out of the blue. Later
-  // still brings one back, because a follow-up date outranks this.
-  if (!row.follow_up_on && todayAt - Math.max(inAt, outAt) > QUIET_AFTER_DAYS * 86400000) {
-    return { ...base, stage: 'quiet', dueOn: null }
-  }
-  // They wrote last and nobody has answered: that is not a nudge, it's a reply.
-  if (inAt > outAt && !row.follow_up_on) return { ...base, stage: 'reply', dueOn: row.last_in_at!.slice(0, 10) }
+  const daysSince = (t: number) => (todayAt - t) / 86400000
+  const quiet = { ...base, stage: 'quiet' as const, dueOn: null }
+  // A follow-up date Arlo set outranks every rule below: it comes back then.
+  if (row.follow_up_on) return { ...base, stage: row.follow_up_on <= today ? 'nudge' : 'later', dueOn: row.follow_up_on }
 
-  const dueOn = row.follow_up_on ?? (row.last_out_at ? addDays(row.last_out_at, NUDGE_AFTER_DAYS) : today)
-  if (!row.follow_up_on && row.messages_in === 0 && row.messages_out >= QUIET_AFTER_EMAILS) {
-    return { ...base, stage: 'quiet', dueOn: null }
+  // Nothing either way for months: not worth a nudge out of the blue.
+  if (daysSince(Math.max(inAt, outAt)) > QUIET_AFTER_DAYS) return quiet
+
+  // Warm is Arlo saying "this one's real" (a booking for next year can sit
+  // quiet for weeks), so the time-outs below are for cold leads and pitches.
+  const warm = row.temperature === 'warm'
+
+  // They wrote last. Fresh, it needs a reply; a cold one left a fortnight,
+  // Arlo has chosen not to answer, so it isn't a live lead any more.
+  if (inAt > outAt) {
+    if (!warm && daysSince(inAt) > LEFT_AFTER_DAYS) return quiet
+    return { ...base, stage: 'reply', dueOn: row.last_in_at!.slice(0, 10) }
   }
+
+  // A cold pitch nobody has answered is not a lead yet. It earns one nudge a
+  // week after it went out; once that's sent, or the window has passed, it
+  // has had its chance.
+  if (row.messages_in === 0) {
+    if (row.messages_out >= 2 || daysSince(outAt) > PITCH_NUDGE_UNTIL_DAYS) return quiet
+  } else if (!warm && daysSince(outAt) > NO_ANSWER_AFTER_DAYS) {
+    // A real conversation where Arlo wrote last and they went silent.
+    return quiet
+  }
+
+  const dueOn = row.last_out_at ? addDays(row.last_out_at, NUDGE_AFTER_DAYS) : today
   return { ...base, stage: dueOn <= today ? 'nudge' : 'later', dueOn }
 }
 
